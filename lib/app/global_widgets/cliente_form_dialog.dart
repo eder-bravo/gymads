@@ -209,36 +209,35 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
                             color: Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                             child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.nfc, color: hasRfid ? AppColors.accent : AppColors.textSecondary, size: 28),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            hasRfid ? 'Tarjeta vinculada' : 'Acerca la tarjeta al lector...',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: hasRfid ? AppColors.textPrimary : AppColors.textSecondary,
-                                            ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.nfc, color: hasRfid ? AppColors.accent : AppColors.textSecondary, size: 28),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          hasRfid ? 'Tarjeta vinculada' : 'Acerca la tarjeta al lector...',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: hasRfid ? AppColors.textPrimary : AppColors.textSecondary,
                                           ),
-                                          if (hasRfid) ...[
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'ID: ${widget.rfidController.text}',
-                                              style: TextStyle(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w500),
-                                            ),
-                                          ]
-                                        ],
-                                      ),
+                                        ),
+                                        if (hasRfid) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'ID: ${widget.rfidController.text}',
+                                            style: TextStyle(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w500),
+                                          ),
+                                        ]
+                                      ],
                                     ),
-                                    Icon(hasRfid ? Icons.check_circle : Icons.nfc, color: hasRfid ? AppColors.accent : AppColors.textSecondary, size: 20),
-                                  ],
-                                ),
+                                  ),
+                                  Icon(hasRfid ? Icons.check_circle : Icons.nfc, color: hasRfid ? AppColors.accent : AppColors.textSecondary, size: 20),
+                                ],
                               ),
                             ),
                           ),

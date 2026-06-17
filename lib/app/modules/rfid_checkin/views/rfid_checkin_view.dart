@@ -42,6 +42,7 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
               userName: controller.userName.value,
               userPhotoUrl: controller.userPhotoUrl.value,
               daysLeft: controller.daysLeft.value,
+              expirationDate: controller.expirationDate.value,
               isVisible: controller.isShowingDialog.value,
             )),
           ],

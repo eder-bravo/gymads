@@ -24,7 +24,7 @@ class ClienteCard extends StatelessWidget {
     final dateFormatter = DateFormat('dd/MM/yyyy');
     final String expirationDateText = cliente.expirationDate != null
         ? dateFormatter.format(cliente.expirationDate!)
-        : 'Sin fecha de expiración';
+        : 'Sin límite de fecha';
 
     // Determinar colores según el estado
     final bool isExpired =
@@ -175,46 +175,22 @@ class ClienteCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Nombre del cliente con badge de ID
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    cliente.name,
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.backgroundColor,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    cliente.userNumber,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textHint,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            // Nombre del cliente
+                            Text(
+                              cliente.name,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 8),
 
                             _buildInfoRow(
                               Icons.event_available_rounded,
-                              'Expira: $expirationDateText',
+                              'Puede entrar hasta: $expirationDateText',
                               primaryColor,
                             ),
                             const SizedBox(height: 8),

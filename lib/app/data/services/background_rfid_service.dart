@@ -32,6 +32,9 @@ class BackgroundRfidService extends GetxService {
   String? _lastScannedCard;
   static const _scanCooldown = Duration(seconds: 3);
 
+  // Guard para evitar peticiones concurrentes
+  bool _isChecking = false;
+
   /// Método para mostrar notificación usando el ScaffoldMessenger global
   void _showSnackbarSafe(String title, String message, {bool isError = false}) {
     if (kDebugMode) {
@@ -97,6 +100,7 @@ class BackgroundRfidService extends GetxService {
   // Usuario actual escaneado
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
   final showWelcomeDialog = false.obs;
+  final showNotFoundDialog = false.obs;
 
   @override
   void onInit() {
@@ -126,14 +130,14 @@ class BackgroundRfidService extends GetxService {
     // Cargar configuración de RFID (IP, etc) si es necesario
     await RfidConfig.loadConfig();
 
-    // Iniciar polling cada 500ms (medio segundo)
+    // Iniciar polling cada 1.5 segundos
     _pollingTimer =
-        Timer.periodic(const Duration(milliseconds: 500), (timer) async {
+        Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
       await _checkForCard();
     });
 
     if (kDebugMode) {
-      print('✅ Escaneo RFID en segundo plano iniciado (polling cada 500ms)');
+      print('✅ Escaneo RFID en segundo plano iniciado (polling cada 1.5s)');
     }
   }
 
@@ -181,6 +185,10 @@ class BackgroundRfidService extends GetxService {
 
   /// Verificar si hay una tarjeta disponible
   Future<void> _checkForCard() async {
+    // Evitar peticiones concurrentes si la anterior no ha terminado
+    if (_isChecking) return;
+    _isChecking = true;
+
     try {
       // Si el servicio está pausado, no hacer nada
       if (isPaused.value) {
@@ -188,10 +196,6 @@ class BackgroundRfidService extends GetxService {
       }
 
       final uid = await RfidReaderService.checkForCard();
-
-      if (kDebugMode) {
-        print('🔍 Polling RFID: $uid');
-      }
 
       if (uid == null || uid.isEmpty || uid == 'NO_CARD') {
         return;
@@ -220,6 +224,8 @@ class BackgroundRfidService extends GetxService {
       if (kDebugMode) {
         print('❌ Error en escaneo de fondo: $e');
       }
+    } finally {
+      _isChecking = false;
     }
   }
 
@@ -284,57 +290,24 @@ class BackgroundRfidService extends GetxService {
       verificationType: 'rfid',
     );
 
-    // Mostrar notificación de denegado
-    _showDeniedNotification('Usuario no registrado');
+    // Ya no mostramos la notificación inferior (tarjetita roja) por petición del usuario
 
-    // Mostrar diálogo para agregar cliente
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: const Color(0xFF1E1E2E), // AppColors.cardBackground
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Tarjeta No Registrada',
-          style: TextStyle(
-            color: Colors.white, // AppColors.titleColor
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Text(
-          'La tarjeta escaneada ($uid) no pertenece a ningún cliente.\n\n¿Deseas registrar un nuevo cliente con esta tarjeta?',
-          style: const TextStyle(color: Colors.white70), // AppColors.textPrimary
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(
-                color: Colors.grey, // AppColors.textSecondary
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back(); // Cerrar diálogo
-              // Navegar a clientes pasando el RFID como argumento
-              Get.toNamed(Routes.CLIENTES, arguments: {'new_rfid': uid});
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1DB954), // AppColors.accent
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'Agregar Cliente',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
+    // Mostrar pantalla completa de tarjeta no registrada
+    final currentRoute = Get.currentRoute;
+    if (currentRoute == Routes.HOME || currentRoute == '/') {
+      showNotFoundDialog.value = true;
+
+      // Cerrar después de 6 segundos
+      await Future.delayed(const Duration(seconds: 6));
+      showNotFoundDialog.value = false;
+    } else {
+      // Si no estamos en home, podríamos usar la notificación o un diálogo, 
+      // pero el usuario especificó "pantalla completa".
+      // Vamos a habilitar la pantalla completa también asumiendo que el widget está en el home
+      showNotFoundDialog.value = true;
+      await Future.delayed(const Duration(seconds: 6));
+      showNotFoundDialog.value = false;
+    }
   }
 
   /// Manejar usuario inactivo

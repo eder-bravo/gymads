@@ -6,7 +6,7 @@ import 'dart:convert';
 /// Configuración simplificada del lector RFID ESP32 con IP manual
 class RfidConfig {
   // ⭐ CAMBIAR ESTA IP POR LA DEL ESP32 ⭐
-  static const String DEFAULT_ESP32_IP = '192.168.1.109';
+  static const String DEFAULT_ESP32_IP = '192.168.100.109';
 
   static const String _urlKey = 'esp32_api_url';
   static String? _currentUrl;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:intl/intl.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import '../../../core/widgets/cached_user_image.dart';
 
@@ -7,22 +8,28 @@ class WelcomeScreenWidget extends StatefulWidget {
   final String userName;
   final String userPhotoUrl;
   final int daysLeft;
+  final DateTime? expirationDate;
   final bool isVisible;
   final bool isExpired;
+  final bool isNotFound;
   final VoidCallback? onClose;
   final VoidCallback? onAbonar;
   final VoidCallback? onEditar;
+  final VoidCallback? onRegister; // Para cuando no se encuentra tarjeta
 
   const WelcomeScreenWidget({
     super.key,
     required this.userName,
     required this.userPhotoUrl,
     required this.daysLeft,
+    this.expirationDate,
     required this.isVisible,
     this.isExpired = false,
+    this.isNotFound = false,
     this.onClose,
     this.onAbonar,
     this.onEditar,
+    this.onRegister,
   });
 
   @override
@@ -129,11 +136,13 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                             child: Transform.translate(
                               offset: Offset(0, 20 * (1 - value)),
                               child: Text(
-                                widget.isExpired ? 'Membresía Vencida' : '¡Bienvenido!',
+                                widget.isNotFound 
+                                    ? 'Tarjeta No Registrada' 
+                                    : (widget.isExpired ? 'Membresía Vencida' : '¡Bienvenido!'),
                                 style: TextStyle(
-                                  fontSize: titleSize,
+                                  fontSize: widget.isNotFound ? (isTabletSize ? 50.0 : (isSmallPhone ? 30.0 : 40.0)) : titleSize,
                                   fontWeight: FontWeight.bold,
-                                  color: widget.isExpired ? Colors.redAccent : Colors.white,
+                                  color: widget.isNotFound ? Colors.redAccent : (widget.isExpired ? Colors.redAccent : Colors.white),
                                   shadows: [
                                     Shadow(
                                       color: Colors.black.withOpacity(0.5),
@@ -167,7 +176,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   height: (photoSize + 20) * value,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: (widget.isExpired ? Colors.red : AppColors.primary).withOpacity(0.2),
+                                    color: (widget.isNotFound || widget.isExpired ? Colors.red : AppColors.primary).withOpacity(0.2),
                                   ),
                                 ),
                                 // Aura interior
@@ -176,7 +185,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   height: (photoSize + 10) * value,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: (widget.isExpired ? Colors.redAccent : AppColors.accent).withOpacity(0.3),
+                                    color: (widget.isNotFound || widget.isExpired ? Colors.redAccent : AppColors.accent).withOpacity(0.3),
                                   ),
                                 ),
                                 // Foto
@@ -191,29 +200,39 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: (widget.isExpired ? Colors.red : AppColors.primary).withOpacity(0.5),
+                                        color: (widget.isNotFound || widget.isExpired ? Colors.red : AppColors.primary).withOpacity(0.5),
                                         spreadRadius: 5,
                                         blurRadius: 15,
                                       ),
                                     ],
                                   ),
-                                  child: widget.userPhotoUrl.isNotEmpty
-                                      ? CachedUserImage(
-                                          imageUrl: widget.userPhotoUrl,
-                                          userName: widget.userName,
-                                          size: photoSize * value,
-                                          isCircular: true,
-                                          fit: BoxFit.cover,
-                                        )
-                                      : CircleAvatar(
+                                  child: widget.isNotFound
+                                      ? CircleAvatar(
                                           radius: photoSize/2 * value,
-                                          backgroundColor: widget.isExpired ? Colors.red : AppColors.primary,
+                                          backgroundColor: Colors.red,
                                           child: Icon(
-                                            Icons.person,
-                                            size: photoSize/3 * value,
+                                            Icons.contactless_outlined,
+                                            size: photoSize/2.5 * value,
                                             color: Colors.white,
                                           ),
-                                        ),
+                                        )
+                                      : (widget.userPhotoUrl.isNotEmpty
+                                          ? CachedUserImage(
+                                              imageUrl: widget.userPhotoUrl,
+                                              userName: widget.userName,
+                                              size: photoSize * value,
+                                              isCircular: true,
+                                              fit: BoxFit.cover,
+                                            )
+                                          : CircleAvatar(
+                                              radius: photoSize/2 * value,
+                                              backgroundColor: widget.isExpired ? Colors.red : AppColors.primary,
+                                              child: Icon(
+                                                Icons.person,
+                                                size: photoSize/3 * value,
+                                                color: Colors.white,
+                                              ),
+                                            )),
                                 ),
                               ],
                             ),
@@ -234,9 +253,9 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                             child: Transform.translate(
                               offset: Offset(0, 30 * (1 - value)),
                               child: Text(
-                                widget.userName,
+                                widget.isNotFound ? 'ID: ${widget.userName}' : widget.userName,
                                 style: TextStyle(
-                                  fontSize: nameSize,
+                                  fontSize: widget.isNotFound ? (nameSize * 0.7) : nameSize,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                 ),
@@ -248,7 +267,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                       ),
                       SizedBox(height: isSmallPhone ? 12 : 16),
                       
-
+                      if (!widget.isNotFound)
                       // Días restantes con animación de entrada
                       TweenAnimationBuilder<double>(
                         tween: Tween(begin: 0.0, end: 1.0),
@@ -269,23 +288,40 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   color: Colors.white.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(15),
                                 ),
-                                child: Row(
+                                child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(
-                                      Icons.event_available,
-                                      color: Colors.white,
-                                      size: isTabletSize ? 28 : 24,
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.event_available,
+                                          color: Colors.white,
+                                          size: isTabletSize ? 28 : 24,
+                                        ),
+                                        SizedBox(width: isTabletSize ? 12 : 8),
+                                        Text(
+                                          widget.isExpired ? '0 días restantes' : '${widget.daysLeft} días restantes',
+                                          style: TextStyle(
+                                            fontSize: infoTextSize,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    SizedBox(width: isTabletSize ? 12 : 8),
-                                    Text(
-                                      widget.isExpired ? '0 días restantes' : '${widget.daysLeft} días restantes',
-                                      style: TextStyle(
-                                        fontSize: infoTextSize,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
+                                    if (widget.expirationDate != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 8.0),
+                                        child: Text(
+                                          'Hasta qué fecha puede entrar: ${DateFormat('dd/MM/yyyy').format(widget.expirationDate!)}',
+                                          style: TextStyle(
+                                            fontSize: infoTextSize * 0.85,
+                                            color: Colors.white.withOpacity(0.9),
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
                                       ),
-                                    ),
                                   ],
                                 ),
                               ),
@@ -304,17 +340,19 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                           final safeOpacity = value.clamp(0.0, 1.0);
                           return Opacity(
                             opacity: safeOpacity,
-                            child: Text(
-                              widget.isExpired ? '¡Por favor pasa a recepción!' : '¡Que tengas un excelente entrenamiento!',
-                              style: TextStyle(
-                                fontSize: isTabletSize
-                                    ? 20.0
-                                    : (isSmallPhone ? 14.0 : 16.0),
-                                color: Colors.white.withOpacity(0.8),
-                                fontStyle: FontStyle.italic,
+                              child: Text(
+                                widget.isNotFound 
+                                    ? 'Acude a recepción para registrar tu acceso'
+                                    : (widget.isExpired ? '¡Por favor pasa a recepción!' : '¡Que tengas un excelente entrenamiento!'),
+                                style: TextStyle(
+                                  fontSize: isTabletSize
+                                      ? 20.0
+                                      : (isSmallPhone ? 14.0 : 16.0),
+                                  color: Colors.white.withOpacity(0.8),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              textAlign: TextAlign.center,
-                            ),
                           );
                         }
                       ),
@@ -332,7 +370,20 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                if (widget.onAbonar != null)
+                                if (widget.isNotFound && widget.onRegister != null)
+                                  ElevatedButton.icon(
+                                    onPressed: widget.onRegister,
+                                    icon: const Icon(Icons.person_add, color: Colors.white),
+                                    label: const Text('Registrar', style: TextStyle(color: Colors.white)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.accent,
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                if (!widget.isNotFound && widget.onAbonar != null)
                                   ElevatedButton.icon(
                                     onPressed: widget.onAbonar,
                                     icon: const Icon(Icons.payment, color: Colors.white),
@@ -345,9 +396,9 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                       ),
                                     ),
                                   ),
-                                if (widget.onAbonar != null && widget.onEditar != null)
+                                if (!widget.isNotFound && widget.onAbonar != null && widget.onEditar != null)
                                   const SizedBox(width: 16),
-                                if (widget.onEditar != null)
+                                if (!widget.isNotFound && widget.onEditar != null)
                                   ElevatedButton.icon(
                                     onPressed: widget.onEditar,
                                     icon: const Icon(Icons.edit, color: Colors.white),

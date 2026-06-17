@@ -35,6 +35,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
   final daysLeft = 0.obs;
   final userPhotoUrl = ''.obs;
   final membershipType = ''.obs;
+  final expirationDate = Rx<DateTime?>(null);
   
   // Timer para verificar periódicamente la tarjeta RFID
   Timer? _rfidCheckTimer;
@@ -272,6 +273,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         userName.value = user.name;
         daysLeft.value = user.daysRemaining;
         userPhotoUrl.value = user.photoUrl ?? '';
+        expirationDate.value = user.expirationDate;
         
         // Reproducir sonido y mostrar bienvenida
         AudioService.playWelcomeSound();
@@ -312,6 +314,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         userName.value = user.name;
         daysLeft.value = user.daysRemaining;
         userPhotoUrl.value = user.photoUrl ?? '';
+        expirationDate.value = user.expirationDate;
         
         // Reproducir sonido y mostrar bienvenida
         AudioService.playWelcomeSound();

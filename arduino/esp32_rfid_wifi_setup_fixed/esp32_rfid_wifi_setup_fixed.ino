@@ -36,8 +36,11 @@
 
 // =================== CONFIGURACIÓN WIFI ===================
 // TODO: Cambiar estas credenciales por las de tu red WiFi
-const char* WIFI_SSID = "TD Campus_C";
-const char* WIFI_PASSWORD = "1Gestudio";
+//const char* WIFI_SSID = "TD Campus_C";
+//const char* WIFI_PASSWORD = "1Gestudio";
+
+const char* WIFI_SSID = "Totalplay-2.4G-2368";
+const char* WIFI_PASSWORD = "N5q6aS55GGjDsYt7";
 
 // =================== CONFIGURACIÓN DE ESCANEO RFID ===================
 // Intervalo mínimo entre lecturas de la misma tarjeta (en milisegundos)
@@ -48,8 +51,8 @@ const unsigned long CARD_READ_INTERVAL_MS = 3000;
 // =================== CONFIGURACIÓN DE IP ESTÁTICA ===================
 // Configuración de IP estática
 bool useStaticIP = true;  // Establecer a false para usar DHCP
-IPAddress staticIP(192, 168, 1, 109);  // IP estática que quieres asignar al ESP32
-IPAddress gateway(192, 168, 1, 1);     // IP del router (puerta de enlace) - CORREGIDO
+IPAddress staticIP(192, 168, 100, 109);  // IP estática que quieres asignar al ESP32
+IPAddress gateway(192, 168, 100, 1);     // IP del router (puerta de enlace) - CORREGIDO
 IPAddress subnet(255, 255, 255, 0);    // Máscara de subred
 IPAddress dns(8, 8, 8, 8);             // Servidor DNS (Google)
 
@@ -134,7 +137,12 @@ void setup() {
     .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,  // Monitorear todos los cores
     .trigger_panic = true  // Reinicio automático habilitado
   };
-  esp_task_wdt_init(&wdt_config);
+  
+  esp_err_t err = esp_task_wdt_init(&wdt_config);
+  if (err != ESP_OK) {
+    // Si ya estaba inicializado, intentamos reconfigurarlo al nuevo timeout
+    esp_task_wdt_reconfigure(&wdt_config);
+  }
   esp_task_wdt_add(NULL);  // Añadir la tarea actual al WDT
 
   // Configurar LEDs
@@ -169,8 +177,8 @@ void setup() {
     Serial.print(".");
     Serial.println((versiondata >> 8) & 0xFF);
     nfc->SAMConfig();
-    // Configurar reintentos bajos para evitar bloqueo del loop y desconexiones WiFi
-    nfc->setPassiveActivationRetries(0x02);
+    // Configurar reintentos MUY bajos para NO bloquear el loop y que el servidor HTTP responda
+    nfc->setPassiveActivationRetries(0x01);
   }
 
   // Conectar a WiFi
@@ -208,14 +216,14 @@ void loop() {
   
   unsigned long currentMillis = millis();
   
-  // Heartbeat LED (parpadeo cada segundo para indicar que el sistema está vivo)
+  // Heartbeat LED (sin delay bloqueante)
   if (currentMillis - lastHeartbeat >= HEARTBEAT_INTERVAL) {
     lastHeartbeat = currentMillis;
-    // Parpadear LED WiFi brevemente si está conectado
     if (wifiConnected) {
-      digitalWrite(LED_WIFI, LOW);
-      delay(50);
-      digitalWrite(LED_WIFI, HIGH);
+      // Toggle rápido sin delay
+      static bool heartbeatState = true;
+      heartbeatState = !heartbeatState;
+      digitalWrite(LED_WIFI, heartbeatState ? HIGH : LOW);
     }
   }
   
@@ -411,11 +419,13 @@ void connectToWiFi() {
   }
   
   // Iniciar conexión
+  WiFi.setAutoReconnect(true);  // Habilitar reconexión automática del stack WiFi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   // LED parpadeando durante conexión
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    esp_task_wdt_reset(); // Alimentar el watchdog durante la espera
     delay(500);
     Serial.print(".");
     digitalWrite(LED_WIFI, !digitalRead(LED_WIFI)); // Parpadeo

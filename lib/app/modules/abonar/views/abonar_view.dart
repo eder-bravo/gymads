@@ -127,7 +127,7 @@ class AbonarView extends GetView<AbonarController> {
                         style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
                       ),
                       subtitle: Text(
-                        'ID: ${client.userNumber} | Tel: ${client.phone}',
+                        'Tel: ${client.phone}',
                         style: const TextStyle(color: AppColors.textSecondary),
                       ),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.accent),
@@ -350,7 +350,7 @@ class AbonarView extends GetView<AbonarController> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Nueva Fecha de Expiración',
+                                  'Hasta qué fecha puede entrar',
                                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                                 ),
                                 Text(

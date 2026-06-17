@@ -23,13 +23,11 @@ class RfidReaderService {
         return null;
       }
       
-      if (kDebugMode) {
-        print('Verificando tarjeta RFID en: $baseUrl/uid');
-      }
+
 
       final response = await http.get(
         Uri.parse('$baseUrl/uid'),
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
         final responseText = response.body.trim();
@@ -77,13 +75,10 @@ class RfidReaderService {
         return null;
       }
       
-      if (kDebugMode) {
-        print('🔇 Verificando tarjeta RFID (modo silencioso): $baseUrl/uid_only');
-      }
 
       final response = await http.get(
         Uri.parse('$baseUrl/uid_only'),
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
         final responseText = response.body.trim();

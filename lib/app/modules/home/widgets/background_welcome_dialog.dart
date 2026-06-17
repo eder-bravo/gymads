@@ -18,6 +18,23 @@ class BackgroundWelcomeDialog extends StatelessWidget {
       final service = Get.find<BackgroundRfidService>();
       
       return Obx(() {
+        // Primero verificamos si debemos mostrar la pantalla de tarjeta no registrada
+        if (service.showNotFoundDialog.value) {
+          return WelcomeScreenWidget(
+            userName: service.lastScannedUid.value, // Mostrar el UID de la tarjeta
+            userPhotoUrl: '',
+            daysLeft: 0,
+            isVisible: true,
+            isExpired: false,
+            isNotFound: true,
+            onRegister: () {
+              service.showNotFoundDialog.value = false;
+              Get.toNamed('/clientes', arguments: {'new_rfid': service.lastScannedUid.value});
+            },
+          );
+        }
+
+        // Si no, verificamos el diálogo de bienvenida normal
         if (!service.showWelcomeDialog.value || service.currentUser.value == null) {
           return const SizedBox.shrink();
         }
@@ -28,8 +45,10 @@ class BackgroundWelcomeDialog extends StatelessWidget {
           userName: user.name,
           userPhotoUrl: user.photoUrl ?? '',
           daysLeft: user.daysRemaining,
+          expirationDate: user.expirationDate,
           isVisible: service.showWelcomeDialog.value,
           isExpired: user.daysRemaining <= 0 || !user.isActive,
+          isNotFound: false,
           onAbonar: (user.daysRemaining <= 0 || !user.isActive) ? () {
             service.showWelcomeDialog.value = false;
             Get.toNamed('/abonar', arguments: {'cliente': user});

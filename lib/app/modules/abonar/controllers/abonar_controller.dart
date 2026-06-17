@@ -36,7 +36,7 @@ class AbonarController extends GetxController {
   final paymentMethod = 'Efectivo'.obs;
   
   final paymentMethods = ['Efectivo', 'Tarjeta', 'Transferencia'];
-  final durationTypes = ['Meses', 'Semanas', 'Días'];
+  final durationTypes = ['Meses', 'Semanas', 'Días', 'Años'];
 
   final isLoading = false.obs;
   final isSuccess = false.obs;
@@ -230,6 +230,8 @@ class AbonarController extends GetxController {
         return baseDate.add(Duration(days: durationValue * 7));
       case 'Días':
         return baseDate.add(Duration(days: durationValue));
+      case 'Años':
+        return baseDate.add(Duration(days: durationValue * 365));
       default:
         return baseDate.add(Duration(days: 30));
     }

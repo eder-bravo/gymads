@@ -22,6 +22,7 @@ class ChecadorController extends GetxController {
   final daysLeft = 0.obs;
   final userPhotoUrl = ''.obs;
   final membershipType = ''.obs;
+  final expirationDate = Rx<DateTime?>(null);
   final isLoading = false.obs;
   final errorMessage = ''.obs;
   
@@ -242,6 +243,7 @@ class ChecadorController extends GetxController {
         userName.value = user.name;
         daysLeft.value = user.daysRemaining;
         userPhotoUrl.value = user.photoUrl ?? '';
+        expirationDate.value = user.expirationDate;
 
         // Siempre es entrada (sin salidas)
         const nextAccessType = 'entrada';

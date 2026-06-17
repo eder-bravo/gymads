@@ -281,14 +281,6 @@ class AccessLogsView extends GetView<AccessLogsController> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Usuario: ${log.userNumber}',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
                     'Staff: ${log.staffUser}',
                     style: TextStyle(
                       color: AppColors.textSecondary,

@@ -35,6 +35,37 @@ class IngresosController extends GetxController {
   final List<String> conceptos = ['registro', 'renovacion', 'producto'];
   final List<String> metodosPago = ['efectivo', 'tarjeta', 'transferencia'];
 
+  // Nombres de meses en español (evita depender de locale de intl)
+  static const List<String> nombresMeses = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ];
+
+  static const List<String> nombresMesesCortos = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+
   @override
   void onInit() {
     super.onInit();
@@ -235,6 +266,52 @@ class IngresosController extends GetxController {
   /// Formatea un número como moneda
   String formatCurrency(double amount) {
     return '\$${amount.toStringAsFixed(2)}';
+  }
+
+  /// Etiqueta del mes seleccionado, ej: "Mayo 2026"
+  String get mesSeleccionadoLabel {
+    final f = fechaInicio.value ?? DateTime.now();
+    return '${nombresMeses[f.month - 1]} ${f.year}';
+  }
+
+  /// Solo el nombre del mes seleccionado, ej: "mayo"
+  String get nombreMesSeleccionado {
+    final f = fechaInicio.value ?? DateTime.now();
+    return nombresMeses[f.month - 1].toLowerCase();
+  }
+
+  /// Formatea una fecha de forma corta en español, ej: "27 may"
+  String formatFechaCorta(DateTime date) {
+    return '${date.day} ${nombresMesesCortos[date.month - 1]}';
+  }
+
+  /// Indica si se puede avanzar al mes siguiente (no permite meses futuros)
+  bool get puedeAvanzarMes {
+    final f = fechaInicio.value ?? DateTime.now();
+    final now = DateTime.now();
+    return f.year < now.year || (f.year == now.year && f.month < now.month);
+  }
+
+  void _setMonth(int year, int month) {
+    selectedPeriodo.value = 'mes';
+    fechaInicio.value = DateTime(year, month, 1);
+    fechaFin.value = DateTime(year, month + 1, 0, 23, 59, 59);
+    refreshData();
+  }
+
+  /// Navega al mes anterior
+  void goToPreviousMonth() {
+    final f = fechaInicio.value ?? DateTime.now();
+    final prev = DateTime(f.year, f.month - 1, 1);
+    _setMonth(prev.year, prev.month);
+  }
+
+  /// Navega al mes siguiente (si no es futuro)
+  void goToNextMonth() {
+    if (!puedeAvanzarMes) return;
+    final f = fechaInicio.value ?? DateTime.now();
+    final next = DateTime(f.year, f.month + 1, 1);
+    _setMonth(next.year, next.month);
   }
 
   /// Obtiene el color para un concepto

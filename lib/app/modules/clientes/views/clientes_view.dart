@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/global_widgets/cliente_card.dart';
-import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/core/utils/responsive_utils.dart';
 import 'cliente_detail_view.dart';
@@ -125,8 +124,6 @@ class ClientesView extends GetView<ClientesController> {
                       return ClienteCard(
                         cliente: cliente,
                         onTap: () => _showClienteDetails(cliente),
-                        onEdit: () => _showEditDialog(cliente),
-                        onDelete: () => _showDeleteConfirmation(cliente),
                       );
                     },
                   );
@@ -145,84 +142,5 @@ class ClientesView extends GetView<ClientesController> {
 
   void _showAddDialog() {
     controller.showAddDialog();
-  }
-
-  void _showEditDialog(UserModel cliente) async {
-    controller.setupFormForEdit(cliente);
-
-    Get.to(
-      () => ClienteFormDialog(
-        nombreController: controller.nombreController,
-        phoneController: controller.phoneController,
-        emailController: controller.emailController,
-        addressController: controller.addressController,
-        userNumberController: controller.userNumberController,
-        rfidController: controller.rfidController,
-        currentPhotoUrl: cliente.photoUrl,
-        onSave: (updatedUser, photoFile) {
-          final user = updatedUser.copyWith(
-            id: cliente.id,
-            joinDate: cliente.joinDate,
-            accessHistory: cliente.accessHistory,
-            photoUrl: photoFile == null ? cliente.photoUrl : null,
-          );
-
-          controller.updateCliente(cliente.id!, user, photoFile: photoFile);
-          Get.back();
-        },
-        isEditing: true,
-        fullScreen: true,
-      ),
-      fullscreenDialog: true,
-    );
-  }
-
-  void _showDeleteConfirmation(UserModel cliente) {
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Eliminar Cliente',
-          style: TextStyle(
-            color: AppColors.titleColor,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Text(
-          '¿Estás seguro de que deseas eliminar a ${cliente.name}?\n\nEsta acción no se puede deshacer.',
-          style: const TextStyle(color: AppColors.textPrimary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              controller.deleteCliente(cliente.id!);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

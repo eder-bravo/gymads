@@ -56,6 +56,11 @@ class TenantContextService extends GetxService {
   /// Gym brand font name
   String? get brandFont => _staffProfile.value?.brandFont;
 
+  /// Fecha de creación de la cuenta (gimnasio). Si no está disponible la
+  /// fecha del gimnasio, se usa la del perfil de staff como respaldo.
+  DateTime? get accountCreatedAt =>
+      _staffProfile.value?.gymCreatedAt ?? _staffProfile.value?.createdAt;
+
   /// Get the full staff profile
   StaffProfileModel? get staffProfile => _staffProfile.value;
 

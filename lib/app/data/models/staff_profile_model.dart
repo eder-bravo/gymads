@@ -15,6 +15,9 @@ class StaffProfileModel {
   final String? gymName;
   final String? brandColor;
   final String? brandFont;
+  // Gym creation date (joined from gyms table) — used as the lower bound
+  // for date navigation (e.g. income months can't go before the account existed)
+  final DateTime? gymCreatedAt;
 
   StaffProfileModel({
     required this.id,
@@ -31,6 +34,7 @@ class StaffProfileModel {
     this.gymName,
     this.brandColor,
     this.brandFont,
+    this.gymCreatedAt,
   });
 
   factory StaffProfileModel.fromJson(Map<String, dynamic> json) {
@@ -53,7 +57,17 @@ class StaffProfileModel {
           gymData?['brand_color'] as String? ?? json['brand_color'] as String?,
       brandFont:
           gymData?['brand_font'] as String? ?? json['brand_font'] as String?,
+      gymCreatedAt: _parseDate(
+          gymData?['created_at'] ?? json['gym_created_at']),
     );
+  }
+
+  /// Parsea una fecha que puede venir null o como String
+  static DateTime? _parseDate(dynamic value) {
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {
@@ -72,6 +86,7 @@ class StaffProfileModel {
       'gym_name': gymName,
       'brand_color': brandColor,
       'brand_font': brandFont,
+      'gym_created_at': gymCreatedAt?.toIso8601String(),
     };
   }
 
@@ -104,6 +119,7 @@ class StaffProfileModel {
     String? gymName,
     String? brandColor,
     String? brandFont,
+    DateTime? gymCreatedAt,
   }) {
     return StaffProfileModel(
       id: id ?? this.id,
@@ -120,6 +136,7 @@ class StaffProfileModel {
       gymName: gymName ?? this.gymName,
       brandColor: brandColor ?? this.brandColor,
       brandFont: brandFont ?? this.brandFont,
+      gymCreatedAt: gymCreatedAt ?? this.gymCreatedAt,
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/snackbar_helper.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
+import 'package:gymads/app/data/services/tenant_context_service.dart';
 
 class IngresosController extends GetxController {
   final IngresoService ingresoService;
@@ -18,6 +19,10 @@ class IngresosController extends GetxController {
       EstadisticasIngresos.empty().obs;
   final RxList<IngresoModel> ingresos = <IngresoModel>[].obs;
   final RxMap<String, double> datosGrafica = <String, double>{}.obs;
+
+  // Todas las transacciones (sin filtro de mes) para la vista completa
+  final RxList<IngresoModel> todasTransacciones = <IngresoModel>[].obs;
+  final RxBool isLoadingTodas = false.obs;
 
   // Filtros
   final selectedPeriodo = 'mes'.obs; // 'dia', 'semana', 'mes'
@@ -124,6 +129,25 @@ class IngresosController extends GetxController {
     } catch (e) {
       print('❌ Error al obtener ingresos: $e');
       errorMessage.value = 'Error al cargar ingresos: $e';
+    }
+  }
+
+  /// Obtiene todas las transacciones registradas (sin filtro de mes)
+  Future<void> fetchTodasLasTransacciones() async {
+    try {
+      isLoadingTodas.value = true;
+      print('📋 Obteniendo TODAS las transacciones...');
+
+      final lista = await ingresoService.getIngresos(limit: 1000);
+
+      todasTransacciones.assignAll(lista);
+      print('✅ ${lista.length} transacciones (todas) obtenidas');
+    } catch (e) {
+      print('❌ Error al obtener todas las transacciones: $e');
+      SnackbarHelper.error(
+          'Error', 'No se pudieron cargar todas las transacciones');
+    } finally {
+      isLoadingTodas.value = false;
     }
   }
 
@@ -292,6 +316,33 @@ class IngresosController extends GetxController {
     return f.year < now.year || (f.year == now.year && f.month < now.month);
   }
 
+  /// Primer día del mes en que se creó la cuenta (límite inferior de navegación).
+  /// Retorna null si no hay contexto de cuenta disponible.
+  DateTime? get _mesCreacionCuenta {
+    if (!Get.isRegistered<TenantContextService>()) return null;
+    final created = TenantContextService.to.accountCreatedAt;
+    if (created == null) return null;
+    return DateTime(created.year, created.month, 1);
+  }
+
+  /// Año de creación de la cuenta (para limitar el navegador de año)
+  int? get anioCreacionCuenta => _mesCreacionCuenta?.year;
+
+  /// Indica si se puede retroceder al mes anterior (no antes de la creación)
+  bool get puedeRetrocederMes {
+    final limite = _mesCreacionCuenta;
+    if (limite == null) return true;
+    final f = fechaInicio.value ?? DateTime.now();
+    return DateTime(f.year, f.month, 1).isAfter(limite);
+  }
+
+  /// Indica si un mes/año es anterior al mes de creación de la cuenta
+  bool esMesAnteriorACreacion(int year, int month) {
+    final limite = _mesCreacionCuenta;
+    if (limite == null) return false;
+    return DateTime(year, month, 1).isBefore(limite);
+  }
+
   void _setMonth(int year, int month) {
     selectedPeriodo.value = 'mes';
     fechaInicio.value = DateTime(year, month, 1);
@@ -299,8 +350,9 @@ class IngresosController extends GetxController {
     refreshData();
   }
 
-  /// Navega al mes anterior
+  /// Navega al mes anterior (no antes de la creación de la cuenta)
   void goToPreviousMonth() {
+    if (!puedeRetrocederMes) return;
     final f = fechaInicio.value ?? DateTime.now();
     final prev = DateTime(f.year, f.month - 1, 1);
     _setMonth(prev.year, prev.month);
@@ -312,6 +364,20 @@ class IngresosController extends GetxController {
     final f = fechaInicio.value ?? DateTime.now();
     final next = DateTime(f.year, f.month + 1, 1);
     _setMonth(next.year, next.month);
+  }
+
+  /// Selecciona un mes específico (no permite meses futuros ni anteriores a
+  /// la creación de la cuenta)
+  void seleccionarMes(int year, int month) {
+    if (esMesFuturo(year, month)) return;
+    if (esMesAnteriorACreacion(year, month)) return;
+    _setMonth(year, month);
+  }
+
+  /// Indica si un mes/año dado es futuro (no seleccionable)
+  bool esMesFuturo(int year, int month) {
+    final now = DateTime.now();
+    return year > now.year || (year == now.year && month > now.month);
   }
 
   /// Obtiene el color para un concepto

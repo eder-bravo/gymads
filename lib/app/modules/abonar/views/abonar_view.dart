@@ -52,44 +52,25 @@ class AbonarView extends GetView<AbonarController> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Busca por nombre, teléfono celular o escanea tarjeta RFID.',
+            'Busca por nombre o teléfono celular.',
             style: TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller.searchController,
-                  keyboardType: TextInputType.phone,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Ej: Juan Pérez, 551234...',
-                    prefixIcon: const Icon(Icons.search, color: AppColors.accent),
-                    filled: true,
-                    fillColor: AppColors.containerBackground,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
+          TextField(
+            controller: controller.searchController,
+            keyboardType: TextInputType.phone,
+            style: const TextStyle(color: AppColors.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'Ej: Juan Pérez, 551234...',
+              prefixIcon: const Icon(Icons.search, color: AppColors.accent),
+              filled: true,
+              fillColor: AppColors.containerBackground,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
               ),
-              const SizedBox(width: 12),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.containerBackground,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: IconButton(
-                  onPressed: () => controller.startNfcSearch(context),
-                  icon: const Icon(Icons.contactless_outlined, color: AppColors.accent),
-                  padding: const EdgeInsets.all(16),
-                  tooltip: 'Buscar por RFID',
-                ),
-              ),
-            ],
+              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+            ),
           ),
           const SizedBox(height: 16),
           Expanded(

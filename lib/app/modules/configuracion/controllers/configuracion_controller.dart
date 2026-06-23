@@ -161,7 +161,7 @@ class ConfiguracionController extends GetxController {
       if (userId == null) return;
       final response = await Supabase.instance.client
           .from('staff_profiles')
-          .select('*, gyms(name, brand_color, brand_font)')
+          .select('*, gyms(name, brand_color, brand_font, created_at)')
           .eq('user_id', userId)
           .eq('is_active', true)
           .maybeSingle();

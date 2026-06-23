@@ -7,15 +7,11 @@ import 'package:intl/intl.dart';
 class ClienteCard extends StatelessWidget {
   final UserModel cliente;
   final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
 
   const ClienteCard({
     super.key,
     required this.cliente,
     required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
   });
 
   @override
@@ -205,40 +201,6 @@ class ClienteCard extends StatelessWidget {
                     ],
                   ),
                 ),
-
-                // Separador
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: primaryColor.withOpacity(0.2),
-                ),
-
-                // Acciones
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: Wrap(
-                    alignment: WrapAlignment.spaceEvenly,
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: [
-                      _buildActionButton(
-                        onEdit,
-                        Icons.edit_rounded,
-                        'Editar',
-                        Colors.blue.shade300,
-                      ),
-                      _buildActionButton(
-                        onDelete,
-                        Icons.delete_rounded,
-                        'Eliminar',
-                        Colors.red.shade300,
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -270,28 +232,4 @@ class ClienteCard extends StatelessWidget {
     );
   }
 
-  // Widget para botones de acción
-  Widget _buildActionButton(
-    VoidCallback onPressed,
-    IconData icon,
-    String label,
-    Color color,
-  ) {
-    return TextButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18, color: color),
-      label: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-        ),
-      ),
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import '../controllers/ingresos_controller.dart';
+import '../widgets/transaction_tile.dart';
+import 'todas_transacciones_view.dart';
 
 class IngresosView extends GetView<IngresosController> {
   const IngresosView({super.key});
@@ -36,7 +38,7 @@ class IngresosView extends GetView<IngresosController> {
 
             // Encabezado de la lista
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
               child: Row(
                 children: [
                   const Text(
@@ -48,13 +50,14 @@ class IngresosView extends GetView<IngresosController> {
                     ),
                   ),
                   const Spacer(),
-                  Obx(() => Text(
-                        '${controller.ingresos.length}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      )),
+                  TextButton.icon(
+                    onPressed: _verTodasLasTransacciones,
+                    icon: const Icon(Icons.list_alt_outlined, size: 18),
+                    label: const Text('Ver todas'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.accent,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -83,21 +86,44 @@ class IngresosView extends GetView<IngresosController> {
         ),
         child: Row(
           children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left, color: AppColors.accent),
-              onPressed: controller.goToPreviousMonth,
-              tooltip: 'Mes anterior',
-            ),
+            Obx(() => IconButton(
+                  icon: Icon(
+                    Icons.chevron_left,
+                    color: controller.puedeRetrocederMes
+                        ? AppColors.accent
+                        : AppColors.disabled,
+                  ),
+                  onPressed: controller.puedeRetrocederMes
+                      ? controller.goToPreviousMonth
+                      : null,
+                  tooltip: 'Mes anterior',
+                )),
             Expanded(
-              child: Obx(() => Text(
-                    controller.mesSeleccionadoLabel,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+              child: Builder(
+                builder: (context) => InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _showMonthPicker(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Obx(() => Text(
+                              controller.mesSeleccionadoLabel,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            )),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_drop_down,
+                            color: AppColors.accent, size: 22),
+                      ],
                     ),
-                  )),
+                  ),
+                ),
+              ),
             ),
             Obx(() => IconButton(
                   icon: Icon(
@@ -223,132 +249,155 @@ class IngresosView extends GetView<IngresosController> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           itemCount: controller.ingresos.length,
           itemBuilder: (context, index) {
-            return _buildTransactionTile(controller.ingresos[index]);
+            return TransactionTile(ingreso: controller.ingresos[index]);
           },
         ),
       );
     });
   }
 
-  Widget _buildTransactionTile(ingreso) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.disabled.withOpacity(0.4)),
-      ),
-      child: Row(
-        children: [
-          // Icono del concepto
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: controller
-                  .getColorForConcepto(ingreso.concepto)
-                  .withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              _getIconForConcepto(ingreso.concepto),
-              color: controller.getColorForConcepto(ingreso.concepto),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
+  // Abre la vista a pantalla completa con todas las transacciones
+  void _verTodasLasTransacciones() {
+    controller.fetchTodasLasTransacciones();
+    Get.to(() => const TodasTransaccionesView());
+  }
 
-          // Información de la transacción
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  ingreso.clienteNombre,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Row(
+  // Abre un selector de mes/año para saltar a un mes específico
+  void _showMonthPicker(BuildContext context) {
+    final now = DateTime.now();
+    final current = controller.fechaInicio.value ?? now;
+    int displayYear = current.year;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: AppColors.cardBackground,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Flexible(
-                      child: Text(
-                        ingreso.conceptoDescripcion,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                    const Text(
+                      'Selecciona un mes',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.titleColor,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: controller
-                            .getColorForMetodoPago(ingreso.metodoPago)
-                            .withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        ingreso.metodoPagoDescripcion,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: controller
-                              .getColorForMetodoPago(ingreso.metodoPago),
-                          fontWeight: FontWeight.w500,
+                    const SizedBox(height: 12),
+                    // Navegador de año
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Builder(builder: (_) {
+                          final minYear = controller.anioCreacionCuenta;
+                          final puedeRetroceder =
+                              minYear == null || displayYear > minYear;
+                          return IconButton(
+                            icon: Icon(
+                              Icons.chevron_left,
+                              color: puedeRetroceder
+                                  ? AppColors.accent
+                                  : AppColors.disabled,
+                            ),
+                            onPressed: puedeRetroceder
+                                ? () => setState(() => displayYear--)
+                                : null,
+                            tooltip: 'Año anterior',
+                          );
+                        }),
+                        Text(
+                          '$displayYear',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.chevron_right,
+                            color: displayYear < now.year
+                                ? AppColors.accent
+                                : AppColors.disabled,
+                          ),
+                          onPressed: displayYear < now.year
+                              ? () => setState(() => displayYear++)
+                              : null,
+                          tooltip: 'Año siguiente',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Cuadrícula de meses
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 3,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 2.2,
+                      children: List.generate(12, (index) {
+                        final month = index + 1;
+                        final isFuture =
+                            controller.esMesFuturo(displayYear, month);
+                        final isAnterior = controller.esMesAnteriorACreacion(
+                            displayYear, month);
+                        final isDisabled = isFuture || isAnterior;
+                        final isSelected = displayYear == current.year &&
+                            month == current.month;
+                        final shortName =
+                            IngresosController.nombresMesesCortos[index];
+                        final label = '${shortName[0].toUpperCase()}'
+                            '${shortName.substring(1)}';
+
+                        return Material(
+                          color: isSelected
+                              ? AppColors.accent.withOpacity(0.2)
+                              : AppColors.containerBackground,
+                          borderRadius: BorderRadius.circular(10),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: isDisabled
+                                ? null
+                                : () {
+                                    controller.seleccionarMes(
+                                        displayYear, month);
+                                    Get.back();
+                                  },
+                            child: Center(
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: isDisabled
+                                      ? AppColors.disabled
+                                      : isSelected
+                                          ? AppColors.accent
+                                          : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Monto y fecha
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                controller.formatCurrency(ingreso.montoFinal),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.success,
-                  fontSize: 14,
-                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                controller.formatFechaCorta(ingreso.fecha),
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+            );
+          },
+        );
+      },
     );
-  }
-
-  IconData _getIconForConcepto(String concepto) {
-    switch (concepto) {
-      case 'nuevo_registro':
-        return Icons.person_add;
-      case 'renovacion':
-        return Icons.refresh;
-      case 'registro':
-        return Icons.how_to_reg;
-      default:
-        return Icons.receipt;
-    }
   }
 }

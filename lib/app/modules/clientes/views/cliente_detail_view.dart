@@ -3,8 +3,8 @@ import 'package:get/get.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/core/widgets/cached_user_image.dart';
-import 'package:gymads/app/core/utils/snackbar_helper.dart';
 import 'package:gymads/app/core/utils/phone_utils.dart';
+import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import '../controllers/clientes_controller.dart';
 
 class ClienteDetailView extends GetView<ClientesController> {
@@ -24,13 +24,6 @@ class ClienteDetailView extends GetView<ClientesController> {
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: _editCliente,
-            tooltip: 'Editar cliente',
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -38,22 +31,22 @@ class ClienteDetailView extends GetView<ClientesController> {
             // Cabecera con foto y nombre
             _buildHeader(),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // Tarjetas de información rápida
             _buildQuickInfoCards(),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // Detalles generales (incluyendo los nuevos campos email y address)
             _buildDetailCards(),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // Botones de acción principales
             _buildActionButtons(),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -70,8 +63,9 @@ class ClienteDetailView extends GetView<ClientesController> {
           bottomRight: Radius.circular(30),
         ),
       ),
-      padding: const EdgeInsets.only(bottom: 30, top: 10),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Foto de perfil con animación Hero
           Hero(
@@ -94,22 +88,22 @@ class ClienteDetailView extends GetView<ClientesController> {
               child: UserThumbnail(
                 imageUrl: cliente.photoUrl,
                 userName: cliente.name,
-                size: 110,
+                size: 96,
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(width: 16),
           // Nombre del cliente
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+          Flexible(
             child: Text(
               cliente.name,
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: AppColors.titleColor,
               ),
-              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -137,13 +131,19 @@ class ClienteDetailView extends GetView<ClientesController> {
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: _buildInfoCard(
-              icon: Icons.credit_card_outlined,
-              title: 'RFID',
-              value: cliente.rfidCard ?? 'No asignada',
-              color: cliente.rfidCard != null
-                  ? AppColors.success
-                  : AppColors.textSecondary,
+            child: Builder(
+              builder: (context) {
+                final bool vinculado = cliente.rfidCard != null &&
+                    cliente.rfidCard!.trim().isNotEmpty;
+                return _buildInfoCard(
+                  icon: Icons.vpn_key_outlined,
+                  title: 'Llavero/Tarjeta',
+                  value: vinculado ? 'Vinculado' : 'No vinculado',
+                  color: vinculado
+                      ? AppColors.success
+                      : AppColors.textSecondary,
+                );
+              },
             ),
           ),
         ],
@@ -466,12 +466,34 @@ class ClienteDetailView extends GetView<ClientesController> {
 
   // Funciones para manejar las acciones
   void _editCliente() {
-    Get.back(); // Volver a la lista de clientes
-    SnackbarHelper.info(
-      'Editar',
-      'Redirigiendo a edición de cliente...',
+    controller.setupFormForEdit(cliente);
+
+    Get.to(
+      () => ClienteFormDialog(
+        nombreController: controller.nombreController,
+        phoneController: controller.phoneController,
+        emailController: controller.emailController,
+        addressController: controller.addressController,
+        userNumberController: controller.userNumberController,
+        rfidController: controller.rfidController,
+        currentPhotoUrl: cliente.photoUrl,
+        onSave: (updatedUser, photoFile) {
+          final user = updatedUser.copyWith(
+            id: cliente.id,
+            joinDate: cliente.joinDate,
+            accessHistory: cliente.accessHistory,
+            photoUrl: photoFile == null ? cliente.photoUrl : null,
+          );
+
+          controller.updateCliente(cliente.id!, user, photoFile: photoFile);
+          Get.back(); // Cerrar el formulario
+          Get.back(); // Volver a la lista de clientes
+        },
+        isEditing: true,
+        fullScreen: true,
+      ),
+      fullscreenDialog: true,
     );
-    // La lógica de edición se manejará desde la vista principal o se puede implementar aquí
   }
 
   void _abonarCliente() {

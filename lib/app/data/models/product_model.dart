@@ -30,11 +30,11 @@ class Product {
       price: (json['price'] is num) ? json['price'].toDouble() : 0.0,
       stock: json['stock'] ?? 0,
       isActive: json['is_active'] ?? true,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : DateTime.now(),
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at']) 
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'])
           : DateTime.now(),
     );
   }
@@ -50,6 +50,18 @@ class Product {
       'is_active': isActive,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  /// Método para insertar un nuevo producto (sin enviar el id)
+  Map<String, dynamic> toJsonForInsert() {
+    return {
+      'name': name,
+      'description': description,
+      'category': category,
+      'price': price,
+      'stock': stock,
+      'is_active': isActive,
     };
   }
 
@@ -106,11 +118,11 @@ class ProductCategory {
       name: json['name'] ?? '',
       description: json['description'] ?? '',
       isActive: json['is_active'] ?? true,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : DateTime.now(),
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at']) 
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'])
           : DateTime.now(),
     );
   }
@@ -159,14 +171,15 @@ class ProductTransaction {
       productName: json['product_name'] ?? '',
       type: _stringToTransactionType(json['type'] ?? 'entrada'),
       quantity: json['quantity'] ?? 0,
-      unitPrice: (json['unit_price'] is num) ? json['unit_price'].toDouble() : 0.0,
+      unitPrice:
+          (json['unit_price'] is num) ? json['unit_price'].toDouble() : 0.0,
       notes: json['notes'] ?? '',
       staffUser: json['staff_user'] ?? '',
-      transactionDate: json['transaction_date'] != null 
-          ? DateTime.parse(json['transaction_date']) 
+      transactionDate: json['transaction_date'] != null
+          ? DateTime.parse(json['transaction_date'])
           : DateTime.now(),
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : DateTime.now(),
     );
   }
@@ -202,9 +215,4 @@ class ProductTransaction {
   }
 }
 
-enum TransactionType {
-  entrada,
-  salida,
-  ajuste,
-  venta
-}
+enum TransactionType { entrada, salida, ajuste, venta }

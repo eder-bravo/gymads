@@ -35,6 +35,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
   final daysLeft = 0.obs;
   final userPhotoUrl = ''.obs;
   final membershipType = ''.obs;
+  final expirationDate = Rx<DateTime?>(null);
   
   // Timer para verificar periódicamente la tarjeta RFID
   Timer? _rfidCheckTimer;
@@ -272,7 +273,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         userName.value = user.name;
         daysLeft.value = user.daysRemaining;
         userPhotoUrl.value = user.photoUrl ?? '';
-        membershipType.value = user.membershipType;
+        expirationDate.value = user.expirationDate;
         
         // Reproducir sonido y mostrar bienvenida
         AudioService.playWelcomeSound();
@@ -313,7 +314,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         userName.value = user.name;
         daysLeft.value = user.daysRemaining;
         userPhotoUrl.value = user.photoUrl ?? '';
-        membershipType.value = user.membershipType;
+        expirationDate.value = user.expirationDate;
         
         // Reproducir sonido y mostrar bienvenida
         AudioService.playWelcomeSound();
@@ -480,6 +481,14 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
           return;
         }
 
+        // Salvaguarda: nunca registrar entrada de una membresía inactiva o vencida
+        if (!user.isActive || user.daysRemaining <= 0) {
+          if (kDebugMode) {
+            print('⛔ [RFID] Registro de acceso bloqueado (membresía no válida): ${user.name}');
+          }
+          return;
+        }
+
         if (kDebugMode) {
           print('🔄 [RFID] Iniciando registro de acceso en Supabase...');
           print('   👤 Usuario: ${user.name} (${user.userNumber})');
@@ -509,7 +518,8 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
           }
         } else {
           if (kDebugMode) {
-            print('❌ [RFID] Error: No se pudo registrar el acceso en Supabase');
+            print('⚠️ [RFID] No se registró el acceso: Ya existe una entrada para hoy');
+            print('   El usuario ${user.name} ya tiene una entrada registrada hoy');
           }
         }
       } catch (e) {

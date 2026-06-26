@@ -4,51 +4,18 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../providers/supabase/supabase_storage_provider.dart';
 
-/// Servicio para gestionar todas las interacciones con Supabase
-/// 
+/// Servicio para gestionar las interacciones con Supabase
+///
 /// Este servicio proporciona métodos para:
-/// - Inicializar la conexión con Supabase
-/// - Autenticar al usuario administrador
 /// - Verificar la conexión a la base de datos
 /// - Proporcionar acceso al cliente de Supabase
+/// - Métodos legacy de storage (en desuso)
 class SupabaseService {
   /// Cliente de Supabase para operaciones personalizadas
   static SupabaseClient get client => Supabase.instance.client;
 
-  /// Inicializa la conexión con Supabase y autentica al usuario
-  /// 
-  /// Este método debe llamarse al inicio de la aplicación
-  static Future<void> initialize() async {
-    try {
-      // Inicializar cliente de Supabase con credenciales del config
-      await Supabase.initialize(
-        url: SupabaseConfig.url,
-        anonKey: SupabaseConfig.anonKey,
-      );
-
-      // Autenticar al usuario administrador
-      final response = await Supabase.instance.client.auth.signInWithPassword(
-        email: SupabaseConfig.userEmail,
-        password: SupabaseConfig.userPassword,
-      );
-
-      if (response.user == null) {
-        throw Exception('No se pudo autenticar el usuario');
-      }
-
-      if (kDebugMode && SupabaseConfig.debugMode) {
-        print('Usuario autenticado: ${response.user?.email}');
-      }
-    } catch (e) {
-      if (kDebugMode && SupabaseConfig.debugMode) {
-        print('Error al inicializar Supabase: $e');
-      }
-      rethrow;
-    }
-  }
-
   /// Método para verificar la conexión a la base de datos Supabase
-  /// 
+  ///
   /// Realiza comprobaciones básicas para confirmar que la conexión funciona
   /// y que la tabla 'users' es accesible
   static Future<void> testDatabaseConnection() async {
@@ -58,21 +25,21 @@ class SupabaseService {
       if (session == null || session.accessToken.isEmpty) {
         throw Exception('No hay sesión activa');
       }
-      
+
       if (kDebugMode && SupabaseConfig.debugMode) {
         print('✅ Sesión activa: ${session.user.email}');
       }
 
       // Verificar acceso a la tabla users
       await client.from('users').select('count').limit(1).maybeSingle();
-      
+
       if (kDebugMode && SupabaseConfig.debugMode) {
         print('✅ Conexión a la base de datos verificada');
       }
     } catch (e) {
       if (kDebugMode && SupabaseConfig.debugMode) {
         print('❌ Error al verificar la conexión: $e');
-        
+
         if (e is PostgrestException) {
           print('  - Código: ${e.code}');
           print('  - Detalles: ${e.details}');
@@ -84,7 +51,7 @@ class SupabaseService {
 
   /// NOTA: Estos métodos se mantienen para compatibilidad durante la transición
   /// Deberían eliminarse después de migrar todas las llamadas a los nuevos proveedores
-  
+
   /// Sube la foto de un usuario al bucket de Supabase (OBSOLETO)
   /// @deprecated Usar SupabaseStorageProvider.uploadUserPhoto en su lugar
   static Future<String?> uploadUserPhoto(String filePath, String userId) async {

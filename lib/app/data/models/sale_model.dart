@@ -6,8 +6,6 @@ class Sale {
   final String concepto;
   final String tipoMembresia;
   final double montoBase;
-  final String? promocionId;
-  final String? promocionNombre;
   final double montoFinal;
   final String metodoPago;
   final DateTime? periodoInicio;
@@ -34,8 +32,6 @@ class Sale {
     required this.concepto,
     required this.tipoMembresia,
     required this.montoBase,
-    this.promocionId,
-    this.promocionNombre,
     required this.montoFinal,
     required this.metodoPago,
     this.periodoInicio,
@@ -73,8 +69,6 @@ class Sale {
       concepto: json['concepto'] ?? '',
       tipoMembresia: json['tipo_membresia'] ?? '',
       montoBase: (json['monto_base'] ?? 0).toDouble(),
-      promocionId: json['promocion_id'],
-      promocionNombre: json['promocion_nombre'],
       montoFinal: (json['monto_final'] ?? 0).toDouble(),
       metodoPago: json['metodo_pago'] ?? '',
       periodoInicio: json['periodo_inicio'] != null
@@ -111,19 +105,13 @@ class Sale {
       'concepto': concepto,
       'tipo_membresia': tipoMembresia,
       'monto_base': montoBase,
-      'promocion_id': promocionId,
-      'promocion_nombre': promocionNombre,
       'monto_final': montoFinal,
       'metodo_pago': metodoPago,
-      'periodo_inicio': periodoInicio?.toIso8601String(),
-      'periodo_fin': periodoFin?.toIso8601String(),
       'notas': notas,
       'usuario_staff': usuarioStaff,
       'cuota_registro': cuotaRegistro,
       'descuento': descuento,
       'fecha': fecha.toIso8601String(),
-      'created_at': createdAt?.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
       'items_detalle': items.map((item) => item.toJson()).toList(),
       'impuestos': impuestos,
       'monto_recibido': montoRecibido,
@@ -137,10 +125,15 @@ class Sale {
       json['id'] = id;
     }
     
-    // Solo incluir cliente_id si no es null y no está vacío (para ventas con cliente específico)
+    // Solo incluir cliente_id si no es null y no está vacío
     if (clienteId != null && clienteId!.isNotEmpty) {
       json['cliente_id'] = clienteId;
     }
+    
+    // Solo incluir campos opcionales si tienen valor
+    if (periodoInicio != null) json['periodo_inicio'] = periodoInicio!.toIso8601String();
+    if (periodoFin != null) json['periodo_fin'] = periodoFin!.toIso8601String();
+    // No incluir created_at ni updated_at para que la BD use sus defaults
     
     return json;
   }
@@ -152,8 +145,6 @@ class Sale {
     String? concepto,
     String? tipoMembresia,
     double? montoBase,
-    String? promocionId,
-    String? promocionNombre,
     double? montoFinal,
     String? metodoPago,
     DateTime? periodoInicio,
@@ -174,8 +165,6 @@ class Sale {
       concepto: concepto ?? this.concepto,
       tipoMembresia: tipoMembresia ?? this.tipoMembresia,
       montoBase: montoBase ?? this.montoBase,
-      promocionId: promocionId ?? this.promocionId,
-      promocionNombre: promocionNombre ?? this.promocionNombre,
       montoFinal: montoFinal ?? this.montoFinal,
       metodoPago: metodoPago ?? this.metodoPago,
       periodoInicio: periodoInicio ?? this.periodoInicio,

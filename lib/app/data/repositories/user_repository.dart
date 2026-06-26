@@ -33,6 +33,95 @@ class UserRepository {
     }
   }
 
+  /// Obtiene un usuario por su tarjeta RFID
+  Future<UserModel?> getUserByRfid(String rfidUid) async {
+    try {
+      if (kDebugMode) {
+        print('🔍 Buscando usuario con RFID: $rfidUid');
+      }
+
+      // Verificar si el provider es SupabaseApiProvider para usar el método específico
+      Map<String, dynamic> response;
+      
+      if (_apiProvider.runtimeType.toString().contains('SupabaseApiProvider')) {
+        final supabaseProvider = _apiProvider as dynamic;
+        response = await supabaseProvider.getUserByRfid(rfidUid);
+        
+        if (kDebugMode) {
+          print('🔍 Respuesta getUserByRfid específico: $response');
+        }
+      } else {
+        // Fallback para otros providers: buscar en toda la lista
+        response = await _apiProvider.getAll();
+
+        if (response['error'] == true || response['data'] == null) {
+          if (kDebugMode) {
+            print('❌ Error en la respuesta o datos nulos');
+            print('Response: $response');
+          }
+          return null;
+        }
+
+        final data = response['data'];
+        if (data is! List) {
+          if (kDebugMode) {
+            print('❌ Data no es una lista');
+          }
+          return null;
+        }
+
+        // Buscar el usuario que coincida con el rfid_card
+        for (var item in data) {
+          if (item is Map<String, dynamic> && item['rfid_card'] == rfidUid) {
+            if (kDebugMode) {
+              print('✅ Usuario encontrado en lista por RFID. Datos: $item');
+            }
+            return UserModel.fromJson(item);
+          }
+        }
+
+        if (kDebugMode) {
+          print('❌ No se encontró ningún usuario con RFID: $rfidUid');
+        }
+        return null;
+      }
+
+      // Procesar respuesta del método específico
+      if (response['error'] == true) {
+        if (kDebugMode) {
+          print('❌ Error en getUserByRfid: ${response['message']}');
+        }
+        return null;
+      }
+
+      if (response['data'] == null) {
+        if (kDebugMode) {
+          print('ℹ️ Usuario con RFID $rfidUid no encontrado');
+        }
+        return null;
+      }
+
+      final userData = response['data'];
+      if (userData is Map<String, dynamic>) {
+        if (kDebugMode) {
+          print('✅ Usuario encontrado por RFID. Datos: $userData');
+        }
+        return UserModel.fromJson(userData);
+      }
+
+      if (kDebugMode) {
+        print('❌ Formato de datos incorrecto');
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error al obtener usuario por RFID: $e');
+        print('❌ Stack trace: ${StackTrace.current}');
+      }
+      return null;
+    }
+  }
+
   /// Obtiene un usuario por su número de usuario (userNumber)
   Future<UserModel?> getUserByNumber(String userNumber) async {
     try {

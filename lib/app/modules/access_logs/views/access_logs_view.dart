@@ -31,16 +31,18 @@ class AccessLogsView extends GetView<AccessLogsController> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Estadísticas superiores
-          _buildStatsSection(),
-          
-          // Lista de logs
-          Expanded(
-            child: _buildLogsList(),
-          ),
-        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Estadísticas superiores
+            _buildStatsSection(),
+            
+            // Lista de logs
+            Expanded(
+              child: _buildLogsList(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -50,43 +52,17 @@ class AccessLogsView extends GetView<AccessLogsController> {
       margin: const EdgeInsets.all(16),
       child: Obx(() {
         final stats = controller.getFormattedStats();
-        return Column(
+        return Row(
           children: [
-            // Primera fila
-            Row(
-              children: [
-                _buildStatCard(
-                  '✅ Entradas',
-                  stats['totalEntries'] ?? '0',
-                  AppColors.success,
-                ),
-                _buildStatCard(
-                  '📊 Total',
-                  stats['total'] ?? '0',
-                  AppColors.accent,
-                ),
-              ],
+            _buildStatCard(
+              '✅ Entradas',
+              stats['totalEntries'] ?? '0',
+              AppColors.success,
             ),
-            const SizedBox(height: 8),
-            // Segunda fila
-            Row(
-              children: [
-                _buildStatCard(
-                  '📱 QR',
-                  stats['totalQr'] ?? '0',
-                  AppColors.info,
-                ),
-                _buildStatCard(
-                  '💳 RFID',
-                  stats['totalRfid'] ?? '0',
-                  AppColors.warning,
-                ),
-                _buildStatCard(
-                  '📊 Total',
-                  stats['totalLogs'] ?? '0',
-                  AppColors.primary,
-                ),
-              ],
+            _buildStatCard(
+              '📊 Total',
+              stats['totalLogs'] ?? '0',
+              AppColors.accent,
             ),
           ],
         );
@@ -235,8 +211,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
     final isEntry = log.accessType == 'entrada';
     final color = isEntry ? AppColors.success : AppColors.error;
     final icon = isEntry ? Icons.login : Icons.logout;
-    final methodIcon = log.method == 'qr' ? '📱' : '💳';
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       color: AppColors.cardBackground,
@@ -279,14 +254,6 @@ class AccessLogsView extends GetView<AccessLogsController> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Usuario: ${log.userNumber}',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
                     'Staff: ${log.staffUser}',
                     style: TextStyle(
                       color: AppColors.textSecondary,
@@ -317,14 +284,6 @@ class AccessLogsView extends GetView<AccessLogsController> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '$methodIcon ${log.method.toUpperCase()}',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 10,
-                  ),
-                ),
-                const SizedBox(height: 2),
                 Text(
                   DateFormat('dd/MM HH:mm').format(log.accessTime),
                   style: TextStyle(

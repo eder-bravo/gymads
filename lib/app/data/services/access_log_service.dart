@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/access_log_model.dart';
+import 'tenant_query_helper.dart';
 
 class AccessLogService {
   static final _supabase = Supabase.instance.client;
@@ -26,7 +27,48 @@ class AccessLogService {
         print('   🕐 Time: ${DateTime.now().toIso8601String()}');
       }
 
-      final accessData = {
+      // Verificar si ya existe una entrada en el día actual (desde 1:00 AM)
+      final now = DateTime.now();
+      DateTime startOfDay;
+
+      // Si es antes de la 1:00 AM, considerar el día anterior
+      if (now.hour < 1) {
+        final yesterday = now.subtract(const Duration(days: 1));
+        startOfDay =
+            DateTime(yesterday.year, yesterday.month, yesterday.day, 1, 0, 0);
+      } else {
+        startOfDay = DateTime(now.year, now.month, now.day, 1, 0, 0);
+      }
+
+      final endOfDay = startOfDay.add(const Duration(hours: 24));
+
+      if (kDebugMode) {
+        print(
+            '   📅 Verificando entradas desde: ${startOfDay.toIso8601String()}');
+        print('   📅 Hasta: ${endOfDay.toIso8601String()}');
+      }
+
+      // Verificar si ya hay una entrada registrada en el rango de tiempo
+      final existingAccess = await _supabase
+          .from('access_logs')
+          .select()
+          .eq('user_id', userId)
+          .eq('access_type', 'entrada')
+          .gte('access_time', startOfDay.toIso8601String())
+          .lt('access_time', endOfDay.toIso8601String())
+          .limit(1);
+
+      if (existingAccess.isNotEmpty) {
+        if (kDebugMode) {
+          print(
+              '⚠️ [AccessLogService] Ya existe una entrada registrada para hoy');
+          print(
+              '   🕐 Entrada existente: ${existingAccess.first['access_time']}');
+        }
+        return false; // No registrar entrada duplicada
+      }
+
+      final accessData = TenantQueryHelper.withTenant({
         'user_id': userId,
         'user_name': userName,
         'user_number': userNumber,
@@ -34,19 +76,18 @@ class AccessLogService {
         'method': method,
         'staff_user': staffUser,
         'access_time': DateTime.now().toIso8601String(),
-      };
+      });
 
       if (kDebugMode) {
         print('   📦 Data to insert: $accessData');
       }
 
-      final response = await _supabase
-          .from('access_logs')
-          .insert(accessData)
-          .select();
+      final response =
+          await _supabase.from('access_logs').insert(accessData).select();
 
       if (kDebugMode) {
-        print('✅ [AccessLogService] Respuesta de Supabase: ${response.toString()}');
+        print(
+            '✅ [AccessLogService] Respuesta de Supabase: ${response.toString()}');
         print('✅ [AccessLogService] Acceso registrado exitosamente');
       }
 
@@ -56,8 +97,10 @@ class AccessLogService {
         print('❌ [AccessLogService] Error al registrar acceso: $e');
         print('❌ [AccessLogService] Tipo de error: ${e.runtimeType}');
         if (e is PostgrestException) {
-          print('❌ [AccessLogService] PostgrestException - Message: ${e.message}');
-          print('❌ [AccessLogService] PostgrestException - Details: ${e.details}');
+          print(
+              '❌ [AccessLogService] PostgrestException - Message: ${e.message}');
+          print(
+              '❌ [AccessLogService] PostgrestException - Details: ${e.details}');
           print('❌ [AccessLogService] PostgrestException - Hint: ${e.hint}');
           print('❌ [AccessLogService] PostgrestException - Code: ${e.code}');
         }
@@ -79,7 +122,7 @@ class AccessLogService {
       if (response.isNotEmpty) {
         return AccessLogModel.fromJson(response.first);
       }
-      
+
       return null;
     } catch (e) {
       if (kDebugMode) {
@@ -93,7 +136,7 @@ class AccessLogService {
   static Future<String> determineAccessType(String userId) async {
     try {
       final lastAccess = await getLastUserAccess(userId);
-      
+
       if (lastAccess == null) {
         // Si no hay registros previos, el primer acceso es entrada
         return 'entrada';
@@ -118,9 +161,14 @@ class AccessLogService {
       final startOfDay = DateTime(today.year, today.month, today.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
 
-      final response = await _supabase
-          .from('access_logs')
-          .select()
+      final branchId = TenantQueryHelper.branchIdOrNull;
+      var query = _supabase.from('access_logs').select();
+
+      if (branchId != null) {
+        query = query.eq('branch_id', branchId);
+      }
+
+      final response = await query
           .gte('access_time', startOfDay.toIso8601String())
           .lt('access_time', endOfDay.toIso8601String())
           .order('access_time', ascending: false);
@@ -144,10 +192,7 @@ class AccessLogService {
     int limit = 50,
   }) async {
     try {
-      var query = _supabase
-          .from('access_logs')
-          .select()
-          .eq('user_id', userId);
+      var query = _supabase.from('access_logs').select().eq('user_id', userId);
 
       if (startDate != null) {
         query = query.gte('access_time', startDate.toIso8601String());
@@ -157,9 +202,8 @@ class AccessLogService {
         query = query.lte('access_time', endDate.toIso8601String());
       }
 
-      final response = await query
-          .order('access_time', ascending: false)
-          .limit(limit);
+      final response =
+          await query.order('access_time', ascending: false).limit(limit);
 
       return response
           .map<AccessLogModel>((json) => AccessLogModel.fromJson(json))
@@ -189,11 +233,12 @@ class AccessLogService {
           .lte('access_time', end.toIso8601String());
 
       final stats = <String, int>{};
-      
+
       for (final record in response) {
         final accessTime = DateTime.parse(record['access_time']);
-        final dayKey = '${accessTime.year}-${accessTime.month.toString().padLeft(2, '0')}-${accessTime.day.toString().padLeft(2, '0')}';
-        
+        final dayKey =
+            '${accessTime.year}-${accessTime.month.toString().padLeft(2, '0')}-${accessTime.day.toString().padLeft(2, '0')}';
+
         stats[dayKey] = (stats[dayKey] ?? 0) + 1;
       }
 
@@ -210,7 +255,7 @@ class AccessLogService {
   static Future<bool> isUserInside(String userId) async {
     try {
       final lastAccess = await getLastUserAccess(userId);
-      
+
       if (lastAccess == null) {
         return false; // Si no hay registros, no está adentro
       }
@@ -232,16 +277,20 @@ class AccessLogService {
         print('📊 Obteniendo todos los logs de acceso desde Supabase...');
       }
 
-      var query = _supabase
-          .from('access_logs')
-          .select()
-          .order('access_time', ascending: false);
+      final branchId = TenantQueryHelper.branchIdOrNull;
+      var query = _supabase.from('access_logs').select();
 
-      if (limit != null) {
-        query = query.limit(limit);
+      if (branchId != null) {
+        query = query.eq('branch_id', branchId);
       }
 
-      final response = await query;
+      var orderedQuery = query.order('access_time', ascending: false);
+
+      if (limit != null) {
+        orderedQuery = orderedQuery.limit(limit);
+      }
+
+      final response = await orderedQuery;
 
       if (kDebugMode) {
         print('✅ ${response.length} logs obtenidos desde Supabase');
@@ -289,9 +338,8 @@ class AccessLogService {
 
       // Primero intentar usar la vista SQL
       try {
-        final response = await _supabase
-            .from('users_currently_inside')
-            .select();
+        final response =
+            await _supabase.from('users_currently_inside').select();
 
         if (kDebugMode) {
           print('✅ ${response.length} usuarios obtenidos desde vista SQL');
@@ -326,7 +374,7 @@ class AccessLogService {
         if (kDebugMode) {
           print('⚠️ Vista SQL no disponible, usando método alternativo: $e');
         }
-        
+
         // Método alternativo: usar función SQL directa
         return await _getUsersInsideAlternative();
       }
@@ -350,7 +398,7 @@ class AccessLogService {
       if (allLogs == null) return [];
 
       final Map<String, AccessLogModel> lastAccessByUser = {};
-      
+
       // Encontrar el último acceso de cada usuario
       for (final log in allLogs) {
         if (!lastAccessByUser.containsKey(log.userId) ||
@@ -378,7 +426,8 @@ class AccessLogService {
   }
 
   /// Obtiene logs de acceso para un usuario específico
-  static Future<List<AccessLogModel>?> getUserAccessLogs(String userId, {int? limit}) async {
+  static Future<List<AccessLogModel>?> getUserAccessLogs(String userId,
+      {int? limit}) async {
     try {
       if (kDebugMode) {
         print('📋 Obteniendo logs de acceso para usuario: $userId');
@@ -400,7 +449,9 @@ class AccessLogService {
         print('✅ ${response.length} logs obtenidos para el usuario');
       }
 
-      return response.map<AccessLogModel>((log) => AccessLogModel.fromJson(log)).toList();
+      return response
+          .map<AccessLogModel>((log) => AccessLogModel.fromJson(log))
+          .toList();
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error al obtener logs del usuario: $e');
@@ -410,10 +461,12 @@ class AccessLogService {
   }
 
   /// Obtiene logs de acceso filtrados por fecha
-  static Future<List<AccessLogModel>?> getAccessLogsByDate(DateTime startDate, DateTime endDate) async {
+  static Future<List<AccessLogModel>?> getAccessLogsByDate(
+      DateTime startDate, DateTime endDate) async {
     try {
       if (kDebugMode) {
-        print('📅 Obteniendo logs entre ${startDate.toIso8601String()} y ${endDate.toIso8601String()}');
+        print(
+            '📅 Obteniendo logs entre ${startDate.toIso8601String()} y ${endDate.toIso8601String()}');
       }
 
       final response = await _supabase
@@ -427,7 +480,9 @@ class AccessLogService {
         print('✅ ${response.length} logs obtenidos en el rango de fechas');
       }
 
-      return response.map<AccessLogModel>((log) => AccessLogModel.fromJson(log)).toList();
+      return response
+          .map<AccessLogModel>((log) => AccessLogModel.fromJson(log))
+          .toList();
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error al obtener logs por fecha: $e');

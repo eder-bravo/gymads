@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/core/utils/snackbar_helper.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
+import 'package:gymads/app/data/services/tenant_context_service.dart';
 
 class IngresosController extends GetxController {
   final IngresoService ingresoService;
@@ -11,19 +13,24 @@ class IngresosController extends GetxController {
   // Estado observable
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
-  
+
   // Datos de ingresos
-  final Rx<EstadisticasIngresos> estadisticas = EstadisticasIngresos.empty().obs;
+  final Rx<EstadisticasIngresos> estadisticas =
+      EstadisticasIngresos.empty().obs;
   final RxList<IngresoModel> ingresos = <IngresoModel>[].obs;
   final RxMap<String, double> datosGrafica = <String, double>{}.obs;
-  
+
+  // Todas las transacciones (sin filtro de mes) para la vista completa
+  final RxList<IngresoModel> todasTransacciones = <IngresoModel>[].obs;
+  final RxBool isLoadingTodas = false.obs;
+
   // Filtros
   final selectedPeriodo = 'mes'.obs; // 'dia', 'semana', 'mes'
   final selectedConcepto = Rx<String?>(null);
   final selectedMetodoPago = Rx<String?>(null);
   final fechaInicio = Rx<DateTime?>(null);
   final fechaFin = Rx<DateTime?>(null);
-  
+
   // Tipo de gráfica
   final selectedChartType = 'barras'.obs; // 'barras', 'pastel', 'lineas'
   final List<String> chartTypes = ['barras', 'pastel', 'lineas'];
@@ -33,6 +40,37 @@ class IngresosController extends GetxController {
   final List<String> conceptos = ['registro', 'renovacion', 'producto'];
   final List<String> metodosPago = ['efectivo', 'tarjeta', 'transferencia'];
 
+  // Nombres de meses en español (evita depender de locale de intl)
+  static const List<String> nombresMeses = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ];
+
+  static const List<String> nombresMesesCortos = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+
   @override
   void onInit() {
     super.onInit();
@@ -40,7 +78,7 @@ class IngresosController extends GetxController {
     final now = DateTime.now();
     fechaInicio.value = DateTime(now.year, now.month, 1);
     fechaFin.value = DateTime(now.year, now.month + 1, 0);
-    
+
     // Cargar datos iniciales
     fetchEstadisticas();
     fetchIngresos();
@@ -52,28 +90,22 @@ class IngresosController extends GetxController {
     try {
       isLoading.value = true;
       errorMessage.value = '';
-      
+
       print('📊 Obteniendo estadísticas de ingresos...');
-      
+
       final stats = await ingresoService.getEstadisticas(
         fechaInicio: fechaInicio.value,
         fechaFin: fechaFin.value,
       );
-      
+
       estadisticas.value = stats;
-      print('✅ Estadísticas obtenidas: Total \$${stats.totalIngresos.toStringAsFixed(2)}');
-      
+      print(
+          '✅ Estadísticas obtenidas: Total \$${stats.totalIngresos.toStringAsFixed(2)}');
     } catch (e) {
       print('❌ Error al obtener estadísticas: $e');
       errorMessage.value = 'Error al cargar estadísticas: $e';
-      
-      Get.snackbar(
-        'Error',
-        'Error al cargar estadísticas: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+
+      SnackbarHelper.error('Error', 'Error al cargar estadísticas: $e');
     } finally {
       isLoading.value = false;
     }
@@ -83,7 +115,7 @@ class IngresosController extends GetxController {
   Future<void> fetchIngresos() async {
     try {
       print('📋 Obteniendo lista de ingresos...');
-      
+
       final listaIngresos = await ingresoService.getIngresos(
         fechaInicio: fechaInicio.value,
         fechaFin: fechaFin.value,
@@ -91,13 +123,31 @@ class IngresosController extends GetxController {
         metodoPago: selectedMetodoPago.value,
         limit: 50,
       );
-      
+
       ingresos.assignAll(listaIngresos);
       print('✅ ${listaIngresos.length} ingresos obtenidos');
-      
     } catch (e) {
       print('❌ Error al obtener ingresos: $e');
       errorMessage.value = 'Error al cargar ingresos: $e';
+    }
+  }
+
+  /// Obtiene todas las transacciones registradas (sin filtro de mes)
+  Future<void> fetchTodasLasTransacciones() async {
+    try {
+      isLoadingTodas.value = true;
+      print('📋 Obteniendo TODAS las transacciones...');
+
+      final lista = await ingresoService.getIngresos(limit: 1000);
+
+      todasTransacciones.assignAll(lista);
+      print('✅ ${lista.length} transacciones (todas) obtenidas');
+    } catch (e) {
+      print('❌ Error al obtener todas las transacciones: $e');
+      SnackbarHelper.error(
+          'Error', 'No se pudieron cargar todas las transacciones');
+    } finally {
+      isLoadingTodas.value = false;
     }
   }
 
@@ -105,16 +155,16 @@ class IngresosController extends GetxController {
   Future<void> fetchDatosGrafica() async {
     try {
       print('📈 Obteniendo datos para gráfica...');
-      
+
       final datos = await ingresoService.getIngresosPorPeriodo(
-        fechaInicio: fechaInicio.value ?? DateTime(DateTime.now().year, DateTime.now().month, 1),
+        fechaInicio: fechaInicio.value ??
+            DateTime(DateTime.now().year, DateTime.now().month, 1),
         fechaFin: fechaFin.value ?? DateTime.now(),
         agrupacion: selectedPeriodo.value,
       );
-      
+
       datosGrafica.assignAll(datos);
       print('✅ Datos de gráfica obtenidos: ${datos.length} puntos');
-      
     } catch (e) {
       print('❌ Error al obtener datos de gráfica: $e');
     }
@@ -125,7 +175,7 @@ class IngresosController extends GetxController {
     try {
       selectedPeriodo.value = nuevoPeriodo;
       final now = DateTime.now();
-      
+
       switch (nuevoPeriodo) {
         case 'dia':
           fechaInicio.value = DateTime(now.year, now.month, now.day);
@@ -133,8 +183,10 @@ class IngresosController extends GetxController {
           break;
         case 'semana':
           final inicioSemana = now.subtract(Duration(days: now.weekday - 1));
-          fechaInicio.value = DateTime(inicioSemana.year, inicioSemana.month, inicioSemana.day);
-          fechaFin.value = inicioSemana.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+          fechaInicio.value =
+              DateTime(inicioSemana.year, inicioSemana.month, inicioSemana.day);
+          fechaFin.value = inicioSemana.add(
+              const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
           break;
         case 'mes':
           fechaInicio.value = DateTime(now.year, now.month, 1);
@@ -145,17 +197,11 @@ class IngresosController extends GetxController {
           fechaInicio.value = DateTime(now.year, now.month, 1);
           fechaFin.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
       }
-      
+
       refreshData();
     } catch (e) {
       print('❌ Error al cambiar período: $e');
-      Get.snackbar(
-        'Error',
-        'Error al cambiar período: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      SnackbarHelper.error('Error', 'Error al cambiar período: $e');
     }
   }
 
@@ -166,13 +212,7 @@ class IngresosController extends GetxController {
       fetchIngresos();
     } catch (e) {
       print('❌ Error al cambiar concepto: $e');
-      Get.snackbar(
-        'Error',
-        'Error al aplicar filtro: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      SnackbarHelper.error('Error', 'Error al aplicar filtro: $e');
     }
   }
 
@@ -183,13 +223,7 @@ class IngresosController extends GetxController {
       fetchIngresos();
     } catch (e) {
       print('❌ Error al cambiar método de pago: $e');
-      Get.snackbar(
-        'Error',
-        'Error al aplicar filtro: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      SnackbarHelper.error('Error', 'Error al aplicar filtro: $e');
     }
   }
 
@@ -204,7 +238,7 @@ class IngresosController extends GetxController {
   Future<void> refreshData() async {
     isLoading.value = true;
     errorMessage.value = '';
-    
+
     try {
       await Future.wait([
         fetchEstadisticas().catchError((e) {
@@ -223,14 +257,9 @@ class IngresosController extends GetxController {
     } catch (e) {
       print('❌ Error general al refrescar datos: $e');
       errorMessage.value = 'Error al actualizar datos: $e';
-      
-      Get.snackbar(
-        'Error',
-        'Error al actualizar datos. Intente nuevamente.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+
+      SnackbarHelper.error(
+          'Error', 'Error al actualizar datos. Intente nuevamente.');
     } finally {
       isLoading.value = false;
     }
@@ -240,7 +269,7 @@ class IngresosController extends GetxController {
   static Future<void> refreshIngresosGlobally() async {
     try {
       print('🔄 Iniciando refresh global de ingresos...');
-      
+
       // Verificar si el controlador ya está registrado
       if (Get.isRegistered<IngresosController>()) {
         final controller = Get.find<IngresosController>();
@@ -248,7 +277,8 @@ class IngresosController extends GetxController {
         await controller.refreshData();
         print('✅ Datos de ingresos actualizados globalmente');
       } else {
-        print('⚠️ IngresosController no está registrado aún. Los datos se actualizarán cuando se navegue a la pantalla de ingresos.');
+        print(
+            '⚠️ IngresosController no está registrado aún. Los datos se actualizarán cuando se navegue a la pantalla de ingresos.');
       }
     } catch (e) {
       print('⚠️ No se pudo actualizar el controlador de ingresos: $e');
@@ -260,6 +290,94 @@ class IngresosController extends GetxController {
   /// Formatea un número como moneda
   String formatCurrency(double amount) {
     return '\$${amount.toStringAsFixed(2)}';
+  }
+
+  /// Etiqueta del mes seleccionado, ej: "Mayo 2026"
+  String get mesSeleccionadoLabel {
+    final f = fechaInicio.value ?? DateTime.now();
+    return '${nombresMeses[f.month - 1]} ${f.year}';
+  }
+
+  /// Solo el nombre del mes seleccionado, ej: "mayo"
+  String get nombreMesSeleccionado {
+    final f = fechaInicio.value ?? DateTime.now();
+    return nombresMeses[f.month - 1].toLowerCase();
+  }
+
+  /// Formatea una fecha de forma corta en español, ej: "27 may"
+  String formatFechaCorta(DateTime date) {
+    return '${date.day} ${nombresMesesCortos[date.month - 1]}';
+  }
+
+  /// Indica si se puede avanzar al mes siguiente (no permite meses futuros)
+  bool get puedeAvanzarMes {
+    final f = fechaInicio.value ?? DateTime.now();
+    final now = DateTime.now();
+    return f.year < now.year || (f.year == now.year && f.month < now.month);
+  }
+
+  /// Primer día del mes en que se creó la cuenta (límite inferior de navegación).
+  /// Retorna null si no hay contexto de cuenta disponible.
+  DateTime? get _mesCreacionCuenta {
+    if (!Get.isRegistered<TenantContextService>()) return null;
+    final created = TenantContextService.to.accountCreatedAt;
+    if (created == null) return null;
+    return DateTime(created.year, created.month, 1);
+  }
+
+  /// Año de creación de la cuenta (para limitar el navegador de año)
+  int? get anioCreacionCuenta => _mesCreacionCuenta?.year;
+
+  /// Indica si se puede retroceder al mes anterior (no antes de la creación)
+  bool get puedeRetrocederMes {
+    final limite = _mesCreacionCuenta;
+    if (limite == null) return true;
+    final f = fechaInicio.value ?? DateTime.now();
+    return DateTime(f.year, f.month, 1).isAfter(limite);
+  }
+
+  /// Indica si un mes/año es anterior al mes de creación de la cuenta
+  bool esMesAnteriorACreacion(int year, int month) {
+    final limite = _mesCreacionCuenta;
+    if (limite == null) return false;
+    return DateTime(year, month, 1).isBefore(limite);
+  }
+
+  void _setMonth(int year, int month) {
+    selectedPeriodo.value = 'mes';
+    fechaInicio.value = DateTime(year, month, 1);
+    fechaFin.value = DateTime(year, month + 1, 0, 23, 59, 59);
+    refreshData();
+  }
+
+  /// Navega al mes anterior (no antes de la creación de la cuenta)
+  void goToPreviousMonth() {
+    if (!puedeRetrocederMes) return;
+    final f = fechaInicio.value ?? DateTime.now();
+    final prev = DateTime(f.year, f.month - 1, 1);
+    _setMonth(prev.year, prev.month);
+  }
+
+  /// Navega al mes siguiente (si no es futuro)
+  void goToNextMonth() {
+    if (!puedeAvanzarMes) return;
+    final f = fechaInicio.value ?? DateTime.now();
+    final next = DateTime(f.year, f.month + 1, 1);
+    _setMonth(next.year, next.month);
+  }
+
+  /// Selecciona un mes específico (no permite meses futuros ni anteriores a
+  /// la creación de la cuenta)
+  void seleccionarMes(int year, int month) {
+    if (esMesFuturo(year, month)) return;
+    if (esMesAnteriorACreacion(year, month)) return;
+    _setMonth(year, month);
+  }
+
+  /// Indica si un mes/año dado es futuro (no seleccionable)
+  bool esMesFuturo(int year, int month) {
+    final now = DateTime.now();
+    return year > now.year || (year == now.year && month > now.month);
   }
 
   /// Obtiene el color para un concepto
@@ -297,13 +415,7 @@ class IngresosController extends GetxController {
       // No es necesario recargar datos, sólo cambiar la visualización
     } catch (e) {
       print('❌ Error al cambiar tipo de gráfica: $e');
-      Get.snackbar(
-        'Error',
-        'Error al cambiar tipo de gráfica: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      SnackbarHelper.error('Error', 'Error al cambiar tipo de gráfica: $e');
     }
   }
 
@@ -320,9 +432,9 @@ class IngresosController extends GetxController {
       if (estadisticas.value.ingresosPorConcepto.isEmpty) {
         return {};
       }
-      
+
       Map<String, double> datosFormateados = {};
-      
+
       // Transformar las claves para mostrar nombres más amigables
       estadisticas.value.ingresosPorConcepto.forEach((key, value) {
         switch (key) {
@@ -339,7 +451,7 @@ class IngresosController extends GetxController {
             datosFormateados[key.capitalize!] = value;
         }
       });
-      
+
       return datosFormateados;
     } catch (e) {
       print('❌ Error al obtener datos para gráfica pie: $e');

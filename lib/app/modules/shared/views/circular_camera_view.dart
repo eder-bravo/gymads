@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import '../../../core/utils/snackbar_helper.dart';
 
 class CircularCameraView extends StatefulWidget {
   final Function(File) onPhotoTaken;
@@ -68,14 +69,16 @@ class _CircularCameraViewState extends State<CircularCameraView>
       }
 
       // Seleccionar ÚNICAMENTE cámara trasera
-      final backCameras = _cameras.where(
-        (camera) => camera.lensDirection == CameraLensDirection.back,
-      ).toList();
-      
+      final backCameras = _cameras
+          .where(
+            (camera) => camera.lensDirection == CameraLensDirection.back,
+          )
+          .toList();
+
       if (backCameras.isEmpty) {
         throw Exception('No se encontró cámara trasera disponible');
       }
-      
+
       CameraDescription selectedCamera = backCameras.first;
 
       await _controller?.dispose();
@@ -139,12 +142,9 @@ class _CircularCameraViewState extends State<CircularCameraView>
       }
     } catch (e) {
       if (mounted) {
-        Get.snackbar(
+        SnackbarHelper.error(
           'Error',
           'No se pudo tomar la foto: ${e.toString()}',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
         );
       }
     } finally {
@@ -329,15 +329,17 @@ class CircularMaskPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final double centerX = size.width / 2;
     // Ajustar el centro vertical para mejor posicionamiento
-    final double centerY = size.height * 0.45; // Ligeramente más arriba del centro
-    
+    final double centerY =
+        size.height * 0.45; // Ligeramente más arriba del centro
+
     // Calcular el radio basado en la altura de la pantalla para mejor precisión
     // Usar un factor que tenga más relación con la captura real
     final double radius = (size.height * 0.25).clamp(120.0, 200.0);
 
     // Crear path para el círculo
     final Path circlePath = Path()
-      ..addOval(Rect.fromCircle(center: Offset(centerX, centerY), radius: radius));
+      ..addOval(
+          Rect.fromCircle(center: Offset(centerX, centerY), radius: radius));
 
     // Crear path para toda la pantalla
     final Path screenPath = Path()

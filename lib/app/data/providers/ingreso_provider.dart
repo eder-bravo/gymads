@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ingreso_model.dart';
+import '../services/tenant_query_helper.dart';
 
 class IngresoProvider {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -15,7 +16,10 @@ class IngresoProvider {
     try {
       // Ya no necesitamos JOIN porque eliminamos las foreign keys
       // Los nombres de cliente están en cliente_nombre
-      var query = _supabase.from('ingresos').select('*');
+      var query = _supabase
+          .from('ingresos')
+          .select('*')
+          .eq('branch_id', TenantQueryHelper.branchIdOrNull ?? '');
 
       // Aplicar filtros
       if (fechaInicio != null) {
@@ -31,9 +35,8 @@ class IngresoProvider {
         query = query.eq('metodo_pago', metodoPago);
       }
 
-      final response = await query
-          .order('fecha', ascending: false)
-          .limit(limit);
+      final response =
+          await query.order('fecha', ascending: false).limit(limit);
 
       return (response as List)
           .map((json) => IngresoModel.fromJson(json))
@@ -47,7 +50,7 @@ class IngresoProvider {
   /// Crea un nuevo ingreso
   Future<bool> createIngreso(IngresoModel ingreso) async {
     try {
-      final data = ingreso.toJson();
+      final data = TenantQueryHelper.withTenant(ingreso.toJson());
       data.remove('id'); // Remover ID para que sea auto-generado
       data['created_at'] = DateTime.now().toIso8601String();
 
@@ -93,9 +96,8 @@ class IngresoProvider {
       );
 
       // Calcular estadísticas
-      final totalIngresos = ingresos.fold<double>(
-        0, (sum, ingreso) => sum + ingreso.montoFinal
-      );
+      final totalIngresos =
+          ingresos.fold<double>(0, (sum, ingreso) => sum + ingreso.montoFinal);
 
       final ingresosDiarios = ingresos
           .where((ingreso) => ingreso.fecha.isAfter(inicioDia))
@@ -109,30 +111,26 @@ class IngresoProvider {
           .where((ingreso) => ingreso.fecha.isAfter(inicioMes))
           .fold<double>(0, (sum, ingreso) => sum + ingreso.montoFinal);
 
-      final registrosNuevos = ingresos
-          .where((ingreso) => 
-              ingreso.concepto == 'registro')
-          .length;
+      final registrosNuevos =
+          ingresos.where((ingreso) => ingreso.concepto == 'registro').length;
 
-      final renovaciones = ingresos
-          .where((ingreso) => ingreso.concepto == 'renovacion')
-          .length;
+      final renovaciones =
+          ingresos.where((ingreso) => ingreso.concepto == 'renovacion').length;
 
-      final promedioTransaccion = ingresos.isNotEmpty 
-          ? totalIngresos / ingresos.length 
-          : 0.0;
+      final promedioTransaccion =
+          ingresos.isNotEmpty ? totalIngresos / ingresos.length : 0.0;
 
       // Ingresos por método de pago
       final ingresosPorMetodo = <String, double>{};
       for (final ingreso in ingresos) {
-        ingresosPorMetodo[ingreso.metodoPago] = 
+        ingresosPorMetodo[ingreso.metodoPago] =
             (ingresosPorMetodo[ingreso.metodoPago] ?? 0) + ingreso.montoFinal;
       }
 
       // Ingresos por concepto
       final ingresosPorConcepto = <String, double>{};
       for (final ingreso in ingresos) {
-        ingresosPorConcepto[ingreso.concepto] = 
+        ingresosPorConcepto[ingreso.concepto] =
             (ingresosPorConcepto[ingreso.concepto] ?? 0) + ingreso.montoFinal;
       }
 
@@ -172,15 +170,14 @@ class IngresoProvider {
 
       for (final ingreso in ingresos) {
         String clave;
-        
+
         switch (agrupacion) {
           case 'dia':
             clave = '${ingreso.fecha.day}/${ingreso.fecha.month}';
             break;
           case 'semana':
-            final inicioSemana = ingreso.fecha.subtract(
-              Duration(days: ingreso.fecha.weekday - 1)
-            );
+            final inicioSemana = ingreso.fecha
+                .subtract(Duration(days: ingreso.fecha.weekday - 1));
             clave = '${inicioSemana.day}/${inicioSemana.month}';
             break;
           case 'mes':
@@ -214,8 +211,7 @@ class IngresoProvider {
       );
 
       return ingresos.fold<double>(
-        0, (sum, ingreso) => sum + ingreso.montoFinal
-      );
+          0, (sum, ingreso) => sum + ingreso.montoFinal);
     } catch (e) {
       print('❌ Error al obtener ingresos del mes: $e');
       return 0;

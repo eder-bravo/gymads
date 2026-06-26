@@ -3,6 +3,7 @@ import '../controllers/navigation_controller.dart';
 import '../data/providers/storage_provider.dart';
 import '../data/providers/supabase/supabase_storage_provider.dart';
 import '../data/providers/supabase/supabase_api_provider.dart';
+import '../data/repositories/user_repository.dart';
 
 /// Binding inicial para registrar todas las dependencias necesarias
 /// 
@@ -34,6 +35,12 @@ class InitialBinding extends Bindings {
     Get.lazyPut<SupabaseApiProvider>(
       () => SupabaseApiProvider(table: 'check_ins'),
       tag: 'check_ins_provider',
+      fenix: true
+    );
+    
+    // Repositorios globales
+    Get.lazyPut<UserRepository>(
+      () => UserRepository(Get.find<SupabaseApiProvider>(tag: 'users_provider')),
       fenix: true
     );
   }

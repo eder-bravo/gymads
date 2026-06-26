@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../views/circular_camera_view.dart';
+import '../../../core/utils/snackbar_helper.dart';
 
 class PhotoCaptureWidget extends StatelessWidget {
   final Function(File) onPhotoTaken;
@@ -28,23 +29,22 @@ class PhotoCaptureWidget extends StatelessWidget {
       if (Get.context != null) {
         showDialog(
           context: Get.context!,
-          builder:
-              (context) => AlertDialog(
-                title: const Text('Permiso de Cámara Requerido'),
-                content: const Text(
-                  'Para tomar la foto del usuario, necesitamos acceso a la cámara.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Get.back(),
-                    child: const Text('Cancelar'),
-                  ),
-                  TextButton(
-                    onPressed: () => openAppSettings(),
-                    child: const Text('Abrir Configuración'),
-                  ),
-                ],
+          builder: (context) => AlertDialog(
+            title: const Text('Permiso de Cámara Requerido'),
+            content: const Text(
+              'Para tomar la foto del usuario, necesitamos acceso a la cámara.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cancelar'),
               ),
+              TextButton(
+                onPressed: () => openAppSettings(),
+                child: const Text('Abrir Configuración'),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -85,10 +85,9 @@ class PhotoCaptureWidget extends StatelessWidget {
           onPhotoTaken(file);
         }
       } catch (fallbackError) {
-        Get.snackbar(
+        SnackbarHelper.error(
           'Error',
           'No se pudo tomar la foto. Por favor, intenta de nuevo.',
-          snackPosition: SnackPosition.BOTTOM,
         );
       }
     }
@@ -114,38 +113,38 @@ class PhotoCaptureWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(75),
                   border: Border.all(color: Colors.grey[400]!, width: 2),
                 ),
-                child:
-                    tempFile != null
+                child: tempFile != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(75),
+                        child: Image.file(tempFile, fit: BoxFit.cover),
+                      )
+                    : currentPhotoUrl != null
                         ? ClipRRect(
-                          borderRadius: BorderRadius.circular(75),
-                          child: Image.file(tempFile, fit: BoxFit.cover),
-                        )
-                        : currentPhotoUrl != null
-                        ? ClipRRect(
-                          borderRadius: BorderRadius.circular(75),
-                          child: Image.network(
-                            currentPhotoUrl!,
-                            fit: BoxFit.cover,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
-                                Icons.person,
-                                size: 80,
-                                color: Colors.grey,
-                              );
-                            },
-                          ),
-                        )
+                            borderRadius: BorderRadius.circular(75),
+                            child: Image.network(
+                              currentPhotoUrl!,
+                              fit: BoxFit.cover,
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(
+                                  Icons.person,
+                                  size: 80,
+                                  color: Colors.grey,
+                                );
+                              },
+                            ),
+                          )
                         : const Icon(
-                          Icons.camera_alt,
-                          size: 50,
-                          color: Colors.grey,
-                        ),
+                            Icons.camera_alt,
+                            size: 50,
+                            color: Colors.grey,
+                          ),
               );
             }),
           ),

@@ -1,5 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../routes/app_pages.dart';
+import '../../auth/controllers/auth_controller.dart';
+import 'package:gymads/core/theme/app_colors.dart';
+
 
 class HomeController extends GetxController {
   // Estado observable para controlar cuando se está creando un usuario
@@ -20,15 +24,15 @@ class HomeController extends GetxController {
     }
   }
 
+  @override
+  void onReady() {
+    super.onReady();
+  }
+
   // Funciones para manejar las opciones del menú
   void goToCheckIns() {
     statusMessages.add('Navegando a la pantalla de Check-Ins...');
     Get.toNamed(Routes.CHECADOR);
-  }
-
-  void goToRfidCheckIn() {
-    statusMessages.add('Navegando a Control de Acceso RFID...');
-    Get.toNamed(Routes.RFID_CHECKIN);
   }
 
   void goToPaymentRegistration() {
@@ -36,7 +40,7 @@ class HomeController extends GetxController {
     Get.toNamed(Routes.INGRESOS);
   }
 
-  void goToClientes() {
+  Future<void> goToClientes() async {
     statusMessages.add('Navegando a Gestión de Clientes...');
     Get.toNamed(Routes.CLIENTES);
   }
@@ -50,15 +54,10 @@ class HomeController extends GetxController {
     statusMessages.add('Navegando a Punto de Venta...');
     Get.toNamed(Routes.POINT_OF_SALE);
   }
-  
-  void goToMembresias() {
-    statusMessages.add('Navegando a Gestión de Membresías...');
-    Get.toNamed(Routes.MEMBRESIAS);
-  }
 
-  void goToPromociones() {
-    statusMessages.add('Navegando a Gestión de Promociones...');
-    Get.toNamed(Routes.PROMOCIONES);
+  void goToAbonar() {
+    statusMessages.add('Navegando a Abonar...');
+    Get.toNamed(Routes.ABONAR);
   }
 
   void goToAccessLogs() {
@@ -69,5 +68,10 @@ class HomeController extends GetxController {
   /// Limpia los mensajes de estado
   void clearMessages() {
     statusMessages.clear();
+  }
+
+  /// Cerrar sesión
+  void logout() {
+    Get.find<AuthController>().logout();
   }
 }

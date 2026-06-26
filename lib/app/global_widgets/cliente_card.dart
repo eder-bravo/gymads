@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/core/theme/app_colors.dart';
@@ -8,58 +7,48 @@ import 'package:intl/intl.dart';
 class ClienteCard extends StatelessWidget {
   final UserModel cliente;
   final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-  final VoidCallback onRenovar;
 
   const ClienteCard({
     super.key,
     required this.cliente,
     required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onRenovar,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Capitalizar primera letra del tipo de membresía
-    final membershipType =
-        cliente.membershipType[0].toUpperCase() +
-        cliente.membershipType.substring(1);
-
     // Formatear fecha de expiración
     final dateFormatter = DateFormat('dd/MM/yyyy');
-    final String expirationDateText =
-        cliente.expirationDate != null
-            ? dateFormatter.format(cliente.expirationDate!)
-            : 'Sin fecha de expiración';
+    final String expirationDateText = cliente.expirationDate != null
+        ? dateFormatter.format(cliente.expirationDate!)
+        : 'Sin límite de fecha';
 
     // Determinar colores según el estado
-    final Color primaryColor =
-        cliente.isActive
-            ? cliente.needsRenewal
-                ? AppColors.warning
-                : AppColors.info
-            : AppColors.error;
+    final bool isExpired =
+        cliente.daysRemaining <= 0 && cliente.expirationDate != null;
+
+    final Color primaryColor = !cliente.isActive || isExpired
+        ? AppColors.error // Rojo para inactivo o vencido
+        : cliente.needsRenewal
+            ? AppColors.warning // Naranja para por vencer (5 días o menos)
+            : AppColors.info; // Azul para activo
 
     final Color statusColor = primaryColor.withOpacity(0.1);
 
     // Texto del estado
-    final String statusText =
-        cliente.isActive
-            ? cliente.needsRenewal
+    final String statusText = !cliente.isActive
+        ? 'Inactivo'
+        : isExpired
+            ? 'Vencido'
+            : cliente.needsRenewal
                 ? 'Por vencer'
-                : 'Activo'
-            : 'Inactivo';
+                : 'Activo';
 
     // Icono según el estado
-    final IconData statusIcon =
-        cliente.isActive
-            ? cliente.needsRenewal
-                ? Icons.warning_rounded
-                : Icons.check_circle_rounded
-            : Icons.cancel_rounded;
+    final IconData statusIcon = !cliente.isActive || isExpired
+        ? Icons.cancel_rounded // X para inactivo o vencido
+        : cliente.needsRenewal
+            ? Icons.warning_rounded // Advertencia para por vencer
+            : Icons.check_circle_rounded; // Check para activo
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -182,155 +171,32 @@ class ClienteCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Nombre del cliente con badge de ID
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    cliente.name,
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.backgroundColor,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    cliente.userNumber,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textHint,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            // Nombre del cliente
+                            Text(
+                              cliente.name,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 8),
 
-                            // Detalles de la membresía - Layout optimizado para evitar cortes
-                            // Detalles de la membresía - Mostrar en dos líneas con Text.rich
-                            // Detalles de la membresía - icono y tipo en la primera línea, precio en la segunda con indentación
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.card_membership_rounded, size: 16, color: primaryColor),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        membershipType,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: AppColors.textSecondary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 24), // Indent para alinear con texto
-                                  child: Text(
-                                    '\$${cliente.membershipPrice.toStringAsFixed(0)}',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      color: primaryColor,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.visible,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8), // Incrementado de 6 a 8
                             _buildInfoRow(
                               Icons.event_available_rounded,
-                              'Expira: $expirationDateText',
+                              'Puede entrar hasta: $expirationDateText',
                               primaryColor,
                             ),
-                            const SizedBox(height: 8), // Incrementado de 6 a 8
+                            const SizedBox(height: 8),
                             _buildInfoRow(
                               Icons.phone_rounded,
                               cliente.phone,
                               primaryColor,
                             ),
-                            
-                            // Información de promoción si existe
-                            if (cliente.hasActivePromotion) ...[
-                              const SizedBox(height: 8),
-                              _buildInfoRow(
-                                Icons.local_offer_rounded,
-                                cliente.promotionDisplayText,
-                                Colors.orange,
-                                allowWrap: true,
-                              ),
-                              if (cliente.promotionExpiringSoon && cliente.promotionExpiresDate != null) ...[
-                                const SizedBox(height: 4),
-                                _buildInfoRow(
-                                  Icons.warning_rounded,
-                                  'Promoción expira: ${DateFormat('dd/MM/yyyy').format(cliente.promotionExpiresDate!)}',
-                                  Colors.amber,
-                                  allowWrap: true,
-                                ),
-                              ],
-                            ],
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Separador
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: primaryColor.withOpacity(0.2),
-                ),
-
-                // Acciones
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildActionButton(
-                        onEdit,
-                        Icons.edit_rounded,
-                        'Editar',
-                        Colors.blue.shade300,
-                      ),
-                      _buildActionButton(
-                        onDelete,
-                        Icons.delete_rounded,
-                        'Eliminar',
-                        Colors.red.shade300,
-                      ),
-                      _buildActionButton(
-                        onRenovar,
-                        Icons.autorenew_rounded,
-                        'Renovar',
-                        Colors.green.shade300,
                       ),
                     ],
                   ),
@@ -344,12 +210,13 @@ class ClienteCard extends StatelessWidget {
   }
 
   // Widget para filas de información
-  Widget _buildInfoRow(IconData icon, String text, Color color, {bool allowWrap = false}) {
+  Widget _buildInfoRow(IconData icon, String text, Color color,
+      {bool allowWrap = false}) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start, // Cambiar para permitir múltiples líneas
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 2), // Ajustar para alinear con el texto
+          padding: const EdgeInsets.only(top: 2),
           child: Icon(icon, size: 16, color: color),
         ),
         const SizedBox(width: 8),
@@ -357,7 +224,7 @@ class ClienteCard extends StatelessWidget {
           child: Text(
             text,
             style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            maxLines: allowWrap ? 2 : 1, // Permitir hasta 2 líneas si allowWrap es true
+            maxLines: allowWrap ? 2 : 1,
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -365,28 +232,4 @@ class ClienteCard extends StatelessWidget {
     );
   }
 
-  // Widget para botones de acción
-  Widget _buildActionButton(
-    VoidCallback onPressed,
-    IconData icon,
-    String label,
-    Color color,
-  ) {
-    return TextButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18, color: color),
-      label: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-        ),
-      ),
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
 }

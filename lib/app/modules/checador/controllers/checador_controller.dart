@@ -22,6 +22,7 @@ class ChecadorController extends GetxController {
   final daysLeft = 0.obs;
   final userPhotoUrl = ''.obs;
   final membershipType = ''.obs;
+  final expirationDate = Rx<DateTime?>(null);
   final isLoading = false.obs;
   final errorMessage = ''.obs;
   
@@ -242,7 +243,7 @@ class ChecadorController extends GetxController {
         userName.value = user.name;
         daysLeft.value = user.daysRemaining;
         userPhotoUrl.value = user.photoUrl ?? '';
-        membershipType.value = user.membershipType;
+        expirationDate.value = user.expirationDate;
 
         // Siempre es entrada (sin salidas)
         const nextAccessType = 'entrada';
@@ -336,6 +337,14 @@ class ChecadorController extends GetxController {
           return;
         }
 
+        // Salvaguarda: nunca registrar entrada de una membresía inactiva o vencida
+        if (!user.isActive || user.daysRemaining <= 0) {
+          if (kDebugMode) {
+            print('⛔ Registro de acceso bloqueado (membresía no válida): ${user.name}');
+          }
+          return;
+        }
+
         if (kDebugMode) {
           print('🔄 Iniciando registro de acceso en Supabase...');
           print('   👤 Usuario: ${user.name} (${user.userNumber})');
@@ -365,7 +374,8 @@ class ChecadorController extends GetxController {
           }
         } else {
           if (kDebugMode) {
-            print('❌ Error: No se pudo registrar el acceso en Supabase');
+            print('⚠️ No se registró el acceso: Ya existe una entrada para hoy');
+            print('   El usuario ${user.name} ya tiene una entrada registrada hoy');
           }
         }
       } catch (e) {

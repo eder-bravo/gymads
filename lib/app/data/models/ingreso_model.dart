@@ -7,8 +7,6 @@ class IngresoModel {
   final String tipoMembresia;
   final double montoBase;
   final double cuotaRegistro;
-  final String? promocionId;
-  final String? promocionNombre;
   final double descuento;
   final double montoFinal;
   final String metodoPago; // 'efectivo', 'tarjeta', 'transferencia'
@@ -28,8 +26,6 @@ class IngresoModel {
     required this.tipoMembresia,
     required this.montoBase,
     this.cuotaRegistro = 0.0,
-    this.promocionId,
-    this.promocionNombre,
     this.descuento = 0.0,
     required this.montoFinal,
     required this.metodoPago,
@@ -52,8 +48,6 @@ class IngresoModel {
       tipoMembresia: json['tipo_membresia'] ?? '',
       montoBase: (json['monto_base'] ?? 0).toDouble(),
       cuotaRegistro: (json['cuota_registro'] ?? 0).toDouble(),
-      promocionId: json['promocion_id'],
-      promocionNombre: json['promocion_nombre'],
       descuento: (json['descuento'] ?? 0).toDouble(),
       montoFinal: (json['monto_final'] ?? 0).toDouble(),
       metodoPago: json['metodo_pago'] ?? 'efectivo',
@@ -87,8 +81,6 @@ class IngresoModel {
       'tipo_membresia': tipoMembresia,
       'monto_base': montoBase,
       'cuota_registro': cuotaRegistro,
-      'promocion_id': promocionId,
-      'promocion_nombre': promocionNombre,
       'descuento': descuento,
       'monto_final': montoFinal,
       'metodo_pago': metodoPago,
@@ -111,8 +103,6 @@ class IngresoModel {
     String? tipoMembresia,
     double? montoBase,
     double? cuotaRegistro,
-    String? promocionId,
-    String? promocionNombre,
     double? descuento,
     double? montoFinal,
     String? metodoPago,
@@ -132,8 +122,6 @@ class IngresoModel {
       tipoMembresia: tipoMembresia ?? this.tipoMembresia,
       montoBase: montoBase ?? this.montoBase,
       cuotaRegistro: cuotaRegistro ?? this.cuotaRegistro,
-      promocionId: promocionId ?? this.promocionId,
-      promocionNombre: promocionNombre ?? this.promocionNombre,
       descuento: descuento ?? this.descuento,
       montoFinal: montoFinal ?? this.montoFinal,
       metodoPago: metodoPago ?? this.metodoPago,

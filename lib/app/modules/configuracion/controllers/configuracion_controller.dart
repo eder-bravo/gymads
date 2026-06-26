@@ -1,41 +1,57 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/rfid_reader_service.dart';
+import '../../../data/services/tenant_context_service.dart';
+import '../../../data/services/branding_service.dart';
+import '../views/branding_settings_view.dart';
+import '../../../data/models/staff_profile_model.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/utils/snackbar_helper.dart';
+import '../../../routes/app_pages.dart';
 
 class ConfiguracionController extends GetxController {
   // Variables observables para la configuración
   final RxBool isLoading = false.obs;
-  
-  // Variables para información de cuenta
-  final RxString userName = 'Eder Blanco'.obs;
-  final RxString userEmail = 'eder@gymads.com'.obs;
-  final RxString userRole = 'Admin'.obs;
-  
+
+  // Variables para información de cuenta (populated from TenantContextService)
+  final RxString userName = ''.obs;
+  final RxString userEmail = ''.obs;
+  final RxString userRole = ''.obs;
+  final RxString firstName = ''.obs;
+  final RxString lastName = ''.obs;
+  final RxString gymName = ''.obs;
+  final RxString branchName = ''.obs;
+  final RxString brandColor = '#10D5E8'.obs;
+
   // Variables para configuración del lector RFID
   final RxBool rfidConnectionStatus = false.obs;
-  final RxString connectionStatusMessage = 'Verificando conexión...'.obs;
+  final RxString connectionStatusMessage = 'Desactivado'.obs;
   final RxString esp32IpAddress = ''.obs;
-  
+  final RxBool isRfidScanning = false.obs;
+  final RxBool rfidEnabled = false.obs;
+  bool _rfidScanCancelled = false;
+
   // Variables para ESP32 con IP manual
   final RxBool esp32Connected = false.obs;
   final RxString esp32StatusMessage = 'ESP32 desconectado'.obs;
-  
+
   // Variables para configuración de audio
   final RxBool soundEnabled = true.obs;
   final RxDouble soundVolume = 0.8.obs;
-  
+
   // Variables para configuración de QR
   final RxBool qrEnabled = true.obs;
   final RxString qrCodeFormat = 'auto'.obs;
-  
+
   @override
   void onInit() {
     super.onInit();
+    _loadUserInfo();
     _loadConfiguration();
-    _initializeESP32Connection();
   }
 
   @override
@@ -43,121 +59,262 @@ class ConfiguracionController extends GetxController {
     super.onClose();
   }
 
-  // =================== MÉTODOS DE INICIALIZACIÓN ===================
+  // =================== USER INFO FROM SESSION ===================
 
-  Future<void> _loadConfiguration() async {
+  void _loadUserInfo() {
+    final tenant = TenantContextService.to;
+    final user = Supabase.instance.client.auth.currentUser;
+
+    // Name
+    final profile = tenant.staffProfile;
+    firstName.value = profile?.firstName ?? '';
+    lastName.value = profile?.lastName ?? '';
+    userName.value =
+        tenant.displayName ?? user?.email?.split('@').first ?? 'Usuario';
+    userEmail.value = user?.email ?? '';
+    userRole.value = _formatRole(profile?.role);
+    gymName.value = '';
+    branchName.value = '';
+
+    // Try to load gym/branch names
+    _loadGymInfo();
+  }
+
+  String _formatRole(String? role) {
+    switch (role) {
+      case 'owner_admin':
+        return 'Dueño / Admin';
+      case 'branch_staff':
+        return 'Staff de Sucursal';
+      default:
+        return 'Admin';
+    }
+  }
+
+  Future<void> _loadGymInfo() async {
+    try {
+      final tenant = TenantContextService.to;
+      if (tenant.currentGymId != null) {
+        final gymData = await Supabase.instance.client
+            .from('gyms')
+            .select('name, brand_color')
+            .eq('id', tenant.currentGymId!)
+            .maybeSingle();
+        if (gymData != null) {
+          gymName.value = gymData['name'] as String? ?? '';
+          brandColor.value = gymData['brand_color'] as String? ?? '#10D5E8';
+        }
+      }
+      if (tenant.currentBranchId != null) {
+        final branchData = await Supabase.instance.client
+            .from('branches')
+            .select('name')
+            .eq('id', tenant.currentBranchId!)
+            .maybeSingle();
+        if (branchData != null) {
+          branchName.value = branchData['name'] as String? ?? '';
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Could not load gym/branch names: $e');
+    }
+  }
+
+  // =================== UPDATE GYM BRANDING ===================
+
+  Future<void> updateGymName(String value) async {
+    final gymId = TenantContextService.to.currentGymId;
+    if (gymId == null) return;
+    try {
+      await Supabase.instance.client
+          .from('gyms')
+          .update({'name': value}).eq('id', gymId);
+      gymName.value = value;
+      // Refresh the staff profile to update cached gym name
+      await _refreshTenantProfile();
+      SnackbarHelper.success('¡Listo!', 'Nombre del gimnasio actualizado');
+    } catch (e) {
+      if (kDebugMode) print('Error updating gym name: $e');
+      SnackbarHelper.error('Error', 'No se pudo actualizar el nombre');
+    }
+  }
+
+  Future<void> updateBrandColor(String hexColor) async {
+    final gymId = TenantContextService.to.currentGymId;
+    if (gymId == null) return;
+    try {
+      await Supabase.instance.client
+          .from('gyms')
+          .update({'brand_color': hexColor}).eq('id', gymId);
+      brandColor.value = hexColor;
+      await _refreshTenantProfile();
+      SnackbarHelper.success('¡Listo!', 'Color de marca actualizado');
+    } catch (e) {
+      if (kDebugMode) print('Error updating brand color: $e');
+      SnackbarHelper.error('Error', 'No se pudo actualizar el color');
+    }
+  }
+
+  Future<void> _refreshTenantProfile() async {
+    try {
+      final userId = TenantContextService.to.userId;
+      if (userId == null) return;
+      final response = await Supabase.instance.client
+          .from('staff_profiles')
+          .select('*, gyms(name, brand_color, brand_font, created_at)')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .maybeSingle();
+      if (response != null) {
+        final profile = StaffProfileModel.fromJson(response);
+        await TenantContextService.to.setProfile(profile);
+      }
+    } catch (e) {
+      if (kDebugMode) print('Error refreshing tenant profile: $e');
+    }
+  }
+
+  // =================== UPDATE PROFILE ===================
+
+  Future<void> updateFirstName(String value) async {
+    await _updateProfileField('first_name', value);
+    firstName.value = value;
+    _refreshDisplayName();
+  }
+
+  Future<void> updateLastName(String value) async {
+    await _updateProfileField('last_name', value);
+    lastName.value = value;
+    _refreshDisplayName();
+  }
+
+  Future<void> _updateProfileField(String field, String value) async {
     try {
       isLoading.value = true;
-      
-      // Cargar configuración desde SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      
-      // Configuración de usuario
-      userName.value = prefs.getString('user_name') ?? 'Eder Blanco';
-      userEmail.value = prefs.getString('user_email') ?? 'eder@gymads.com';
-      userRole.value = prefs.getString('user_role') ?? 'Admin';
-      
-      // Configuración de audio
-      soundEnabled.value = prefs.getBool('sound_enabled') ?? true;
-      soundVolume.value = prefs.getDouble('sound_volume') ?? 0.8;
-      
-      // Configuración de QR
-      qrEnabled.value = prefs.getBool('qr_enabled') ?? true;
-      qrCodeFormat.value = prefs.getString('qr_format') ?? 'auto';
-      
-      // Cargar IP manual si existe
-      String? savedIP = prefs.getString('esp32_ip_manual');
-      if (savedIP != null && savedIP.isNotEmpty) {
-        // Intentar conectar con la IP guardada
-        await connectToESP32WithIP(savedIP);
-      }
-      
-      await RfidConfig.loadConfig();
-      await _checkRfidConnection();
-      
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      // Build display_name
+      String newFirst = field == 'first_name' ? value : firstName.value;
+      String newLast = field == 'last_name' ? value : lastName.value;
+      String displayName = '$newFirst $newLast'.trim();
+
+      await Supabase.instance.client.from('staff_profiles').update({
+        field: value,
+        'display_name': displayName,
+      }).eq('user_id', userId);
+
+      // Refresh TenantContextService cache
+      final profileData = await Supabase.instance.client
+          .from('staff_profiles')
+          .select()
+          .eq('user_id', userId)
+          .single();
+
+      await TenantContextService.to
+          .setProfile(StaffProfileModel.fromJson(profileData));
+
+      SnackbarHelper.success('Guardado', 'Información actualizada');
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Error al cargar configuración: $e',
-        backgroundColor: AppColors.error,
-        colorText: Colors.white,
-      );
+      if (kDebugMode) print('❌ Error updating profile: $e');
+      SnackbarHelper.error('Error', 'No se pudo actualizar: $e');
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> _initializeESP32Connection() async {
+  void _refreshDisplayName() {
+    userName.value = '${firstName.value} ${lastName.value}'.trim();
+  }
+
+  // =================== MÉTODOS DE INICIALIZACIÓN ===================
+
+  Future<void> _loadConfiguration() async {
     try {
-      // Intentar conectar directamente con la IP estática predeterminada
-      await connectToESP32WithIP(RfidConfig.DEFAULT_ESP32_IP);
+      isLoading.value = true;
+
+      // Cargar configuración desde SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+
+      // Configuración de audio
+      soundEnabled.value = prefs.getBool('sound_enabled') ?? true;
+      soundVolume.value = prefs.getDouble('sound_volume') ?? 0.8;
+
+      // Configuración de QR
+      qrEnabled.value = prefs.getBool('qr_enabled') ?? true;
+      qrCodeFormat.value = prefs.getString('qr_format') ?? 'auto';
+
+      // RFID — only scan if enabled
+      rfidEnabled.value = prefs.getBool('rfid_enabled') ?? false;
+      if (rfidEnabled.value && !_rfidScanCancelled) {
+        isRfidScanning.value = true;
+        connectionStatusMessage.value = 'Buscando lector RFID...';
+        await RfidConfig.loadConfig();
+        isRfidScanning.value = false;
+        if (!_rfidScanCancelled) {
+          await _checkRfidConnection();
+        }
+      } else if (!rfidEnabled.value) {
+        connectionStatusMessage.value = 'Desactivado';
+      }
     } catch (e) {
-      esp32StatusMessage.value = 'Error de inicialización: $e';
+      if (kDebugMode) {
+        print('❌ Error al cargar configuración: $e');
+      }
+    } finally {
+      isLoading.value = false;
     }
   }
 
   // =================== MÉTODOS DE CONEXIÓN ESP32 ===================
 
-
-
-
-
-  /// Conectar manualmente con IP específica (método principal de conexión)
-  Future<void> connectToESP32WithIP(String ipAddress) async {
+  /// Conectar manualmente con IP específica
+  Future<void> connectToESP32WithIP(String ipAddress,
+      {bool showNotification = true}) async {
     try {
       isLoading.value = true;
       esp32StatusMessage.value = 'Conectando a $ipAddress...';
-      
-      // Verificar formato de IP válido
-      final RegExp ipRegex = RegExp(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$');
+
+      final RegExp ipRegex = RegExp(
+          r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$');
       if (!ipRegex.hasMatch(ipAddress)) {
-        Get.snackbar(
-          'Formato inválido',
-          'La dirección IP no tiene un formato válido (ej: 192.168.1.100)',
-          backgroundColor: AppColors.warning,
-          colorText: Colors.white,
-        );
+        if (showNotification) {
+          SnackbarHelper.error('Formato inválido',
+              'La dirección IP no tiene un formato válido (ej: 192.168.1.100)');
+        }
         return;
       }
-      
+
       bool connected = await RfidConfig.setManualIP(ipAddress);
-      
+
       if (connected) {
         esp32Connected.value = true;
         esp32IpAddress.value = ipAddress;
         esp32StatusMessage.value = 'ESP32 conectado: $ipAddress';
-        
-        Get.snackbar(
-          'Conectado',
-          'ESP32 conectado exitosamente a $ipAddress',
-          backgroundColor: AppColors.success,
-          colorText: Colors.white,
-        );
-        
-        // Guardar la IP para uso futuro
+
+        if (showNotification) {
+          SnackbarHelper.success(
+              'Conectado', 'ESP32 conectado exitosamente a $ipAddress');
+        }
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('esp32_ip_manual', ipAddress);
       } else {
         esp32Connected.value = false;
         esp32StatusMessage.value = 'No se pudo conectar a $ipAddress';
-        
-        Get.snackbar(
-          'Error de conexión',
-          'No se pudo conectar al ESP32 en $ipAddress. Verifique que el dispositivo esté encendido y en la misma red.',
-          backgroundColor: AppColors.error,
-          colorText: Colors.white,
-        );
+
+        if (showNotification) {
+          SnackbarHelper.error('Error de conexión',
+              'No se pudo conectar al ESP32 en $ipAddress.');
+        }
       }
     } catch (e) {
       esp32Connected.value = false;
       esp32StatusMessage.value = 'Error: $e';
-      
-      Get.snackbar(
-        'Error',
-        'Error al conectar: $e',
-        backgroundColor: AppColors.error,
-        colorText: Colors.white,
-      );
+
+      if (showNotification) {
+        SnackbarHelper.error('Error', 'Error al conectar: $e');
+      }
     } finally {
       isLoading.value = false;
     }
@@ -167,10 +324,11 @@ class ConfiguracionController extends GetxController {
   Future<void> getESP32Status() async {
     try {
       bool available = await RfidConfig.isESP32Available();
-      
+
       if (available) {
         esp32Connected.value = true;
-        esp32IpAddress.value = RfidConfig.getCurrentIP() ?? RfidConfig.DEFAULT_ESP32_IP;
+        esp32IpAddress.value =
+            RfidConfig.getCurrentIP() ?? RfidConfig.DEFAULT_ESP32_IP;
         esp32StatusMessage.value = 'ESP32 conectado: ${esp32IpAddress.value}';
       } else {
         esp32Connected.value = false;
@@ -185,14 +343,12 @@ class ConfiguracionController extends GetxController {
 
   Future<void> _checkRfidConnection() async {
     try {
-      // Verificar si hay configuración RFID
-      bool isConfigured = RfidConfig.isConfigured;
-      rfidConnectionStatus.value = isConfigured;
-      
-      if (isConfigured) {
-        connectionStatusMessage.value = 'RFID configurado';
+      final available = await RfidConfig.isESP32Available();
+      rfidConnectionStatus.value = available;
+
+      if (available) {
+        connectionStatusMessage.value = 'Conectado y funcionando';
         if (RfidConfig.baseUrl != null) {
-          // Extraer IP de la URL
           String url = RfidConfig.baseUrl!;
           final RegExp ipRegex = RegExp(r'(\d+\.\d+\.\d+\.\d+)');
           final match = ipRegex.firstMatch(url);
@@ -201,117 +357,114 @@ class ConfiguracionController extends GetxController {
           }
         }
       } else {
-        connectionStatusMessage.value = 'RFID no configurado';
+        connectionStatusMessage.value = 'Sin conexión al lector';
       }
     } catch (e) {
       rfidConnectionStatus.value = false;
-      connectionStatusMessage.value = 'Error al verificar RFID: $e';
+      connectionStatusMessage.value = 'Error al verificar: $e';
     }
   }
 
-  /// Probar conexión RFID
+  /// Probar conexión RFID (also enables RFID)
   Future<void> testRfidConnection() async {
     try {
+      _rfidScanCancelled = false;
+      rfidEnabled.value = true;
+      isRfidScanning.value = true;
       isLoading.value = true;
-      connectionStatusMessage.value = 'Probando conexión...';
-      
-      // Intentar leer una tarjeta para probar la conexión
+      connectionStatusMessage.value = 'Buscando lector RFID...';
+
+      // Persist enabled state
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('rfid_enabled', true);
+
+      await RfidConfig.loadConfig();
+      if (_rfidScanCancelled) return;
+
+      // Real connectivity check
+      connectionStatusMessage.value = 'Verificando conexión...';
+      final bool isAvailable = await RfidConfig.isESP32Available();
+      if (_rfidScanCancelled) return;
+
+      if (!isAvailable) {
+        rfidConnectionStatus.value = false;
+        connectionStatusMessage.value = 'Sin conexión al lector';
+        SnackbarHelper.error('Sin conexión',
+            'No se pudo conectar al lector RFID. Verifica que esté encendido y en la misma red WiFi.');
+        return;
+      }
+
+      // Device is reachable, try reading a card
+      connectionStatusMessage.value = 'Probando lectura...';
       String? cardUid = await RfidReaderService.checkForCard();
-      
+      if (_rfidScanCancelled) return;
+
       if (cardUid != null) {
         rfidConnectionStatus.value = true;
-        connectionStatusMessage.value = 'RFID conectado - Tarjeta detectada';
-        
-        Get.snackbar(
-          'Conexión exitosa',
-          'El lector RFID está funcionando correctamente',
-          backgroundColor: AppColors.success,
-          colorText: Colors.white,
-        );
-      } else if (RfidConfig.isConfigured) {
-        rfidConnectionStatus.value = true;
-        connectionStatusMessage.value = 'RFID conectado - Sin tarjeta';
-        
-        Get.snackbar(
-          'Conexión OK',
-          'El lector RFID está conectado pero no hay tarjeta presente',
-          backgroundColor: AppColors.info,
-          colorText: Colors.white,
-        );
+        connectionStatusMessage.value = 'Conectado - Tarjeta detectada';
+        SnackbarHelper.success('Conexión exitosa',
+            'El lector RFID está funcionando correctamente');
       } else {
-        rfidConnectionStatus.value = false;
-        connectionStatusMessage.value = 'RFID no configurado';
-        
-        Get.snackbar(
-          'Sin configurar',
-          'El lector RFID no está configurado',
-          backgroundColor: AppColors.warning,
-          colorText: Colors.white,
-        );
+        rfidConnectionStatus.value = true;
+        connectionStatusMessage.value = 'Conectado - Sin tarjeta';
+        SnackbarHelper.info('Conexión OK',
+            'El lector RFID está conectado pero no hay tarjeta presente');
       }
-    } catch (e) {
-      rfidConnectionStatus.value = false;
-      connectionStatusMessage.value = 'Error: $e';
-      
-      Get.snackbar(
-        'Error',
-        'Error al probar conexión: $e',
-        backgroundColor: AppColors.error,
-        colorText: Colors.white,
-      );
+    } on Exception catch (e) {
+      if (!_rfidScanCancelled) {
+        rfidConnectionStatus.value = false;
+        final msg = e.toString();
+        if (msg.contains('TimeoutException') || msg.contains('timed out')) {
+          connectionStatusMessage.value = 'Tiempo de espera agotado';
+          SnackbarHelper.error('Timeout',
+              'El lector RFID no respondió a tiempo. Verifica que esté encendido.');
+        } else if (msg.contains('Connection refused') ||
+            msg.contains('ECONNREFUSED')) {
+          connectionStatusMessage.value = 'Conexión rechazada';
+          SnackbarHelper.error('Conexión rechazada',
+              'El lector RFID rechazó la conexión. Verifica la IP configurada.');
+        } else if (msg.contains('Network is unreachable') ||
+            msg.contains('No route to host')) {
+          connectionStatusMessage.value = 'Red no disponible';
+          SnackbarHelper.error('Sin red',
+              'No se puede alcanzar la red del lector. Verifica tu conexión WiFi.');
+        } else {
+          connectionStatusMessage.value = 'Error de conexión';
+          SnackbarHelper.error('Error', 'Error al conectar: $msg');
+        }
+      }
     } finally {
+      isRfidScanning.value = false;
       isLoading.value = false;
     }
   }
 
-  // =================== MÉTODOS DE CONFIGURACIÓN ===================
+  /// Cancel ongoing RFID scan / disable RFID
+  void cancelRfidScan() async {
+    _rfidScanCancelled = true;
+    rfidEnabled.value = false;
+    isRfidScanning.value = false;
+    rfidConnectionStatus.value = false;
+    isLoading.value = false;
+    connectionStatusMessage.value = 'Desactivado';
 
-  /// Guardar configuración de usuario
-  Future<void> saveUserConfiguration() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      await prefs.setString('user_name', userName.value);
-      await prefs.setString('user_email', userEmail.value);
-      await prefs.setString('user_role', userRole.value);
-      
-      Get.snackbar(
-        'Guardado',
-        'Configuración de usuario guardada',
-        backgroundColor: AppColors.success,
-        colorText: Colors.white,
-      );
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Error al guardar configuración: $e',
-        backgroundColor: AppColors.error,
-        colorText: Colors.white,
-      );
-    }
+    // Persist disabled state
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('rfid_enabled', false);
   }
+
+  // =================== MÉTODOS DE CONFIGURACIÓN ===================
 
   /// Guardar configuración de audio
   Future<void> saveAudioConfiguration() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
       await prefs.setBool('sound_enabled', soundEnabled.value);
       await prefs.setDouble('sound_volume', soundVolume.value);
-      
-      Get.snackbar(
-        'Guardado',
-        'Configuración de audio guardada',
-        backgroundColor: AppColors.success,
-        colorText: Colors.white,
-      );
+      SnackbarHelper.success('Guardado', 'Configuración de audio guardada');
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Error al guardar configuración de audio: $e',
-        backgroundColor: AppColors.error,
-        colorText: Colors.white,
-      );
+      SnackbarHelper.error(
+          'Error', 'Error al guardar configuración de audio: $e');
     }
   }
 
@@ -319,162 +472,268 @@ class ConfiguracionController extends GetxController {
   Future<void> saveQRConfiguration() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
       await prefs.setBool('qr_enabled', qrEnabled.value);
       await prefs.setString('qr_format', qrCodeFormat.value);
-      
-      Get.snackbar(
-        'Guardado',
-        'Configuración de QR guardada',
-        backgroundColor: AppColors.success,
-        colorText: Colors.white,
-      );
+      SnackbarHelper.success('Guardado', 'Configuración de QR guardada');
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Error al guardar configuración de QR: $e',
-        backgroundColor: AppColors.error,
-        colorText: Colors.white,
-      );
+      SnackbarHelper.error('Error', 'Error al guardar configuración de QR: $e');
     }
   }
 
-  /// Restablecer configuración
-  Future<void> resetConfiguration() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-      
-      // Restablecer valores por defecto
-      userName.value = 'Eder Blanco';
-      userEmail.value = 'eder@gymads.com';
-      userRole.value = 'Admin';
-      soundEnabled.value = true;
-      soundVolume.value = 0.8;
-      qrEnabled.value = true;
-      qrCodeFormat.value = 'auto';
-      
-      Get.snackbar(
-        'Restablecido',
-        'Configuración restablecida a valores por defecto',
-        backgroundColor: AppColors.info,
-        colorText: Colors.white,
-      );
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Error al restablecer configuración: $e',
-        backgroundColor: AppColors.error,
-        colorText: Colors.white,
-      );
-    }
-  }
-
-  // =================== MÉTODOS DE INFORMACIÓN ===================
-
-  /// Mostrar información sobre la conexión WiFi
-  void showWifiInfo() {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Conexión WiFi con IP Estática'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('El sistema ahora usa conexión WiFi directa con IP estática:'),
-            SizedBox(height: 8),
-            Text('✓ IP fija: 192.168.1.100'),
-            Text('✓ Sin configuración necesaria'),
-            Text('✓ Mayor estabilidad y rendimiento'),
-            SizedBox(height: 12),
-            Text('IMPORTANTE:', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('El ESP32 debe estar en la misma red WiFi que este dispositivo.'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Entendido'),
-          ),
-        ],
-      ),
-    );
-  }
-  
   // =================== MÉTODOS PARA NAVEGACIÓN DE CONFIGURACIÓN ===================
-  
-  /// Abrir configuración de cuenta
+
+  /// Abrir configuración de cuenta — navega a CuentaView
   void openAccountSettings() {
-    // Mostrar un diálogo simple por ahora
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Configuración de Cuenta'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Esta funcionalidad será implementada próximamente.'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Aceptar'),
-          ),
-        ],
-      ),
-    );
+    Get.toNamed(Routes.CUENTA);
   }
-  
-  /// Abrir configuración de aplicación
+
+  /// Open application settings — full-screen branding page
   void openAppSettings() {
-    // Mostrar un diálogo simple por ahora
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Configuración de Aplicación'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Esta funcionalidad será implementada próximamente.'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Aceptar'),
-          ),
-        ],
-      ),
-    );
+    Get.to(() => BrandingSettingsView());
   }
-  
-  /// Cerrar sesión
+
+  /// Backup branding to DB (fire-and-forget)
+  Future<void> backupBranding(
+      {String? name, String? color, String? font}) async {
+    final gymId = TenantContextService.to.currentGymId;
+    if (gymId == null) return;
+    try {
+      final updates = <String, dynamic>{};
+      if (name != null) updates['name'] = name;
+      if (color != null) updates['brand_color'] = color;
+      if (font != null) updates['brand_font'] = font;
+      if (updates.isNotEmpty) {
+        await Supabase.instance.client
+            .from('gyms')
+            .update(updates)
+            .eq('id', gymId);
+      }
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Could not backup branding to DB: $e');
+    }
+  }
+
+  // =================== LOGOUT ===================
+
+  /// Cerrar sesión con confirmación
   void logout() {
     Get.dialog(
       AlertDialog(
-        title: const Text('Cerrar Sesión'),
-        content: const Text('¿Está seguro que desea cerrar la sesión?'),
+        backgroundColor: AppColors.cardBackground,
+        title: const Text(
+          'Cerrar Sesión',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          '¿Estás seguro que deseas cerrar la sesión?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              // Aquí implementar la lógica de cierre de sesión
-              Get.back();
-              Get.snackbar(
-                'Cerrar Sesión',
-                'Funcionalidad en desarrollo',
-                backgroundColor: AppColors.info,
-                colorText: Colors.white,
-              );
+            onPressed: () async {
+              Get.back(); // close dialog
+              await _performLogout();
             },
-            child: const Text('Cerrar Sesión'),
+            child: const Text(
+              'Cerrar Sesión',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      isLoading.value = true;
+
+      // Sign out from Supabase
+      await Supabase.instance.client.auth.signOut();
+
+      // Clear tenant context
+      await TenantContextService.to.clearProfile();
+
+      // Navigate to login
+      Get.offAllNamed(Routes.LOGIN);
+    } catch (e) {
+      if (kDebugMode) print('❌ Error during logout: $e');
+      SnackbarHelper.error('Error', 'Error al cerrar sesión: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // =================== DELETE GYM & ACCOUNT ===================
+
+  /// Delete entire gym data and owner account via Supabase RPC
+  Future<void> deleteGymAndAccount() async {
+    final gymId = TenantContextService.to.currentGymId;
+    if (gymId == null) {
+      SnackbarHelper.error('Error', 'No se encontró el gimnasio');
+      return;
+    }
+
+    // First confirmation
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red[400], size: 28),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                '¿Borrar todos los datos?',
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Esta acción eliminará permanentemente:\n\n'
+          '• Todos los clientes y membresías\n'
+          '• Todo el inventario y ventas\n'
+          '• Todos los registros de acceso\n'
+          '• Todos los pagos e ingresos\n'
+          '• El gimnasio y sus sucursales\n'
+          '• Tu cuenta de usuario\n\n'
+          'Esta acción NO se puede deshacer.',
+          style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: Text(
+              'Sí, borrar todo',
+              style: TextStyle(color: Colors.red[400], fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Second confirmation — type gym name
+    final nameConfirmed = await Get.dialog<bool>(
+      _ConfirmDeleteDialog(gymName: gymName.value),
+    );
+
+    if (nameConfirmed != true) return;
+
+    // Execute deletion
+    try {
+      isLoading.value = true;
+
+      final result = await Supabase.instance.client
+          .rpc('delete_gym_cascade', params: {'p_gym_id': gymId});
+
+      if (kDebugMode) print('🗑️ delete_gym_cascade result: $result');
+
+      // Clear local data
+      await TenantContextService.to.clearProfile();
+
+      // Navigate to login
+      Get.offAllNamed(Routes.LOGIN);
+
+      // Show success after navigation
+      Future.delayed(const Duration(milliseconds: 500), () {
+        SnackbarHelper.success(
+            'Cuenta eliminada', 'Todos los datos han sido borrados');
+      });
+    } catch (e) {
+      if (kDebugMode) print('❌ Error deleting gym: $e');
+      SnackbarHelper.error(
+          'Error', 'No se pudieron borrar los datos: ${e.toString()}');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+}
+
+/// Dialog that requires typing the gym name to confirm deletion
+class _ConfirmDeleteDialog extends StatelessWidget {
+  final String gymName;
+  _ConfirmDeleteDialog({required this.gymName});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = TextEditingController();
+    final isMatch = false.obs;
+
+    return Obx(() => AlertDialog(
+          backgroundColor: AppColors.cardBackground,
+          title: const Text(
+            'Confirmar eliminación',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(color: AppColors.textSecondary, height: 1.5),
+                  children: [
+                    const TextSpan(text: 'Para confirmar, escribe el nombre de tu gimnasio:\n\n'),
+                    TextSpan(
+                      text: gymName,
+                      style: TextStyle(
+                        color: Colors.red[400],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Escribe el nombre aquí',
+                  hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.red.withOpacity(0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.red[400]!),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.05),
+                ),
+                onChanged: (val) {
+                  isMatch.value = val.trim().toLowerCase() == gymName.trim().toLowerCase();
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: isMatch.value ? () => Get.back(result: true) : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[700],
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey[800],
+              ),
+              child: const Text('Borrar permanentemente'),
+            ),
+          ],
+        ));
   }
 }

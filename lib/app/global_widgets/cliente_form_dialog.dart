@@ -1,147 +1,139 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/user_model.dart';
-import 'package:gymads/app/data/models/membership_type_model.dart';
-import 'package:gymads/app/data/models/promotion_model.dart';
-import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/app/modules/shared/widgets/rfid_reader_animation.dart';
-import 'package:gymads/app/modules/clientes/controllers/clientes_controller.dart';
+import 'package:gymads/app/data/services/rfid_reader_service.dart';
+import 'package:gymads/app/data/services/background_rfid_service.dart';
 import 'package:gymads/core/theme/app_colors.dart';
-import 'package:gymads/app/data/config/rfid_config.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import '../modules/shared/widgets/photo_capture_widget.dart';
 
-class ClienteFormDialog extends StatelessWidget {
+class ClienteFormDialog extends StatefulWidget {
   final TextEditingController nombreController;
   final TextEditingController phoneController;
+  final TextEditingController emailController;
+  final TextEditingController addressController;
   final TextEditingController userNumberController;
-  final TextEditingController rfidController; // Añadido controlador para RFID
-  final RxString selectedMembershipType;
-  final List<String> membershipTypes;
-  final List<MembershipTypeModel>? membershipTypeModels;
-  final RxString selectedPaymentMethod;
-  final List<String> paymentMethods;
+  final TextEditingController rfidController;
   final bool isEditing;
-  final bool isRenewing;
   final Function(UserModel, File?) onSave;
-  final RxDouble membershipCost;
-  final RxDouble registrationFee;
-  final RxDouble totalAmount;
   final String? currentPhotoUrl;
-  // Flag para mostrar como pantalla completa en lugar de diálogo
   final bool fullScreen;
 
   const ClienteFormDialog({
     super.key,
     required this.nombreController,
     required this.phoneController,
+    required this.emailController,
+    required this.addressController,
     required this.userNumberController,
-    required this.rfidController, // Añadido parámetro
-    required this.selectedMembershipType,
-    required this.membershipTypes,
-    this.membershipTypeModels,
-    required this.selectedPaymentMethod,
-    required this.paymentMethods,
+    required this.rfidController,
     this.isEditing = false,
-    this.isRenewing = false,
     required this.onSave,
-    required this.membershipCost,
-    required this.registrationFee,
-    required this.totalAmount,
     this.currentPhotoUrl,
     this.fullScreen = false,
   });
 
   @override
+  State<ClienteFormDialog> createState() => _ClienteFormDialogState();
+}
+
+class _ClienteFormDialogState extends State<ClienteFormDialog> {
+  Timer? _pollTimer;
+  BackgroundRfidService? _rfidService;
+
+  @override
+  void initState() {
+    super.initState();
+    _rfidService = Get.isRegistered<BackgroundRfidService>() 
+        ? Get.find<BackgroundRfidService>() 
+        : null;
+    _startSilentPolling();
+  }
+
+  void _startSilentPolling() {
+    _rfidService?.pauseScanning();
+    _pollTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) async {
+      try {
+        final uid = await RfidReaderService.checkForCardSilent();
+        if (uid != null && uid.isNotEmpty && uid != 'NO_CARD') {
+          if (widget.rfidController.text != uid) {
+            widget.rfidController.text = uid;
+            // Ya no cancelamos el timer para permitir cambiar de tarjeta silenciosamente
+          }
+        }
+      } catch (e) {
+        // Ignorar
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _rfidService?.resumeScanning();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Si fullScreen, mostrar Scaffold en lugar de AlertDialog
-    if (fullScreen) {
+    if (widget.fullScreen) {
       return Scaffold(
+        backgroundColor: AppColors.cardBackground,
         appBar: AppBar(
-          title: Text(
-            isEditing
-                ? (isRenewing ? 'Renovar Membresía' : 'Editar Cliente')
-                : 'Nuevo Cliente',
-          ),
+          title: Text(widget.isEditing ? 'Editar Cliente' : 'Nuevo Cliente'),
           backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
         ),
         body: SafeArea(
-          child: contentBox(context, GlobalKey<FormState>(), !isEditing || isRenewing, Rx<File?>(null), isFullScreen: true),
+          child: contentBox(context, GlobalKey<FormState>(), Rx<File?>(null), isFullScreen: true),
         ),
       );
     }
-    final formKey = GlobalKey<FormState>();
-    final bool isNewRegistration = !isEditing || isRenewing;
-    final phoneNumberController = TextEditingController();
-    final Rx<File?> photoFile = Rx<File?>(null);
-
-    if (phoneController.text.isNotEmpty) {
-      try {
-        PhoneNumber.getRegionInfoFromPhoneNumber(
-          phoneController.text,
-          'MX',
-        ).then((value) => phoneNumberController.text = value.phoneNumber ?? '');
-      } catch (e) {
-        phoneNumberController.text = phoneController.text;
-      }
-    }
-
-    // Usar AlertDialog en lugar de Dialog para evitar conflictos de parámetros
+    
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
       elevation: 0,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.cardBackground,
+      surfaceTintColor: Colors.transparent,
       contentPadding: EdgeInsets.zero,
-      content: contentBox(context, formKey, isNewRegistration, photoFile, isFullScreen: false),
+      content: contentBox(context, GlobalKey<FormState>(), Rx<File?>(null), isFullScreen: false),
     );
   }
 
   Widget contentBox(
     BuildContext context,
     GlobalKey<FormState> formKey,
-    bool isNewRegistration,
     Rx<File?> photoFile, {
     bool isFullScreen = false,
   }) {
-    // Inicializar el número de teléfono correctamente para edición
     PhoneNumber initialPhoneNumber;
-    
-    if (isEditing && phoneController.text.isNotEmpty) {
+    if (widget.isEditing && widget.phoneController.text.isNotEmpty) {
       try {
-        // Intentar parsear el número existente del cliente
-        final phone = phoneController.text.trim();
-        
+        final phone = widget.phoneController.text.trim();
         if (phone.startsWith('+52')) {
-          // Extraer solo el número sin el código de país para el widget
           final phoneWithoutCountryCode = phone.substring(3);
-          initialPhoneNumber = PhoneNumber(
-            phoneNumber: phoneWithoutCountryCode,
-            isoCode: 'MX',
-          );
+          initialPhoneNumber = PhoneNumber(phoneNumber: phoneWithoutCountryCode, isoCode: 'MX');
         } else if (phone.startsWith('+')) {
-          // Para otros códigos de país, intentar detectar automáticamente
           initialPhoneNumber = PhoneNumber(phoneNumber: phone);
         } else {
-          // Si no tiene +, asumir que es de México
-          initialPhoneNumber = PhoneNumber(
-            phoneNumber: phone,
-            isoCode: 'MX',
-          );
+          initialPhoneNumber = PhoneNumber(phoneNumber: phone, isoCode: 'MX');
         }
       } catch (e) {
-        // Si hay error, usar México como default
         initialPhoneNumber = PhoneNumber(isoCode: 'MX');
       }
     } else {
-      // Para nuevos clientes, usar México como default
       initialPhoneNumber = PhoneNumber(isoCode: 'MX');
     }
-    
-    String formattedPhoneNumber = phoneController.text;
+
+    String formattedPhoneNumber = widget.phoneController.text;
 
     return Container(
+      clipBehavior: Clip.antiAlias,
       padding: const EdgeInsets.all(0),
       decoration: BoxDecoration(
         color: AppColors.cardBackground,
@@ -152,7 +144,6 @@ class ClienteFormDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Encabezado - solo mostrar en modo diálogo, no en pantalla completa
             if (!isFullScreen)
               Container(
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
@@ -161,16 +152,12 @@ class ClienteFormDialog extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Icon(
-                      isEditing
-                          ? (isRenewing ? Icons.autorenew : Icons.edit)
-                          : Icons.person_add,
+                      widget.isEditing ? Icons.edit : Icons.person_add,
                       color: AppColors.accent,
                       size: 30,
                     ),
                     Text(
-                      isEditing
-                          ? (isRenewing ? 'Renovar Membresía' : 'Editar Cliente')
-                          : 'Nuevo Cliente',
+                      widget.isEditing ? 'Editar Cliente' : 'Nuevo Cliente',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w600,
@@ -182,768 +169,188 @@ class ClienteFormDialog extends StatelessWidget {
               ),
             Flexible(
               child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  24, 
-                  isFullScreen ? 16 : 20, // Menos padding top cuando hay AppBar
-                  24, 
-                  24
-                ),
+                padding: EdgeInsets.fromLTRB(24, isFullScreen ? 16 : 20, 24, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    if (!isRenewing) ...[
-                      // Widget de captura de foto
-                      PhotoCaptureWidget(
-                        currentPhotoUrl: currentPhotoUrl,
-                        onPhotoTaken: (file) {
-                          photoFile.value = file;
-                        },
+                    PhotoCaptureWidget(
+                      currentPhotoUrl: widget.currentPhotoUrl,
+                      onPhotoTaken: (file) {
+                        photoFile.value = file;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: widget.userNumberController,
+                      decoration: InputDecoration(
+                        labelText: 'Número de Usuario',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        prefixIcon: const Icon(Icons.badge_outlined),
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: userNumberController,
-                        decoration: InputDecoration(
-                          labelText: 'Número de Usuario',
-                          border: OutlineInputBorder(
+                      style: TextStyle(color: AppColors.accent),
+                      readOnly: true,
+                      enabled: false,
+                    ),
+                    const SizedBox(height: 16),
+                    AnimatedBuilder(
+                      animation: widget.rfidController,
+                      builder: (context, child) {
+                        final hasRfid = widget.rfidController.text.isNotEmpty;
+                        return Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10),
-                          ),
-                          prefixIcon: const Icon(Icons.badge_outlined),
-                          filled: true,
-                          fillColor: AppColors.containerBackground,
-                        ),
-                        style: TextStyle(color: AppColors.accent),
-                        keyboardType: TextInputType.number,
-                        readOnly: isEditing,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor ingrese un número de usuario';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      // Campo para la tarjeta RFID
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: rfidController,
-                              decoration: InputDecoration(
-                                labelText: 'Tarjeta RFID',
-                                hintText: 'Código RFID o use el lector',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                prefixIcon: const Icon(Icons.contactless),
-                                filled: true,
-                                fillColor: AppColors.containerBackground,
-                              ),
-                              style: TextStyle(color: AppColors.textPrimary),
+                            border: Border.all(
+                              color: hasRfid ? AppColors.accent : Colors.grey.withOpacity(0.3),
+                              width: 1.5,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          // Botón mejorado para el lector RFID con Material Design 3
-                          Material(
-                            color: AppColors.accent,
+                          child: Material(
+                            color: Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
-                            elevation: 2,
-                            child: InkWell(
-                              onTap: () => _showRfidReaderDialog(context),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(
-                                  Icons.sensor_door,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.nfc, color: hasRfid ? AppColors.accent : AppColors.textSecondary, size: 28),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          hasRfid ? 'Tarjeta vinculada' : 'Acerca la tarjeta al lector...',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: hasRfid ? AppColors.textPrimary : AppColors.textSecondary,
+                                          ),
+                                        ),
+                                        if (hasRfid) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'ID: ${widget.rfidController.text}',
+                                            style: TextStyle(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w500),
+                                          ),
+                                        ]
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(hasRfid ? Icons.check_circle : Icons.nfc, color: hasRfid ? AppColors.accent : AppColors.textSecondary, size: 20),
+                                ],
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          // Ya no hay botón para generar RFID aleatorio
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: nombreController,
-                        decoration: InputDecoration(
-                          labelText: 'Nombre',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          prefixIcon: const Icon(Icons.person_outline),
-                          filled: true,
-                          fillColor: AppColors.containerBackground,
-                        ),
-                        style: TextStyle(color: AppColors.textPrimary),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor ingrese un nombre';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      InternationalPhoneNumberInput(
-                        onInputChanged: (PhoneNumber number) {
-                          formattedPhoneNumber = number.phoneNumber ?? '';
-                          phoneController.text = formattedPhoneNumber;
-                        },
-                        onInputValidated: (bool value) {
-                          if (value && formattedPhoneNumber.isNotEmpty) {
-                            phoneController.text = formattedPhoneNumber;
-                          }
-                        },
-                        selectorConfig: const SelectorConfig(
-                          selectorType: PhoneInputSelectorType.DIALOG,
-                          setSelectorButtonAsPrefixIcon: true,
-                        ),
-                        ignoreBlank: false,
-                        autoValidateMode: AutovalidateMode.onUserInteraction,
-                        initialValue: initialPhoneNumber,
-                        formatInput: true,
-                        keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
-                        textStyle: TextStyle(color: AppColors.textPrimary),
-                        selectorTextStyle: TextStyle(
-                          color: AppColors.textPrimary,
-                        ),
-                        inputDecoration: InputDecoration(
-                          labelText: 'Teléfono',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          filled: true,
-                          fillColor: AppColors.containerBackground,
-                        ),
-                        searchBoxDecoration: InputDecoration(
-                          labelText: 'Buscar país',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        locale: 'es',
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor ingrese un número de teléfono';
-                          }
-                          if (!formattedPhoneNumber.startsWith('+')) {
-                            return 'El número debe incluir el código de país';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    Obx(
-                      () {
-                        // Crear una lista filtrada sin duplicados (comparación case-insensitive)
-                        final List<String> filteredTypes = [];
-                        final Set<String> seenTypes = {};
-                        
-                        for (String typeName in membershipTypes) {
-                          final normalizedName = typeName.trim().toLowerCase();
-                          if (!seenTypes.contains(normalizedName)) {
-                            seenTypes.add(normalizedName);
-                            filteredTypes.add(typeName.trim());
-                          }
-                        }
-                        
-                        // Obtener el valor actual
-                        String currentValue = selectedMembershipType.value.trim();
-                        
-                        // Verificar que el valor actual esté en la lista filtrada (comparación exacta)
-                        String? validValue;
-                        for (String type in filteredTypes) {
-                          if (type.toLowerCase() == currentValue.toLowerCase()) {
-                            validValue = type; // Usar el valor exacto de la lista
-                            break;
-                          }
-                        }
-                        
-                        // Si no se encontró un valor válido, usar el primero disponible
-                        if (validValue == null && filteredTypes.isNotEmpty) {
-                          validValue = filteredTypes.first;
-                        }
-                        
-                        return DropdownButtonFormField<String>(
-                          decoration: InputDecoration(
-                            labelText: 'Tipo de Membresía',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            prefixIcon: const Icon(Icons.card_membership),
-                            filled: true,
-                            fillColor: AppColors.containerBackground,
-                          ),
-                          dropdownColor: AppColors.cardBackground,
-                          style: TextStyle(color: AppColors.textPrimary),
-                          value: validValue,
-                          items: filteredTypes.map((typeName) {
-                            // Buscar el precio correcto para mostrar
-                            double price = 0.0;
-                            bool isActive = true;
-                            if (membershipTypeModels != null) {
-                              final model = membershipTypeModels!.firstWhereOrNull(
-                                (m) => m.name.toLowerCase().trim() == typeName.toLowerCase().trim()
-                              );
-                              if (model != null) {
-                                price = model.price;
-                                isActive = model.isActive;
-                              }
-                            }
-                            // Fallback a precios estáticos si no se encontró en los modelos
-                            if (price == 0.0) {
-                              price = UserModel.membershipPrices[typeName.toLowerCase().trim()] ?? 0.0;
-                            }
-                            
-                            // Formatear el nombre con primera letra en mayúscula
-                            final displayName = typeName[0].toUpperCase() + typeName.substring(1);
-                            
-                            // Agregar indicador si está inactiva
-                            final displayText = isActive 
-                                ? '$displayName (\$${price.toStringAsFixed(0)})'
-                                : '$displayName (\$${price.toStringAsFixed(0)}) - INACTIVA';
-                            
-                            return DropdownMenuItem(
-                              value: typeName,
-                              child: Text(
-                                displayText,
-                                style: TextStyle(
-                                  color: isActive ? AppColors.textPrimary : AppColors.disabled,
-                                  fontStyle: isActive ? FontStyle.normal : FontStyle.italic,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              // Verificar si la membresía seleccionada está activa
-                              bool isActive = true;
-                              if (membershipTypeModels != null) {
-                                final selectedModel = membershipTypeModels!.firstWhereOrNull(
-                                  (m) => m.name.toLowerCase().trim() == value.toLowerCase().trim()
-                                );
-                                if (selectedModel != null) {
-                                  isActive = selectedModel.isActive;
-                                }
-                              }
-                              
-                              // Si está editando y la membresía seleccionada está inactiva, mostrar advertencia
-                              if (isEditing && !isActive) {
-                                Get.snackbar(
-                                  'Membresía Inactiva',
-                                  'Esta membresía ya no está disponible. Se recomienda seleccionar una membresía activa.',
-                                  snackPosition: SnackPosition.BOTTOM,
-                                  backgroundColor: Colors.orange,
-                                  colorText: Colors.white,
-                                  duration: const Duration(seconds: 4),
-                                );
-                              }
-                              
-                              selectedMembershipType.value = value;
-                              
-                              // Usar el controlador para actualizar los costos
-                              final controller = Get.find<ClientesController>();
-                              controller.updateMembershipCost();
-                            }
-                          },
                         );
                       },
                     ),
                     const SizedBox(height: 16),
-                    Obx(
-                      () => DropdownButtonFormField<String>(
-                        decoration: InputDecoration(
-                          labelText: 'Método de Pago',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          prefixIcon: const Icon(Icons.payments_outlined),
-                          filled: true,
-                          fillColor: AppColors.containerBackground,
-                        ),
-                        dropdownColor: AppColors.cardBackground,
-                        style: TextStyle(color: AppColors.textPrimary),
-                        value: selectedPaymentMethod.value,
-                        items:
-                            paymentMethods
-                                .map(
-                                  (method) => DropdownMenuItem(
-                                    value: method,
-                                    child: Text(
-                                      method,
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            selectedPaymentMethod.value = value;
-                          }
-                        },
+                    TextFormField(
+                      controller: widget.nombreController,
+                      decoration: InputDecoration(
+                        labelText: 'Nombre',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        prefixIcon: const Icon(Icons.person_outline),
                       ),
+                      style: TextStyle(color: AppColors.textPrimary),
+                      textCapitalization: TextCapitalization.words,
+                      validator: (value) => value == null || value.isEmpty ? 'Requerido' : null,
                     ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.containerBackground,
-                        borderRadius: BorderRadius.circular(10),
+                    const SizedBox(height: 16),
+                    InternationalPhoneNumberInput(
+                      onInputChanged: (PhoneNumber number) {
+                        formattedPhoneNumber = number.phoneNumber ?? '';
+                        widget.phoneController.text = formattedPhoneNumber;
+                      },
+                      selectorConfig: const SelectorConfig(
+                        selectorType: PhoneInputSelectorType.DROPDOWN,
+                        setSelectorButtonAsPrefixIcon: true,
+                        useEmoji: true,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.receipt_long, color: AppColors.accent),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Resumen de Pago',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: AppColors.accent,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Obx(() {
-                            final controller = Get.find<ClientesController>();
-                            return _buildCostRow(
-                              'Membresía:',
-                              controller.membershipCost.value,
-                            );
-                          }),
-                          Obx(() {
-                            final controller = Get.find<ClientesController>();
-                            return controller.registrationFee.value > 0
-                                ? Column(
-                                  children: [
-                                    Divider(
-                                      color: AppColors.disabled,
-                                      height: 16,
-                                    ),
-                                    _buildCostRow(
-                                      'Registro:',
-                                      controller.registrationFee.value,
-                                    ),
-                                  ],
-                                )
-                                : const SizedBox.shrink();
-                          }),
-                          
-                          // Sección de promociones
-                          if (!isEditing || isRenewing) ...[
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.orange.withOpacity(0.3),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.local_offer,
-                                        color: Colors.orange,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'Promociones Disponibles',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.orange.shade700,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  // Selector de promociones
-                                  GetBuilder<ClientesController>(
-                                    id: 'promotions',
-                                    builder: (controller) {
-                                      if (controller.availablePromotions.isEmpty) {
-                                        return Text(
-                                          'No hay promociones disponibles',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        );
-                                      }
-
-                                      return Column(
-                                        children: [
-                                          // Opción "Sin promoción"
-                                          Obx(() {
-                                            final currentController = Get.find<ClientesController>();
-                                            return RadioListTile<String?>(
-                                              title: Text(
-                                                'Sin promoción',
-                                                style: TextStyle(fontSize: 14),
-                                              ),
-                                              subtitle: Text(
-                                                'Total: \$${(currentController.membershipCost.value + currentController.registrationFee.value).toStringAsFixed(2)}',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                              ),
-                                              value: null,
-                                              groupValue: currentController.selectedPromotion.value?.id,
-                                              onChanged: (value) {
-                                                currentController.applyPromotion(null);
-                                              },
-                                              dense: true,
-                                              contentPadding: EdgeInsets.zero,
-                                            );
-                                          }),
-                                          
-                                          // Lista de promociones disponibles
-                                          ...controller.availablePromotions.map((promotion) {
-                                            return Obx(() {
-                                              final currentController = Get.find<ClientesController>();
-                                              final discount = _calculatePromotionDiscount(promotion, currentController.membershipCost.value, currentController.registrationFee.value);
-                                              final finalAmount = (currentController.membershipCost.value + currentController.registrationFee.value) - discount;
-                                              
-                                              return RadioListTile<String>(
-                                                title: Text(
-                                                  promotion.name,
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                                subtitle: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    if (promotion.description?.isNotEmpty == true)
-                                                      Text(
-                                                        promotion.description!,
-                                                        style: TextStyle(
-                                                          fontSize: 11,
-                                                          color: Colors.grey.shade600,
-                                                        ),
-                                                      ),
-                                                    Text(
-                                                      'Descuento: -\$${discount.toStringAsFixed(2)} | Total: \$${finalAmount.toStringAsFixed(2)}',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: Colors.green.shade700,
-                                                        fontWeight: FontWeight.w500,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                value: promotion.id!,
-                                                groupValue: currentController.selectedPromotion.value?.id,
-                                                onChanged: (value) {
-                                                  currentController.applyPromotion(promotion);
-                                                },
-                                                dense: true,
-                                                contentPadding: EdgeInsets.zero,
-                                              );
-                                            });
-                                          }).toList(),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          
-                          Divider(color: AppColors.disabled, height: 16),
-                          
-                          // Mostrar descuento si hay promoción aplicada
-                          Obx(() {
-                            final controller = Get.find<ClientesController>();
-                            if (controller.selectedPromotion.value != null && 
-                                controller.promotionDiscount.value > 0) {
-                              return Column(
-                                children: [
-                                  _buildCostRow(
-                                    'Subtotal:',
-                                    controller.totalAmount.value,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  _buildCostRow(
-                                    'Descuento (${controller.selectedPromotion.value!.name}):',
-                                    -controller.promotionDiscount.value,
-                                  ),
-                                  Divider(color: AppColors.disabled, height: 12),
-                                  _buildCostRow(
-                                    'Total final:',
-                                    controller.finalAmount.value,
-                                    isTotal: true,
-                                  ),
-                                ],
-                              );
-                            } else {
-                              return _buildCostRow(
-                                'Total a pagar:',
-                                controller.totalAmount.value,
-                                isTotal: true,
-                              );
-                            }
-                          }),
-                        ],
+                      initialValue: initialPhoneNumber,
+                      textStyle: TextStyle(color: AppColors.textPrimary),
+                      inputDecoration: InputDecoration(
+                        labelText: 'Teléfono',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
+                      validator: (value) => value == null || value.isEmpty ? 'Requerido' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: widget.emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Correo Electrónico (Opcional)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        prefixIcon: const Icon(Icons.email_outlined),
+                      ),
+                      style: TextStyle(color: AppColors.textPrimary),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: widget.addressController,
+                      decoration: InputDecoration(
+                        labelText: 'Dirección (Opcional)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        prefixIcon: const Icon(Icons.location_on_outlined),
+                      ),
+                      style: TextStyle(color: AppColors.textPrimary),
+                      maxLines: 2,
                     ),
                     const SizedBox(height: 24),
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 12,
-                      children: [
-                        TextButton(
-                          onPressed: () => Get.back(),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
-                          ),
-                          child: Text(
-                            'Cancelar',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            if (formKey.currentState!.validate()) {
-                              final now = DateTime.now();
-                              // Duración de membresía según el modelo seleccionado
-                              final typeKey = selectedMembershipType.value.toLowerCase().trim();
-                              int durationDays = 30; // Valor por defecto
-                              
-                              // Buscar en los modelos para obtener la duración correcta
-                              if (membershipTypeModels != null) {
-                                // Buscar en todos los modelos, no solo en los activos
-                                final selectedModel = membershipTypeModels!
-                                    .firstWhereOrNull((m) => m.name.toLowerCase().trim() == typeKey);
-                                if (selectedModel != null) {
-                                  durationDays = selectedModel.durationDays;
-                                } else {
-                                  // Fallback a los valores estáticos
-                                  durationDays = UserModel.membershipDurations[typeKey] ?? 30;
-                                }
-                              } else {
-                                // Fallback a los valores estáticos
-                                durationDays = UserModel.membershipDurations[typeKey] ?? 30;
-                              }
-                              
-                              // Calcular la nueva fecha de expiración:
-                              // - Si es edición/renovación: desde la fecha actual
-                              // - Si es nuevo cliente: desde la fecha actual
-                              final expirationDate = now.add(Duration(days: durationDays));
-
-                              String finalPhoneNumber = phoneController.text;
-                              if (!finalPhoneNumber.startsWith('+')) {
-                                finalPhoneNumber = '+52$finalPhoneNumber';
-                              }
-
-                              // Obtener el precio actual de la membresía seleccionada
-                              double currentPrice = membershipCost.value;
-                              
-                              final user = UserModel(
-                                name: nombreController.text,
-                                phone: finalPhoneNumber,
-                                membershipType: selectedMembershipType.value,
-                                membershipPrice: currentPrice,
-                                joinDate: now, // Se preservará en la vista con copyWith
-                                expirationDate: expirationDate,
-                                isActive: true,
-                                userNumber: userNumberController.text,
-                                rfidCard: rfidController.text.isEmpty ? null : rfidController.text,
-                                lastPaymentDate: now, // Siempre actualizar fecha de último pago
-                                
-                                // Información de promoción aplicada
-                                currentPromotionId: Get.find<ClientesController>().selectedPromotion.value?.id,
-                                currentPromotionName: Get.find<ClientesController>().selectedPromotion.value?.name,
-                                promotionDiscountAmount: Get.find<ClientesController>().promotionDiscount.value,
-                                promotionAppliedDate: Get.find<ClientesController>().selectedPromotion.value != null ? now : null,
-                                promotionExpiresDate: Get.find<ClientesController>().selectedPromotion.value?.endDate,
-                              );
-
-                              onSave(user, photoFile.value);
-                              Get.back();
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            backgroundColor: AppColors.accent,
-                          ),
-                          child: Text(
-                            isEditing
-                                ? (isRenewing ? 'Renovar' : 'Actualizar')
-                                : 'Crear',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              decoration: BoxDecoration(
+                color: AppColors.containerBackground,
+                border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.2))),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => isFullScreen ? Get.back() : Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (formKey.currentState!.validate()) {
+                          final user = UserModel(
+                            name: widget.nombreController.text.trim(),
+                            phone: widget.phoneController.text,
+                            email: widget.emailController.text.isEmpty ? null : widget.emailController.text.trim(),
+                            address: widget.addressController.text.isEmpty ? null : widget.addressController.text.trim(),
+                            joinDate: DateTime.now(),
+                            userNumber: widget.userNumberController.text,
+                            rfidCard: widget.rfidController.text.isEmpty ? null : widget.rfidController.text,
+                          );
+                          widget.onSave(user, photoFile.value);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text(widget.isEditing ? 'Guardar' : 'Agregar', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildCostRow(String label, double amount, {bool isTotal = false}) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              fontSize: isTotal ? 16 : 14,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '\$${amount.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: isTotal ? 18 : 14,
-            color: isTotal ? AppColors.accent : AppColors.textPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Método para mostrar el diálogo del lector RFID
-  Future<void> _showRfidReaderDialog(BuildContext context) async {
-    final isReading = true.obs;
-    final detectedUid = Rx<String?>(null);
-
-    // Mostrar el diálogo con la animación
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Obx(
-        () => RfidReaderAnimation(
-          isReading: isReading.value,
-          detectedUid: detectedUid.value,
-          onCancel: () {
-            // Si ya detectamos un UID y el usuario acepta, cerramos el diálogo
-            if (detectedUid.value != null) {
-              // Asignar el UID detectado al controlador de texto
-              rfidController.text = detectedUid.value!;
-              Get.back();
-            } else {
-              // Si el usuario cancela durante la lectura, también cerramos
-              isReading.value = false;
-              Get.back();
-            }
-          },
-        ),
-      ),
-    );
-
-    // Iniciar la lectura del RFID (en modo real o simulado)
-    try {
-      // Intentar iniciar el lector ESP32 real
-      bool readerStarted = await RfidReaderService.startReading();
-      
-      if (readerStarted) {
-        // Si el lector inició correctamente, revisar periódicamente si hay una tarjeta
-        int attempts = 0;
-        final maxAttempts = RfidConfig.maxReadingTimeoutSeconds * 1000 ~/ RfidConfig.pollingIntervalMs;
-        
-        while (isReading.value && attempts < maxAttempts && detectedUid.value == null) {
-          // Verificar si hay una tarjeta según el intervalo de polling configurado
-          final uid = await RfidReaderService.checkForCard();
-          if (uid != null) {
-            detectedUid.value = uid;
-            isReading.value = false;
-            break;
-          }
-          attempts++;
-          await Future.delayed(Duration(milliseconds: RfidConfig.pollingIntervalMs));
-        }
-      } else {
-        // Si no se pudo iniciar el lector real, mostrar un mensaje de error
-        if (isReading.value) {  // Verificar que el usuario no haya cancelado
-          Get.snackbar(
-            'Error de conexión',
-            'No se pudo conectar con el lector RFID. Verifica la configuración.',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
-            duration: const Duration(seconds: 3),
-          );
-          isReading.value = false;
-          Get.back(); // Cerrar el diálogo
-        }
-      }
-    } catch (e) {
-      // En caso de error, mostrar mensaje
-      if (isReading.value) {
-        Get.snackbar(
-          'Error',
-          'No se pudo leer la tarjeta RFID: ${e.toString()}',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 3),
-        );
-        isReading.value = false;
-        Get.back(); // Cerrar el diálogo
-      }
-    }
-  }
-  
-  // Método para calcular el descuento de una promoción
-  double _calculatePromotionDiscount(PromotionModel promotion, double membershipCost, double registrationFee) {
-    if (!promotion.isCurrentlyValid) return 0.0;
-    
-    double discount = 0.0;
-    
-    // Verificar si aplica a registro
-    if (promotion.appliesTo_('registration') || promotion.appliesTo_('both')) {
-      discount += promotion.calculateDiscount(registrationFee);
-    }
-    
-    // Verificar si aplica a membresía  
-    if (promotion.appliesTo_('membership') || promotion.appliesTo_('both')) {
-      discount += promotion.calculateDiscount(membershipCost);
-    }
-    
-    return discount;
   }
 }

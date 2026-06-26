@@ -3,7 +3,10 @@ import 'package:flutter/foundation.dart';
 
 /// Servicio para manejar la reproducción de audio en la aplicación
 class AudioService {
-  static final AudioPlayer _audioPlayer = AudioPlayer();
+  static final AudioPlayer _welcomePlayer = AudioPlayer();
+  static final AudioPlayer _deniedPlayer = AudioPlayer();
+  static final AudioPlayer _errorPlayer = AudioPlayer();
+  static final AudioPlayer _successPlayer = AudioPlayer();
   
   /// Reproduce el sonido de bienvenida cuando un usuario escanea exitosamente
   static Future<void> playWelcomeSound() async {
@@ -12,18 +15,21 @@ class AudioService {
         print('🔊 Reproduciendo sonido de bienvenida...');
       }
       
+      // Detener si estaba reproduciendo
+      await _welcomePlayer.stop();
+      
       // Cargar el archivo de audio de bienvenida
-      await _audioPlayer.setAsset('assets/audio/welcome.mp3');
+      await _welcomePlayer.setAsset('assets/audio/welcome.mp3');
       
       // Configurar volumen a 80%
-      await _audioPlayer.setVolume(0.8);
+      await _welcomePlayer.setVolume(0.8);
       
       // Configurar velocidad normal
-      await _audioPlayer.setSpeed(1.0);
+      await _welcomePlayer.setSpeed(1.0);
       
       // Reproducir desde el inicio
-      await _audioPlayer.seek(Duration.zero);
-      await _audioPlayer.play();
+      await _welcomePlayer.seek(Duration.zero);
+      _welcomePlayer.play(); // Sin await para no bloquear
       
       if (kDebugMode) {
         print('✅ Sonido de bienvenida reproducido correctamente');
@@ -31,7 +37,6 @@ class AudioService {
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error al reproducir sonido de bienvenida: $e');
-        print('📊 Tipo de error: ${e.runtimeType}');
       }
     }
   }
@@ -43,26 +48,18 @@ class AudioService {
         print('🔊 Reproduciendo sonido de error...');
       }
       
+      await _errorPlayer.stop();
+      
       // Cargar el archivo de audio de bienvenida (usado como error)
-      await _audioPlayer.setAsset('assets/audio/welcome.mp3');
+      await _errorPlayer.setAsset('assets/audio/welcome.mp3');
       
       // Configurar para error (volumen más bajo y velocidad más lenta)
-      await _audioPlayer.setVolume(0.6); // Más bajo para error
-      await _audioPlayer.setSpeed(0.7); // Más lento para indicar error
+      await _errorPlayer.setVolume(0.6); // Más bajo para error
+      await _errorPlayer.setSpeed(0.7); // Más lento para indicar error
       
       // Reproducir desde el inicio
-      await _audioPlayer.seek(Duration.zero);
-      await _audioPlayer.play();
-      
-      // Resetear la velocidad y volumen después de un momento
-      Future.delayed(const Duration(milliseconds: 800), () async {
-        try {
-          await _audioPlayer.setSpeed(1.0);
-          await _audioPlayer.setVolume(0.8);
-        } catch (e) {
-          if (kDebugMode) print('Error al resetear configuración de audio: $e');
-        }
-      });
+      await _errorPlayer.seek(Duration.zero);
+      _errorPlayer.play();
       
       if (kDebugMode) {
         print('✅ Sonido de error reproducido correctamente');
@@ -70,7 +67,6 @@ class AudioService {
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error al reproducir sonido de error: $e');
-        print('📊 Tipo de error: ${e.runtimeType}');
       }
     }
   }
@@ -82,18 +78,20 @@ class AudioService {
         print('🔊 Reproduciendo sonido de acceso denegado...');
       }
       
+      await _deniedPlayer.stop();
+      
       // Cargar el archivo de audio de denegado
-      await _audioPlayer.setAsset('assets/audio/denegado.mp3');
+      await _deniedPlayer.setAsset('assets/audio/denegado.mp3');
       
       // Configurar volumen a 85%
-      await _audioPlayer.setVolume(0.85);
+      await _deniedPlayer.setVolume(0.85);
       
       // Configurar velocidad normal
-      await _audioPlayer.setSpeed(1.0);
+      await _deniedPlayer.setSpeed(1.0);
       
       // Reproducir desde el inicio
-      await _audioPlayer.seek(Duration.zero);
-      await _audioPlayer.play();
+      await _deniedPlayer.seek(Duration.zero);
+      _deniedPlayer.play();
       
       if (kDebugMode) {
         print('✅ Sonido de acceso denegado reproducido correctamente');
@@ -101,7 +99,6 @@ class AudioService {
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error al reproducir sonido de acceso denegado: $e');
-        print('📊 Tipo de error: ${e.runtimeType}');
       }
     }
   }
@@ -113,25 +110,18 @@ class AudioService {
         print('🔊 Reproduciendo sonido de éxito...');
       }
       
+      await _successPlayer.stop();
+      
       // Cargar el archivo de audio de bienvenida
-      await _audioPlayer.setAsset('assets/audio/welcome.mp3');
+      await _successPlayer.setAsset('assets/audio/welcome.mp3');
       
       // Configurar para éxito (velocidad más rápida)
-      await _audioPlayer.setVolume(0.8);
-      await _audioPlayer.setSpeed(1.2); // Más rápido para indicar éxito
+      await _successPlayer.setVolume(0.8);
+      await _successPlayer.setSpeed(1.2); // Más rápido para indicar éxito
       
       // Reproducir desde el inicio
-      await _audioPlayer.seek(Duration.zero);
-      await _audioPlayer.play();
-      
-      // Resetear la velocidad después de un momento
-      Future.delayed(const Duration(milliseconds: 500), () async {
-        try {
-          await _audioPlayer.setSpeed(1.0);
-        } catch (e) {
-          if (kDebugMode) print('Error al resetear velocidad de audio: $e');
-        }
-      });
+      await _successPlayer.seek(Duration.zero);
+      _successPlayer.play();
       
       if (kDebugMode) {
         print('✅ Sonido de éxito reproducido correctamente');
@@ -139,7 +129,6 @@ class AudioService {
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error al reproducir sonido de éxito: $e');
-        print('📊 Tipo de error: ${e.runtimeType}');
       }
     }
   }
@@ -147,9 +136,14 @@ class AudioService {
   /// Detiene cualquier audio que se esté reproduciendo
   static Future<void> stopAudio() async {
     try {
-      await _audioPlayer.stop();
+      await Future.wait([
+        _welcomePlayer.stop(),
+        _deniedPlayer.stop(),
+        _errorPlayer.stop(),
+        _successPlayer.stop(),
+      ]);
       if (kDebugMode) {
-        print('🔇 Audio detenido');
+        print('🔇 Todo el audio detenido');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -161,7 +155,12 @@ class AudioService {
   /// Libera los recursos del reproductor de audio
   static Future<void> dispose() async {
     try {
-      await _audioPlayer.dispose();
+      await Future.wait([
+        _welcomePlayer.dispose(),
+        _deniedPlayer.dispose(),
+        _errorPlayer.dispose(),
+        _successPlayer.dispose(),
+      ]);
       if (kDebugMode) {
         print('🗑️ Recursos de audio liberados');
       }
@@ -172,12 +171,18 @@ class AudioService {
     }
   }
   
-  /// Configura el volumen del audio
+  /// Configura el volumen del audio (general, aunque afectaría solo si se guarda)
   static Future<void> setVolume(double volume) async {
     try {
-      await _audioPlayer.setVolume(volume.clamp(0.0, 1.0));
+      final v = volume.clamp(0.0, 1.0);
+      await Future.wait([
+        _welcomePlayer.setVolume(v),
+        _deniedPlayer.setVolume(v),
+        _errorPlayer.setVolume(v),
+        _successPlayer.setVolume(v),
+      ]);
       if (kDebugMode) {
-        print('🔊 Volumen configurado a: ${(volume * 100).toInt()}%');
+        print('🔊 Volumen general configurado a: ${(v * 100).toInt()}%');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -186,3 +191,4 @@ class AudioService {
     }
   }
 }
+

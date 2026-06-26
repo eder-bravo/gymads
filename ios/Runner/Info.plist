@@ -53,5 +53,18 @@
 	<string>Necesitamos acceso a la galería para guardar el código QR.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Necesitamos acceso para guardar el código QR en tu galería.</string>
+	<key>GIDClientID</key>
+	<string>161338034924-4kfeihb6hgt7hf8f3ritrb1v6lukodv5.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.161338034924-4kfeihb6hgt7hf8f3ritrb1v6lukodv5</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

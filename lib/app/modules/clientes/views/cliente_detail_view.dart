@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/core/theme/app_colors.dart';
-import 'package:gymads/app/global_widgets/qr_dialog.dart';
-import '../../../core/widgets/cached_user_image.dart';
+import 'package:gymads/app/core/widgets/cached_user_image.dart';
+import 'package:gymads/app/core/utils/phone_utils.dart';
+import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import '../controllers/clientes_controller.dart';
 
 class ClienteDetailView extends GetView<ClientesController> {
@@ -18,297 +19,94 @@ class ClienteDetailView extends GetView<ClientesController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      body: CustomScrollView(
-        slivers: [
-          // AppBar moderno con gradiente
-          _buildSliverAppBar(),
-          
-          // Contenido principal
-          SliverToBoxAdapter(
-            child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 120),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 20),
-                    // Header con información principal
-                    _buildHeaderCard(),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Cards de información rápida
-                    _buildQuickInfoCards(),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Información detallada
-                    _buildDetailCards(),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Botones de acción
-                    _buildActionButtons(),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+      appBar: AppBar(
+        title: const Text('Detalles del Cliente'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Cabecera con foto y nombre
+            _buildHeader(),
+
+            const SizedBox(height: 16),
+
+            // Tarjetas de información rápida
+            _buildQuickInfoCards(),
+
+            const SizedBox(height: 16),
+
+            // Detalles generales (incluyendo los nuevos campos email y address)
+            _buildDetailCards(),
+
+            const SizedBox(height: 16),
+
+            // Botones de acción principales
+            _buildActionButtons(),
+
+            const SizedBox(height: 32),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSliverAppBar() {
-    return SliverAppBar(
-      expandedHeight: 250,
-      floating: false,
-      pinned: true,
-      elevation: 0,
-      backgroundColor: AppColors.backgroundColor,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                AppColors.backgroundColor,
-                AppColors.cardBackground,
-              ],
-            ),
-          ),
-          child: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(height: constraints.maxHeight * 0.15),
-                        // Avatar del cliente
-                        Hero(
-                          tag: 'cliente-${cliente.id}',
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: _getStatusColor(),
-                                width: 3,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: _getStatusColor().withOpacity(0.3),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: UserProfileImage(
-                              imageUrl: cliente.photoUrl,
-                              userName: cliente.name,
-                              size: 100,
-                              showBorder: false,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Nombre del cliente
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            cliente.name,
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.titleColor,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // ID del cliente
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.containerBackground,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: AppColors.titleColor.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            'ID: ${cliente.userNumber}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: constraints.maxHeight * 0.1),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-      leading: IconButton(
-        icon: Icon(
-          Icons.arrow_back_ios,
-          color: AppColors.titleColor,
-        ),
-        onPressed: () => Get.back(),
-      ),
-    );
-  }
-
-  Widget _buildHeaderCard() {
+  Widget _buildHeader() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.titleColor.withOpacity(0.1),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.titleColor.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Estado del cliente
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildStatusChip(),
-              if (cliente.needsRenewal || !cliente.isActive)
-                _buildDaysRemaining(),
-            ],
-          ),
-          const SizedBox(height: 20),
-          
-          // Información de membresía
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Membresía',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      cliente.membershipType.toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.titleColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.success.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  '\$${cliente.membershipPrice.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.success,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusChip() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: _getStatusColor().withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: _getStatusColor().withOpacity(0.3),
-          width: 1,
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
         ),
       ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            _getStatusIcon(),
-            color: _getStatusColor(),
-            size: 16,
+          // Foto de perfil con animación Hero
+          Hero(
+            tag: 'avatar_${cliente.id}',
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.accent,
+                  width: 3,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: UserThumbnail(
+                imageUrl: cliente.photoUrl,
+                userName: cliente.name,
+                size: 96,
+              ),
+            ),
           ),
-          const SizedBox(width: 6),
-          Text(
-            _getStatusText(),
-            style: TextStyle(
-              color: _getStatusColor(),
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
+          const SizedBox(width: 16),
+          // Nombre del cliente
+          Flexible(
+            child: Text(
+              cliente.name,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: AppColors.titleColor,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildDaysRemaining() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.warning.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Text(
-        '${cliente.daysRemaining} días',
-        style: const TextStyle(
-          color: AppColors.warning,
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
-        ),
       ),
     );
   }
@@ -316,127 +114,39 @@ class ClienteDetailView extends GetView<ClientesController> {
   Widget _buildQuickInfoCards() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
+      child: Row(
         children: [
-          // Primera fila: Teléfono y RFID
-          Row(
-            children: [
-              Expanded(
-                child: _buildInfoCard(
-                  icon: Icons.phone_outlined,
-                  title: 'Teléfono',
-                  value: cliente.phone,
-                  color: AppColors.info,
-                ),
+          Expanded(
+            child: Builder(
+              builder: (context) => _buildInfoCard(
+                icon: Icons.phone_outlined,
+                title: 'Teléfono',
+                value: cliente.phone,
+                color: AppColors.info,
+                trailing: const Icon(Icons.touch_app_outlined,
+                    color: AppColors.info, size: 18),
+                onTap: () => PhoneUtils.showActions(context, cliente.phone),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildInfoCard(
-                  icon: Icons.credit_card_outlined,
-                  title: 'RFID',
-                  value: cliente.rfidCard ?? 'No asignada',
-                  color: cliente.rfidCard != null ? AppColors.success : AppColors.textSecondary,
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 16),
-          
-          // Segunda fila: QR Code (centrado, más ancho)
-          _buildQrCard(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQrCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.titleColor.withOpacity(0.2),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.titleColor.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Builder(
+              builder: (context) {
+                final bool vinculado = cliente.rfidCard != null &&
+                    cliente.rfidCard!.trim().isNotEmpty;
+                return _buildInfoCard(
+                  icon: Icons.vpn_key_outlined,
+                  title: 'Llavero/Tarjeta',
+                  value: vinculado ? 'Vinculado' : 'No vinculado',
+                  color: vinculado
+                      ? AppColors.success
+                      : AppColors.textSecondary,
+                );
+              },
+            ),
           ),
         ],
-      ),
-      child: Column(
-        children: [
-          // Header con icono y título
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.titleColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.qr_code_outlined,
-                  color: AppColors.titleColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Código QR de Acceso',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.titleColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          
-          // Botón de acción
-          _buildQrActionButton(
-            label: 'Ver QR',
-            icon: Icons.visibility_outlined,
-            color: AppColors.info,
-            onPressed: _showQrDialog,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQrActionButton({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(
-        label,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color.withOpacity(0.1),
-        foregroundColor: color,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: color.withOpacity(0.3)),
-        ),
       ),
     );
   }
@@ -446,8 +156,10 @@ class ClienteDetailView extends GetView<ClientesController> {
     required String title,
     required String value,
     required Color color,
+    Widget? trailing,
+    VoidCallback? onTap,
   }) {
-    return Container(
+    final card = Container(
       height: 120, // Altura fija para que tengan el mismo tamaño
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -482,6 +194,7 @@ class ClienteDetailView extends GetView<ClientesController> {
                   ),
                 ),
               ),
+              if (trailing != null) trailing,
             ],
           ),
           const Spacer(), // Empuja el texto hacia abajo
@@ -498,6 +211,16 @@ class ClienteDetailView extends GetView<ClientesController> {
         ],
       ),
     );
+
+    if (onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: card,
+      ),
+    );
   }
 
   Widget _buildDetailCards() {
@@ -505,6 +228,26 @@ class ClienteDetailView extends GetView<ClientesController> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
+          // Card de información de contacto extendida
+          _buildDetailCard(
+            title: 'Contacto y Dirección',
+            icon: Icons.contact_mail_outlined,
+            children: [
+              _buildDetailRow(
+                'Correo',
+                cliente.email?.isNotEmpty == true ? cliente.email! : 'No registrado',
+                Icons.email_outlined,
+              ),
+              _buildDetailRow(
+                'Dirección',
+                cliente.address?.isNotEmpty == true ? cliente.address! : 'No registrada',
+                Icons.location_on_outlined,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
           // Card de fechas importantes
           _buildDetailCard(
             title: 'Fechas Importantes',
@@ -517,7 +260,7 @@ class ClienteDetailView extends GetView<ClientesController> {
               ),
               if (cliente.expirationDate != null)
                 _buildDetailRow(
-                  'Fecha de expiración',
+                  'Hasta qué fecha puede entrar',
                   _formatDate(cliente.expirationDate!),
                   Icons.event_outlined,
                 ),
@@ -529,54 +272,6 @@ class ClienteDetailView extends GetView<ClientesController> {
                 ),
             ],
           ),
-          
-          if (!cliente.isActive) ...[
-            const SizedBox(height: 16),
-            // Card de información adicional
-            _buildDetailCard(
-              title: 'Información Adicional',
-              icon: Icons.info_outline,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: cliente.isNewRegistration() 
-                        ? AppColors.error.withOpacity(0.1)
-                        : AppColors.info.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: cliente.isNewRegistration() 
-                          ? AppColors.error.withOpacity(0.3)
-                          : AppColors.info.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        cliente.isNewRegistration() ? Icons.warning_outlined : Icons.info_outlined,
-                        color: cliente.isNewRegistration() ? AppColors.error : AppColors.info,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          cliente.isNewRegistration()
-                              ? 'Requiere pago de registro nuevo (\$${UserModel.registrationFee.toStringAsFixed(0)})'
-                              : 'Puede renovar sin costo adicional',
-                          style: TextStyle(
-                            color: cliente.isNewRegistration() ? AppColors.error : AppColors.info,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
@@ -677,13 +372,18 @@ class ClienteDetailView extends GetView<ClientesController> {
             children: [
               Expanded(
                 child: _buildActionButton(
-                  label: 'Renovar',
-                  icon: Icons.refresh_outlined,
+                  label: 'Abonar',
+                  icon: Icons.payment,
                   color: AppColors.success,
-                  onPressed: _renovarCliente,
+                  onPressed: _abonarCliente,
+                  isOutlined: false,
                 ),
               ),
-              const SizedBox(width: 16),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
               Expanded(
                 child: _buildActionButton(
                   label: 'Editar',
@@ -693,16 +393,17 @@ class ClienteDetailView extends GetView<ClientesController> {
                   isOutlined: true,
                 ),
               ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildActionButton(
+                  label: 'Eliminar',
+                  icon: Icons.delete_outline,
+                  color: AppColors.error,
+                  onPressed: _deleteCliente,
+                  isOutlined: true,
+                ),
+              ),
             ],
-          ),
-          const SizedBox(height: 16),
-          _buildActionButton(
-            label: 'Eliminar Cliente',
-            icon: Icons.delete_outline,
-            color: AppColors.error,
-            onPressed: _deleteCliente,
-            isOutlined: true,
-            isFullWidth: true,
           ),
         ],
       ),
@@ -763,44 +464,42 @@ class ClienteDetailView extends GetView<ClientesController> {
     );
   }
 
-  // Helper methods para el estado
-  Color _getStatusColor() {
-    if (!cliente.isActive) return AppColors.error;
-    if (cliente.needsRenewal) return AppColors.warning;
-    return AppColors.success;
-  }
-
-  IconData _getStatusIcon() {
-    if (!cliente.isActive) return Icons.cancel;
-    if (cliente.needsRenewal) return Icons.warning;
-    return Icons.check_circle;
-  }
-
-  String _getStatusText() {
-    if (!cliente.isActive) return 'Inactivo';
-    if (cliente.needsRenewal) return 'Por vencer';
-    return 'Activo';
-  }
-
   // Funciones para manejar las acciones
   void _editCliente() {
-    Get.back(); // Volver a la lista de clientes
-    Get.snackbar(
-      'Editar',
-      'Redirigiendo a edición de cliente...',
-      snackPosition: SnackPosition.BOTTOM,
+    controller.setupFormForEdit(cliente);
+
+    Get.to(
+      () => ClienteFormDialog(
+        nombreController: controller.nombreController,
+        phoneController: controller.phoneController,
+        emailController: controller.emailController,
+        addressController: controller.addressController,
+        userNumberController: controller.userNumberController,
+        rfidController: controller.rfidController,
+        currentPhotoUrl: cliente.photoUrl,
+        onSave: (updatedUser, photoFile) {
+          final user = updatedUser.copyWith(
+            id: cliente.id,
+            joinDate: cliente.joinDate,
+            accessHistory: cliente.accessHistory,
+            photoUrl: photoFile == null ? cliente.photoUrl : null,
+          );
+
+          controller.updateCliente(cliente.id!, user, photoFile: photoFile);
+          Get.back(); // Cerrar el formulario
+          Get.back(); // Volver a la lista de clientes
+        },
+        isEditing: true,
+        fullScreen: true,
+      ),
+      fullscreenDialog: true,
     );
-    // La lógica de edición se manejará desde la vista principal
   }
 
-  void _renovarCliente() {
+  void _abonarCliente() {
     Get.back(); // Volver a la lista de clientes
-    Get.snackbar(
-      'Renovar',
-      'Redirigiendo a renovación de membresía...',
-      snackPosition: SnackPosition.BOTTOM,
-    );
-    // La lógica de renovación se manejará desde la vista principal
+    // Navegar al módulo de abonar pre-seleccionando al cliente, asumiendo ruta /abonar
+    Get.toNamed('/abonar', arguments: {'cliente': cliente});
   }
 
   void _deleteCliente() {
@@ -808,7 +507,7 @@ class ClienteDetailView extends GetView<ClientesController> {
       AlertDialog(
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
+        title: const Text(
           'Eliminar Cliente',
           style: TextStyle(
             color: AppColors.titleColor,
@@ -822,7 +521,7 @@ class ClienteDetailView extends GetView<ClientesController> {
         actions: [
           TextButton(
             onPressed: () => Get.back(),
-            child: Text(
+            child: const Text(
               'Cancelar',
               style: TextStyle(
                 color: AppColors.textSecondary,
@@ -849,18 +548,6 @@ class ClienteDetailView extends GetView<ClientesController> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // Métodos para manejar las acciones del QR
-  void _showQrDialog() {
-    Get.dialog(
-      QrDialog(
-        nombre: cliente.name,
-        telefono: cliente.phone,
-        userNumber: cliente.userNumber,
-        totalAmount: cliente.membershipPrice,
       ),
     );
   }

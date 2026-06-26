@@ -41,8 +41,8 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
             Obx(() => WelcomeScreenWidget(
               userName: controller.userName.value,
               userPhotoUrl: controller.userPhotoUrl.value,
-              membershipType: controller.membershipType.value,
               daysLeft: controller.daysLeft.value,
+              expirationDate: controller.expirationDate.value,
               isVisible: controller.isShowingDialog.value,
             )),
           ],

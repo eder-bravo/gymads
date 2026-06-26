@@ -1,0 +1,28 @@
+{
+  "name": "gymads",
+  "version": "1.0.0",
+  "description": "A new Flutter project.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ebravo-dev/gymads.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ebravo-dev/gymads/issues"
+  },
+  "homepage": "https://github.com/ebravo-dev/gymads#readme",
+  "devDependencies": {
+    "supabase": "^2.76.8"
+  }
+}

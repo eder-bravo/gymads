@@ -1,0 +1,96 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gymads/app/data/config/rfid_config.dart';
+import 'package:gymads/app/data/services/supabase_service.dart';
+import 'package:gymads/app/data/services/rfid_reader_service.dart';
+import 'package:gymads/app/data/services/image_cache_service.dart';
+import 'package:gymads/app/data/services/background_rfid_service.dart';
+import 'package:gymads/app/modules/clientes/services/qr_cache_service.dart';
+import 'app/bindings/initial_binding.dart';
+import 'app/routes/app_pages.dart';
+import 'core/theme/app_theme.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Cargar variables de entorno
+  await dotenv.load(fileName: ".env");
+
+  bool rfidConnected = false; // Variable para tracking del estado RFID
+
+  try {
+    // Inicializar Supabase usando nuestro servicio configurado
+    await SupabaseService.initialize();
+    print('Supabase inicializado correctamente');
+    
+    // Inicializar servicio de caché de imágenes
+    await ImageCacheService.instance.initialize();
+    print('Servicio de caché de imágenes inicializado');
+    
+    // Inicializar servicio de caché de QR codes
+    QrCacheService().initialize();
+    print('Servicio de caché de QR codes inicializado');
+    
+    // Verificar conexión a la base de datos
+    await SupabaseService.testDatabaseConnection();
+    print('Conexión a la base de datos verificada');
+    
+    // Cargar configuración de RFID primero
+    print('⚙️ Intentando cargar configuración RFID...');
+    await RfidConfig.loadConfig();
+    print('🌐 URL RFID configurada: ${RfidConfig.baseUrl}');
+    
+    // Intentar conectar con el lector RFID al inicio
+    print('🔄 Intentando conectar al ESP32...');
+    
+    bool rfidConnected = false;
+    try {
+      rfidConnected = await RfidReaderService.startReading();
+      print('🔍 DEBUG: rfidConnected = $rfidConnected');
+    } catch (e, stackTrace) {
+      print('❌ ERROR en startReading: $e');
+      print('📍 Stack: $stackTrace');
+    }
+    
+    if (rfidConnected) {
+      print('✅ Lector RFID conectado correctamente');
+      print('📡 IP del ESP32: ${RfidConfig.getCurrentIP() ?? RfidConfig.DEFAULT_ESP32_IP}');
+    } else {
+      print('⚠️  Advertencia: No se pudo conectar con el lector RFID');
+    }
+  } catch (e) {
+    print('Error en inicialización: $e');
+  }
+  
+  runApp(
+    GetMaterialApp(
+      title: "GymAds - Gestión de Gimnasio",
+      initialRoute: AppPages.INITIAL,
+      getPages: AppPages.routes,
+      theme: AppTheme.theme,
+      debugShowCheckedModeBanner: false,
+      initialBinding: InitialBinding(),
+    ),
+  );
+  
+  // Inicializar servicio RFID DESPUÉS de runApp si está conectado
+  if (rfidConnected) {
+    // Esperar a que GetX esté listo
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      try {
+        print('🔍 DEBUG: Iniciando servicio RFID post-runApp...');
+        final backgroundService = Get.put(BackgroundRfidService());
+        print('� Servicio de escaneo RFID en segundo plano inicializado');
+        
+        backgroundService.startScanning();
+        print('� Servicio de escaneo RFID iniciado globalmente');
+      } catch (e, stackTrace) {
+        print('❌ ERROR al inicializar servicio RFID: $e');
+        print('📍 Stack trace: $stackTrace');
+      }
+    });
+  }
+}

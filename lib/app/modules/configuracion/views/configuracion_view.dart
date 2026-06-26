@@ -23,101 +23,65 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      body: Obx(() => ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          // Header con información básica del usuario
-          _buildUserHeader(),
-          
-          const SizedBox(height: 24),
-          
-          // Lista de opciones de configuración
-          _buildConfigurationOptions(),
-        ],
-      )),
+      body: SafeArea(
+        child: Obx(() => ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                // Header con información básica del usuario
+                _buildUserHeader(),
+
+                const SizedBox(height: 24),
+
+                // Lista de opciones de configuración
+                _buildConfigurationOptions(),
+              ],
+            )),
+      ),
     );
   }
-  
+
   Widget _buildUserHeader() {
     return Card(
       elevation: 4,
       color: AppColors.cardBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: AppColors.cardBackground,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.titleColor,
-                ),
-                child: const CircleAvatar(
-                  radius: 32,
-                  backgroundColor: AppColors.titleColor,
-                  child: Icon(
-                    Icons.person,
-                    size: 36,
-                    color: Colors.white,
-                  ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.titleColor,
+              ),
+              child: const CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.titleColor,
+                child: Icon(
+                  Icons.person,
+                  size: 28,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      controller.userName.value,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.titleColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'Admin',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.titleColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                controller.userName.value,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.verified_user,
-                  color: AppColors.success,
-                  size: 24,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
-  
+
   Widget _buildConfigurationOptions() {
     return Column(
       children: [
@@ -130,42 +94,28 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           onTap: () => controller.openAccountSettings(),
           trailing: _buildStatusIndicator(true),
         ),
-        
+
         const SizedBox(height: 12),
-        
-        // Opción de Lector RFID
-        _buildOptionTile(
-          icon: Icons.nfc,
-          iconColor: AppColors.titleColor,
-          title: 'Lector RFID',
-          subtitle: controller.rfidConnectionStatus.value 
-            ? 'Conectado y funcionando'
-            : 'IP Fija: 192.168.1.100',
-          onTap: () => controller.testRfidConnection(),
-          trailing: _buildStatusIndicator(controller.rfidConnectionStatus.value),
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Opción de Aplicación (preparado para futuro)
+
+        // Opción de Aplicación (branding & preferences)
         _buildOptionTile(
           icon: Icons.settings_applications,
           iconColor: AppColors.accent,
           title: 'Aplicación',
-          subtitle: 'Preferencias generales y configuración',
+          subtitle: 'Personaliza nombre, color y preferencias',
           onTap: () => controller.openAppSettings(),
-          trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
-          enabled: false, // Deshabilitado por ahora
+          trailing: const Icon(Icons.arrow_forward_ios,
+              size: 16, color: AppColors.textSecondary),
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         // Sección de acciones peligrosas
         _buildDangerousActions(),
       ],
     );
   }
-  
+
   Widget _buildOptionTile({
     required IconData icon,
     required Color iconColor,
@@ -217,18 +167,20 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
               ),
             ),
           ),
-          trailing: trailing ?? Icon(
-            Icons.arrow_forward_ios, 
-            size: 18, 
-            color: enabled ? AppColors.textSecondary : AppColors.textHint,
-          ),
+          trailing: trailing ??
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 18,
+                color: enabled ? AppColors.textSecondary : AppColors.textHint,
+              ),
           onTap: enabled ? onTap : null,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         ),
       ),
     );
   }
-  
+
   Widget _buildStatusIndicator(bool isActive) {
     return Container(
       width: 12,
@@ -239,7 +191,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
       ),
     );
   }
-  
+
   Widget _buildDangerousActions() {
     return Card(
       elevation: 3,
@@ -284,9 +236,11 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
                   ),
                 ),
               ),
-              trailing: Icon(Icons.arrow_forward_ios, size: 18, color: AppColors.error.withOpacity(0.8)),
+              trailing: Icon(Icons.arrow_forward_ios,
+                  size: 18, color: AppColors.error.withOpacity(0.8)),
               onTap: controller.logout,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
           ],
         ),

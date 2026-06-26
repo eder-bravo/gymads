@@ -259,7 +259,8 @@ class BackgroundRfidService extends GetxService {
         return;
       }
 
-      if (!user.isActive) {
+      // Membresía inactiva o vencida → acceso denegado
+      if (!user.isActive || user.daysRemaining <= 0) {
         await _handleInactiveUser(user);
         return;
       }
@@ -310,10 +311,14 @@ class BackgroundRfidService extends GetxService {
     }
   }
 
-  /// Manejar usuario inactivo
+  /// Manejar usuario inactivo o con membresía vencida
   Future<void> _handleInactiveUser(UserModel user) async {
+    final bool estaVencida = user.daysRemaining <= 0;
+    final String motivo =
+        estaVencida ? 'Membresía vencida' : 'Membresía inactiva';
+
     if (kDebugMode) {
-      print('⚠️ Usuario inactivo: ${user.name}');
+      print('⚠️ Acceso denegado ($motivo): ${user.name}');
     }
 
     AudioService.playDeniedSound();
@@ -340,7 +345,7 @@ class BackgroundRfidService extends GetxService {
       currentUser.value = null;
     } else {
       // Mostrar notificación de denegado
-      _showDeniedNotification('Membresía inactiva');
+      _showDeniedNotification(motivo);
     }
   }
 
@@ -416,6 +421,15 @@ class BackgroundRfidService extends GetxService {
     Future(() async {
       try {
         if (user.id == null) return;
+
+        // Salvaguarda: nunca registrar entrada de una membresía inactiva o vencida
+        if (!user.isActive || user.daysRemaining <= 0) {
+          if (kDebugMode) {
+            print(
+                '⛔ Registro de acceso bloqueado (membresía no válida): ${user.name}');
+          }
+          return;
+        }
 
         final staffUser = AuthUtils.getStaffIdentifier();
 

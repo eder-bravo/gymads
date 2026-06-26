@@ -337,6 +337,14 @@ class ChecadorController extends GetxController {
           return;
         }
 
+        // Salvaguarda: nunca registrar entrada de una membresía inactiva o vencida
+        if (!user.isActive || user.daysRemaining <= 0) {
+          if (kDebugMode) {
+            print('⛔ Registro de acceso bloqueado (membresía no válida): ${user.name}');
+          }
+          return;
+        }
+
         if (kDebugMode) {
           print('🔄 Iniciando registro de acceso en Supabase...');
           print('   👤 Usuario: ${user.name} (${user.userNumber})');

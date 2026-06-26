@@ -481,6 +481,14 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
           return;
         }
 
+        // Salvaguarda: nunca registrar entrada de una membresía inactiva o vencida
+        if (!user.isActive || user.daysRemaining <= 0) {
+          if (kDebugMode) {
+            print('⛔ [RFID] Registro de acceso bloqueado (membresía no válida): ${user.name}');
+          }
+          return;
+        }
+
         if (kDebugMode) {
           print('🔄 [RFID] Iniciando registro de acceso en Supabase...');
           print('   👤 Usuario: ${user.name} (${user.userNumber})');

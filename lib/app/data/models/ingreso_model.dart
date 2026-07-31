@@ -144,6 +144,8 @@ class IngresoModel {
         return 'Renovación';
       case 'producto':
         return 'Venta de producto';
+      case 'abono':
+        return 'Abono';
       default:
         return concepto;
     }

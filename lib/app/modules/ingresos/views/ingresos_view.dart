@@ -72,6 +72,59 @@ class IngresosView extends GetView<IngresosController> {
   }
 
   // ─────────────────────────────────────────────────────────
+  // RANGO DE FECHAS PERSONALIZADO
+  // ─────────────────────────────────────────────────────────
+  Future<void> _seleccionarRango(BuildContext context) async {
+    final now = DateTime.now();
+
+    final rango = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 5),
+      // Fecha final libre: el usuario decide dónde termina el rango
+      lastDate: DateTime(now.year + 1, now.month, now.day),
+      // Sin rango inicial: el mes no abre ya pintado de naranja y el primer
+      // toque se distingue claramente.
+      locale: const Locale('es'),
+      helpText: 'Selecciona un rango de fechas',
+      saveText: 'Aplicar',
+      builder: (context, child) => Theme(
+        // Tema oscuro construido desde cero: copiar el tema claro de la app
+        // dejaba la tipografía con texto negro y los días no se veían.
+        data: ThemeData(
+          useMaterial3: true,
+          brightness: Brightness.dark,
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.accent,
+            onPrimary: Colors.white,
+            surface: AppColors.cardBackground,
+            onSurface: AppColors.textPrimary,
+            secondary: AppColors.accent,
+          ),
+          scaffoldBackgroundColor: AppColors.backgroundColor,
+          appBarTheme: const AppBarTheme(
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.textPrimary,
+          ),
+          datePickerTheme: DatePickerThemeData(
+            // Banda del rango translúcida para que inicio/fin resalten
+            rangeSelectionBackgroundColor: AppColors.accent.withOpacity(0.25),
+            rangePickerBackgroundColor: AppColors.backgroundColor,
+            rangePickerHeaderForegroundColor: AppColors.textPrimary,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (rango != null) {
+      // Incluir todo el día final hasta las 23:59:59
+      final fin = DateTime(
+          rango.end.year, rango.end.month, rango.end.day, 23, 59, 59);
+      controller.setFechasPersonalizadas(rango.start, fin);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
   // SELECTOR DE MES
   // ─────────────────────────────────────────────────────────
   Widget _buildMonthSelector() {
@@ -81,7 +134,7 @@ class IngresosView extends GetView<IngresosController> {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.accent.withOpacity(0.2)),
         ),
         child: Row(
@@ -137,6 +190,19 @@ class IngresosView extends GetView<IngresosController> {
                       : null,
                   tooltip: 'Mes siguiente',
                 )),
+            Container(
+              width: 1,
+              height: 24,
+              color: AppColors.accent.withOpacity(0.2),
+            ),
+            Builder(
+              builder: (context) => IconButton(
+                onPressed: () => _seleccionarRango(context),
+                icon: const Icon(Icons.date_range_outlined),
+                color: AppColors.accent,
+                tooltip: 'Rango de fechas',
+              ),
+            ),
           ],
         ),
       ),
@@ -362,9 +428,9 @@ class IngresosView extends GetView<IngresosController> {
                           color: isSelected
                               ? AppColors.accent.withOpacity(0.2)
                               : AppColors.containerBackground,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(14),
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(14),
                             onTap: isDisabled
                                 ? null
                                 : () {

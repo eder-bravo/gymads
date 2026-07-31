@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/user_model.dart';
-import 'package:gymads/app/modules/shared/widgets/rfid_reader_animation.dart';
 import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
 import 'package:gymads/core/theme/app_colors.dart';

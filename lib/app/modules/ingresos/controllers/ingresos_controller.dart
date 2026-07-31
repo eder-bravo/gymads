@@ -229,6 +229,7 @@ class IngresosController extends GetxController {
 
   /// Establece un rango de fechas personalizado
   void setFechasPersonalizadas(DateTime inicio, DateTime fin) {
+    selectedPeriodo.value = ''; // rango personalizado: sin chip resaltado
     fechaInicio.value = inicio;
     fechaFin.value = fin;
     refreshData();
@@ -344,7 +345,11 @@ class IngresosController extends GetxController {
   }
 
   void _setMonth(int year, int month) {
-    selectedPeriodo.value = 'mes';
+    final now = DateTime.now();
+    // Solo el mes actual corresponde al chip "Mes"; cualquier otro mes
+    // navegado deja los chips sin resaltar.
+    selectedPeriodo.value =
+        (year == now.year && month == now.month) ? 'mes' : '';
     fechaInicio.value = DateTime(year, month, 1);
     fechaFin.value = DateTime(year, month + 1, 0, 23, 59, 59);
     refreshData();

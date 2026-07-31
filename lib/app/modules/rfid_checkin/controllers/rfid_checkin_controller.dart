@@ -8,6 +8,7 @@ import '../../../data/models/user_model.dart';
 import '../../../data/services/rfid_reader_service.dart';
 import '../../../data/services/audio_service.dart';
 import '../../../data/services/image_cache_service.dart';
+import '../../../data/services/storage_service.dart';
 import '../../../data/services/access_log_service.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../core/utils/auth_utils.dart';
@@ -186,13 +187,18 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
       int cached = 0;
       for (final user in usersToCache) {
         try {
-          await CachedNetworkImage.evictFromCache(user.photoUrl!);
-          await precacheImage(
-            CachedNetworkImageProvider(user.photoUrl!),
-            Get.context!,
-          );
-          cached++;
-          
+          // Bucket privado: firmar la URL y precachear con la misma clave estable
+          // (path del objeto) que usa CachedUserImage al mostrarla.
+          final signed = await StorageService.instance.signedUrl(user.photoUrl);
+          final key = StorageService.instance.stableKey(user.photoUrl);
+          if (signed != null && key != null) {
+            await precacheImage(
+              CachedNetworkImageProvider(signed, cacheKey: key),
+              Get.context!,
+            );
+            cached++;
+          }
+
           // Pausa breve entre cada imagen
           await Future.delayed(const Duration(milliseconds: 50));
         } catch (e) {

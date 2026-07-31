@@ -30,11 +30,33 @@ class AbonarController extends GetxController {
   final Rx<UserModel?> selectedClient = Rx<UserModel?>(null);
 
   // Formulario de Abono
-  final amountController = TextEditingController(); // Cantidad a abonar
-  final durationController = TextEditingController(text: '1'); // Cantidad de tiempo
+  final unitPriceController = TextEditingController(); // Precio por periodo
+  final durationController = TextEditingController(text: '1'); // Cantidad de periodos
   final durationType = 'Meses'.obs; // Tipo de tiempo: Meses, Semanas, Días
   final paymentMethod = 'Efectivo'.obs;
-  
+
+  // Espejo reactivo de los campos de texto, para recalcular total y fecha en vivo
+  final unitPrice = 0.0.obs;
+  final durationValue = 1.obs;
+
+  double get totalAmount => unitPrice.value * durationValue.value;
+
+  /// Unidad en singular para etiquetas ("por mes", "por semana"...)
+  String get durationUnitLabel {
+    switch (durationType.value) {
+      case 'Meses':
+        return 'mes';
+      case 'Semanas':
+        return 'semana';
+      case 'Días':
+        return 'día';
+      case 'Años':
+        return 'año';
+      default:
+        return 'periodo';
+    }
+  }
+
   final paymentMethods = ['Efectivo', 'Tarjeta', 'Transferencia'];
   final durationTypes = ['Meses', 'Semanas', 'Días', 'Años'];
 
@@ -54,31 +76,37 @@ class AbonarController extends GetxController {
     }
 
     _setupRfidListener();
-    
+
     // Escuchar cambios en el buscador
     searchController.addListener(_onSearchChanged);
+
+    // Mantener el estado reactivo en sincronía con los campos de texto
+    unitPriceController.addListener(_onUnitPriceChanged);
+    durationController.addListener(_onDurationChanged);
+  }
+
+  void _onUnitPriceChanged() {
+    unitPrice.value = double.tryParse(unitPriceController.text) ?? 0.0;
+  }
+
+  void _onDurationChanged() {
+    durationValue.value = int.tryParse(durationController.text) ?? 0;
   }
 
   void incrementDuration() {
-    int current = int.tryParse(durationController.text) ?? 0;
-    current++;
-    durationController.text = current.toString();
-    update();
+    durationController.text = (durationValue.value + 1).toString();
   }
 
   void decrementDuration() {
-    int current = int.tryParse(durationController.text) ?? 0;
-    if (current > 1) {
-      current--;
-      durationController.text = current.toString();
-      update();
+    if (durationValue.value > 1) {
+      durationController.text = (durationValue.value - 1).toString();
     }
   }
 
   @override
   void onClose() {
     searchController.dispose();
-    amountController.dispose();
+    unitPriceController.dispose();
     durationController.dispose();
     _debounce?.cancel();
     _rfidSubscription?.cancel();
@@ -204,36 +232,40 @@ class AbonarController extends GetxController {
 
   void clearSelection() {
     selectedClient.value = null;
-    amountController.clear();
+    unitPriceController.clear();
     durationController.text = '1';
     durationType.value = 'Meses';
     isSuccess.value = false;
   }
 
-  DateTime calculateNewExpirationDate() {
+  /// Fecha desde la que se cuenta el nuevo periodo: la expiración vigente si
+  /// aún no ha pasado, o hoy si la membresía ya venció.
+  DateTime calculatePeriodStartDate() {
     final client = selectedClient.value;
-    if (client == null) return DateTime.now();
-
     final now = DateTime.now();
-    // Iniciar desde la fecha de expiración actual si es mayor a hoy, o desde hoy.
-    DateTime baseDate = now;
-    if (client.expirationDate != null && client.expirationDate!.isAfter(now)) {
-      baseDate = client.expirationDate!;
+    if (client?.expirationDate != null && client!.expirationDate!.isAfter(now)) {
+      return client.expirationDate!;
     }
+    return now;
+  }
 
-    final durationValue = int.tryParse(durationController.text) ?? 1;
+  DateTime calculateNewExpirationDate() {
+    if (selectedClient.value == null) return DateTime.now();
+
+    final baseDate = calculatePeriodStartDate();
+    final periods = durationValue.value;
 
     switch (durationType.value) {
       case 'Meses':
-        return baseDate.add(Duration(days: durationValue * 30));
+        return baseDate.add(Duration(days: periods * 30));
       case 'Semanas':
-        return baseDate.add(Duration(days: durationValue * 7));
+        return baseDate.add(Duration(days: periods * 7));
       case 'Días':
-        return baseDate.add(Duration(days: durationValue));
+        return baseDate.add(Duration(days: periods));
       case 'Años':
-        return baseDate.add(Duration(days: durationValue * 365));
+        return baseDate.add(Duration(days: periods * 365));
       default:
-        return baseDate.add(Duration(days: 30));
+        return baseDate.add(const Duration(days: 30));
     }
   }
 
@@ -243,21 +275,24 @@ class AbonarController extends GetxController {
       return;
     }
 
-    final amount = double.tryParse(amountController.text);
-    if (amount == null || amount <= 0) {
-      _showSnackbar('Error', 'Ingresa una cantidad válida a abonar', isError: true);
+    final periods = durationValue.value;
+    if (periods <= 0) {
+      _showSnackbar('Error', 'Selecciona una cantidad de periodos válida', isError: true);
       return;
     }
 
-    final durationValue = int.tryParse(durationController.text);
-    if (durationValue == null || durationValue <= 0) {
-      _showSnackbar('Error', 'Ingresa una duración válida', isError: true);
+    final precioUnitario = unitPrice.value;
+    if (precioUnitario <= 0) {
+      _showSnackbar('Error', 'Ingresa un precio unitario válido', isError: true);
       return;
     }
+
+    final amount = totalAmount;
 
     isLoading.value = true;
     try {
       final client = selectedClient.value!;
+      final periodStartDate = calculatePeriodStartDate();
       final newExpirationDate = calculateNewExpirationDate();
       final now = DateTime.now();
 
@@ -276,8 +311,9 @@ class AbonarController extends GetxController {
       if (success) {
         // Registrar el Ingreso
         try {
-          final descripcion = 'Abono: $durationValue ${durationType.value.toLowerCase()}';
-          
+          final descripcion =
+              'Abono: $periods ${durationType.value.toLowerCase()} × \$${precioUnitario.toStringAsFixed(2)}';
+
           await ingresoService.registrarAbono(
             clienteId: client.id!,
             clienteNombre: client.name,
@@ -286,6 +322,8 @@ class AbonarController extends GetxController {
             descripcion: descripcion,
             usuarioStaff: 'Staff',
             notas: 'Abono libre',
+            periodoInicio: periodStartDate,
+            periodoFin: newExpirationDate,
           );
           
           if (Get.isRegistered<IngresosController>()) {

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
+import 'storage_service.dart';
 
 /// Servicio de caché de imágenes optimizado para la aplicación GymOne
 /// 
@@ -133,9 +134,14 @@ class ImageCacheService {
       if (kDebugMode) {
         print('⬇️ Descargando imagen: $photoUrl');
       }
-      
+
+      // Bucket privado: resolver una URL firmada antes de descargar.
+      // Si no se puede firmar (p. ej. path externo), usar el valor tal cual.
+      final downloadUrl =
+          await StorageService.instance.signedUrl(photoUrl) ?? photoUrl;
+
       // Descargar imagen desde Supabase
-      final response = await http.get(Uri.parse(photoUrl));
+      final response = await http.get(Uri.parse(downloadUrl));
       if (response.statusCode != 200) {
         if (kDebugMode) {
           print('❌ Error descargando imagen: ${response.statusCode}');

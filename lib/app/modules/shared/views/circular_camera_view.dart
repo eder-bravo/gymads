@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:get/get.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -116,10 +115,18 @@ class _CircularCameraViewState extends State<CircularCameraView>
       // Capturar la foto con la resolución completa de la cámara
       final XFile photoFile = await _controller!.takePicture();
 
-      // Crear archivo en directorio temporal
-      final Directory tempDir = await getTemporaryDirectory();
+      // Guardar en Application Documents (NO en el directorio de caché):
+      // el usuario puede tardar en llenar el resto del formulario antes de
+      // guardar, y Android puede purgar getTemporaryDirectory() en cualquier
+      // momento sin avisar, borrando la foto antes de subirla.
+      final Directory docsDir = await getApplicationDocumentsDirectory();
+      final Directory captureDir =
+          Directory(path.join(docsDir.path, 'photo_capture'));
+      if (!await captureDir.exists()) {
+        await captureDir.create(recursive: true);
+      }
       final String targetPath = path.join(
-        tempDir.path,
+        captureDir.path,
         'cliente_${DateTime.now().millisecondsSinceEpoch}.jpg',
       );
 

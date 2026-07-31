@@ -17,6 +17,8 @@ class IngresoService {
     required String descripcion,
     required String usuarioStaff,
     String? notas,
+    DateTime? periodoInicio,
+    DateTime? periodoFin,
   }) async {
     try {
       final ingreso = IngresoModel(
@@ -30,6 +32,8 @@ class IngresoService {
         montoFinal: monto,
         metodoPago: metodoPago,
         fecha: DateTime.now(),
+        periodoInicio: periodoInicio,
+        periodoFin: periodoFin,
         usuarioStaff: usuarioStaff,
         notas: notas,
       );

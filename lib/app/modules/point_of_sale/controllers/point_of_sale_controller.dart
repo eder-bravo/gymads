@@ -137,8 +137,6 @@ class PointOfSaleController extends GetxController {
     }
 
     _calculateTotals();
-
-    SnackbarHelper.success('Producto agregado', '${product.name} x$quantity');
   }
 
   /// Actualizar cantidad de un item en el carrito
@@ -259,8 +257,8 @@ class PointOfSaleController extends GetxController {
       final result = await _saleRepository.createSale(sale);
 
       if (result != null) {
-        SnackbarHelper.success(
-            'Venta procesada', 'Venta completada exitosamente');
+        // La notificación de éxito la muestra la vista tras cerrar el modal,
+        // para evitar el doble snackbar que se auto-cancelaba con clearSnackBars().
 
         // Limpiar carrito y estado
         clearCart();

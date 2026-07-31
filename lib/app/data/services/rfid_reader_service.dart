@@ -155,7 +155,7 @@ class RfidReaderService {
     String status, {
     String? userName,
     String? accessType,
-    String? verificationType = 'qr',
+    String? verificationType = 'rfid',
   }) async {
     try {
       // Verificar si hay configuración disponible

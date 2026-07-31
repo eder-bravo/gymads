@@ -7,8 +7,6 @@ import '../modules/auth/views/login_view.dart';
 import '../modules/auth/views/register_view.dart';
 import '../modules/auth/views/email_confirmation_view.dart';
 import '../modules/auth/controllers/register_controller.dart';
-import '../modules/checador/bindings/checador_binding.dart';
-import '../modules/checador/views/checador_view.dart';
 import '../modules/clientes/bindings/clientes_binding.dart';
 import '../modules/clientes/views/clientes_view.dart';
 import '../modules/configuracion/bindings/configuracion_binding.dart';
@@ -68,11 +66,6 @@ class AppPages {
       name: _Paths.HOME,
       page: () => const HomeView(),
       binding: HomeBinding(),
-    ),
-    GetPage(
-      name: _Paths.CHECADOR,
-      page: () => const ChecadorView(),
-      binding: ChecadorBinding(),
     ),
     GetPage(
       name: _Paths.CLIENTES,

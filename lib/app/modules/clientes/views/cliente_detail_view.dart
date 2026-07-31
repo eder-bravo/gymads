@@ -80,15 +80,15 @@ class ClienteDetailView extends GetView<ClientesController> {
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.accent.withOpacity(0.3),
-                    blurRadius: 15,
-                    spreadRadius: 2,
+                    blurRadius: 20,
+                    spreadRadius: 3,
                   ),
                 ],
               ),
               child: UserThumbnail(
                 imageUrl: cliente.photoUrl,
                 userName: cliente.name,
-                size: 96,
+                size: 130,
               ),
             ),
           ),
@@ -539,7 +539,7 @@ class ClienteDetailView extends GetView<ClientesController> {
               backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
             ),
             child: const Text(

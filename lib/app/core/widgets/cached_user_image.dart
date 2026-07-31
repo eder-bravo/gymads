@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
+import '../../data/services/storage_service.dart';
 
 /// Widget optimizado para mostrar imágenes de usuarios con caché automático
-/// 
+///
 /// Características:
-/// - Caché automático en disco y memoria
+/// - Buckets privados: resuelve una URL firmada bajo demanda (cacheada en memoria)
+/// - Caché de imagen estable por *path* del objeto (la rotación de la URL
+///   firmada NO invalida el caché de disco/memoria)
 /// - Placeholder mientras carga
 /// - Manejo de errores con avatar por defecto
-/// - Compresión y optimización transparente
-class CachedUserImage extends StatelessWidget {
+class CachedUserImage extends StatefulWidget {
   final String? imageUrl;
   final double size;
   final bool isCircular;
@@ -28,15 +30,61 @@ class CachedUserImage extends StatelessWidget {
   });
 
   @override
+  State<CachedUserImage> createState() => _CachedUserImageState();
+}
+
+class _CachedUserImageState extends State<CachedUserImage> {
+  String? _signedUrl;
+  String? _cacheKey;
+  bool _resolving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(CachedUserImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _signedUrl = null;
+      _resolve();
+    }
+  }
+
+  Future<void> _resolve() async {
+    final stored = widget.imageUrl;
+    if (stored == null || stored.isEmpty) return;
+    _cacheKey = StorageService.instance.stableKey(stored);
+    setState(() => _resolving = true);
+    final url = await StorageService.instance.signedUrl(stored);
+    if (!mounted) return;
+    setState(() {
+      _signedUrl = url;
+      _resolving = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final size = widget.size;
+    final isCircular = widget.isCircular;
+    final fit = widget.fit;
+
     // Si no hay URL, mostrar avatar por defecto
-    if (imageUrl == null || imageUrl!.isEmpty) {
+    if (widget.imageUrl == null || widget.imageUrl!.isEmpty) {
       return _buildDefaultAvatar();
+    }
+
+    // Mientras se resuelve la URL firmada, mostrar placeholder de carga
+    if (_signedUrl == null) {
+      return _resolving ? _buildLoadingPlaceholder() : _buildDefaultAvatar();
     }
 
     // Retornar directamente CachedNetworkImage con imageBuilder optimizado
     return CachedNetworkImage(
-      imageUrl: imageUrl!,
+      imageUrl: _signedUrl!,
       imageBuilder: (context, imageProvider) {
         // Usar Container con DecorationImage para mantener proporciones
         return Container(
@@ -60,8 +108,8 @@ class CachedUserImage extends StatelessWidget {
         }
         return _buildDefaultAvatar();
       },
-      // Configuración de caché optimizada
-      cacheKey: imageUrl,
+      // Clave de caché estable = path del objeto (no la URL firmada que rota)
+      cacheKey: _cacheKey ?? _signedUrl!,
       maxWidthDiskCache: 800,
       maxHeightDiskCache: 800,
       memCacheWidth: 400,
@@ -73,13 +121,14 @@ class CachedUserImage extends StatelessWidget {
 
   /// Placeholder mientras se carga la imagen
   Widget _buildLoadingPlaceholder() {
+    final size = widget.size;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: isCircular ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: isCircular ? null : BorderRadius.circular(8),
-        color: backgroundColor ?? Colors.grey[300],
+        shape: widget.isCircular ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: widget.isCircular ? null : BorderRadius.circular(8),
+        color: widget.backgroundColor ?? Colors.grey[300],
       ),
       child: Center(
         child: SizedBox(
@@ -96,14 +145,16 @@ class CachedUserImage extends StatelessWidget {
 
   /// Avatar por defecto cuando no hay imagen
   Widget _buildDefaultAvatar() {
+    final size = widget.size;
+    final userName = widget.userName;
     // Obtener iniciales del nombre si está disponible
     String initials = '?';
-    if (userName != null && userName!.isNotEmpty) {
-      final names = userName!.trim().split(' ');
+    if (userName != null && userName.isNotEmpty) {
+      final names = userName.trim().split(' ');
       if (names.length >= 2) {
         initials = '${names[0][0]}${names[1][0]}'.toUpperCase();
       } else {
-        initials = userName![0].toUpperCase();
+        initials = userName[0].toUpperCase();
       }
     }
 
@@ -111,9 +162,9 @@ class CachedUserImage extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: isCircular ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: isCircular ? null : BorderRadius.circular(8),
-        color: backgroundColor ?? Colors.grey[400],
+        shape: widget.isCircular ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: widget.isCircular ? null : BorderRadius.circular(8),
+        color: widget.backgroundColor ?? Colors.grey[400],
       ),
       child: Center(
         child: Text(

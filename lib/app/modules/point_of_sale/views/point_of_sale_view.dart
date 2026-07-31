@@ -33,7 +33,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   filled: true,
                   fillColor: AppColors.cardBackground,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 0),
@@ -101,7 +101,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
           border: quantity > 0
               ? Border.all(color: AppColors.accent, width: 2)
               : null,
@@ -278,7 +278,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     vertical: 14,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 child: const Text(
@@ -345,7 +345,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.containerBackground,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Obx(() => Column(
                       children: [
@@ -385,7 +385,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       filled: true,
                       fillColor: AppColors.containerBackground,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.symmetric(
@@ -426,7 +426,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                           filled: true,
                           fillColor: AppColors.containerBackground,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(16),
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(
@@ -466,7 +466,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                     ),
                     child: controller.isProcessingPayment

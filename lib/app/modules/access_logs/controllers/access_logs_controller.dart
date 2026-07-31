@@ -12,7 +12,6 @@ class AccessLogsController extends GetxController {
 
   // Estadísticas
   final totalEntries = 0.obs;
-  final totalQrAccesses = 0.obs;
   final totalRfidAccesses = 0.obs;
 
   @override
@@ -79,7 +78,6 @@ class AccessLogsController extends GetxController {
 
     totalEntries.value =
         logs.where((log) => log.accessType == 'entrada').length;
-    totalQrAccesses.value = logs.where((log) => log.method == 'qr').length;
     totalRfidAccesses.value = logs.where((log) => log.method == 'rfid').length;
   }
 
@@ -92,7 +90,6 @@ class AccessLogsController extends GetxController {
   Map<String, String> getFormattedStats() {
     return {
       'totalEntries': totalEntries.value.toString(),
-      'totalQr': totalQrAccesses.value.toString(),
       'totalRfid': totalRfidAccesses.value.toString(),
       'total': accessLogs.length.toString(),
     };

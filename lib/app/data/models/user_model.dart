@@ -11,7 +11,6 @@ class UserModel {
   final DateTime? expirationDate;
   final bool isActive;
   final String? photoUrl;
-  final String? qrCode;
   final String userNumber;
   final String? rfidCard;
   final List<dynamic> accessHistory;
@@ -29,7 +28,6 @@ class UserModel {
     this.expirationDate,
     this.isActive = true,
     this.photoUrl,
-    this.qrCode,
     this.rfidCard,
     required this.userNumber,
     this.accessHistory = const [],
@@ -81,7 +79,6 @@ class UserModel {
       expirationDate: expDate,
       isActive: json['is_active'] ?? json['isActive'] == true,
       photoUrl: (json['photo_url'] ?? json['photoUrl'])?.toString(),
-      qrCode: (json['qr_code'] ?? json['qrCode'])?.toString(),
       rfidCard: (json['rfid_card'] ?? json['rfidCard'])?.toString(),
       userNumber:
           ((json['user_number'] ?? json['userNumber'] ?? '')).toString().trim(),
@@ -102,7 +99,6 @@ class UserModel {
       'expiration_date': expirationDate?.toUtc().toIso8601String(),
       'is_active': isActive,
       'photo_url': photoUrl,
-      'qr_code': qrCode,
       'rfid_card': rfidCard,
       'user_number': userNumber,
       'last_payment_date': lastPaymentDate?.toUtc().toIso8601String(),
@@ -120,7 +116,6 @@ class UserModel {
     DateTime? expirationDate,
     bool? isActive,
     String? photoUrl,
-    String? qrCode,
     String? rfidCard,
     String? userNumber,
     List<dynamic>? accessHistory,
@@ -137,7 +132,6 @@ class UserModel {
       expirationDate: expirationDate ?? this.expirationDate,
       isActive: isActive ?? this.isActive,
       photoUrl: photoUrl ?? this.photoUrl,
-      qrCode: qrCode ?? this.qrCode,
       rfidCard: rfidCard ?? this.rfidCard,
       userNumber: userNumber ?? this.userNumber,
       accessHistory: accessHistory ?? this.accessHistory,

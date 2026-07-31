@@ -6,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/rfid_reader_service.dart';
 import '../../../data/services/tenant_context_service.dart';
-import '../../../data/services/branding_service.dart';
 import '../views/branding_settings_view.dart';
 import '../../../data/models/staff_profile_model.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -42,10 +41,6 @@ class ConfiguracionController extends GetxController {
   // Variables para configuración de audio
   final RxBool soundEnabled = true.obs;
   final RxDouble soundVolume = 0.8.obs;
-
-  // Variables para configuración de QR
-  final RxBool qrEnabled = true.obs;
-  final RxString qrCodeFormat = 'auto'.obs;
 
   @override
   void onInit() {
@@ -239,10 +234,6 @@ class ConfiguracionController extends GetxController {
       // Configuración de audio
       soundEnabled.value = prefs.getBool('sound_enabled') ?? true;
       soundVolume.value = prefs.getDouble('sound_volume') ?? 0.8;
-
-      // Configuración de QR
-      qrEnabled.value = prefs.getBool('qr_enabled') ?? true;
-      qrCodeFormat.value = prefs.getString('qr_format') ?? 'auto';
 
       // RFID — only scan if enabled
       rfidEnabled.value = prefs.getBool('rfid_enabled') ?? false;
@@ -468,17 +459,6 @@ class ConfiguracionController extends GetxController {
     }
   }
 
-  /// Guardar configuración de QR
-  Future<void> saveQRConfiguration() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('qr_enabled', qrEnabled.value);
-      await prefs.setString('qr_format', qrCodeFormat.value);
-      SnackbarHelper.success('Guardado', 'Configuración de QR guardada');
-    } catch (e) {
-      SnackbarHelper.error('Error', 'Error al guardar configuración de QR: $e');
-    }
-  }
 
   // =================== MÉTODOS PARA NAVEGACIÓN DE CONFIGURACIÓN ===================
 

@@ -7,7 +7,6 @@ abstract class Routes {
   static const REGISTER = _Paths.REGISTER;
   static const EMAIL_CONFIRMATION = _Paths.EMAIL_CONFIRMATION;
   static const HOME = _Paths.HOME;
-  static const CHECADOR = _Paths.CHECADOR;
   static const CLIENTES = _Paths.CLIENTES;
   static const INVENTARIO = _Paths.INVENTARIO;
   static const PRODUCT_FORM = _Paths.PRODUCT_FORM;
@@ -27,7 +26,6 @@ abstract class _Paths {
   static const REGISTER = '/register';
   static const EMAIL_CONFIRMATION = '/email-confirmation';
   static const HOME = '/home';
-  static const CHECADOR = '/checador';
   static const CLIENTES = '/clientes';
   static const INVENTARIO = '/inventario';
   static const PRODUCT_FORM = '/inventario/product-form';

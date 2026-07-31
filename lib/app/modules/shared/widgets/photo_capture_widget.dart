@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../views/circular_camera_view.dart';
 import '../../../core/utils/snackbar_helper.dart';
+import '../../../core/widgets/cached_user_image.dart';
 
 class PhotoCaptureWidget extends StatelessWidget {
   final Function(File) onPhotoTaken;
@@ -119,26 +120,10 @@ class PhotoCaptureWidget extends StatelessWidget {
                         child: Image.file(tempFile, fit: BoxFit.cover),
                       )
                     : currentPhotoUrl != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(75),
-                            child: Image.network(
-                              currentPhotoUrl!,
-                              fit: BoxFit.cover,
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(
-                                  Icons.person,
-                                  size: 80,
-                                  color: Colors.grey,
-                                );
-                              },
-                            ),
+                        ? CachedUserImage(
+                            imageUrl: currentPhotoUrl,
+                            size: 150,
+                            isCircular: true,
                           )
                         : const Icon(
                             Icons.camera_alt,

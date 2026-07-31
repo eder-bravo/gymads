@@ -52,25 +52,44 @@ class AbonarView extends GetView<AbonarController> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Busca por nombre o teléfono celular.',
+            'Busca por teléfono celular, o escanea tarjeta RFID.',
             style: TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 24),
-          TextField(
-            controller: controller.searchController,
-            keyboardType: TextInputType.phone,
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Ej: Juan Pérez, 551234...',
-              prefixIcon: const Icon(Icons.search, color: AppColors.accent),
-              filled: true,
-              fillColor: AppColors.containerBackground,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller.searchController,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Ej: 551234...',
+                    prefixIcon: const Icon(Icons.search, color: AppColors.accent),
+                    filled: true,
+                    fillColor: AppColors.containerBackground,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
               ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 16),
-            ),
+              const SizedBox(width: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.containerBackground,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: IconButton(
+                  onPressed: () => controller.startNfcSearch(context),
+                  icon: const Icon(Icons.contactless_outlined, color: AppColors.accent),
+                  padding: const EdgeInsets.all(16),
+                  tooltip: 'Buscar por RFID',
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -108,7 +127,7 @@ class AbonarView extends GetView<AbonarController> {
                         style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
                       ),
                       subtitle: Text(
-                        'Tel: ${client.phone}',
+                        'ID: ${client.userNumber} | Tel: ${client.phone}',
                         style: const TextStyle(color: AppColors.textSecondary),
                       ),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.accent),
@@ -195,70 +214,44 @@ class AbonarView extends GetView<AbonarController> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
-                // Cantidad Monetaria
-                TextField(
-                  controller: controller.amountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    labelText: 'Cantidad a Pagar',
-                    prefixText: '\$ ',
-                    prefixStyle: const TextStyle(color: AppColors.accent, fontSize: 24, fontWeight: FontWeight.bold),
-                    filled: true,
-                    fillColor: AppColors.containerBackground,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                
-                // Duración
-                const Text(
-                  'Duración',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
+
+                // 1. Periodo a pagar: cantidad + tipo
                 Row(
                   children: [
                     Expanded(
-                      flex: 2,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.containerBackground,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            IconButton(
-                              onPressed: controller.decrementDuration,
-                              icon: const Icon(Icons.remove, color: AppColors.textPrimary),
-                              constraints: const BoxConstraints(),
-                              padding: EdgeInsets.zero,
-                            ),
-                            GetBuilder<AbonarController>(
-                              builder: (_) => Text(
-                                controller.durationController.text.isEmpty ? '0' : controller.durationController.text,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: controller.incrementDuration,
-                              icon: const Icon(Icons.add, color: AppColors.textPrimary),
-                              constraints: const BoxConstraints(),
-                              padding: EdgeInsets.zero,
-                            ),
-                          ],
+                      flex: 3,
+                      child: TextField(
+                        controller: controller.durationController,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: InputDecoration(
+                          labelText: 'Cantidad',
+                          filled: true,
+                          fillColor: AppColors.containerBackground,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+                          prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          prefixIcon: IconButton(
+                            onPressed: controller.decrementDuration,
+                            icon: const Icon(Icons.remove, size: 18),
+                            color: AppColors.accent,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            splashRadius: 18,
+                            tooltip: 'Restar',
+                          ),
+                          suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          suffixIcon: IconButton(
+                            onPressed: controller.incrementDuration,
+                            icon: const Icon(Icons.add, size: 18),
+                            color: AppColors.accent,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            splashRadius: 18,
+                            tooltip: 'Sumar',
+                          ),
                         ),
                       ),
                     ),
@@ -271,6 +264,7 @@ class AbonarView extends GetView<AbonarController> {
                           filled: true,
                           fillColor: AppColors.containerBackground,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
                         ),
                         dropdownColor: AppColors.cardBackground,
                         style: const TextStyle(color: AppColors.textPrimary),
@@ -278,17 +272,68 @@ class AbonarView extends GetView<AbonarController> {
                           return DropdownMenuItem(value: type, child: Text(type));
                         }).toList(),
                         onChanged: (val) {
-                          if (val != null) {
-                            controller.durationType.value = val;
-                            controller.update(); // Rebuild to update expiration
-                          }
+                          if (val != null) controller.durationType.value = val;
                         },
                       )),
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
-                
+
+                // 2. Precio unitario
+                Obx(() => TextField(
+                  controller: controller.unitPriceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    labelText: 'Precio Unitario',
+                    helperText: 'Por ${controller.durationUnitLabel}',
+                    helperStyle: const TextStyle(color: AppColors.textSecondary),
+                    prefixText: '\$ ',
+                    prefixStyle: const TextStyle(color: AppColors.accent, fontSize: 24, fontWeight: FontWeight.bold),
+                    filled: true,
+                    fillColor: AppColors.containerBackground,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                )),
+                const SizedBox(height: 20),
+
+                // Total calculado (solo lectura)
+                Obx(() {
+                  final currency = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total a Pagar',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          currency.format(controller.totalAmount),
+                          style: const TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 20),
+
                 // Metodo de pago
                 Obx(() => DropdownButtonFormField<String>(
                   value: controller.paymentMethod.value,
@@ -311,9 +356,8 @@ class AbonarView extends GetView<AbonarController> {
                 const SizedBox(height: 30),
                 
                 // Proyección de Fecha
-                GetBuilder<AbonarController>(
-                  builder: (ctrl) {
-                    final newExp = ctrl.calculateNewExpirationDate();
+                Obx(() {
+                    final newExp = controller.calculateNewExpirationDate();
                     final formattedDate = DateFormat('dd/MM/yyyy').format(newExp);
                     return Container(
                       padding: const EdgeInsets.all(16),
@@ -331,7 +375,7 @@ class AbonarView extends GetView<AbonarController> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Hasta qué fecha puede entrar',
+                                  'Nueva Fecha de Expiración',
                                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                                 ),
                                 Text(
@@ -348,8 +392,7 @@ class AbonarView extends GetView<AbonarController> {
                         ],
                       ),
                     );
-                  }
-                ),
+                }),
                 const SizedBox(height: 40),
                 
                 // Botón Enviar

@@ -4,6 +4,7 @@ import 'dart:math';
 import '../controllers/rfid_checkin_controller.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/core/utils/responsive_utils.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
 import '../../shared/widgets/welcome_screen_widget.dart';
 
 class RfidCheckinView extends GetView<RfidCheckinController> {
@@ -18,11 +19,7 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
     final bool isSmallPhone = MediaQuery.of(context).size.width < 360;
     
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Acceso con Tarjeta'),
-        centerTitle: true,
-        backgroundColor: AppColors.primary,
-      ),
+      appBar: const GymAppBar(title: 'Acceso con Tarjeta'),
       body: SafeArea(
         child: Stack(
           children: [

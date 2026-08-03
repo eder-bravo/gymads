@@ -29,6 +29,10 @@ class PointOfSaleController extends GetxController {
   final RxList<Product> _availableProducts = <Product>[].obs;
   final RxString _searchQuery = ''.obs;
 
+  // Filtro de categoría
+  final RxList<ProductCategory> _categories = <ProductCategory>[].obs;
+  final RxString _selectedCategory = 'Todas'.obs;
+
   // Configuración de impuestos
   final RxDouble _taxRate = 0.0.obs; // 0% por defecto, configurable
 
@@ -47,22 +51,27 @@ class PointOfSaleController extends GetxController {
 
   List<Product> get availableProducts => _availableProducts;
   List<Product> get filteredProducts {
-    if (_searchQuery.value.isEmpty) {
-      return _availableProducts;
-    }
-    return _availableProducts
-        .where((product) =>
-            product.name
-                .toLowerCase()
-                .contains(_searchQuery.value.toLowerCase()) ||
-            product.category
-                .toLowerCase()
-                .contains(_searchQuery.value.toLowerCase()))
-        .toList();
+    return _availableProducts.where((product) {
+      final matchesCategory = _selectedCategory.value == 'Todas' ||
+          product.category == _selectedCategory.value;
+
+      final matchesSearch = _searchQuery.value.isEmpty ||
+          product.name
+              .toLowerCase()
+              .contains(_searchQuery.value.toLowerCase()) ||
+          product.category
+              .toLowerCase()
+              .contains(_searchQuery.value.toLowerCase());
+
+      return matchesCategory && matchesSearch;
+    }).toList();
   }
 
   String get searchQuery => _searchQuery.value;
   double get taxRate => _taxRate.value;
+
+  List<ProductCategory> get categories => _categories;
+  String get selectedCategory => _selectedCategory.value;
 
   // Métodos de pago disponibles
   final List<String> paymentMethods = [
@@ -77,6 +86,7 @@ class PointOfSaleController extends GetxController {
   void onInit() {
     super.onInit();
     loadProducts();
+    loadCategories();
   }
 
   /// Cargar productos disponibles
@@ -93,6 +103,22 @@ class PointOfSaleController extends GetxController {
     } finally {
       _isLoading.value = false;
     }
+  }
+
+  /// Cargar categorías disponibles para el filtro
+  Future<void> loadCategories() async {
+    try {
+      _categories.value = await _productRepository.getAllCategories();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error al cargar categorías: $e');
+      }
+    }
+  }
+
+  /// Establecer la categoría seleccionada del filtro
+  void setSelectedCategory(String category) {
+    _selectedCategory.value = category;
   }
 
   /// Buscar productos

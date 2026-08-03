@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/core/widgets/cached_user_image.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:intl/intl.dart';
 
 import '../controllers/abonar_controller.dart';
@@ -14,12 +15,7 @@ class AbonarView extends GetView<AbonarController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Abonar'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
+      appBar: const GymAppBar(title: 'Abonar'),
       body: SafeArea(
         child: Obx(() {
           if (controller.isSuccess.value) {
@@ -42,54 +38,10 @@ class AbonarView extends GetView<AbonarController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Buscar Cliente',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.titleColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Busca por teléfono celular, o escanea tarjeta RFID.',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller.searchController,
-                  keyboardType: TextInputType.phone,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Ej: 551234...',
-                    prefixIcon: const Icon(Icons.search, color: AppColors.accent),
-                    filled: true,
-                    fillColor: AppColors.containerBackground,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.containerBackground,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: IconButton(
-                  onPressed: () => controller.startNfcSearch(context),
-                  icon: const Icon(Icons.contactless_outlined, color: AppColors.accent),
-                  padding: const EdgeInsets.all(16),
-                  tooltip: 'Buscar por RFID',
-                ),
-              ),
-            ],
+          AppSearchField(
+            hintText: 'Buscar cliente...',
+            controller: controller.searchController,
+            keyboardType: TextInputType.phone,
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -127,7 +79,7 @@ class AbonarView extends GetView<AbonarController> {
                         style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
                       ),
                       subtitle: Text(
-                        'ID: ${client.userNumber} | Tel: ${client.phone}',
+                        'Tel: ${client.phone}',
                         style: const TextStyle(color: AppColors.textSecondary),
                       ),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.accent),
@@ -215,93 +167,32 @@ class AbonarView extends GetView<AbonarController> {
                 ),
                 const SizedBox(height: 20),
 
-                // 1. Periodo a pagar: cantidad + tipo
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: TextField(
-                        controller: controller.durationController,
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        style: const TextStyle(color: AppColors.textPrimary),
-                        decoration: InputDecoration(
-                          labelText: 'Cantidad',
-                          filled: true,
-                          fillColor: AppColors.containerBackground,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
-                          prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                          prefixIcon: IconButton(
-                            onPressed: controller.decrementDuration,
-                            icon: const Icon(Icons.remove, size: 18),
-                            color: AppColors.accent,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                            splashRadius: 18,
-                            tooltip: 'Restar',
-                          ),
-                          suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                          suffixIcon: IconButton(
-                            onPressed: controller.incrementDuration,
-                            icon: const Icon(Icons.add, size: 18),
-                            color: AppColors.accent,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                            splashRadius: 18,
-                            tooltip: 'Sumar',
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      flex: 3,
-                      child: Obx(() => DropdownButtonFormField<String>(
-                        value: controller.durationType.value,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: AppColors.containerBackground,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
-                        ),
-                        dropdownColor: AppColors.cardBackground,
-                        style: const TextStyle(color: AppColors.textPrimary),
-                        items: controller.durationTypes.map((type) {
-                          return DropdownMenuItem(value: type, child: Text(type));
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) controller.durationType.value = val;
-                        },
-                      )),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // 2. Precio unitario
-                Obx(() => TextField(
-                  controller: controller.unitPriceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    labelText: 'Precio Unitario',
-                    helperText: 'Por ${controller.durationUnitLabel}',
-                    helperStyle: const TextStyle(color: AppColors.textSecondary),
-                    prefixText: '\$ ',
-                    prefixStyle: const TextStyle(color: AppColors.accent, fontSize: 24, fontWeight: FontWeight.bold),
-                    filled: true,
-                    fillColor: AppColors.containerBackground,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                )),
-                const SizedBox(height: 20),
-
-                // Total calculado (solo lectura)
+                // Selector de modo (solo si hay planes fijos configurados)
                 Obx(() {
-                  final currency = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
+                  if (controller.planes.isEmpty) return const SizedBox.shrink();
+                  return Column(
+                    children: [
+                      _buildModoToggle(),
+                      const SizedBox(height: 20),
+                    ],
+                  );
+                }),
+
+                // Campos según el modo activo
+                Obx(() =>
+                    controller.isModoFijo.value && controller.planes.isNotEmpty
+                        ? _buildPlanSelector()
+                        : _buildCamposLibres()),
+
+                // Total a pagar (solo lectura)
+                Obx(() {
+                  final currency =
+                      NumberFormat.currency(locale: 'es_MX', symbol: '\$');
+                  final fijo = controller.isModoFijo.value &&
+                      controller.planes.isNotEmpty;
+                  final total = fijo
+                      ? (controller.selectedPlan.value?.price ?? 0.0)
+                      : controller.totalAmount;
                   return Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -321,7 +212,7 @@ class AbonarView extends GetView<AbonarController> {
                           ),
                         ),
                         Text(
-                          currency.format(controller.totalAmount),
+                          currency.format(total),
                           style: const TextStyle(
                             color: AppColors.accent,
                             fontSize: 26,
@@ -357,6 +248,12 @@ class AbonarView extends GetView<AbonarController> {
                 
                 // Proyección de Fecha
                 Obx(() {
+                    // En modo fijo sin plan elegido aún no hay nada que proyectar
+                    if (controller.isModoFijo.value &&
+                        controller.planes.isNotEmpty &&
+                        controller.selectedPlan.value == null) {
+                      return const SizedBox.shrink();
+                    }
                     final newExp = controller.calculateNewExpirationDate();
                     final formattedDate = DateFormat('dd/MM/yyyy').format(newExp);
                     return Container(
@@ -417,6 +314,229 @@ class AbonarView extends GetView<AbonarController> {
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  // Toggle segmentado Plan Fijo / Libre
+  Widget _buildModoToggle() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.containerBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Obx(() {
+        final fijo = controller.isModoFijo.value;
+        return Row(
+          children: [
+            _modoButton('Plan Fijo', true, fijo),
+            _modoButton('Libre', false, fijo),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _modoButton(String label, bool value, bool fijoActivo) {
+    final seleccionado = fijoActivo == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => controller.setModoFijo(value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: seleccionado ? AppColors.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: seleccionado ? FontWeight.w700 : FontWeight.w500,
+              color: seleccionado ? Colors.white : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Lista de planes fijos seleccionables
+  Widget _buildPlanSelector() {
+    return Obx(() {
+      final seleccionado = controller.selectedPlan.value;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ...controller.planes.map((plan) {
+            final isSelected = seleccionado?.id == plan.id;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.accent.withOpacity(0.12)
+                    : AppColors.containerBackground,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.accent
+                      : AppColors.accent.withOpacity(0.15),
+                  width: isSelected ? 1.5 : 1,
+                ),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => controller.selectPlan(plan),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isSelected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_off,
+                        color: isSelected
+                            ? AppColors.accent
+                            : AppColors.textSecondary,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              plan.name,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              plan.descripcionPeriodo,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '\$${plan.price.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          color: isSelected
+                              ? AppColors.accent
+                              : AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 10),
+        ],
+      );
+    });
+  }
+
+  // Campos del modo libre (periodo, cantidad y precio unitario)
+  Widget _buildCamposLibres() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Periodo a pagar: cantidad + tipo
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: TextField(
+                controller: controller.durationController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'Cantidad',
+                  filled: true,
+                  fillColor: AppColors.containerBackground,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  prefixIcon: IconButton(
+                    onPressed: controller.decrementDuration,
+                    icon: const Icon(Icons.remove, size: 18),
+                    color: AppColors.accent,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    splashRadius: 18,
+                    tooltip: 'Restar',
+                  ),
+                  suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  suffixIcon: IconButton(
+                    onPressed: controller.incrementDuration,
+                    icon: const Icon(Icons.add, size: 18),
+                    color: AppColors.accent,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    splashRadius: 18,
+                    tooltip: 'Sumar',
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 3,
+              child: Obx(() => DropdownButtonFormField<String>(
+                value: controller.durationType.value,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: AppColors.containerBackground,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+                ),
+                dropdownColor: AppColors.cardBackground,
+                style: const TextStyle(color: AppColors.textPrimary),
+                items: controller.durationTypes.map((type) {
+                  return DropdownMenuItem(value: type, child: Text(type));
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) controller.durationType.value = val;
+                },
+              )),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // 2. Precio unitario
+        Obx(() => TextField(
+          controller: controller.unitPriceController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
+            labelText: 'Precio Unitario',
+            helperText: 'Por ${controller.durationUnitLabel}',
+            helperStyle: const TextStyle(color: AppColors.textSecondary),
+            prefixText: '\$ ',
+            prefixStyle: const TextStyle(color: AppColors.accent, fontSize: 24, fontWeight: FontWeight.bold),
+            filled: true,
+            fillColor: AppColors.containerBackground,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+        )),
+        const SizedBox(height: 20),
       ],
     );
   }

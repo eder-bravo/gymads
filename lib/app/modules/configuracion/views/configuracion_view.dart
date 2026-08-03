@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
 
 class ConfiguracionView extends GetView<ConfiguracionController> {
@@ -11,18 +12,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Configuración',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color.fromARGB(255, 0, 0, 0),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
+      appBar: const GymAppBar(title: 'Configuración'),
       body: SafeArea(
         child: Obx(() => ListView(
               padding: const EdgeInsets.all(16.0),
@@ -104,6 +94,19 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           title: 'Aplicación',
           subtitle: 'Personaliza nombre, color y preferencias',
           onTap: () => controller.openAppSettings(),
+          trailing: const Icon(Icons.arrow_forward_ios,
+              size: 16, color: AppColors.textSecondary),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Opción de Abonos Fijos (planes de membresía)
+        _buildOptionTile(
+          icon: Icons.card_membership,
+          iconColor: AppColors.success,
+          title: 'Abonos Fijos',
+          subtitle: 'Planes de membresía con precio fijo',
+          onTap: () => controller.openMembershipPlans(),
           trailing: const Icon(Icons.arrow_forward_ios,
               size: 16, color: AppColors.textSecondary),
         ),

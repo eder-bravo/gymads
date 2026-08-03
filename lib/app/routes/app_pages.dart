@@ -12,6 +12,7 @@ import '../modules/clientes/views/clientes_view.dart';
 import '../modules/configuracion/bindings/configuracion_binding.dart';
 import '../modules/configuracion/views/configuracion_view.dart';
 import '../modules/configuracion/views/cuenta_view.dart';
+import '../modules/configuracion/views/membership_plans_view.dart';
 import '../modules/home/bindings/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/ingresos/bindings/ingresos_binding.dart';
@@ -105,6 +106,11 @@ class AppPages {
     GetPage(
       name: _Paths.CUENTA,
       page: () => const CuentaView(),
+      binding: ConfiguracionBinding(),
+    ),
+    GetPage(
+      name: _Paths.MEMBERSHIP_PLANS,
+      page: () => const MembershipPlansView(),
       binding: ConfiguracionBinding(),
     ),
     GetPage(

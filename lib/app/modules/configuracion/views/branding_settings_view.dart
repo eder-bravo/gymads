@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../global_widgets/app_header.dart';
 import '../../../data/services/branding_service.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../controllers/configuracion_controller.dart';
@@ -46,22 +47,8 @@ class BrandingSettingsView extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.primary,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Get.back(),
-        ),
-        title: const Text(
-          'Personalizar Aplicación',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        centerTitle: true,
+      appBar: GymAppBar(
+        title: 'Personalizar Aplicación',
         actions: [
           TextButton(
             onPressed: _save,

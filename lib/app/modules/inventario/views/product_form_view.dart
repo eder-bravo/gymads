@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
 import '../controllers/inventario_controller.dart';
 
 class ProductFormView extends GetView<InventarioController> {
@@ -32,11 +33,8 @@ class ProductFormView extends GetView<InventarioController> {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: Text(isEditing ? 'Editar Producto' : 'Nuevo Producto'),
-        backgroundColor: AppColors.cardBackground,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
+      appBar: GymAppBar(
+        title: isEditing ? 'Editar Producto' : 'Nuevo Producto',
         leading: IconButton(
           icon: const Icon(Icons.close, color: AppColors.textPrimary),
           onPressed: () {

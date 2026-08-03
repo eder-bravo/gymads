@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
 import '../controllers/ingresos_controller.dart';
 import '../widgets/transaction_tile.dart';
 import 'todas_transacciones_view.dart';
@@ -12,11 +13,8 @@ class IngresosView extends GetView<IngresosController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Ingresos'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
+      appBar: GymAppBar(
+        title: 'Ingresos',
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -125,88 +123,182 @@ class IngresosView extends GetView<IngresosController> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // SELECTOR DE MES
+  // SELECTOR DE PERIODO (Día / Semana / Mes)
   // ─────────────────────────────────────────────────────────
   Widget _buildMonthSelector() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.accent.withOpacity(0.2)),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Obx(() => IconButton(
-                  icon: Icon(
-                    Icons.chevron_left,
-                    color: controller.puedeRetrocederMes
-                        ? AppColors.accent
-                        : AppColors.disabled,
-                  ),
-                  onPressed: controller.puedeRetrocederMes
-                      ? controller.goToPreviousMonth
-                      : null,
-                  tooltip: 'Mes anterior',
-                )),
-            Expanded(
-              child: Builder(
-                builder: (context) => InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () => _showMonthPicker(context),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Obx(() => Text(
-                              controller.mesSeleccionadoLabel,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            )),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.arrow_drop_down,
-                            color: AppColors.accent, size: 22),
-                      ],
+            // Segmentado de modo
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.containerBackground,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Obx(() {
+                final modo = controller.selectedPeriodo.value;
+                return Row(
+                  children: [
+                    _modoButton('Día', 'dia', modo),
+                    _modoButton('Semana', 'semana', modo),
+                    _modoButton('Mes', 'mes', modo),
+                  ],
+                );
+              }),
+            ),
+            const SizedBox(height: 4),
+            // Navegación del periodo
+            Row(
+              children: [
+                Obx(() => IconButton(
+                      icon: Icon(
+                        Icons.chevron_left,
+                        color: controller.puedeRetroceder
+                            ? AppColors.accent
+                            : AppColors.disabled,
+                      ),
+                      onPressed: controller.puedeRetroceder
+                          ? controller.goToPrevious
+                          : null,
+                      tooltip: 'Anterior',
+                    )),
+                Expanded(
+                  child: Builder(
+                    builder: (context) => InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _onLabelTap(context),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Obx(() => Text(
+                                  controller.periodoLabel,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                )),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_drop_down,
+                                color: AppColors.accent, size: 22),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            Obx(() => IconButton(
-                  icon: Icon(
-                    Icons.chevron_right,
-                    color: controller.puedeAvanzarMes
-                        ? AppColors.accent
-                        : AppColors.disabled,
+                Obx(() => IconButton(
+                      icon: Icon(
+                        Icons.chevron_right,
+                        color: controller.puedeAvanzar
+                            ? AppColors.accent
+                            : AppColors.disabled,
+                      ),
+                      onPressed: controller.puedeAvanzar
+                          ? controller.goToNext
+                          : null,
+                      tooltip: 'Siguiente',
+                    )),
+                Container(
+                  width: 1,
+                  height: 24,
+                  color: AppColors.accent.withOpacity(0.2),
+                ),
+                Builder(
+                  builder: (context) => IconButton(
+                    onPressed: () => _seleccionarRango(context),
+                    icon: const Icon(Icons.date_range_outlined),
+                    color: AppColors.accent,
+                    tooltip: 'Rango de fechas',
                   ),
-                  onPressed: controller.puedeAvanzarMes
-                      ? controller.goToNextMonth
-                      : null,
-                  tooltip: 'Mes siguiente',
-                )),
-            Container(
-              width: 1,
-              height: 24,
-              color: AppColors.accent.withOpacity(0.2),
-            ),
-            Builder(
-              builder: (context) => IconButton(
-                onPressed: () => _seleccionarRango(context),
-                icon: const Icon(Icons.date_range_outlined),
-                color: AppColors.accent,
-                tooltip: 'Rango de fechas',
-              ),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _modoButton(String label, String value, String activo) {
+    final seleccionado = activo == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => controller.changePeriodo(value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: seleccionado ? AppColors.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: seleccionado ? FontWeight.w700 : FontWeight.w500,
+              color: seleccionado ? Colors.white : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Al tocar la etiqueta: en modo mes abre el selector de mes; en día/semana
+  /// abre un calendario para saltar a una fecha concreta.
+  Future<void> _onLabelTap(BuildContext context) async {
+    final modo = controller.selectedPeriodo.value;
+    if (modo == 'mes') {
+      _showMonthPicker(context);
+      return;
+    }
+    if (modo != 'dia' && modo != 'semana') return;
+
+    final now = DateTime.now();
+    final fecha = await showDatePicker(
+      context: context,
+      initialDate: controller.fechaInicio.value ?? now,
+      firstDate: DateTime(now.year - 5),
+      lastDate: now,
+      locale: const Locale('es'),
+      helpText:
+          modo == 'dia' ? 'Selecciona un día' : 'Selecciona una semana',
+      builder: (context, child) => Theme(
+        data: ThemeData(
+          useMaterial3: true,
+          brightness: Brightness.dark,
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.accent,
+            onPrimary: Colors.white,
+            surface: AppColors.cardBackground,
+            onSurface: AppColors.textPrimary,
+            secondary: AppColors.accent,
+          ),
+          scaffoldBackgroundColor: AppColors.backgroundColor,
+        ),
+        child: child!,
+      ),
+    );
+
+    if (fecha != null) {
+      if (modo == 'dia') {
+        controller.seleccionarDia(fecha);
+      } else {
+        controller.seleccionarSemana(fecha);
+      }
+    }
   }
 
   // ─────────────────────────────────────────────────────────
@@ -242,7 +334,7 @@ class IngresosView extends GetView<IngresosController> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Total de ingresos de ${controller.nombreMesSeleccionado}',
+                      controller.periodoTotalLabel,
                       style: const TextStyle(
                         fontSize: 14,
                         color: AppColors.textSecondary,
@@ -299,7 +391,7 @@ class IngresosView extends GetView<IngresosController> {
               SizedBox(height: 16),
               Center(
                 child: Text(
-                  'No hay transacciones este mes',
+                  'No hay transacciones en este periodo',
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
               ),

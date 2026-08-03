@@ -8,6 +8,7 @@ import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
+import 'app_header.dart';
 import '../modules/shared/widgets/photo_capture_widget.dart';
 
 class ClienteFormDialog extends StatefulWidget {
@@ -82,10 +83,8 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
     if (widget.fullScreen) {
       return Scaffold(
         backgroundColor: AppColors.cardBackground,
-        appBar: AppBar(
-          title: Text(widget.isEditing ? 'Editar Cliente' : 'Nuevo Cliente'),
-          backgroundColor: AppColors.accent,
-          foregroundColor: Colors.white,
+        appBar: GymAppBar(
+          title: widget.isEditing ? 'Editar Cliente' : 'Nuevo Cliente',
         ),
         body: SafeArea(
           child: contentBox(context, GlobalKey<FormState>(), Rx<File?>(null), isFullScreen: true),
@@ -179,18 +178,8 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: widget.userNumberController,
-                      decoration: InputDecoration(
-                        labelText: 'Número de Usuario',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        prefixIcon: const Icon(Icons.badge_outlined),
-                      ),
-                      style: TextStyle(color: AppColors.accent),
-                      readOnly: true,
-                      enabled: false,
-                    ),
-                    const SizedBox(height: 16),
+                    // El "Número de Usuario" se sigue generando y guardando en
+                    // el backend vía userNumberController, pero no se muestra.
                     AnimatedBuilder(
                       animation: widget.rfidController,
                       builder: (context, child) {

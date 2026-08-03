@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/data/models/membership_plan_model.dart';
 import 'package:gymads/app/data/models/user_model.dart';
+import 'package:gymads/app/data/repositories/membership_plan_repository.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
@@ -60,6 +62,12 @@ class AbonarController extends GetxController {
   final paymentMethods = ['Efectivo', 'Tarjeta', 'Transferencia'];
   final durationTypes = ['Meses', 'Semanas', 'Días', 'Años'];
 
+  // Abonos fijos (planes de membresía)
+  final MembershipPlanRepository planRepository = MembershipPlanRepository();
+  final planes = <MembershipPlanModel>[].obs;
+  final selectedPlan = Rx<MembershipPlanModel?>(null);
+  final isModoFijo = false.obs;
+
   final isLoading = false.obs;
   final isSuccess = false.obs;
   
@@ -83,6 +91,27 @@ class AbonarController extends GetxController {
     // Mantener el estado reactivo en sincronía con los campos de texto
     unitPriceController.addListener(_onUnitPriceChanged);
     durationController.addListener(_onDurationChanged);
+
+    _loadPlanes();
+  }
+
+  Future<void> _loadPlanes() async {
+    final result = await planRepository.getPlans();
+    planes.assignAll(result);
+    // Si el gimnasio tiene planes, el modo fijo es el default
+    if (result.isNotEmpty) isModoFijo.value = true;
+  }
+
+  void setModoFijo(bool fijo) {
+    isModoFijo.value = fijo;
+  }
+
+  /// Selecciona un plan fijo y sincroniza periodo/cantidad para que la
+  /// proyección de fecha reactiva funcione sin cambios.
+  void selectPlan(MembershipPlanModel plan) {
+    selectedPlan.value = plan;
+    durationType.value = plan.periodType;
+    durationController.text = '${plan.periodCount}';
   }
 
   void _onUnitPriceChanged() {
@@ -235,6 +264,7 @@ class AbonarController extends GetxController {
     unitPriceController.clear();
     durationController.text = '1';
     durationType.value = 'Meses';
+    selectedPlan.value = null;
     isSuccess.value = false;
   }
 
@@ -275,19 +305,39 @@ class AbonarController extends GetxController {
       return;
     }
 
-    final periods = durationValue.value;
-    if (periods <= 0) {
-      _showSnackbar('Error', 'Selecciona una cantidad de periodos válida', isError: true);
-      return;
-    }
+    final bool fijo = isModoFijo.value;
+    final plan = selectedPlan.value;
+    final double amount;
+    final String descripcion;
 
-    final precioUnitario = unitPrice.value;
-    if (precioUnitario <= 0) {
-      _showSnackbar('Error', 'Ingresa un precio unitario válido', isError: true);
-      return;
-    }
+    if (fijo) {
+      if (plan == null) {
+        _showSnackbar('Error', 'Selecciona un plan de abono', isError: true);
+        return;
+      }
+      // Re-sincronizar periodo/cantidad con el plan por si el usuario cambió
+      // de modo y modificó los campos manuales antes de volver a fijo.
+      durationType.value = plan.periodType;
+      durationController.text = '${plan.periodCount}';
+      amount = plan.price;
+      descripcion = 'Abono: ${plan.name} — ${plan.descripcionPeriodo}';
+    } else {
+      final periods = durationValue.value;
+      if (periods <= 0) {
+        _showSnackbar('Error', 'Selecciona una cantidad de periodos válida', isError: true);
+        return;
+      }
 
-    final amount = totalAmount;
+      final precioUnitario = unitPrice.value;
+      if (precioUnitario <= 0) {
+        _showSnackbar('Error', 'Ingresa un precio unitario válido', isError: true);
+        return;
+      }
+
+      amount = totalAmount;
+      descripcion =
+          'Abono: $periods ${durationType.value.toLowerCase()} × \$${precioUnitario.toStringAsFixed(2)}';
+    }
 
     isLoading.value = true;
     try {
@@ -311,9 +361,6 @@ class AbonarController extends GetxController {
       if (success) {
         // Registrar el Ingreso
         try {
-          final descripcion =
-              'Abono: $periods ${durationType.value.toLowerCase()} × \$${precioUnitario.toStringAsFixed(2)}';
-
           await ingresoService.registrarAbono(
             clienteId: client.id!,
             clienteNombre: client.name,
@@ -321,7 +368,7 @@ class AbonarController extends GetxController {
             metodoPago: paymentMethod.value.toLowerCase(),
             descripcion: descripcion,
             usuarioStaff: 'Staff',
-            notas: 'Abono libre',
+            notas: fijo ? 'Abono fijo' : 'Abono libre',
             periodoInicio: periodStartDate,
             periodoFin: newExpirationDate,
           );

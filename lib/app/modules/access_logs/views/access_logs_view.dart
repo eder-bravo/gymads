@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../controllers/access_logs_controller.dart';
 import '../../../data/models/access_log_model.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../global_widgets/app_header.dart';
 
 class AccessLogsView extends GetView<AccessLogsController> {
   const AccessLogsView({super.key});
@@ -12,17 +13,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: Text(
-          'Entradas',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
+      appBar: GymAppBar(
+        title: 'Entradas',
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -73,34 +65,34 @@ class AccessLogsView extends GetView<AccessLogsController> {
   Widget _buildStatCard(String title, String value, Color color) {
     return Expanded(
       child: Container(
-        height: 70,
+        height: 88,
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: color.withOpacity(0.3),
             width: 1,
           ),
         ),
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               value,
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               title,
               style: TextStyle(
-                fontSize: 9,
+                fontSize: 13,
                 color: AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
@@ -213,32 +205,32 @@ class AccessLogsView extends GetView<AccessLogsController> {
     final icon = isEntry ? Icons.login : Icons.logout;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       color: AppColors.cardBackground,
       elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: color.withOpacity(0.3),
           width: 1,
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             // Icono de acceso
             CircleAvatar(
               backgroundColor: color.withOpacity(0.2),
-              radius: 20,
+              radius: 26,
               child: Icon(
                 icon,
                 color: color,
-                size: 20,
+                size: 26,
               ),
             ),
-            const SizedBox(width: 12),
-            
+            const SizedBox(width: 14),
+
             // Información del usuario
             Expanded(
               child: Column(
@@ -249,46 +241,46 @@ class AccessLogsView extends GetView<AccessLogsController> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
-                      fontSize: 16,
+                      fontSize: 18,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     'Staff: ${log.staffUser}',
                     style: TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 12,
+                      fontSize: 14,
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             // Información del acceso
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: color.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     log.accessType.toUpperCase(),
                     style: TextStyle(
                       color: color,
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   DateFormat('dd/MM HH:mm').format(log.accessTime),
                   style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 10,
+                    fontSize: 13,
                   ),
                 ),
               ],

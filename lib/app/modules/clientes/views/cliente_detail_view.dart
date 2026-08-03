@@ -4,6 +4,7 @@ import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/core/widgets/cached_user_image.dart';
 import 'package:gymads/app/core/utils/phone_utils.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import '../controllers/clientes_controller.dart';
 
@@ -19,12 +20,7 @@ class ClienteDetailView extends GetView<ClientesController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Detalles del Cliente'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
+      appBar: const GymAppBar(title: 'Detalles del Cliente'),
       body: SingleChildScrollView(
         child: Column(
           children: [

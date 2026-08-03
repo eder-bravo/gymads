@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/routes/app_pages.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
 import '../controllers/inventario_controller.dart';
 
 class InventarioView extends GetView<InventarioController> {
@@ -12,11 +13,8 @@ class InventarioView extends GetView<InventarioController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Inventario'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textPrimary,
-        centerTitle: true,
+      appBar: GymAppBar(
+        title: 'Inventario',
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -98,27 +96,8 @@ class InventarioView extends GetView<InventarioController> {
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: TextField(
-        style: const TextStyle(color: AppColors.textPrimary),
-        decoration: InputDecoration(
-          hintText: 'Buscar productos...',
-          hintStyle: const TextStyle(color: AppColors.textHint),
-          prefixIcon: const Icon(Icons.search, color: AppColors.accent),
-          filled: true,
-          fillColor: AppColors.cardBackground,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.accent.withOpacity(0.3)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.accent.withOpacity(0.3)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.accent, width: 2),
-          ),
-        ),
+      child: AppSearchField(
+        hintText: 'Buscar productos...',
         onChanged: controller.setSearchQuery,
       ),
     );
@@ -127,46 +106,11 @@ class InventarioView extends GetView<InventarioController> {
   Widget _buildCategoryFilter() {
     return Obx(() {
       return Container(
-        height: 50,
         margin: const EdgeInsets.all(16),
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          children: [
-            _buildCategoryChip('Todas'),
-            ...controller.categories.map((category) => _buildCategoryChip(category.name)),
-          ],
-        ),
-      );
-    });
-  }
-  
-  Widget _buildCategoryChip(String category) {
-    return Obx(() {
-      final isSelected = controller.selectedCategory.value == category;
-      
-      return Container(
-        margin: const EdgeInsets.only(right: 8),
-        child: FilterChip(
-          label: Text(
-            category,
-            style: TextStyle(
-              color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          selected: isSelected,
-          onSelected: (selected) {
-            controller.setSelectedCategory(category);
-          },
-          backgroundColor: AppColors.cardBackground,
-          selectedColor: AppColors.accent,
-          checkmarkColor: AppColors.textPrimary,
-          side: BorderSide(
-            color: isSelected ? AppColors.accent : AppColors.accent.withOpacity(0.3),
-            width: 1.5,
-          ),
-          elevation: isSelected ? 4 : 1,
-          shadowColor: AppColors.accent.withOpacity(0.3),
+        child: CategoryFilterChips(
+          categories: controller.categories.map((c) => c.name).toList(),
+          selected: controller.selectedCategory.value,
+          onSelected: controller.setSelectedCategory,
         ),
       );
     });

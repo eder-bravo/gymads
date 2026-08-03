@@ -472,6 +472,11 @@ class ConfiguracionController extends GetxController {
     Get.to(() => BrandingSettingsView());
   }
 
+  /// Abrir administración de abonos fijos (planes de membresía)
+  void openMembershipPlans() {
+    Get.toNamed(Routes.MEMBERSHIP_PLANS);
+  }
+
   /// Backup branding to DB (fire-and-forget)
   Future<void> backupBranding(
       {String? name, String? color, String? font}) async {

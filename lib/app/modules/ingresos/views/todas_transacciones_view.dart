@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
 import '../controllers/ingresos_controller.dart';
 import '../widgets/transaction_tile.dart';
 
@@ -13,11 +14,8 @@ class TodasTransaccionesView extends GetView<IngresosController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Todas las transacciones'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
+      appBar: GymAppBar(
+        title: 'Todas las transacciones',
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

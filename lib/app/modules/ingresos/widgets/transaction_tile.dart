@@ -17,10 +17,10 @@ class TransactionTile extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.disabled.withOpacity(0.4)),
       ),
       child: Row(
@@ -37,7 +37,7 @@ class TransactionTile extends StatelessWidget {
             child: Icon(
               _getIconForConcepto(ingreso.concepto),
               color: controller.getColorForConcepto(ingreso.concepto),
-              size: 20,
+              size: 24,
             ),
           ),
           const SizedBox(width: 12),
@@ -50,6 +50,7 @@ class TransactionTile extends StatelessWidget {
                 Text(
                   ingreso.clienteNombre,
                   style: const TextStyle(
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -63,7 +64,7 @@ class TransactionTile extends StatelessWidget {
                       child: Text(
                         ingreso.conceptoDescripcion,
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           color: AppColors.textSecondary,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -82,7 +83,7 @@ class TransactionTile extends StatelessWidget {
                       child: Text(
                         ingreso.metodoPagoDescripcion,
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 12,
                           color: controller
                               .getColorForMetodoPago(ingreso.metodoPago),
                           fontWeight: FontWeight.w500,
@@ -105,14 +106,14 @@ class TransactionTile extends StatelessWidget {
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppColors.success,
-                  fontSize: 14,
+                  fontSize: 17,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 controller.formatFechaCorta(ingreso.fecha),
                 style: const TextStyle(
-                  fontSize: 11,
+                  fontSize: 13,
                   color: AppColors.textSecondary,
                 ),
               ),

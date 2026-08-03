@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -10,7 +11,6 @@ import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
 import 'package:gymads/app/data/services/branding_service.dart';
 import 'package:gymads/app/modules/auth/controllers/auth_controller.dart';
-import 'package:gymads/app/modules/clientes/services/qr_cache_service.dart';
 import 'package:gymads/app/routes/app_pages.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -74,12 +74,6 @@ void main() async {
   await imageCacheService.initialize();
   Get.put(imageCacheService, permanent: true);
   print('✅ Servicio de caché de imágenes inicializado');
-
-  // Inicializa y registra el servicio de caché de QR
-  final qrCacheService = QrCacheService();
-  qrCacheService.initialize();
-  Get.put(qrCacheService, permanent: true);
-  print('✅ Servicio de caché de QR codes inicializado');
 
   // Inicializa la configuración del lector RFID SOLO si está activado
   final prefs = await SharedPreferences.getInstance();
@@ -151,6 +145,16 @@ class _MyAppState extends State<MyApp> {
       initialRoute: _initialRoute,
       getPages: AppPages.routes,
       initialBinding: InitialBinding(),
+      locale: const Locale('es'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es'),
+        Locale('en'),
+      ],
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,

@@ -102,6 +102,18 @@ class SupabaseStorageProvider {
         }
       }
 
+      // Limpiar la foto original capturada (vive en Application Documents,
+      // el SO no la purga solo — hay que borrarla explícitamente).
+      try {
+        if (await photoFile.exists()) {
+          await photoFile.delete();
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️  No se pudo eliminar la foto original: $e');
+        }
+      }
+
       return result;
     } catch (e) {
       if (kDebugMode && SupabaseConfig.debugMode) {

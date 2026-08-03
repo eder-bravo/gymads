@@ -1,8 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../routes/app_pages.dart';
 import '../../auth/controllers/auth_controller.dart';
-import 'package:gymads/core/theme/app_colors.dart';
 
 
 class HomeController extends GetxController {
@@ -30,11 +28,6 @@ class HomeController extends GetxController {
   }
 
   // Funciones para manejar las opciones del menú
-  void goToCheckIns() {
-    statusMessages.add('Navegando a la pantalla de Check-Ins...');
-    Get.toNamed(Routes.CHECADOR);
-  }
-
   void goToPaymentRegistration() {
     statusMessages.add('Navegando a Registro de Pagos...');
     Get.toNamed(Routes.INGRESOS);

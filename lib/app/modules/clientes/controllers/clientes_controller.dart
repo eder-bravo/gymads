@@ -7,7 +7,6 @@ import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/image_cache_service.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
-import 'package:gymads/app/global_widgets/qr_dialog.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 
 class ClientesController extends GetxController {

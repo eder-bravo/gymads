@@ -355,7 +355,7 @@ class AccessLogService {
               'user_name': userData['user_name']?.toString() ?? '',
               'user_number': userData['user_number']?.toString() ?? '',
               'access_type': 'entrada',
-              'method': userData['entry_method']?.toString() ?? 'qr',
+              'method': userData['entry_method']?.toString() ?? 'rfid',
               'staff_user': 'sistema',
               'access_time': userData['entry_time'],
               'created_at': userData['entry_time'],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/user_model.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/global_widgets/cliente_card.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/core/utils/responsive_utils.dart';
@@ -14,10 +15,8 @@ class ClientesView extends GetView<ClientesController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Clientes'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textPrimary,
+      appBar: GymAppBar(
+        title: 'Clientes',
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -27,7 +26,7 @@ class ClientesView extends GetView<ClientesController> {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => _showAddDialog(),
-            tooltip: 'add',
+            tooltip: 'Agregar cliente',
           ),
         ],
       ),
@@ -59,21 +58,8 @@ class ClientesView extends GetView<ClientesController> {
                     mobile: 16, smallPhone: 12, tablet: 24)),
                 child: Column(
                   children: [
-                    TextField(
-                      style: const TextStyle(color: AppColors.textPrimary),
-                      decoration: InputDecoration(
-                        hintText: 'Buscar cliente...',
-                        hintStyle: const TextStyle(color: AppColors.textHint),
-                        prefixIcon: const Icon(Icons.search,
-                            color: AppColors.textSecondary),
-                        filled: true,
-                        fillColor: AppColors.containerBackground,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                      ),
+                    AppSearchField(
+                      hintText: 'Buscar cliente...',
                       onChanged: (value) =>
                           controller.searchQuery.value = value,
                     ),

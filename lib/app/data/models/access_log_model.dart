@@ -28,7 +28,7 @@ class AccessLogModel {
       userName: json['user_name']?.toString() ?? '',
       userNumber: json['user_number']?.toString() ?? '',
       accessType: json['access_type']?.toString() ?? 'entrada',
-      method: json['method']?.toString() ?? 'qr',
+      method: json['method']?.toString() ?? 'rfid',
       staffUser: json['staff_user']?.toString() ?? '',
       accessTime: _parseDateTime(json['access_time']),
       createdAt: _parseDateTime(json['created_at']),

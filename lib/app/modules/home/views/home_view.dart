@@ -272,7 +272,7 @@ class HomeView extends GetView<HomeController> {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(
                     Icons.settings_outlined,
@@ -423,7 +423,7 @@ class _ModuleCardState extends State<_ModuleCard>
             padding: EdgeInsets.all(isTablet ? 18 : 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Icon container
                 Container(
@@ -447,7 +447,7 @@ class _ModuleCardState extends State<_ModuleCard>
                     size: isTablet ? 26 : 24,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(height: 14),
                 // Text
                 Text(
                   m.label,
@@ -529,7 +529,7 @@ class _QuickActionTileState extends State<_QuickActionTile> {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: a.color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(a.icon, color: a.color, size: 24),
               ),

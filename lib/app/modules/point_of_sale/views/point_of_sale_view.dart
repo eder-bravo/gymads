@@ -4,6 +4,7 @@ import '../controllers/point_of_sale_controller.dart';
 import '../../../data/models/product_model.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
+import '../../../global_widgets/app_header.dart';
 
 class PointOfSaleView extends GetView<PointOfSaleController> {
   const PointOfSaleView({super.key});
@@ -12,34 +13,28 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Punto de Venta'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textPrimary,
-      ),
+      appBar: const GymAppBar(title: 'Punto de Venta'),
       body: SafeArea(
         child: Column(
           children: [
             // Barra de búsqueda
             Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: TextField(
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  hintText: 'Buscar productos...',
-                  hintStyle: const TextStyle(color: AppColors.textHint),
-                  prefixIcon:
-                      const Icon(Icons.search, color: AppColors.textSecondary),
-                  filled: true,
-                  fillColor: AppColors.cardBackground,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                ),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              child: AppSearchField(
+                hintText: 'Buscar productos...',
                 onChanged: controller.searchProducts,
               ),
+            ),
+
+            // Filtro de categorías
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Obx(() => CategoryFilterChips(
+                    categories:
+                        controller.categories.map((c) => c.name).toList(),
+                    selected: controller.selectedCategory,
+                    onSelected: controller.setSelectedCategory,
+                  )),
             ),
 
             // Lista de productos
@@ -101,7 +96,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
           border: quantity > 0
               ? Border.all(color: AppColors.accent, width: 2)
               : null,
@@ -278,7 +273,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     vertical: 14,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 child: const Text(
@@ -345,7 +340,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.containerBackground,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Obx(() => Column(
                       children: [
@@ -385,7 +380,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       filled: true,
                       fillColor: AppColors.containerBackground,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.symmetric(
@@ -426,7 +421,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                           filled: true,
                           fillColor: AppColors.containerBackground,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(16),
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(
@@ -466,7 +461,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                     ),
                     child: controller.isProcessingPayment

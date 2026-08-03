@@ -4,6 +4,7 @@ import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/core/widgets/cached_user_image.dart';
 import 'package:gymads/app/core/utils/phone_utils.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import '../controllers/clientes_controller.dart';
 
@@ -19,12 +20,7 @@ class ClienteDetailView extends GetView<ClientesController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Detalles del Cliente'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
+      appBar: const GymAppBar(title: 'Detalles del Cliente'),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -80,15 +76,15 @@ class ClienteDetailView extends GetView<ClientesController> {
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.accent.withOpacity(0.3),
-                    blurRadius: 15,
-                    spreadRadius: 2,
+                    blurRadius: 20,
+                    spreadRadius: 3,
                   ),
                 ],
               ),
               child: UserThumbnail(
                 imageUrl: cliente.photoUrl,
                 userName: cliente.name,
-                size: 96,
+                size: 130,
               ),
             ),
           ),
@@ -539,7 +535,7 @@ class ClienteDetailView extends GetView<ClientesController> {
               backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
             ),
             child: const Text(

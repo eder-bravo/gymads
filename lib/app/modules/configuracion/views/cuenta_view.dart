@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
 
 /// Account settings view — shows and allows editing of user profile data
@@ -11,18 +12,7 @@ class CuentaView extends GetView<ConfiguracionController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Mi Cuenta',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color.fromARGB(255, 0, 0, 0),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
+      appBar: const GymAppBar(title: 'Mi Cuenta'),
       body: SafeArea(
         child: Obx(() => ListView(
               padding: const EdgeInsets.all(16.0),

@@ -286,19 +286,23 @@ class UserRepository {
         if (kDebugMode) {
           print('👤 Procesando foto del usuario...');
           print('👤 Ruta de la foto: ${photoFile.path}');
-          print('👤 Tamaño: ${(await photoFile.length() / 1024).toStringAsFixed(2)} KB');
         }
-        
-        // Verificar que el archivo existe
+
+        // Verificar que el archivo existe ANTES de leer sus metadatos
+        // (photoFile.length() lanza PathNotFoundException si ya no existe)
         if (!await photoFile.exists()) {
           if (kDebugMode) {
             print('❌ ERROR: El archivo de foto no existe físicamente: ${photoFile.path}');
           }
           // Continuamos sin foto
         } else {
+          if (kDebugMode) {
+            print('👤 Tamaño: ${(await photoFile.length() / 1024).toStringAsFixed(2)} KB');
+          }
+
           // ID temporal para la foto (se usará el ID real cuando esté disponible)
           final tempId = DateTime.now().millisecondsSinceEpoch.toString();
-          
+
           final photoUrl = await _storageProvider.uploadUserPhoto(
             photoFile,
             tempId,
@@ -385,16 +389,20 @@ class UserRepository {
         if (kDebugMode) {
           print('🔄 Procesando nueva foto del usuario...');
           print('🔄 Ruta de la foto: ${photoFile.path}');
-          print('🔄 Tamaño: ${(await photoFile.length() / 1024).toStringAsFixed(2)} KB');
         }
-        
-        // Verificar que el archivo existe
+
+        // Verificar que el archivo existe ANTES de leer sus metadatos
+        // (photoFile.length() lanza PathNotFoundException si ya no existe)
         if (!await photoFile.exists()) {
           if (kDebugMode) {
             print('❌ ERROR: El archivo de foto no existe físicamente: ${photoFile.path}');
           }
           // Continuamos sin actualizar la foto
         } else {
+          if (kDebugMode) {
+            print('🔄 Tamaño: ${(await photoFile.length() / 1024).toStringAsFixed(2)} KB');
+          }
+
           final photoUrl = await _storageProvider.uploadUserPhoto(
             photoFile,
             id, // Usar el ID real del usuario para la foto

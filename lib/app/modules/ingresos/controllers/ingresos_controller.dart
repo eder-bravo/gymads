@@ -170,7 +170,7 @@ class IngresosController extends GetxController {
     }
   }
 
-  /// Actualiza el período seleccionado y recarga datos
+  /// Actualiza el período seleccionado y salta al periodo actual (hoy)
   void changePeriodo(String nuevoPeriodo) {
     try {
       selectedPeriodo.value = nuevoPeriodo;
@@ -178,31 +178,42 @@ class IngresosController extends GetxController {
 
       switch (nuevoPeriodo) {
         case 'dia':
-          fechaInicio.value = DateTime(now.year, now.month, now.day);
-          fechaFin.value = DateTime(now.year, now.month, now.day, 23, 59, 59);
+          _setDia(now);
           break;
         case 'semana':
-          final inicioSemana = now.subtract(Duration(days: now.weekday - 1));
-          fechaInicio.value =
-              DateTime(inicioSemana.year, inicioSemana.month, inicioSemana.day);
-          fechaFin.value = inicioSemana.add(
-              const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+          _setSemana(now);
           break;
         case 'mes':
-          fechaInicio.value = DateTime(now.year, now.month, 1);
-          fechaFin.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+          _setMonth(now.year, now.month);
           break;
         default:
           print('⚠️ Período no reconocido: $nuevoPeriodo');
-          fechaInicio.value = DateTime(now.year, now.month, 1);
-          fechaFin.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+          _setMonth(now.year, now.month);
       }
-
-      refreshData();
     } catch (e) {
       print('❌ Error al cambiar período: $e');
       SnackbarHelper.error('Error', 'Error al cambiar período: $e');
     }
+  }
+
+  /// Lunes (00:00) de la semana que contiene [d].
+  DateTime _inicioSemana(DateTime d) =>
+      DateTime(d.year, d.month, d.day).subtract(Duration(days: d.weekday - 1));
+
+  /// Fija el rango a un solo día completo.
+  void _setDia(DateTime day) {
+    fechaInicio.value = DateTime(day.year, day.month, day.day);
+    fechaFin.value = DateTime(day.year, day.month, day.day, 23, 59, 59);
+    refreshData();
+  }
+
+  /// Fija el rango a la semana (lunes→domingo) que contiene [any].
+  void _setSemana(DateTime any) {
+    final inicio = _inicioSemana(any);
+    fechaInicio.value = inicio;
+    fechaFin.value = inicio
+        .add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+    refreshData();
   }
 
   /// Actualiza el filtro de concepto
@@ -229,6 +240,7 @@ class IngresosController extends GetxController {
 
   /// Establece un rango de fechas personalizado
   void setFechasPersonalizadas(DateTime inicio, DateTime fin) {
+    selectedPeriodo.value = ''; // rango personalizado: sin chip resaltado
     fechaInicio.value = inicio;
     fechaFin.value = fin;
     refreshData();
@@ -343,6 +355,82 @@ class IngresosController extends GetxController {
     return DateTime(year, month, 1).isBefore(limite);
   }
 
+  /// Indica si se puede avanzar al siguiente periodo según el modo activo
+  /// (nunca al futuro). En modo rango personalizado ('') retorna false.
+  bool get puedeAvanzar {
+    final f = fechaInicio.value ?? DateTime.now();
+    final now = DateTime.now();
+    switch (selectedPeriodo.value) {
+      case 'dia':
+        final hoy = DateTime(now.year, now.month, now.day);
+        return DateTime(f.year, f.month, f.day).isBefore(hoy);
+      case 'semana':
+        return _inicioSemana(f).isBefore(_inicioSemana(now));
+      case 'mes':
+        return puedeAvanzarMes;
+      default:
+        return false;
+    }
+  }
+
+  /// Indica si se puede retroceder al periodo anterior (no antes de la
+  /// creación de la cuenta). En modo rango personalizado ('') retorna false.
+  bool get puedeRetroceder {
+    switch (selectedPeriodo.value) {
+      case 'mes':
+        return puedeRetrocederMes;
+      case 'dia':
+      case 'semana':
+        final limite = _mesCreacionCuenta;
+        if (limite == null) return true;
+        final f = fechaInicio.value ?? DateTime.now();
+        return f.isAfter(limite);
+      default:
+        return false;
+    }
+  }
+
+  /// Etiqueta del periodo activo, adaptada al modo.
+  String get periodoLabel {
+    final ini = fechaInicio.value ?? DateTime.now();
+    final fin = fechaFin.value ?? DateTime.now();
+    switch (selectedPeriodo.value) {
+      case 'dia':
+        return '${ini.day} ${nombresMesesCortos[ini.month - 1]} ${ini.year}';
+      case 'semana':
+        if (ini.month == fin.month) {
+          return '${ini.day} – ${fin.day} ${nombresMesesCortos[ini.month - 1]}';
+        }
+        return '${ini.day} ${nombresMesesCortos[ini.month - 1]} – '
+            '${fin.day} ${nombresMesesCortos[fin.month - 1]}';
+      case 'mes':
+        return '${nombresMeses[ini.month - 1]} ${ini.year}';
+      default: // rango personalizado
+        return '${ini.day} ${nombresMesesCortos[ini.month - 1]} – '
+            '${fin.day} ${nombresMesesCortos[fin.month - 1]}';
+    }
+  }
+
+  /// Etiqueta del total según el periodo activo.
+  String get periodoTotalLabel {
+    switch (selectedPeriodo.value) {
+      case 'dia':
+        return 'Total del día';
+      case 'semana':
+        return 'Total de la semana';
+      case 'mes':
+        return 'Total del mes';
+      default:
+        return 'Total del periodo';
+    }
+  }
+
+  /// Salta a un día específico (modo día).
+  void seleccionarDia(DateTime day) => _setDia(day);
+
+  /// Salta a la semana que contiene un día específico (modo semana).
+  void seleccionarSemana(DateTime day) => _setSemana(day);
+
   void _setMonth(int year, int month) {
     selectedPeriodo.value = 'mes';
     fechaInicio.value = DateTime(year, month, 1);
@@ -350,20 +438,38 @@ class IngresosController extends GetxController {
     refreshData();
   }
 
-  /// Navega al mes anterior (no antes de la creación de la cuenta)
-  void goToPreviousMonth() {
-    if (!puedeRetrocederMes) return;
+  /// Navega al periodo anterior según el modo activo (día/semana/mes).
+  void goToPrevious() {
+    if (!puedeRetroceder) return;
     final f = fechaInicio.value ?? DateTime.now();
-    final prev = DateTime(f.year, f.month - 1, 1);
-    _setMonth(prev.year, prev.month);
+    switch (selectedPeriodo.value) {
+      case 'dia':
+        _setDia(f.subtract(const Duration(days: 1)));
+        break;
+      case 'semana':
+        _setSemana(f.subtract(const Duration(days: 7)));
+        break;
+      default: // mes
+        final prev = DateTime(f.year, f.month - 1, 1);
+        _setMonth(prev.year, prev.month);
+    }
   }
 
-  /// Navega al mes siguiente (si no es futuro)
-  void goToNextMonth() {
-    if (!puedeAvanzarMes) return;
+  /// Navega al periodo siguiente según el modo activo (día/semana/mes).
+  void goToNext() {
+    if (!puedeAvanzar) return;
     final f = fechaInicio.value ?? DateTime.now();
-    final next = DateTime(f.year, f.month + 1, 1);
-    _setMonth(next.year, next.month);
+    switch (selectedPeriodo.value) {
+      case 'dia':
+        _setDia(f.add(const Duration(days: 1)));
+        break;
+      case 'semana':
+        _setSemana(f.add(const Duration(days: 7)));
+        break;
+      default: // mes
+        final next = DateTime(f.year, f.month + 1, 1);
+        _setMonth(next.year, next.month);
+    }
   }
 
   /// Selecciona un mes específico (no permite meses futuros ni anteriores a

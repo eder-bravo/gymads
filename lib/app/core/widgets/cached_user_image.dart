@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart';
 import '../../data/services/storage_service.dart';
 
 /// Widget optimizado para mostrar imágenes de usuarios con caché automático
@@ -103,9 +103,7 @@ class _CachedUserImageState extends State<CachedUserImage> {
       },
       placeholder: (context, url) => _buildLoadingPlaceholder(),
       errorWidget: (context, url, error) {
-        if (kDebugMode) {
-          print('❌ Error cargando imagen: $url - $error');
-        }
+        AppLogger.error('CachedUserImage', 'Error cargando imagen', error);
         return _buildDefaultAvatar();
       },
       // Clave de caché estable = path del objeto (no la URL firmada que rota)

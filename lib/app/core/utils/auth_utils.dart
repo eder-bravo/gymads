@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthUtils {
@@ -39,30 +39,16 @@ class AuthUtils {
   static String getStaffIdentifier() {
     final user = _supabase.auth.currentUser;
     if (user == null) {
-      print('⚠️ [AuthUtils] No hay usuario autenticado');
+      AppLogger.warning('AuthUtils', 'No hay usuario autenticado');
       return 'unknown';
-    }
-    
-    if (kDebugMode) {
-      print('👤 [AuthUtils] Usuario autenticado encontrado:');
-      print('   🆔 ID: ${user.id}');
-      print('   📧 Email: ${user.email}');
-      print('   📋 Metadata: ${user.userMetadata}');
     }
     
     // Priorizar nombre completo, luego email
     final name = user.userMetadata?['full_name'] ?? user.userMetadata?['name'];
     if (name != null && name.toString().isNotEmpty) {
-      if (kDebugMode) {
-        print('   ✅ [AuthUtils] Usando nombre: $name');
-      }
       return name.toString();
     }
-    
-    if (kDebugMode) {
-      print('   ✅ [AuthUtils] Usando email: ${user.email ?? 'unknown'}');
-    }
-    
+
     return user.email ?? 'unknown';
   }
 }

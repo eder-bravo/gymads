@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/image_cache_service.dart';
@@ -66,7 +67,7 @@ class ClientesController extends GetxController {
     try {
       await ImageCacheService.instance.initialize();
     } catch (e) {
-      print('Error inicializando caché de imágenes: $e');
+      AppLogger.error('ClientesController', 'Error inicializando caché de imágenes', e);
     }
   }
 
@@ -141,7 +142,7 @@ class ClientesController extends GetxController {
         await Future.delayed(const Duration(milliseconds: 100));
       }
     } catch (e) {
-      print('Error precargando imágenes de clientes: $e');
+      AppLogger.error('ClientesController', 'Error precargando imágenes de clientes', e);
     }
   }
 
@@ -153,7 +154,7 @@ class ClientesController extends GetxController {
             .getUserImage(userId, user.photoUrl, isThumbnail: true);
       }
     } catch (e) {
-      print('Error precargando imagen del usuario $userId: $e');
+      AppLogger.error('ClientesController', 'Error precargando imagen del usuario', e);
     }
   }
 
@@ -194,7 +195,7 @@ class ClientesController extends GetxController {
           );
         }
       } catch (e) {
-        print('${isError ? '❌' : '✅'} $title: $message');
+        AppLogger.error('ClientesController', 'No se pudo mostrar la notificación', e);
       }
     });
   }
@@ -277,7 +278,7 @@ class ClientesController extends GetxController {
         rfidService.pauseScanning();
       }
     } catch (e) {
-      print('⚠️ No se pudo pausar servicio RFID: $e');
+      AppLogger.warning('ClientesController', 'No se pudo pausar servicio RFID');
     }
 
     isLoading.value = true;
@@ -314,7 +315,7 @@ class ClientesController extends GetxController {
         rfidService.pauseScanning();
       }
     } catch (e) {
-      print('⚠️ No se pudo pausar servicio RFID: $e');
+      AppLogger.warning('ClientesController', 'No se pudo pausar servicio RFID');
     }
 
     isLoading.value = true;

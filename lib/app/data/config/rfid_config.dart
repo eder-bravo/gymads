@@ -1,11 +1,12 @@
 import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 /// Configuración simplificada del lector RFID ESP32 con IP manual
 class RfidConfig {
-  // ⭐ CAMBIAR ESTA IP POR LA DEL ESP32 ⭐
+  // CAMBIAR ESTA IP POR LA DEL ESP32
   static const String DEFAULT_ESP32_IP = '192.168.1.100';
 
   static const String _urlKey = 'esp32_api_url';
@@ -22,82 +23,58 @@ class RfidConfig {
   // Cargar configuración
   static Future<void> loadConfig() async {
     try {
-      if (kDebugMode) {
-        print('🔧 Cargando configuración RFID...');
-      }
+      AppLogger.info('RfidConfig', 'Cargando configuración RFID');
 
       final prefs = await SharedPreferences.getInstance();
       final savedUrl = prefs.getString(_urlKey);
 
       if (savedUrl != null && savedUrl.isNotEmpty) {
-        if (kDebugMode) {
-          print('📱 URL guardada encontrada: $savedUrl');
-        }
+        AppLogger.info('RfidConfig', 'URL guardada encontrada');
         if (await _testConnection(savedUrl)) {
           _currentUrl = savedUrl;
-          if (kDebugMode) {
-            print('✅ IP guardada es válida: $savedUrl');
-          }
+          AppLogger.info('RfidConfig', 'IP guardada es válida');
           return;
         } else {
-          if (kDebugMode) {
-            print('❌ IP guardada no responde, intentando IP por defecto');
-          }
+          AppLogger.error('RfidConfig', 'IP guardada no responde, intentando IP por defecto');
         }
       }
 
       // Usar IP por defecto
       final defaultUrl = 'http://$DEFAULT_ESP32_IP/api';
       _currentUrl = defaultUrl;
-      if (kDebugMode) {
-        print('🔧 Intentando IP por defecto: $defaultUrl');
-      }
+      AppLogger.info('RfidConfig', 'Intentando IP por defecto');
 
       if (await _testConnection(defaultUrl)) {
         await saveConfig(defaultUrl);
-        if (kDebugMode) {
-          print('✅ Conectado usando IP por defecto: $defaultUrl');
-        }
+        AppLogger.info('RfidConfig', 'Conectado usando IP por defecto');
       } else {
-        if (kDebugMode) {
-          print('❌ IP por defecto no responde: $defaultUrl');
-          print('🔧 Verificar que el ESP32 esté encendido y en la red WiFi');
-        }
+        AppLogger.error('RfidConfig', 'IP por defecto no responde');
+        AppLogger.info('RfidConfig', 'Verificar que el ESP32 esté encendido y en la red WiFi');
       }
     } catch (e) {
       _currentUrl = 'http://$DEFAULT_ESP32_IP/api';
-      if (kDebugMode) {
-        print('❌ Error al cargar configuración: $e');
-      }
+      AppLogger.error('RfidConfig', 'Error al cargar configuración', e);
     }
   }
 
   // Configurar IP manualmente
   static Future<bool> setManualIP(String ipAddress) async {
     if (ipAddress.isEmpty) {
-      if (kDebugMode) {
-        print('IP proporcionada está vacía');
-      }
+      AppLogger.info('RfidConfig', 'IP proporcionada está vacía');
       return false;
     }
 
     String validatedUrl = 'http://$ipAddress/api';
 
-    if (kDebugMode) {
-      print('Configurando ESP32 manualmente: $validatedUrl');
-    }
+    AppLogger.info('RfidConfig', 'Configurando ESP32 manualmente');
 
     if (await _testConnection(validatedUrl)) {
       _currentUrl = validatedUrl;
       await saveConfig(validatedUrl);
-      if (kDebugMode) {
-        print('IP configurada exitosamente: $validatedUrl');
-      }
+      AppLogger.info('RfidConfig', 'IP configurada exitosamente');
       return true;
     } else {
-      if (kDebugMode) {
-        print('IP proporcionada no responde: $ipAddress');
-      }
+      AppLogger.warning('RfidConfig', 'La IP proporcionada no responde');
       return false;
     }
   }
@@ -120,9 +97,7 @@ class RfidConfig {
       final statusUrl =
           url.endsWith('/api') ? '$url/status' : '$url/api/status';
 
-      if (kDebugMode) {
-        print('🔍 Probando conexión a: $statusUrl');
-      }
+      AppLogger.info('RfidConfig', 'Probando conexión');
 
       final response = await http.get(
         Uri.parse(statusUrl),
@@ -130,27 +105,18 @@ class RfidConfig {
       ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (kDebugMode) {
-          print('✅ ESP32 encontrado y funcionando');
-          print('📊 Status: ${data['status'] ?? 'unknown'}');
-          print('📡 WiFi: ${data['wifi_connected'] ?? 'unknown'}');
-          print('🌐 IP: ${data['ip_address'] ?? 'unknown'}');
-        }
+        AppLogger.info('RfidConfig', 'ESP32 encontrado y funcionando');
         return true;
       } else {
-        if (kDebugMode) {
-          print('❌ ESP32 respondió con código: ${response.statusCode}');
-        }
+        AppLogger.error('RfidConfig', 'ESP32 respondió con código');
         return false;
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Error al probar conexión: $e');
+        AppLogger.error('RfidConfig', 'Error al probar conexión', e);
         if (e.toString().contains('TimeoutException')) {
-          print('⏱️  Timeout: El ESP32 no responde en el tiempo esperado');
-          print(
-              '🔧 Verificar que el ESP32 esté encendido y en la misma red WiFi');
+          AppLogger.info('RfidConfig', 'Timeout: El ESP32 no responde en el tiempo esperado');
+          AppLogger.info('RfidConfig', 'Verificar que el ESP32 esté encendido y en la misma red WiFi');
         }
       }
       return false;
@@ -162,13 +128,9 @@ class RfidConfig {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_urlKey, url);
-      if (kDebugMode) {
-        print('Configuración guardada: $url');
-      }
+      AppLogger.info('RfidConfig', 'Configuración guardada');
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al guardar configuración: $e');
-      }
+      AppLogger.error('RfidConfig', 'Error al guardar configuración', e);
     }
   }
 
@@ -177,9 +139,7 @@ class RfidConfig {
     if (newUrl != null && newUrl.isNotEmpty) {
       _currentUrl = validateUrl(newUrl);
       await saveConfig(_currentUrl!);
-      if (kDebugMode) {
-        print('Configuración actualizada: $_currentUrl');
-      }
+      AppLogger.info('RfidConfig', 'Configuración actualizada');
     }
   }
 
@@ -189,13 +149,9 @@ class RfidConfig {
       String formattedUrl = 'http://$ip/api';
       _currentUrl = formattedUrl;
       await saveConfig(formattedUrl);
-      if (kDebugMode) {
-        print('IP forzada manualmente: $ip');
-      }
+      AppLogger.info('RfidConfig', 'IP forzada manualmente');
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al forzar IP manual: $e');
-      }
+      AppLogger.error('RfidConfig', 'Error al forzar IP manual', e);
     }
   }
 
@@ -205,13 +161,9 @@ class RfidConfig {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_urlKey);
       _currentUrl = null;
-      if (kDebugMode) {
-        print('Configuración limpiada');
-      }
+      AppLogger.info('RfidConfig', 'Configuración limpiada');
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al limpiar configuración: $e');
-      }
+      AppLogger.error('RfidConfig', 'Error al limpiar configuración', e);
     }
   }
 
@@ -252,25 +204,14 @@ class RfidConfig {
       }
       return null;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al obtener información del ESP32: $e');
-      }
+      AppLogger.error('RfidConfig', 'Error al obtener información del ESP32', e);
       return null;
     }
   }
 
   // Mostrar configuración actual
   static void showCurrentConfig() {
-    if (kDebugMode) {
-      print('========================================');
-      print('CONFIGURACIÓN RFID ACTUAL');
-      print('========================================');
-      print('IP por defecto: $DEFAULT_ESP32_IP');
-      print('URL actual: ${_currentUrl ?? "No configurada"}');
-      print('IP actual: ${getCurrentIP()}');
-      print('Configurado: $isConfigured');
-      print('========================================');
-    }
+    AppLogger.info('RfidConfig', 'Lector configurado: $isConfigured');
   }
 
   // =================== CONSTANTES DEL SISTEMA ===================

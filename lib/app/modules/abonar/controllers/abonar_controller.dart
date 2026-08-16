@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:gymads/app/data/models/membership_plan_model.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/data/models/abono_prices_model.dart';
 import 'package:gymads/app/data/models/user_model.dart';
-import 'package:gymads/app/data/repositories/membership_plan_repository.dart';
+import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
@@ -14,11 +15,13 @@ import 'dart:async';
 class AbonarController extends GetxController {
   final UserRepository userRepository;
   final IngresoService ingresoService;
+  final AbonoPricesRepository pricesRepository;
   final BackgroundRfidService? rfidService;
 
   AbonarController({
     required this.userRepository,
     required this.ingresoService,
+    required this.pricesRepository,
     this.rfidService,
   });
 
@@ -62,11 +65,12 @@ class AbonarController extends GetxController {
   final paymentMethods = ['Efectivo', 'Tarjeta', 'Transferencia'];
   final durationTypes = ['Meses', 'Semanas', 'Días', 'Años'];
 
-  // Abonos fijos (planes de membresía)
-  final MembershipPlanRepository planRepository = MembershipPlanRepository();
-  final planes = <MembershipPlanModel>[].obs;
-  final selectedPlan = Rx<MembershipPlanModel?>(null);
-  final isModoFijo = false.obs;
+  // Precios fijos configurados por el gimnasio (por día, semana, mes y año)
+  final Rx<AbonoPricesModel?> prices = Rx<AbonoPricesModel?>(null);
+  final isPrecioFijo = true.obs;
+
+  /// Precio configurado para el periodo seleccionado, si existe.
+  double? get configuredPrice => prices.value?.priceFor(durationType.value);
 
   final isLoading = false.obs;
   final isSuccess = false.obs;
@@ -92,26 +96,35 @@ class AbonarController extends GetxController {
     unitPriceController.addListener(_onUnitPriceChanged);
     durationController.addListener(_onDurationChanged);
 
-    _loadPlanes();
+    _loadPrices();
   }
 
-  Future<void> _loadPlanes() async {
-    final result = await planRepository.getPlans();
-    planes.assignAll(result);
-    // Si el gimnasio tiene planes, el modo fijo es el default
-    if (result.isNotEmpty) isModoFijo.value = true;
+  Future<void> _loadPrices() async {
+    final result = await pricesRepository.getPrices();
+    prices.value = result;
+    // Sin precios configurados el modo fijo no tiene nada que ofrecer
+    isPrecioFijo.value = result.hasAnyPrice;
+    applyFixedPrice();
   }
 
-  void setModoFijo(bool fijo) {
-    isModoFijo.value = fijo;
+  /// Cambia entre precio fijo (tomado de la configuración) y precio libre.
+  void setPrecioFijo(bool fijo) {
+    isPrecioFijo.value = fijo;
+    if (fijo) applyFixedPrice();
   }
 
-  /// Selecciona un plan fijo y sincroniza periodo/cantidad para que la
-  /// proyección de fecha reactiva funcione sin cambios.
-  void selectPlan(MembershipPlanModel plan) {
-    selectedPlan.value = plan;
-    durationType.value = plan.periodType;
-    durationController.text = '${plan.periodCount}';
+  /// Cambia el periodo y, en modo fijo, recarga el precio configurado.
+  void setDurationType(String type) {
+    durationType.value = type;
+    applyFixedPrice();
+  }
+
+  /// En modo fijo escribe el precio configurado del periodo actual en el campo
+  /// (el listener del TextEditingController recalcula total y fecha).
+  void applyFixedPrice() {
+    if (!isPrecioFijo.value) return;
+    final price = configuredPrice;
+    unitPriceController.text = price == null ? '' : price.toStringAsFixed(2);
   }
 
   void _onUnitPriceChanged() {
@@ -178,7 +191,7 @@ class AbonarController extends GetxController {
       }).toList();
       searchResults.assignAll(results);
     } catch (e) {
-      print('Error buscando clientes: $e');
+      AppLogger.error('AbonarController', 'Error buscando clientes', e);
       _showSnackbar('Error', 'No se pudo buscar clientes', isError: true);
     } finally {
       isSearching.value = false;
@@ -198,7 +211,7 @@ class AbonarController extends GetxController {
         _showSnackbar('No encontrado', 'Tarjeta RFID no registrada', isError: true);
       }
     } catch (e) {
-      print('Error buscando por RFID: $e');
+      AppLogger.error('AbonarController', 'Error buscando por RFID', e);
     } finally {
       isSearching.value = false;
     }
@@ -264,7 +277,7 @@ class AbonarController extends GetxController {
     unitPriceController.clear();
     durationController.text = '1';
     durationType.value = 'Meses';
-    selectedPlan.value = null;
+    applyFixedPrice();
     isSuccess.value = false;
   }
 
@@ -305,39 +318,27 @@ class AbonarController extends GetxController {
       return;
     }
 
-    final bool fijo = isModoFijo.value;
-    final plan = selectedPlan.value;
-    final double amount;
-    final String descripcion;
-
-    if (fijo) {
-      if (plan == null) {
-        _showSnackbar('Error', 'Selecciona un plan de abono', isError: true);
-        return;
-      }
-      // Re-sincronizar periodo/cantidad con el plan por si el usuario cambió
-      // de modo y modificó los campos manuales antes de volver a fijo.
-      durationType.value = plan.periodType;
-      durationController.text = '${plan.periodCount}';
-      amount = plan.price;
-      descripcion = 'Abono: ${plan.name} — ${plan.descripcionPeriodo}';
-    } else {
-      final periods = durationValue.value;
-      if (periods <= 0) {
-        _showSnackbar('Error', 'Selecciona una cantidad de periodos válida', isError: true);
-        return;
-      }
-
-      final precioUnitario = unitPrice.value;
-      if (precioUnitario <= 0) {
-        _showSnackbar('Error', 'Ingresa un precio unitario válido', isError: true);
-        return;
-      }
-
-      amount = totalAmount;
-      descripcion =
-          'Abono: $periods ${durationType.value.toLowerCase()} × \$${precioUnitario.toStringAsFixed(2)}';
+    final periods = durationValue.value;
+    if (periods <= 0) {
+      _showSnackbar('Error', 'Selecciona una cantidad de periodos válida', isError: true);
+      return;
     }
+
+    final precioUnitario = unitPrice.value;
+    if (precioUnitario <= 0) {
+      _showSnackbar(
+        'Error',
+        isPrecioFijo.value
+            ? 'No hay precio configurado para este periodo'
+            : 'Ingresa un precio unitario válido',
+        isError: true,
+      );
+      return;
+    }
+
+    final amount = totalAmount;
+    final descripcion =
+        'Abono: $periods ${durationType.value.toLowerCase()} × \$${precioUnitario.toStringAsFixed(2)}';
 
     isLoading.value = true;
     try {
@@ -368,7 +369,7 @@ class AbonarController extends GetxController {
             metodoPago: paymentMethod.value.toLowerCase(),
             descripcion: descripcion,
             usuarioStaff: 'Staff',
-            notas: fijo ? 'Abono fijo' : 'Abono libre',
+            notas: isPrecioFijo.value ? 'Abono fijo' : 'Abono libre',
             periodoInicio: periodStartDate,
             periodoFin: newExpirationDate,
           );
@@ -377,7 +378,7 @@ class AbonarController extends GetxController {
              IngresosController.refreshIngresosGlobally();
           }
         } catch (e) {
-          print('Error registrando ingreso: $e');
+          AppLogger.error('AbonarController', 'Error registrando ingreso', e);
           // No bloqueamos el éxito si el ingreso falla
         }
 

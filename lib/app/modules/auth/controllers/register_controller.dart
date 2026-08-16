@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -151,10 +152,10 @@ class RegisterController extends GetxController {
         await _registerWithGoogleiOS();
       }
     } on AuthException catch (e) {
-      print('❌ Google auth error: ${e.message}');
+      AppLogger.error('RegisterController', 'Fallo de autenticación con Google', e);
       errorMessage.value = 'Error con Google: ${e.message}';
     } catch (e) {
-      print('❌ Google sign-in error: $e');
+      AppLogger.error('RegisterController', 'Google sign-in error', e);
       errorMessage.value = e.toString().replaceAll('Exception: ', '');
     } finally {
       isLoading.value = false;
@@ -201,7 +202,7 @@ class RegisterController extends GetxController {
 
   /// iOS: use Supabase native OAuth flow
   Future<void> _registerWithGoogleiOS() async {
-    print('🔵 [Google-iOS] Starting Supabase OAuth flow for registration...');
+    AppLogger.info('RegisterController', 'Starting Supabase OAuth flow for registration');
 
     final success = await _supabase.auth.signInWithOAuth(
       OAuthProvider.google,
@@ -235,7 +236,7 @@ class RegisterController extends GetxController {
   /// Common handler after Google auth in registration
   Future<void> _handleGoogleRegResult(
       String userId, String? displayName, String? email) async {
-    print('✅ Google auth successful: $userId');
+    AppLogger.info('RegisterController', 'Google auth successful');
 
     final staffProfile = await _staffProfileProvider.getByUserId(userId);
 
@@ -296,7 +297,7 @@ class RegisterController extends GetxController {
         'p_main_branch_name': locationController.text.trim(),
       });
 
-      print('✅ Gym registered via Google flow');
+      AppLogger.info('RegisterController', 'Gym registered via Google flow');
 
       // Auto-login
       final staffProfile = await _staffProfileProvider.getByUserId(userId);
@@ -309,7 +310,7 @@ class RegisterController extends GetxController {
         throw Exception('Error creando el perfil');
       }
     } catch (e) {
-      print('❌ Complete registration error: $e');
+      AppLogger.error('RegisterController', 'Complete registration error', e);
       errorMessage.value = e.toString().replaceAll('Exception: ', '');
     } finally {
       isLoading.value = false;
@@ -326,7 +327,7 @@ class RegisterController extends GetxController {
 
     try {
       // 1. Create auth user
-      print('📝 Creating auth user...');
+      AppLogger.info('RegisterController', 'Creating auth user');
       final authResponse = await _supabase.auth.signUp(
         email: emailController.text.trim(),
         password: passwordController.text,
@@ -341,10 +342,10 @@ class RegisterController extends GetxController {
       }
 
       final userId = authResponse.user!.id;
-      print('✅ Auth user created: $userId');
+      AppLogger.info('RegisterController', 'Auth user created');
 
       // 2. Call the register_gym_owner RPC function
-      print('🏋️ Registering gym via RPC...');
+      AppLogger.info('RegisterController', 'Registering gym via RPC');
 
       await _supabase.rpc('register_gym_owner', params: {
         'p_user_id': userId,
@@ -354,10 +355,10 @@ class RegisterController extends GetxController {
         'p_main_branch_name': locationController.text.trim(),
       });
 
-      print('✅ Gym registered');
+      AppLogger.info('RegisterController', 'Gym registered');
 
       // 3. Auto-login: fetch staff profile and set tenant context
-      print('🔑 Auto-login: fetching staff profile...');
+      AppLogger.info('RegisterController', 'Auto-login: fetching staff profile');
       final staffProfile = await _staffProfileProvider.getByUserId(userId);
 
       if (staffProfile != null && staffProfile.isActive) {
@@ -366,18 +367,18 @@ class RegisterController extends GetxController {
         Get.offAllNamed(Routes.HOME);
       } else {
         // Fallback: staff profile not ready yet, go to login
-        print('⚠️ Staff profile not ready, redirecting to login');
+        AppLogger.warning('RegisterController', 'Staff profile not ready, redirecting to login');
         Get.offAllNamed(Routes.LOGIN);
       }
     } on AuthException catch (e) {
-      print('❌ Auth error: ${e.message}');
+      AppLogger.error('RegisterController', 'Fallo de autenticación', e);
       if (e.message.contains('already registered')) {
         errorMessage.value = 'Este correo ya está registrado';
       } else {
         errorMessage.value = 'Error: ${e.message}';
       }
     } catch (e) {
-      print('❌ Registration error: $e');
+      AppLogger.error('RegisterController', 'Registration error', e);
       errorMessage.value = e.toString().replaceAll('Exception: ', '');
     } finally {
       isLoading.value = false;

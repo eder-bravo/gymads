@@ -1,5 +1,5 @@
 import 'package:get/get.dart';
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../data/models/access_log_model.dart';
 import '../../../data/services/access_log_service.dart';
@@ -26,9 +26,7 @@ class AccessLogsController extends GetxController {
       isLoading.value = true;
       errorMessage.value = '';
 
-      if (kDebugMode) {
-        print('📊 Cargando logs de acceso desde Supabase...');
-      }
+      AppLogger.info('AccessLogsController', 'Cargando logs de acceso desde Supabase');
 
       final logs = await AccessLogService.getAllAccessLogs();
 
@@ -36,33 +34,25 @@ class AccessLogsController extends GetxController {
         accessLogs.value = logs;
         calculateStatistics();
 
-        if (kDebugMode) {
-          print('✅ ${logs.length} logs de acceso cargados exitosamente');
-        }
+        AppLogger.info('AccessLogsController', '${logs.length} logs de acceso cargados exitosamente');
       } else if (logs != null && logs.isEmpty) {
         // Caso donde la consulta fue exitosa pero no hay datos
         accessLogs.clear();
         errorMessage.value = '';
 
-        if (kDebugMode) {
-          print('ℹ️ No se encontraron logs de acceso en la base de datos');
-        }
+        AppLogger.info('AccessLogsController', 'No se encontraron logs de acceso');
       } else {
         // Caso donde hubo un error en la consulta
         errorMessage.value = 'No se pudieron cargar los logs de acceso';
         accessLogs.clear();
 
-        if (kDebugMode) {
-          print('❌ Error: No se pudieron cargar los logs');
-        }
+        AppLogger.error('AccessLogsController', 'Error: No se pudieron cargar los logs');
       }
     } catch (e) {
       errorMessage.value = 'Error al cargar logs: ${e.toString()}';
       accessLogs.clear();
 
-      if (kDebugMode) {
-        print('❌ Excepción al cargar logs: $e');
-      }
+      AppLogger.error('AccessLogsController', 'Excepción al cargar logs', e);
 
       // Mostrar snackbar de error
       SnackbarHelper.error(

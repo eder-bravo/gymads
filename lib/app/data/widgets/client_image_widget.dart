@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../services/image_cache_service.dart';
@@ -95,9 +96,6 @@ class _ClientImageWidgetState extends State<ClientImageWidget> {
           _hasError = false;
         });
         
-        if (kDebugMode) {
-          print('🖼️ Imagen cargada para ${widget.userId}: ${widget.isThumbnail ? 'miniatura' : 'completa'}');
-        }
       } else {
         setState(() {
           _isLoading = false;
@@ -112,9 +110,7 @@ class _ClientImageWidgetState extends State<ClientImageWidget> {
         _hasError = true;
       });
       
-      if (kDebugMode) {
-        print('❌ Error cargando imagen para ${widget.userId}: $e');
-      }
+      AppLogger.error('ClientImageWidget', 'Error cargando imagen', e);
     }
   }
   
@@ -200,9 +196,7 @@ class _ClientImageWidgetState extends State<ClientImageWidget> {
           height: widget.height,
           fit: widget.fit,
           errorBuilder: (context, error, stackTrace) {
-            if (kDebugMode) {
-              print('❌ Error mostrando imagen desde archivo: $error');
-            }
+            AppLogger.error('ClientImageWidget', 'Error mostrando imagen desde archivo', error);
             return _buildErrorWidget();
           },
         ),
@@ -261,9 +255,7 @@ class ClientThumbnailWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     // Si no hay photoUrl, mostrar fallback directamente
     if (photoUrl == null || photoUrl!.isEmpty) {
-      if (kDebugMode) {
-        print('🖼️ ClientThumbnailWidget: No photoUrl para usuario $userId, mostrando fallback');
-      }
+      AppLogger.error('ClientImageWidget', 'ClientThumbnailWidget: No photoUrl para usuario mostrando fallback');
       return _buildFallback();
     }
     

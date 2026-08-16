@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 
 class UserModel {
   final String? id;
@@ -36,9 +36,6 @@ class UserModel {
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
-    if (kDebugMode) {
-      print('Datos recibidos en fromJson: $json');
-    }
 
     // Función para parsear fechas
     DateTime? parseDateTime(dynamic value) {
@@ -46,9 +43,7 @@ class UserModel {
       try {
         return DateTime.parse(value);
       } catch (e) {
-        if (kDebugMode) {
-          print('Error parseando fecha: $value - Error: $e');
-        }
+        AppLogger.error('UserModel', 'Error parseando fecha: $value - Error', e);
         return null;
       }
     }

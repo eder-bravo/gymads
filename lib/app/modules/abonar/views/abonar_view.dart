@@ -167,32 +167,18 @@ class AbonarView extends GetView<AbonarController> {
                 ),
                 const SizedBox(height: 20),
 
-                // Selector de modo (solo si hay planes fijos configurados)
-                Obx(() {
-                  if (controller.planes.isEmpty) return const SizedBox.shrink();
-                  return Column(
-                    children: [
-                      _buildModoToggle(),
-                      const SizedBox(height: 20),
-                    ],
-                  );
-                }),
+                // Selector de precio fijo / libre
+                _buildModoToggle(),
+                const SizedBox(height: 20),
 
-                // Campos según el modo activo
-                Obx(() =>
-                    controller.isModoFijo.value && controller.planes.isNotEmpty
-                        ? _buildPlanSelector()
-                        : _buildCamposLibres()),
+                // Cantidad, periodo y precio unitario
+                _buildCamposAbono(),
 
                 // Total a pagar (solo lectura)
                 Obx(() {
                   final currency =
                       NumberFormat.currency(locale: 'es_MX', symbol: '\$');
-                  final fijo = controller.isModoFijo.value &&
-                      controller.planes.isNotEmpty;
-                  final total = fijo
-                      ? (controller.selectedPlan.value?.price ?? 0.0)
-                      : controller.totalAmount;
+                  final total = controller.totalAmount;
                   return Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -248,12 +234,6 @@ class AbonarView extends GetView<AbonarController> {
                 
                 // Proyección de Fecha
                 Obx(() {
-                    // En modo fijo sin plan elegido aún no hay nada que proyectar
-                    if (controller.isModoFijo.value &&
-                        controller.planes.isNotEmpty &&
-                        controller.selectedPlan.value == null) {
-                      return const SizedBox.shrink();
-                    }
                     final newExp = controller.calculateNewExpirationDate();
                     final formattedDate = DateFormat('dd/MM/yyyy').format(newExp);
                     return Container(
@@ -318,7 +298,7 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
-  // Toggle segmentado Plan Fijo / Libre
+  // Toggle segmentado Precio fijo / Libre
   Widget _buildModoToggle() {
     return Container(
       decoration: BoxDecoration(
@@ -327,10 +307,10 @@ class AbonarView extends GetView<AbonarController> {
       ),
       padding: const EdgeInsets.all(4),
       child: Obx(() {
-        final fijo = controller.isModoFijo.value;
+        final fijo = controller.isPrecioFijo.value;
         return Row(
           children: [
-            _modoButton('Plan Fijo', true, fijo),
+            _modoButton('Precio fijo', true, fijo),
             _modoButton('Libre', false, fijo),
           ],
         );
@@ -342,7 +322,7 @@ class AbonarView extends GetView<AbonarController> {
     final seleccionado = fijoActivo == value;
     return Expanded(
       child: GestureDetector(
-        onTap: () => controller.setModoFijo(value),
+        onTap: () => controller.setPrecioFijo(value),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
@@ -363,94 +343,8 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
-  // Lista de planes fijos seleccionables
-  Widget _buildPlanSelector() {
-    return Obx(() {
-      final seleccionado = controller.selectedPlan.value;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ...controller.planes.map((plan) {
-            final isSelected = seleccionado?.id == plan.id;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.accent.withOpacity(0.12)
-                    : AppColors.containerBackground,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected
-                      ? AppColors.accent
-                      : AppColors.accent.withOpacity(0.15),
-                  width: isSelected ? 1.5 : 1,
-                ),
-              ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => controller.selectPlan(plan),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isSelected
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_off,
-                        color: isSelected
-                            ? AppColors.accent
-                            : AppColors.textSecondary,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              plan.name,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              plan.descripcionPeriodo,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '\$${plan.price.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          color: isSelected
-                              ? AppColors.accent
-                              : AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-          const SizedBox(height: 10),
-        ],
-      );
-    });
-  }
-
-  // Campos del modo libre (periodo, cantidad y precio unitario)
-  Widget _buildCamposLibres() {
+  // Cantidad de periodos, tipo de periodo y precio unitario
+  Widget _buildCamposAbono() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -511,7 +405,7 @@ class AbonarView extends GetView<AbonarController> {
                   return DropdownMenuItem(value: type, child: Text(type));
                 }).toList(),
                 onChanged: (val) {
-                  if (val != null) controller.durationType.value = val;
+                  if (val != null) controller.setDurationType(val);
                 },
               )),
             ),
@@ -520,22 +414,36 @@ class AbonarView extends GetView<AbonarController> {
         const SizedBox(height: 20),
 
         // 2. Precio unitario
-        Obx(() => TextField(
-          controller: controller.unitPriceController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.bold),
-          decoration: InputDecoration(
-            labelText: 'Precio Unitario',
-            helperText: 'Por ${controller.durationUnitLabel}',
-            helperStyle: const TextStyle(color: AppColors.textSecondary),
-            prefixText: '\$ ',
-            prefixStyle: const TextStyle(color: AppColors.accent, fontSize: 24, fontWeight: FontWeight.bold),
-            filled: true,
-            fillColor: AppColors.containerBackground,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        )),
+        Obx(() {
+          final fijo = controller.isPrecioFijo.value;
+          final sinPrecio = fijo && controller.configuredPrice == null;
+          return TextField(
+            controller: controller.unitPriceController,
+            readOnly: fijo,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              labelText: 'Precio por ${controller.durationUnitLabel}',
+              helperText: fijo ? 'Precio configurado' : 'Precio libre',
+              helperStyle: const TextStyle(color: AppColors.textSecondary),
+              errorText: sinPrecio
+                  ? 'Sin precio configurado para este periodo'
+                  : null,
+              suffixIcon: fijo
+                  ? const Icon(Icons.lock_outline,
+                      size: 18, color: AppColors.textSecondary)
+                  : null,
+              prefixText: '\$ ',
+              prefixStyle: const TextStyle(color: AppColors.accent, fontSize: 24, fontWeight: FontWeight.bold),
+              filled: true,
+              fillColor: fijo
+                  ? AppColors.containerBackground.withOpacity(0.5)
+                  : AppColors.containerBackground,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          );
+        }),
         const SizedBox(height: 20),
       ],
     );

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -145,30 +146,22 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
   Future<void> _initializeImageCache() async {
     try {
       await ImageCacheService.instance.initialize();
-      if (kDebugMode) {
-        print('✅ Servicio de caché de imágenes inicializado');
-      }
+      AppLogger.info('RfidCheckinController', 'Servicio de caché de imágenes inicializado');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error inicializando caché de imágenes: $e');
-      }
+      AppLogger.error('RfidCheckinController', 'Error inicializando caché de imágenes', e);
     }
   }
 
   // Precargar imágenes de usuarios activos en segundo plano
   Future<void> _precacheActiveUserImages() async {
     try {
-      if (kDebugMode) {
-        print('🔄 Iniciando precarga de imágenes de usuarios activos (RFID)...');
-      }
+      AppLogger.info('RfidCheckinController', 'Iniciando precarga de imágenes de usuarios activos (RFID)');
 
       // Obtener usuarios activos
       final activeUsers = await userRepository.getAllUsers();
       
       if (activeUsers.isEmpty) {
-        if (kDebugMode) {
-          print('⚠️ No hay usuarios para precargar');
-        }
+        AppLogger.warning('RfidCheckinController', 'No hay usuarios para precargar');
         return;
       }
 
@@ -179,9 +172,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
                user.photoUrl!.isNotEmpty;
       }).toList();
 
-      if (kDebugMode) {
-        print('📥 Precargando ${usersToCache.length} imágenes de usuarios activos...');
-      }
+      AppLogger.info('RfidCheckinController', 'Precargando imágenes de usuarios activos');
 
       // Precargar imágenes en lotes pequeños
       int cached = 0;
@@ -202,19 +193,14 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
           // Pausa breve entre cada imagen
           await Future.delayed(const Duration(milliseconds: 50));
         } catch (e) {
-          if (kDebugMode) {
-            print('⚠️ Error precargando imagen de ${user.name}: $e');
-          }
+          AppLogger.warning('RfidCheckinController', 'Error precargando imagen');
         }
       }
 
-      if (kDebugMode) {
-        print('✅ Precargadas $cached/${usersToCache.length} imágenes de usuarios (RFID)');
-      }
+      AppLogger.info('RfidCheckinController',
+          'Precargadas $cached/${usersToCache.length} imágenes');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error en precarga de imágenes: $e');
-      }
+      AppLogger.error('RfidCheckinController', 'Error en precarga de imágenes', e);
     }
   }
   
@@ -236,9 +222,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
     successMessage.value = '';
     
     try {
-      if (kDebugMode) {
-        print('Verificando acceso con RFID: $rfidCode');
-      }
+      AppLogger.info('RfidCheckinController', 'Verificando acceso con RFID');
       
       // Obtener todos los usuarios y filtrar por RFID
       final List<UserModel> allUsers = await userRepository.getAllUsers();
@@ -271,9 +255,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         // Siempre es entrada (sin salidas)
         const accessType = 'entrada';
         
-        if (kDebugMode) {
-          print('🚪 Registrando entrada RFID para ${user.name}');
-        }
+        AppLogger.info('RfidCheckinController', 'Registrando entrada RFID');
         
         // Actualizar datos para mostrar
         userName.value = user.name;
@@ -312,9 +294,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         // Siempre es entrada (sin salidas)
         const accessType = 'entrada';
         
-        if (kDebugMode) {
-          print('🚪 Registrando entrada RFID para ${user.name}');
-        }
+        AppLogger.info('RfidCheckinController', 'Registrando entrada RFID');
         
         // Actualizar datos para mostrar
         userName.value = user.name;
@@ -359,9 +339,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
       }
       
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al procesar acceso con RFID: $e');
-      }
+      AppLogger.error('RfidCheckinController', 'Error al procesar acceso con RFID', e);
       errorMessage.value = 'Error al procesar el acceso: $e';
     } finally {
       isLoading.value = false;
@@ -375,14 +353,10 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         final updatedUser = user.addAccessRecord();
         if (user.id != null) {
           await userRepository.updateUser(user.id!, updatedUser);
-          if (kDebugMode) {
-            print('✅ Registro de acceso guardado en segundo plano para: ${user.name}');
-          }
+          AppLogger.info('RfidCheckinController', 'Registro de acceso guardado en segundo plano');
         }
       } catch (e) {
-        if (kDebugMode) {
-          print('❌ Error al registrar acceso en segundo plano: $e');
-        }
+        AppLogger.error('RfidCheckinController', 'Error al registrar acceso en segundo plano', e);
       }
     });
   }
@@ -405,14 +379,9 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
           verificationType: verificationType,
         );
         if (kDebugMode) {
-          print('✅ [RFID] Estado de membresía enviado al ESP32: $rfidCode -> $status');
-          if (accessType != null) print('   🚪 Access Type: $accessType');
-          if (verificationType != null) print('   🔍 Verification: $verificationType');
         }
       } catch (e) {
-        if (kDebugMode) {
-          print('❌ [RFID] Error enviando estado al ESP32: $e');
-        }
+        AppLogger.error('RfidCheckinController', 'Error enviando estado al ESP32', e);
       }
     });
   }
@@ -460,9 +429,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
     // Actualizar la configuración usando el nuevo método
     RfidConfig.forceUpdateIP(newIp); // Usar la IP sin formato para el método interno
     
-    if (kDebugMode) {
-      print('Dirección IP del lector RFID actualizada a: $formattedIp');
-    }
+    AppLogger.info('RfidCheckinController', 'Dirección IP del lector RFID actualizada');
     
     // Reiniciar el timer para usar la nueva IP
     _rfidCheckTimer?.cancel();
@@ -481,34 +448,22 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
     Future(() async {
       try {
         if (user.id == null) {
-          if (kDebugMode) {
-            print('❌ [RFID] No se puede registrar acceso: ID de usuario nulo');
-          }
+          AppLogger.error('RfidCheckinController', 'No se puede registrar acceso: ID de usuario nulo');
           return;
         }
 
         // Salvaguarda: nunca registrar entrada de una membresía inactiva o vencida
         if (!user.isActive || user.daysRemaining <= 0) {
-          if (kDebugMode) {
-            print('⛔ [RFID] Registro de acceso bloqueado (membresía no válida): ${user.name}');
-          }
+          AppLogger.error('RfidCheckinController', 'Registro de acceso bloqueado (membresía no válida)');
           return;
         }
 
-        if (kDebugMode) {
-          print('🔄 [RFID] Iniciando registro de acceso en Supabase...');
-          print('   👤 Usuario: ${user.name} (${user.userNumber})');
-          print('   🚪 Tipo: $accessType');
-          print('   📱 Método: $method');
-        }
+        AppLogger.info('RfidCheckinController',
+            'Registrando acceso (tipo: $accessType, método: $method)');
 
         final staffUser = AuthUtils.getStaffIdentifier();
-        
-        if (kDebugMode) {
-          print('   👨‍💼 Staff: $staffUser');
-          print('   🆔 User ID: ${user.id}');
-        }
-        
+
+
         final success = await AccessLogService.registerAccess(
           userId: user.id!,
           userName: user.name,
@@ -519,19 +474,12 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         );
 
         if (success) {
-          if (kDebugMode) {
-            print('✅ [RFID] Acceso registrado exitosamente en Supabase: ${user.name} - $accessType via $method');
-          }
         } else {
-          if (kDebugMode) {
-            print('⚠️ [RFID] No se registró el acceso: Ya existe una entrada para hoy');
-            print('   El usuario ${user.name} ya tiene una entrada registrada hoy');
-          }
+          AppLogger.warning('RfidCheckinController', 'No se registró el acceso: Ya existe una entrada para hoy');
+          AppLogger.info('RfidCheckinController', 'El usuario ya tiene una entrada registrada hoy');
         }
       } catch (e) {
-        if (kDebugMode) {
-          print('❌ [RFID] Excepción al registrar acceso en Supabase: $e');
-        }
+        AppLogger.error('RfidCheckinController', 'Excepción al registrar acceso en Supabase', e);
       }
     });
   }

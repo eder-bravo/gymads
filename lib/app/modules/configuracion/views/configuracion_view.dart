@@ -100,13 +100,13 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
 
         const SizedBox(height: 12),
 
-        // Opción de Abonos Fijos (planes de membresía)
+        // Opción de Precios de Abonos (precio fijo por periodo)
         _buildOptionTile(
-          icon: Icons.card_membership,
+          icon: Icons.attach_money,
           iconColor: AppColors.success,
-          title: 'Abonos Fijos',
-          subtitle: 'Planes de membresía con precio fijo',
-          onTap: () => controller.openMembershipPlans(),
+          title: 'Precios de Abonos',
+          subtitle: 'Precio por día, semana, mes y año',
+          onTap: () => controller.openAbonoPrices(),
           trailing: const Icon(Icons.arrow_forward_ios,
               size: 16, color: AppColors.textSecondary),
         ),

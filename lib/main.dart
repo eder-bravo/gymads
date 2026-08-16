@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/bindings/initial_binding.dart';
 import 'package:gymads/app/data/config/rfid_config.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
@@ -38,24 +39,24 @@ void main() async {
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
     debug: true,
   );
-  print('✅ Supabase inicializado correctamente');
+  AppLogger.info('Main', 'Supabase inicializado correctamente');
 
   // Initialize TenantContextService
   Get.put(TenantContextService(), permanent: true);
   await TenantContextService.to.init();
-  print('✅ TenantContextService inicializado');
+  AppLogger.info('Main', 'TenantContextService inicializado');
 
   // Initialize BrandingService (local-first)
   Get.put(BrandingService(), permanent: true);
   await BrandingService.to.init();
-  print('✅ BrandingService inicializado');
+  AppLogger.info('Main', 'BrandingService inicializado');
 
   // Check for existing session
   final authController = Get.put(AuthController(), permanent: true);
   final hasSession = await authController.checkSession();
 
   if (hasSession) {
-    print('✅ Sesión existente restaurada');
+    AppLogger.info('Main', 'Sesión existente restaurada');
     // Seed branding from DB if no local data exists (first login on device)
     final profile = TenantContextService.to.staffProfile;
     BrandingService.to.syncFromDb(
@@ -65,7 +66,7 @@ void main() async {
     );
     _initialRoute = Routes.HOME;
   } else {
-    print('📍 No hay sesión, mostrando login');
+    AppLogger.info('Main', 'No hay sesión, mostrando login');
     _initialRoute = Routes.LOGIN;
   }
 
@@ -73,21 +74,21 @@ void main() async {
   final imageCacheService = ImageCacheService.instance;
   await imageCacheService.initialize();
   Get.put(imageCacheService, permanent: true);
-  print('✅ Servicio de caché de imágenes inicializado');
+  AppLogger.info('Main', 'Servicio de caché de imágenes inicializado');
 
   // Inicializa la configuración del lector RFID SOLO si está activado
   final prefs = await SharedPreferences.getInstance();
   final rfidEnabled = prefs.getBool('rfid_enabled') ?? false;
   if (rfidEnabled) {
     await RfidConfig.loadConfig();
-    print('✅ Configuración RFID cargada');
+    AppLogger.info('Main', 'Configuración RFID cargada');
   } else {
-    print('⏭️ RFID desactivado, omitiendo configuración');
+    AppLogger.info('Main', 'RFID desactivado, omitiendo configuración');
   }
 
   // Registra el servicio de RFID de forma perezosa
   Get.lazyPut<BackgroundRfidService>(() => BackgroundRfidService());
-  print('✅ BackgroundRfidService registrado');
+  AppLogger.info('Main', 'BackgroundRfidService registrado');
 
   // Inicia la aplicación
   runApp(const MyApp());
@@ -114,25 +115,24 @@ class _MyAppState extends State<MyApp> {
     final prefs = await SharedPreferences.getInstance();
     final rfidEnabled = prefs.getBool('rfid_enabled') ?? false;
     if (!rfidEnabled) {
-      print('⏭️ RFID desactivado, omitiendo servicio de escaneo');
+      AppLogger.info('Main', 'RFID desactivado, omitiendo servicio de escaneo');
       return;
     }
 
     // Inicia el servicio RFID después de que el primer frame se renderice
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      print('⚙️ Post-frame: Iniciando servicio RFID...');
+      AppLogger.info('Main', 'Post-frame: Iniciando servicio RFID');
       try {
         final bool connected = await RfidReaderService.startReading();
         if (connected) {
-          print('✅ RFID conectado. Iniciando escaneo en segundo plano...');
+          AppLogger.info('Main', 'RFID conectado. Iniciando escaneo en segundo plano');
           Get.find<BackgroundRfidService>().startScanning();
-          print('✅ Servicio de escaneo RFID iniciado correctamente.');
+          AppLogger.info('Main', 'Servicio de escaneo RFID iniciado correctamente');
         } else {
-          print('⚠️ No se pudo conectar al lector RFID.');
+          AppLogger.warning('Main', 'No se pudo conectar al lector RFID');
         }
-      } catch (e, stack) {
-        print('❌ ERROR al iniciar servicio RFID: $e');
-        print('Stack: $stack');
+      } catch (e) {
+        AppLogger.error('Main', 'Fallo al iniciar el servicio RFID', e);
       }
     });
   }

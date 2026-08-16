@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'supabase/supabase_storage_provider.dart';
 
 /// Proveedor abstracto para operaciones de almacenamiento
@@ -16,15 +16,11 @@ class StorageProvider {
   /// @return URL pública de la foto o null si hubo error
   Future<String?> uploadUserPhoto(File photoFile, String userId) async {
     try {
-      if (kDebugMode) {
-        print('📷 Iniciando proceso de subida de foto desde StorageProvider');
-      }
+      AppLogger.info('StorageProvider', 'Iniciando proceso de subida de foto desde StorageProvider');
       
       return await _provider.uploadUserPhoto(photoFile, userId);
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error en StorageProvider.uploadUserPhoto: $e');
-      }
+      AppLogger.error('StorageProvider', 'Error en StorageProvider.uploadUserPhoto', e);
       return null;
     }
   }
@@ -37,9 +33,7 @@ class StorageProvider {
     try {
       return await _provider.deleteUserPhoto(photoUrl);
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al eliminar la foto: $e');
-      }
+      AppLogger.error('StorageProvider', 'Error al eliminar la foto', e);
       return false;
     }
   }

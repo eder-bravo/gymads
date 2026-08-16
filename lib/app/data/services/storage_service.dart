@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 
@@ -63,9 +63,7 @@ class StorageService {
       _cache[key] = _SignedEntry(url, now.add(ttl));
       return url;
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ [StorageService] No se pudo firmar "$key": $e');
-      }
+      AppLogger.error('StorageService', 'No se pudo firmar ""', e);
       return null;
     }
   }

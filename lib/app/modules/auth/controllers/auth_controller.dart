@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -97,7 +98,7 @@ class AuthController extends GetxController {
         throw Exception('Error de autenticación');
       }
 
-      print('✅ Auth successful for: ${response.user!.email}');
+      AppLogger.info('AuthController', 'Auth successful for');
 
       // 2. Fetch staff_profile for this user
       final staffProfile = await _staffProfileProvider.getByUserId(
@@ -112,11 +113,9 @@ class AuthController extends GetxController {
         );
       }
 
-      print(
-          '✅ Staff profile loaded: ${staffProfile.displayName ?? staffProfile.userId}');
-      print('   Gym ID: ${staffProfile.gymId}');
-      print('   Branch ID: ${staffProfile.branchId}');
-      print('   Role: ${staffProfile.role}');
+      AppLogger.info('AuthController', 'Gym ID');
+      AppLogger.info('AuthController', 'Branch ID');
+      AppLogger.info('AuthController', 'Role');
 
       // 3. Set tenant context
       await TenantContextService.to.setProfile(staffProfile);
@@ -138,7 +137,7 @@ class AuthController extends GetxController {
 
       return true;
     } on AuthException catch (e) {
-      print('❌ Auth error: ${e.message}');
+      AppLogger.error('AuthController', 'Fallo de autenticación', e);
       if (e.message.contains('Invalid login credentials')) {
         errorMessage.value = 'Credenciales inválidas';
       } else if (e.message.contains('Email not confirmed')) {
@@ -148,7 +147,7 @@ class AuthController extends GetxController {
       }
       return false;
     } catch (e) {
-      print('❌ Login error: $e');
+      AppLogger.error('AuthController', 'Login error', e);
       errorMessage.value = e.toString().replaceAll('Exception: ', '');
       return false;
     } finally {
@@ -171,16 +170,15 @@ class AuthController extends GetxController {
         return await _loginWithGoogleiOS();
       }
     } on AuthException catch (e) {
-      print('❌ [Google] AuthException: ${e.message}');
+      AppLogger.error('AuthController', 'Fallo de autenticación', e);
       if (e.message.contains('host lookup') || e.message.contains('SocketException')) {
         errorMessage.value = 'Sin conexión a internet. Verifica tu red e intenta de nuevo.';
       } else {
         errorMessage.value = 'Error con Google: ${e.message}';
       }
       return false;
-    } catch (e, stackTrace) {
-      print('❌ [Google] Exception: $e');
-      print('❌ [Google] StackTrace: $stackTrace');
+    } catch (e) {
+      AppLogger.error('AuthController', 'Exception', e);
       final msg = e.toString();
       if (msg.contains('12500') || msg.contains('sign_in_failed')) {
         errorMessage.value =
@@ -204,23 +202,22 @@ class AuthController extends GetxController {
 
   /// Android: use google_sign_in plugin + signInWithIdToken
   Future<bool> _loginWithGoogleAndroid() async {
-    print('🔵 [Google-Android] Starting Google Sign-In...');
+    AppLogger.info('AuthController', 'Starting Google Sign-In');
     final srvClientId = dotenv.env['GOOGLE_SERVER_CLIENT_ID'];
-    print('🔵 [Google-Android] serverClientId: $srvClientId');
     final googleSignIn = GoogleSignIn(
       serverClientId: srvClientId,
       scopes: ['email', 'profile'],
     );
 
-    print('🔵 [Google-Android] Calling signIn()...');
+    AppLogger.info('AuthController', 'Calling signIn');
     final googleUser = await googleSignIn.signIn();
     if (googleUser == null) {
-      print('🔵 [Google-Android] User cancelled sign-in');
+      AppLogger.info('AuthController', 'User cancelled sign-in');
       isLoading.value = false;
       return false;
     }
 
-    print('🔵 [Google-Android] Signed in as: ${googleUser.email}');
+    AppLogger.info('AuthController', 'Signed in as');
     final googleAuth = await googleUser.authentication;
     final idToken = googleAuth.idToken;
     final accessToken = googleAuth.accessToken;
@@ -230,7 +227,7 @@ class AuthController extends GetxController {
     }
 
     // Sign in to Supabase with Google token
-    print('🔵 [Google-Android] Calling Supabase signInWithIdToken...');
+    AppLogger.info('AuthController', 'Calling Supabase signInWithIdToken');
     final response = await _supabase.auth.signInWithIdToken(
       provider: OAuthProvider.google,
       idToken: idToken,
@@ -246,7 +243,7 @@ class AuthController extends GetxController {
 
   /// iOS: use Supabase native OAuth flow (no google_sign_in plugin)
   Future<bool> _loginWithGoogleiOS() async {
-    print('🔵 [Google-iOS] Starting Supabase OAuth flow...');
+    AppLogger.info('AuthController', 'Starting Supabase OAuth flow');
 
     final success = await _supabase.auth.signInWithOAuth(
       OAuthProvider.google,
@@ -254,11 +251,11 @@ class AuthController extends GetxController {
     );
 
     if (!success) {
-      print('❌ [Google-iOS] OAuth flow failed to launch');
+      AppLogger.error('AuthController', 'OAuth flow failed to launch');
       throw Exception('No se pudo iniciar sesión con Google');
     }
 
-    print('🔵 [Google-iOS] OAuth launched, waiting for session...');
+    AppLogger.info('AuthController', 'OAuth launched, waiting for session');
 
     // Listen for the auth state change when the OAuth redirect comes back
     final session = await _supabase.auth.onAuthStateChange
@@ -271,7 +268,7 @@ class AuthController extends GetxController {
         );
 
     final userId = session.session!.user.id;
-    print('✅ [Google-iOS] Supabase auth successful: $userId');
+    AppLogger.info('AuthController', 'Supabase auth successful');
 
     // Get user metadata from Supabase session
     final userMeta = session.session!.user.userMetadata;
@@ -287,11 +284,11 @@ class AuthController extends GetxController {
   Future<bool> _handleGoogleAuthResult(
       String userId, String? displayName, String? email) async {
     // Check if user has staff_profile (existing gym owner)
-    print('🔵 [Google] Checking staff profile for $userId...');
+    AppLogger.info('AuthController', 'Checking staff profile for');
     final staffProfile = await _staffProfileProvider.getByUserId(userId);
 
     if (staffProfile != null && staffProfile.isActive) {
-      print('✅ [Google] Existing user, navigating to HOME...');
+      AppLogger.info('AuthController', 'Existing user, navigating to HOME');
       await TenantContextService.to.setProfile(staffProfile);
       BrandingService.to.syncFromDb(
         dbGymName: staffProfile.gymName,
@@ -305,7 +302,7 @@ class AuthController extends GetxController {
       Get.offAllNamed(Routes.HOME);
       return true;
     } else {
-      print('🔵 [Google] New user, navigating to GOOGLE_COMPLETE...');
+      AppLogger.info('AuthController', 'New user, navigating to GOOGLE_COMPLETE');
       final registerCtrl = Get.put(RegisterController());
       final gName = displayName ?? '';
       final nameParts = gName.split(' ');
@@ -334,13 +331,13 @@ class AuthController extends GetxController {
         }).eq('id', gymId);
       }
     } catch (e) {
-      print('⚠️ Error backing up branding: $e');
+      AppLogger.warning('AuthController', 'Error backing up branding');
     }
 
     try {
       await _supabase.auth.signOut();
     } catch (e) {
-      print('⚠️ Error signing out: $e');
+      AppLogger.warning('AuthController', 'Error signing out');
     }
     // Clear branding so next account starts fresh
     BrandingService.to.clearBranding();
@@ -355,11 +352,11 @@ class AuthController extends GetxController {
     try {
       final session = _supabase.auth.currentSession;
       if (session == null) {
-        print('⚠️ No existing session');
+        AppLogger.warning('AuthController', 'No existing session');
         return false;
       }
 
-      print('📍 Found existing session for: ${session.user.email}');
+      AppLogger.info('AuthController', 'Found existing session for');
 
       // Verify staff_profile is still valid
       final staffProfile = await _staffProfileProvider.getByUserId(
@@ -367,7 +364,7 @@ class AuthController extends GetxController {
       );
 
       if (staffProfile == null || !staffProfile.isActive) {
-        print('⚠️ Staff profile no longer valid');
+        AppLogger.warning('AuthController', 'Staff profile no longer valid');
         await logout();
         return false;
       }
@@ -375,11 +372,9 @@ class AuthController extends GetxController {
       // Set tenant context
       await TenantContextService.to.setProfile(staffProfile);
 
-      print(
-          '✅ Session restored for ${staffProfile.displayName ?? session.user.email}');
       return true;
     } catch (e) {
-      print('❌ Error checking session: $e');
+      AppLogger.error('AuthController', 'Error checking session', e);
       return false;
     }
   }

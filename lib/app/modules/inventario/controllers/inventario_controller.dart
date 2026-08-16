@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/repositories/product_repository.dart';
 
@@ -29,8 +30,7 @@ class InventarioController extends GetxController {
           );
         }
       } catch (e) {
-        // Si falla, simplemente logueamos el mensaje
-        print('${isError ? '❌' : (isWarning ? '⚠️' : '✅')} $title: $message');
+        AppLogger.error('InventarioController', 'No se pudo mostrar la notificación', e);
       }
     });
   }
@@ -91,7 +91,7 @@ class InventarioController extends GetxController {
       products.value = await productRepository.getAllProducts();
       filterProducts();
     } catch (e) {
-      print('Error al cargar productos: $e');
+      AppLogger.error('InventarioController', 'Error al cargar productos', e);
       _showSnackbarSafe('Error', 'No se pudieron cargar los productos',
           isError: true);
     } finally {
@@ -101,14 +101,11 @@ class InventarioController extends GetxController {
 
   Future<void> loadCategories() async {
     try {
-      print('🔵 [Inventario] Loading categories...');
+      AppLogger.info('InventarioController', 'Loading categories');
       categories.value = await productRepository.getAllCategories();
-      print('🔵 [Inventario] Loaded ${categories.length} categories');
-      for (final c in categories) {
-        print('   → ${c.name} (${c.id})');
-      }
+      AppLogger.info('InventarioController', 'Loaded ${categories.length} categories');
     } catch (e) {
-      print('❌ Error al cargar categorías: $e');
+      AppLogger.error('InventarioController', 'Error al cargar categorías', e);
     }
   }
 
@@ -116,7 +113,7 @@ class InventarioController extends GetxController {
     try {
       inventoryStats.value = await productRepository.getInventoryStats();
     } catch (e) {
-      print('Error al cargar estadísticas: $e');
+      AppLogger.error('InventarioController', 'Error al cargar estadísticas', e);
     }
   }
 
@@ -201,7 +198,7 @@ class InventarioController extends GetxController {
       filterProducts();
       loadInventoryStats();
     } catch (e) {
-      print('Error al guardar producto: $e');
+      AppLogger.error('InventarioController', 'Error al guardar producto', e);
       _showSnackbarSafe('Error', 'No se pudo guardar el producto',
           isError: true);
     } finally {
@@ -246,7 +243,7 @@ class InventarioController extends GetxController {
         _showSnackbarSafe('Éxito', 'Producto desactivado correctamente');
       }
     } catch (e) {
-      print('Error al desactivar producto: $e');
+      AppLogger.error('InventarioController', 'Error al desactivar producto', e);
       _showSnackbarSafe('Error', 'No se pudo desactivar el producto',
           isError: true);
     }
@@ -306,7 +303,7 @@ class InventarioController extends GetxController {
         }
       }
     } catch (e) {
-      print('Error al eliminar producto: $e');
+      AppLogger.error('InventarioController', 'Error al eliminar producto', e);
       _showSnackbarSafe('Error', 'No se pudo eliminar el producto',
           isError: true);
     }
@@ -318,7 +315,7 @@ class InventarioController extends GetxController {
       transactions.value =
           await productRepository.getProductTransactions(productId);
     } catch (e) {
-      print('Error al cargar transacciones: $e');
+      AppLogger.error('InventarioController', 'Error al cargar transacciones', e);
     } finally {
       isLoading.value = false;
     }
@@ -368,7 +365,7 @@ class InventarioController extends GetxController {
         _showSnackbarSafe('Éxito', 'Transacción registrada correctamente');
       }
     } catch (e) {
-      print('Error al registrar transacción: $e');
+      AppLogger.error('InventarioController', 'Error al registrar transacción', e);
       _showSnackbarSafe('Error', 'No se pudo registrar la transacción',
           isError: true);
     } finally {
@@ -406,7 +403,7 @@ class InventarioController extends GetxController {
         _showSnackbarSafe('Éxito', 'Categoría creada correctamente');
       }
     } catch (e) {
-      print('Error al guardar categoría: $e');
+      AppLogger.error('InventarioController', 'Error al guardar categoría', e);
       _showSnackbarSafe('Error', 'No se pudo guardar la categoría',
           isError: true);
     } finally {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/snackbar_helper.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
@@ -91,7 +92,7 @@ class IngresosController extends GetxController {
       isLoading.value = true;
       errorMessage.value = '';
 
-      print('📊 Obteniendo estadísticas de ingresos...');
+      AppLogger.info('IngresosController', 'Obteniendo estadísticas de ingresos');
 
       final stats = await ingresoService.getEstadisticas(
         fechaInicio: fechaInicio.value,
@@ -99,10 +100,8 @@ class IngresosController extends GetxController {
       );
 
       estadisticas.value = stats;
-      print(
-          '✅ Estadísticas obtenidas: Total \$${stats.totalIngresos.toStringAsFixed(2)}');
     } catch (e) {
-      print('❌ Error al obtener estadísticas: $e');
+      AppLogger.error('IngresosController', 'Error al obtener estadísticas', e);
       errorMessage.value = 'Error al cargar estadísticas: $e';
 
       SnackbarHelper.error('Error', 'Error al cargar estadísticas: $e');
@@ -114,7 +113,7 @@ class IngresosController extends GetxController {
   /// Obtiene la lista de ingresos
   Future<void> fetchIngresos() async {
     try {
-      print('📋 Obteniendo lista de ingresos...');
+      AppLogger.info('IngresosController', 'Obteniendo lista de ingresos');
 
       final listaIngresos = await ingresoService.getIngresos(
         fechaInicio: fechaInicio.value,
@@ -125,9 +124,9 @@ class IngresosController extends GetxController {
       );
 
       ingresos.assignAll(listaIngresos);
-      print('✅ ${listaIngresos.length} ingresos obtenidos');
+      AppLogger.info('IngresosController', '${listaIngresos.length} ingresos obtenidos');
     } catch (e) {
-      print('❌ Error al obtener ingresos: $e');
+      AppLogger.error('IngresosController', 'Error al obtener ingresos', e);
       errorMessage.value = 'Error al cargar ingresos: $e';
     }
   }
@@ -136,14 +135,14 @@ class IngresosController extends GetxController {
   Future<void> fetchTodasLasTransacciones() async {
     try {
       isLoadingTodas.value = true;
-      print('📋 Obteniendo TODAS las transacciones...');
+      AppLogger.info('IngresosController', 'Obteniendo TODAS las transacciones');
 
       final lista = await ingresoService.getIngresos(limit: 1000);
 
       todasTransacciones.assignAll(lista);
-      print('✅ ${lista.length} transacciones (todas) obtenidas');
+      AppLogger.info('IngresosController', '${lista.length} transacciones (todas) obtenidas');
     } catch (e) {
-      print('❌ Error al obtener todas las transacciones: $e');
+      AppLogger.error('IngresosController', 'Error al obtener todas las transacciones', e);
       SnackbarHelper.error(
           'Error', 'No se pudieron cargar todas las transacciones');
     } finally {
@@ -154,7 +153,7 @@ class IngresosController extends GetxController {
   /// Obtiene datos para la gráfica
   Future<void> fetchDatosGrafica() async {
     try {
-      print('📈 Obteniendo datos para gráfica...');
+      AppLogger.info('IngresosController', 'Obteniendo datos para gráfica');
 
       final datos = await ingresoService.getIngresosPorPeriodo(
         fechaInicio: fechaInicio.value ??
@@ -164,9 +163,9 @@ class IngresosController extends GetxController {
       );
 
       datosGrafica.assignAll(datos);
-      print('✅ Datos de gráfica obtenidos: ${datos.length} puntos');
+      AppLogger.info('IngresosController', 'Datos de gráfica obtenidos: puntos');
     } catch (e) {
-      print('❌ Error al obtener datos de gráfica: $e');
+      AppLogger.error('IngresosController', 'Error al obtener datos de gráfica', e);
     }
   }
 
@@ -187,11 +186,11 @@ class IngresosController extends GetxController {
           _setMonth(now.year, now.month);
           break;
         default:
-          print('⚠️ Período no reconocido: $nuevoPeriodo');
+          AppLogger.warning('IngresosController', 'Período no reconocido: $nuevoPeriodo');
           _setMonth(now.year, now.month);
       }
     } catch (e) {
-      print('❌ Error al cambiar período: $e');
+      AppLogger.error('IngresosController', 'Error al cambiar período', e);
       SnackbarHelper.error('Error', 'Error al cambiar período: $e');
     }
   }
@@ -222,7 +221,7 @@ class IngresosController extends GetxController {
       selectedConcepto.value = concepto;
       fetchIngresos();
     } catch (e) {
-      print('❌ Error al cambiar concepto: $e');
+      AppLogger.error('IngresosController', 'Error al cambiar concepto', e);
       SnackbarHelper.error('Error', 'Error al aplicar filtro: $e');
     }
   }
@@ -233,7 +232,7 @@ class IngresosController extends GetxController {
       selectedMetodoPago.value = metodoPago;
       fetchIngresos();
     } catch (e) {
-      print('❌ Error al cambiar método de pago: $e');
+      AppLogger.error('IngresosController', 'Error al cambiar método de pago', e);
       SnackbarHelper.error('Error', 'Error al aplicar filtro: $e');
     }
   }
@@ -254,20 +253,20 @@ class IngresosController extends GetxController {
     try {
       await Future.wait([
         fetchEstadisticas().catchError((e) {
-          print('❌ Error al refrescar estadísticas: $e');
+          AppLogger.error('IngresosController', 'Error al refrescar estadísticas', e);
           return null;
         }),
         fetchIngresos().catchError((e) {
-          print('❌ Error al refrescar ingresos: $e');
+          AppLogger.error('IngresosController', 'Error al refrescar ingresos', e);
           return null;
         }),
         fetchDatosGrafica().catchError((e) {
-          print('❌ Error al refrescar datos de gráfica: $e');
+          AppLogger.error('IngresosController', 'Error al refrescar datos de gráfica', e);
           return null;
         }),
       ]);
     } catch (e) {
-      print('❌ Error general al refrescar datos: $e');
+      AppLogger.error('IngresosController', 'Error general al refrescar datos', e);
       errorMessage.value = 'Error al actualizar datos: $e';
 
       SnackbarHelper.error(
@@ -280,21 +279,20 @@ class IngresosController extends GetxController {
   /// Método público para refrescar datos desde otros módulos
   static Future<void> refreshIngresosGlobally() async {
     try {
-      print('🔄 Iniciando refresh global de ingresos...');
+      AppLogger.info('IngresosController', 'Iniciando refresh global de ingresos');
 
       // Verificar si el controlador ya está registrado
       if (Get.isRegistered<IngresosController>()) {
         final controller = Get.find<IngresosController>();
-        print('🔄 Controlador de ingresos encontrado, refrescando datos...');
+        AppLogger.info('IngresosController', 'Controlador de ingresos encontrado, refrescando datos');
         await controller.refreshData();
-        print('✅ Datos de ingresos actualizados globalmente');
+        AppLogger.info('IngresosController', 'Datos de ingresos actualizados globalmente');
       } else {
-        print(
-            '⚠️ IngresosController no está registrado aún. Los datos se actualizarán cuando se navegue a la pantalla de ingresos.');
+        AppLogger.warning('IngresosController', 'IngresosController no está registrado aún. Los datos se actualizarán cuando se navegue a la pantalla de ingresos');
       }
     } catch (e) {
-      print('⚠️ No se pudo actualizar el controlador de ingresos: $e');
-      print('📊 Error tipo: ${e.runtimeType}');
+      AppLogger.warning('IngresosController', 'No se pudo actualizar el controlador de ingresos');
+      AppLogger.info('IngresosController', 'Error tipo: ${e.runtimeType}');
       // No lanzar excepción para no interrumpir el flujo principal
     }
   }
@@ -520,7 +518,7 @@ class IngresosController extends GetxController {
       selectedChartType.value = chartType;
       // No es necesario recargar datos, sólo cambiar la visualización
     } catch (e) {
-      print('❌ Error al cambiar tipo de gráfica: $e');
+      AppLogger.error('IngresosController', 'Error al cambiar tipo de gráfica', e);
       SnackbarHelper.error('Error', 'Error al cambiar tipo de gráfica: $e');
     }
   }
@@ -560,7 +558,7 @@ class IngresosController extends GetxController {
 
       return datosFormateados;
     } catch (e) {
-      print('❌ Error al obtener datos para gráfica pie: $e');
+      AppLogger.error('IngresosController', 'Error al obtener datos para gráfica pie', e);
       return {};
     }
   }
@@ -571,7 +569,7 @@ class IngresosController extends GetxController {
       // Para la gráfica de línea usamos los mismos datos que las barras
       return datosGrafica;
     } catch (e) {
-      print('❌ Error al obtener datos para gráfica línea: $e');
+      AppLogger.error('IngresosController', 'Error al obtener datos para gráfica línea', e);
       return {};
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../controllers/point_of_sale_controller.dart';
 import '../../../data/models/product_model.dart';
@@ -37,7 +38,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   )),
             ),
 
-            // Lista de productos
+            // Grid de productos
             Expanded(
               child: Obx(() {
                 if (controller.isLoading) {
@@ -65,13 +66,18 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   );
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                final isTablet = MediaQuery.of(context).size.width > 600;
+                return GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: isTablet ? 4 : 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.8,
+                  ),
                   itemCount: products.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
-                    final product = products[index];
-                    return _buildProductItem(product);
+                    return _buildProductCard(products[index]);
                   },
                 );
               }),
@@ -85,131 +91,193 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     );
   }
 
-  Widget _buildProductItem(Product product) {
+  Widget _buildProductCard(Product product) {
     return Obx(() {
       final cartItem = controller.cartItems.firstWhereOrNull(
         (item) => item.productId == product.id,
       );
       final quantity = cartItem?.quantity ?? 0;
+      final inCart = quantity > 0;
 
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
           borderRadius: BorderRadius.circular(16),
-          border: quantity > 0
-              ? Border.all(color: AppColors.accent, width: 2)
-              : null,
+          border: Border.all(
+            color: inCart ? AppColors.accent : AppColors.accent.withOpacity(0.12),
+            width: inCart ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icono del producto
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.containerBackground,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.inventory_2,
-                color: AppColors.textSecondary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Info del producto
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      color: AppColors.textPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            // Ícono de categoría + badge de stock
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: AppColors.containerBackground,
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        '\$${product.price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Stock: ${product.stock}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: product.stock > 5
-                              ? AppColors.textSecondary
-                              : AppColors.warning,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Controles de cantidad
-            if (quantity > 0) ...[
-              IconButton(
-                onPressed: () => controller.updateCartItemQuantity(
-                  product.id,
-                  quantity - 1,
-                ),
-                icon: const Icon(Icons.remove_circle_outline),
-                color: AppColors.textSecondary,
-                iconSize: 28,
-              ),
-              Container(
-                constraints: const BoxConstraints(minWidth: 32),
-                child: Text(
-                  '$quantity',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppColors.textPrimary,
+                  child: Icon(
+                    _iconForCategory(product.category),
+                    color: AppColors.accent,
+                    size: 20,
                   ),
                 ),
+                _buildStockBadge(product.stock),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Nombre
+            Text(
+              product.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: AppColors.textPrimary,
               ),
-              IconButton(
-                onPressed: () => controller.addProductToCart(product),
-                icon: const Icon(Icons.add_circle),
+            ),
+            const Spacer(),
+
+            // Precio
+            Text(
+              '\$${product.price.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 17,
                 color: AppColors.accent,
-                iconSize: 28,
               ),
-            ] else
-              IconButton(
-                onPressed: () => controller.addProductToCart(product),
-                icon: const Icon(Icons.add_circle),
-                color: AppColors.accent,
-                iconSize: 32,
-              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Control de cantidad
+            _buildQuantityControl(product, quantity),
           ],
         ),
       );
     });
   }
 
+  Widget _buildStockBadge(int stock) {
+    final bool lowStock = stock <= 5;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: lowStock ? AppColors.warning : AppColors.success,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '$stock',
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuantityControl(Product product, int quantity) {
+    if (quantity == 0) {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => controller.addProductToCart(product),
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Agregar'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.accent,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.containerBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: () => controller.updateCartItemQuantity(
+              product.id,
+              quantity - 1,
+            ),
+            icon: const Icon(Icons.remove, size: 18),
+            color: AppColors.textSecondary,
+            padding: EdgeInsets.zero,
+            splashRadius: 18,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          ),
+          Text(
+            '$quantity',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          IconButton(
+            onPressed: () => controller.addProductToCart(product),
+            icon: const Icon(Icons.add, size: 18),
+            color: AppColors.accent,
+            padding: EdgeInsets.zero,
+            splashRadius: 18,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Ícono cosmético según categoría del producto (con fallback seguro).
+  IconData _iconForCategory(String category) {
+    final c = category.toLowerCase();
+    if (c.contains('ropa') || c.contains('playera') || c.contains('camiseta')) {
+      return Icons.checkroom;
+    }
+    if (c.contains('bebida')) return Icons.local_drink;
+    if (c.contains('suplemento') ||
+        c.contains('proteina') ||
+        c.contains('proteína')) {
+      return Icons.fitness_center;
+    }
+    if (c.contains('accesorio')) return Icons.watch;
+    if (c.contains('snack') || c.contains('barra')) return Icons.cookie;
+    return Icons.inventory_2;
+  }
+
   Widget _buildCartPanel(BuildContext context) {
     return Obx(() {
       final itemCount = controller.cartItems.length;
       final total = controller.finalAmount;
+      final isEmpty = itemCount == 0;
 
       return Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: isEmpty ? 14 : 16),
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
           boxShadow: [
@@ -222,70 +290,86 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         ),
         child: SafeArea(
           top: false,
-          child: Row(
-            children: [
-              // Info del carrito
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+          child: isEmpty
+              ? Center(
+                  child: Text(
+                    'Selecciona productos para cobrar',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                )
+              : Row(
                   children: [
-                    Text(
-                      '$itemCount ${itemCount == 1 ? 'producto' : 'productos'}',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.shopping_bag_outlined,
+                          color: AppColors.accent),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Info del carrito
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$itemCount ${itemCount == 1 ? 'producto' : 'productos'}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '\$${total.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Total: \$${total.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                        color: AppColors.textPrimary,
+
+                    // Botón limpiar
+                    IconButton(
+                      onPressed: () => controller.clearCart(),
+                      icon: const Icon(Icons.delete_outline),
+                      color: AppColors.textSecondary,
+                      tooltip: 'Vaciar carrito',
+                    ),
+                    const SizedBox(width: 4),
+
+                    // Botón cobrar
+                    ElevatedButton(
+                      onPressed: () => _showPaymentDialog(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cobrar',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-
-              // Botón limpiar
-              if (itemCount > 0)
-                TextButton(
-                  onPressed: () => controller.clearCart(),
-                  child: const Text(
-                    'Limpiar',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                ),
-              const SizedBox(width: 8),
-
-              // Botón cobrar
-              ElevatedButton(
-                onPressed:
-                    itemCount > 0 ? () => _showPaymentDialog(context) : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: const Text(
-                  'Cobrar',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       );
     });
@@ -371,31 +455,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   fontSize: 14,
                 ),
               ),
-              const SizedBox(height: 8),
-              Obx(() => DropdownButtonFormField<String>(
-                    value: controller.selectedPaymentMethod,
-                    dropdownColor: AppColors.cardBackground,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: AppColors.containerBackground,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                    ),
-                    items: controller.paymentMethods.map((method) {
-                      return DropdownMenuItem(
-                        value: method,
-                        child: Text(_getPaymentMethodName(method)),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      if (value != null) controller.setPaymentMethod(value);
-                    },
-                  )),
+              const SizedBox(height: 10),
+              _buildPaymentMethodChips(),
               const SizedBox(height: 16),
 
               // Campo monto recibido (solo efectivo)
@@ -414,7 +475,12 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       const SizedBox(height: 8),
                       TextField(
                         style: const TextStyle(color: AppColors.textPrimary),
-                        keyboardType: TextInputType.number,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d+\.?\d{0,2}')),
+                        ],
                         decoration: InputDecoration(
                           prefixText: '\$ ',
                           prefixStyle: const TextStyle(color: AppColors.accent),
@@ -461,7 +527,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     child: controller.isProcessingPayment
@@ -497,6 +563,67 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         ),
       ),
     );
+  }
+
+  Widget _buildPaymentMethodChips() {
+    return Obx(() => Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: controller.paymentMethods.map((method) {
+            final selected = controller.selectedPaymentMethod == method;
+            return GestureDetector(
+              onTap: () => controller.setPaymentMethod(method),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.accent : AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: selected
+                        ? AppColors.accent
+                        : AppColors.accent.withOpacity(0.3),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _iconForPaymentMethod(method),
+                      size: 16,
+                      color: selected ? Colors.white : AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _getPaymentMethodName(method),
+                      style: TextStyle(
+                        color: selected ? Colors.white : AppColors.textSecondary,
+                        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ));
+  }
+
+  IconData _iconForPaymentMethod(String method) {
+    switch (method) {
+      case 'efectivo':
+        return Icons.payments_outlined;
+      case 'tarjeta_debito':
+      case 'tarjeta_credito':
+        return Icons.credit_card;
+      case 'transferencia':
+        return Icons.account_balance_outlined;
+      case 'mixto':
+        return Icons.call_split;
+      default:
+        return Icons.payment;
+    }
   }
 
   Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {

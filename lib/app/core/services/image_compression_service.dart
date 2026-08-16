@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
@@ -31,10 +32,10 @@ class ImageCompressionService {
   }) async {
     try {
       if (kDebugMode) {
-        print('🖼️ Iniciando compresión de imagen...');
-        print('📁 Archivo original: ${imageFile.path}');
+        AppLogger.info('ImageCompressionService', 'Iniciando compresión de imagen');
+        AppLogger.info('ImageCompressionService', 'Archivo original');
         final originalSize = await imageFile.length();
-        print('📏 Tamaño archivo: ${(originalSize / 1024).toStringAsFixed(2)} KB');
+        AppLogger.info('ImageCompressionService', 'Tamaño archivo: ${(originalSize / 1024).toStringAsFixed(2)} KB');
       }
 
       // Leer la imagen original
@@ -47,9 +48,7 @@ class ImageCompressionService {
         throw Exception('No se pudo decodificar la imagen');
       }
 
-      if (kDebugMode) {
-        print('📐 Dimensiones originales: ${image.width}x${image.height}');
-      }
+      AppLogger.info('ImageCompressionService', 'Dimensiones originales: ${image.width}x${image.height}');
 
       // Redimensionar si es necesario (mantener aspecto)
       if (image.width > maxSize || image.height > maxSize) {
@@ -60,9 +59,7 @@ class ImageCompressionService {
           interpolation: img.Interpolation.linear,
         );
         
-        if (kDebugMode) {
-          print('📏 Redimensionada a: ${image.width}x${image.height}');
-        }
+        AppLogger.info('ImageCompressionService', 'Redimensionada a: ${image.width}x${image.height}');
       }
 
       // Convertir a JPEG optimizado
@@ -71,9 +68,9 @@ class ImageCompressionService {
       );
       
       if (kDebugMode) {
-        print('💾 Tamaño comprimido: ${(compressedBytes.length / 1024).toStringAsFixed(2)} KB');
+        AppLogger.info('ImageCompressionService', 'Tamaño comprimido: ${(compressedBytes.length / 1024).toStringAsFixed(2)} KB');
         final reduction = ((1 - compressedBytes.length / imageBytes.length) * 100);
-        print('📊 Reducción: ${reduction.toStringAsFixed(1)}%');
+        AppLogger.info('ImageCompressionService', 'Reducción: ${reduction.toStringAsFixed(1)}%');
       }
 
       // Guardar en archivo temporal
@@ -85,15 +82,11 @@ class ImageCompressionService {
       final File optimizedFile = File(optimizedPath);
       await optimizedFile.writeAsBytes(compressedBytes);
 
-      if (kDebugMode) {
-        print('✅ Imagen optimizada guardada en: $optimizedPath');
-      }
+      AppLogger.info('ImageCompressionService', 'Imagen optimizada guardada');
 
       return optimizedFile;
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error en compresión de imagen: $e');
-      }
+      AppLogger.error('ImageCompressionService', 'Error en compresión de imagen', e);
       rethrow;
     }
   }
@@ -127,9 +120,7 @@ class ImageCompressionService {
       // Convertir a JPEG
       return Uint8List.fromList(img.encodeJpg(image, quality: quality));
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error en compresión de bytes: $e');
-      }
+      AppLogger.error('ImageCompressionService', 'Error en compresión de bytes', e);
       rethrow;
     }
   }
@@ -173,9 +164,7 @@ class ImageCompressionService {
 
       return Uint8List.fromList(img.encodeJpg(thumbnail, quality: quality));
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error creando thumbnail: $e');
-      }
+      AppLogger.error('ImageCompressionService', 'Error creando thumbnail', e);
       rethrow;
     }
   }
@@ -204,9 +193,7 @@ class ImageCompressionService {
         'height': image.height,
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error obteniendo dimensiones: $e');
-      }
+      AppLogger.error('ImageCompressionService', 'Error obteniendo dimensiones', e);
       return null;
     }
   }

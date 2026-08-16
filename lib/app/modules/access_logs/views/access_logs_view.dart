@@ -47,12 +47,12 @@ class AccessLogsView extends GetView<AccessLogsController> {
         return Row(
           children: [
             _buildStatCard(
-              '✅ Entradas',
+              'Entradas',
               stats['totalEntries'] ?? '0',
               AppColors.success,
             ),
             _buildStatCard(
-              '📊 Total',
+              'Total',
               stats['totalLogs'] ?? '0',
               AppColors.accent,
             ),

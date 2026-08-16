@@ -116,12 +116,11 @@ class _GoodbyeViewState extends State<GoodbyeView>
                     
                     const SizedBox(height: 12),
                     
-                    // Emoji de despedida
-                    Text(
-                      '👋',
-                      style: TextStyle(
-                        fontSize: 48,
-                      ),
+                    // Icono de despedida
+                    const Icon(
+                      Icons.waving_hand_outlined,
+                      size: 48,
+                      color: AppColors.textSecondary,
                     ),
                     
                     const SizedBox(height: 40),

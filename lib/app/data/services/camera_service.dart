@@ -1,6 +1,6 @@
 import 'dart:io';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 class CameraService {
@@ -15,9 +15,7 @@ class CameraService {
         (camera) => camera.lensDirection == CameraLensDirection.back,
       );
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al verificar cámaras disponibles: $e');
-      }
+      AppLogger.error('CameraService', 'Error al verificar cámaras disponibles', e);
       return false;
     }
   }
@@ -44,9 +42,7 @@ class CameraService {
       
       await controller?.initialize();
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al inicializar la cámara trasera: $e');
-      }
+      AppLogger.error('CameraService', 'Error al inicializar la cámara trasera', e);
       rethrow; // Re-lanzar error para que el llamador pueda manejarlo
     }
   }
@@ -68,9 +64,7 @@ class CameraService {
 
         return photoFile;
       } catch (e) {
-        if (kDebugMode) {
-          print('Error al tomar la foto: $e');
-        }
+        AppLogger.error('CameraService', 'Error al tomar la foto', e);
         return null;
       }
     }

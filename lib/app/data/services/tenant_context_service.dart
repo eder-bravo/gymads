@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get_storage/get_storage.dart';
 import '../models/staff_profile_model.dart';
 
@@ -98,7 +99,7 @@ class TenantContextService extends GetxService {
         _staffProfile.value = StaffProfileModel.fromJson(cached);
       }
     } catch (e) {
-      print('⚠️ Error loading cached profile: $e');
+      AppLogger.warning('TenantContextService', 'Error loading cached profile');
       await clearProfile();
     }
     return _staffProfile.value;

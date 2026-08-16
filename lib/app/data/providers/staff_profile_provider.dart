@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import '../models/staff_profile_model.dart';
 
 /// Provider for fetching staff profiles from Supabase
@@ -19,13 +20,13 @@ class StaffProfileProvider {
           .maybeSingle();
 
       if (response == null) {
-        print('⚠️ No staff_profile found for user: $userId');
+        AppLogger.warning('StaffProfileProvider', 'No staff_profile found for user');
         return null;
       }
 
       return StaffProfileModel.fromJson(response);
     } catch (e) {
-      print('❌ Error fetching staff profile: $e');
+      AppLogger.error('StaffProfileProvider', 'Error fetching staff profile', e);
       return null;
     }
   }
@@ -43,7 +44,7 @@ class StaffProfileProvider {
 
       return StaffProfileModel.fromJson(response);
     } catch (e) {
-      print('❌ Error fetching staff profile by ID: $e');
+      AppLogger.error('StaffProfileProvider', 'Error fetching staff profile by ID', e);
       return null;
     }
   }
@@ -62,7 +63,7 @@ class StaffProfileProvider {
           .map((json) => StaffProfileModel.fromJson(json))
           .toList();
     } catch (e) {
-      print('❌ Error fetching staff profiles by branch: $e');
+      AppLogger.error('StaffProfileProvider', 'Error fetching staff profiles by branch', e);
       return [];
     }
   }
@@ -91,7 +92,7 @@ class StaffProfileProvider {
 
       return StaffProfileModel.fromJson(response);
     } catch (e) {
-      print('❌ Error creating staff profile: $e');
+      AppLogger.error('StaffProfileProvider', 'Error creating staff profile', e);
       return null;
     }
   }
@@ -102,7 +103,7 @@ class StaffProfileProvider {
       await _supabase.from('staff_profiles').update(updates).eq('id', id);
       return true;
     } catch (e) {
-      print('❌ Error updating staff profile: $e');
+      AppLogger.error('StaffProfileProvider', 'Error updating staff profile', e);
       return false;
     }
   }

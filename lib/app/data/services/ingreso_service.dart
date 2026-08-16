@@ -1,4 +1,5 @@
 import '../models/ingreso_model.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import '../providers/ingreso_provider.dart';
 
 /// Servicio para gestionar la lógica de ingresos
@@ -38,14 +39,11 @@ class IngresoService {
         notas: notas,
       );
 
-      print('💰 Registrando abono:');
-      print('   - Cliente: $clienteNombre (ID: $clienteId)');
-      print('   - Monto: \$${monto.toStringAsFixed(2)}');
-      print('   - Descripción: $descripcion');
-      
+      AppLogger.info('IngresoService', 'Registrando abono');
+
       return await _ingresoProvider.createIngreso(ingreso);
     } catch (e) {
-      print('❌ Error al registrar abono: $e');
+      AppLogger.error('IngresoService', 'Error al registrar abono', e);
       return false;
     }
   }
@@ -83,7 +81,7 @@ class IngresoService {
       final result = await _ingresoProvider.createIngreso(ingreso);
       return result;
     } catch (e) {
-      print('❌ Error al registrar ingreso nuevo cliente: $e');
+      AppLogger.error('IngresoService', 'Error al registrar ingreso nuevo cliente', e);
       return false;
     }
   }

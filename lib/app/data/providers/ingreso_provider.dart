@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import '../models/ingreso_model.dart';
 import '../services/tenant_query_helper.dart';
 
@@ -42,7 +43,7 @@ class IngresoProvider {
           .map((json) => IngresoModel.fromJson(json))
           .toList();
     } catch (e) {
-      print('Error al obtener ingresos: $e');
+      AppLogger.error('IngresoProvider', 'Error al obtener ingresos', e);
       throw Exception('Error al cargar ingresos: $e');
     }
   }
@@ -54,25 +55,15 @@ class IngresoProvider {
       data.remove('id'); // Remover ID para que sea auto-generado
       data['created_at'] = DateTime.now().toIso8601String();
 
-      print('🔍 DEBUG: Datos a insertar en ingresos:');
-      print('   - cliente_id: ${data['cliente_id']}');
-      print('   - cliente_nombre: ${data['cliente_nombre']}');
-      print('   - concepto: ${data['concepto']}');
-      print('   - tipo_membresia: ${data['tipo_membresia']}');
-      print('   - monto_base: ${data['monto_base']}');
-      print('   - cuota_registro: ${data['cuota_registro']}');
-      print('   - monto_final: ${data['monto_final']}');
-      print('   - metodo_pago: ${data['metodo_pago']}');
-      print('   - usuario_staff: ${data['usuario_staff']}');
-      print('   - fecha: ${data['fecha']}');
+      AppLogger.info('IngresoProvider', 'DEBUG: Datos a insertar en ingresos');
 
-      final response = await _supabase.from('ingresos').insert(data).select();
-      print('✅ Ingreso creado exitosamente');
-      print('📋 Respuesta de inserción: $response');
+      await _supabase.from('ingresos').insert(data).select();
+      AppLogger.info('IngresoProvider', 'Ingreso creado exitosamente');
+      AppLogger.info('IngresoProvider', 'Respuesta de inserción');
       return true;
     } catch (e) {
-      print('❌ Error al crear ingreso: $e');
-      print('📊 Tipo de error: ${e.runtimeType}');
+      AppLogger.error('IngresoProvider', 'Error al crear ingreso', e);
+      AppLogger.info('IngresoProvider', 'Tipo de error: ${e.runtimeType}');
       return false;
     }
   }
@@ -148,7 +139,7 @@ class IngresoProvider {
         ultimosIngresos: ingresos.take(10).toList(),
       );
     } catch (e) {
-      print('❌ Error al obtener estadísticas: $e');
+      AppLogger.error('IngresoProvider', 'Error al obtener estadísticas', e);
       return EstadisticasIngresos.empty();
     }
   }
@@ -192,7 +183,7 @@ class IngresoProvider {
 
       return resultado;
     } catch (e) {
-      print('❌ Error al obtener ingresos por período: $e');
+      AppLogger.error('IngresoProvider', 'Error al obtener ingresos por período', e);
       return {};
     }
   }
@@ -213,7 +204,7 @@ class IngresoProvider {
       return ingresos.fold<double>(
           0, (sum, ingreso) => sum + ingreso.montoFinal);
     } catch (e) {
-      print('❌ Error al obtener ingresos del mes: $e');
+      AppLogger.error('IngresoProvider', 'Error al obtener ingresos del mes', e);
       return 0;
     }
   }
@@ -222,10 +213,10 @@ class IngresoProvider {
   Future<bool> deleteIngreso(String id) async {
     try {
       await _supabase.from('ingresos').delete().eq('id', id);
-      print('✅ Ingreso eliminado exitosamente');
+      AppLogger.info('IngresoProvider', 'Ingreso eliminado exitosamente');
       return true;
     } catch (e) {
-      print('❌ Error al eliminar ingreso: $e');
+      AppLogger.error('IngresoProvider', 'Error al eliminar ingreso', e);
       return false;
     }
   }

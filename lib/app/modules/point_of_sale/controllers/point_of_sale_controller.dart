@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../data/models/product_model.dart';
@@ -96,9 +96,7 @@ class PointOfSaleController extends GetxController {
       final products = await _productRepository.getAllProducts();
       _availableProducts.assignAll(products.where((p) => p.stock > 0));
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al cargar productos: $e');
-      }
+      AppLogger.error('PointOfSaleController', 'Error al cargar productos', e);
       SnackbarHelper.error('Error', 'No se pudieron cargar los productos');
     } finally {
       _isLoading.value = false;
@@ -110,9 +108,7 @@ class PointOfSaleController extends GetxController {
     try {
       _categories.value = await _productRepository.getAllCategories();
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al cargar categorías: $e');
-      }
+      AppLogger.error('PointOfSaleController', 'Error al cargar categorías', e);
     }
   }
 
@@ -218,6 +214,10 @@ class PointOfSaleController extends GetxController {
   /// Establecer método de pago
   void setPaymentMethod(String method) {
     _selectedPaymentMethod.value = method;
+    // Reiniciar monto recibido/cambio: son específicos de un intento de pago
+    // en efectivo, no deben sobrevivir al cambiar de método.
+    _receivedAmount.value = 0.0;
+    _changeAmount.value = 0.0;
   }
 
   /// Establecer monto recibido
@@ -302,9 +302,7 @@ class PointOfSaleController extends GetxController {
         return false;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al procesar venta: $e');
-      }
+      AppLogger.error('PointOfSaleController', 'Error al procesar venta', e);
       SnackbarHelper.error('Error', 'Error inesperado al procesar la venta');
       return false;
     } finally {

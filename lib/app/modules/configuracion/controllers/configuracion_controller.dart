@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -111,7 +111,7 @@ class ConfiguracionController extends GetxController {
         }
       }
     } catch (e) {
-      if (kDebugMode) print('⚠️ Could not load gym/branch names: $e');
+      AppLogger.warning('ConfiguracionController', 'No se pudo cargar la información del gimnasio');
     }
   }
 
@@ -129,7 +129,7 @@ class ConfiguracionController extends GetxController {
       await _refreshTenantProfile();
       SnackbarHelper.success('¡Listo!', 'Nombre del gimnasio actualizado');
     } catch (e) {
-      if (kDebugMode) print('Error updating gym name: $e');
+      AppLogger.error('ConfiguracionController', 'Fallo al actualizar el nombre del gimnasio', e);
       SnackbarHelper.error('Error', 'No se pudo actualizar el nombre');
     }
   }
@@ -145,7 +145,7 @@ class ConfiguracionController extends GetxController {
       await _refreshTenantProfile();
       SnackbarHelper.success('¡Listo!', 'Color de marca actualizado');
     } catch (e) {
-      if (kDebugMode) print('Error updating brand color: $e');
+      AppLogger.error('ConfiguracionController', 'Fallo al actualizar el color de marca', e);
       SnackbarHelper.error('Error', 'No se pudo actualizar el color');
     }
   }
@@ -165,7 +165,7 @@ class ConfiguracionController extends GetxController {
         await TenantContextService.to.setProfile(profile);
       }
     } catch (e) {
-      if (kDebugMode) print('Error refreshing tenant profile: $e');
+      AppLogger.error('ConfiguracionController', 'Fallo al refrescar el perfil', e);
     }
   }
 
@@ -211,7 +211,7 @@ class ConfiguracionController extends GetxController {
 
       SnackbarHelper.success('Guardado', 'Información actualizada');
     } catch (e) {
-      if (kDebugMode) print('❌ Error updating profile: $e');
+      AppLogger.error('ConfiguracionController', 'Fallo al actualizar el perfil', e);
       SnackbarHelper.error('Error', 'No se pudo actualizar: $e');
     } finally {
       isLoading.value = false;
@@ -249,9 +249,7 @@ class ConfiguracionController extends GetxController {
         connectionStatusMessage.value = 'Desactivado';
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al cargar configuración: $e');
-      }
+      AppLogger.error('ConfiguracionController', 'Error al cargar configuración', e);
     } finally {
       isLoading.value = false;
     }
@@ -459,7 +457,6 @@ class ConfiguracionController extends GetxController {
     }
   }
 
-
   // =================== MÉTODOS PARA NAVEGACIÓN DE CONFIGURACIÓN ===================
 
   /// Abrir configuración de cuenta — navega a CuentaView
@@ -472,9 +469,9 @@ class ConfiguracionController extends GetxController {
     Get.to(() => BrandingSettingsView());
   }
 
-  /// Abrir administración de abonos fijos (planes de membresía)
-  void openMembershipPlans() {
-    Get.toNamed(Routes.MEMBERSHIP_PLANS);
+  /// Abrir configuración de precios de abonos (precio fijo por periodo)
+  void openAbonoPrices() {
+    Get.toNamed(Routes.ABONO_PRICES);
   }
 
   /// Backup branding to DB (fire-and-forget)
@@ -494,7 +491,7 @@ class ConfiguracionController extends GetxController {
             .eq('id', gymId);
       }
     } catch (e) {
-      if (kDebugMode) print('⚠️ Could not backup branding to DB: $e');
+      AppLogger.warning('ConfiguracionController', 'No se pudo respaldar la configuración de marca');
     }
   }
 
@@ -546,7 +543,7 @@ class ConfiguracionController extends GetxController {
       // Navigate to login
       Get.offAllNamed(Routes.LOGIN);
     } catch (e) {
-      if (kDebugMode) print('❌ Error during logout: $e');
+      AppLogger.error('ConfiguracionController', 'Fallo al cerrar sesión', e);
       SnackbarHelper.error('Error', 'Error al cerrar sesión: $e');
     } finally {
       isLoading.value = false;
@@ -619,10 +616,8 @@ class ConfiguracionController extends GetxController {
     try {
       isLoading.value = true;
 
-      final result = await Supabase.instance.client
+      await Supabase.instance.client
           .rpc('delete_gym_cascade', params: {'p_gym_id': gymId});
-
-      if (kDebugMode) print('🗑️ delete_gym_cascade result: $result');
 
       // Clear local data
       await TenantContextService.to.clearProfile();
@@ -636,7 +631,7 @@ class ConfiguracionController extends GetxController {
             'Cuenta eliminada', 'Todos los datos han sido borrados');
       });
     } catch (e) {
-      if (kDebugMode) print('❌ Error deleting gym: $e');
+      AppLogger.error('ConfiguracionController', 'Fallo al eliminar el gimnasio', e);
       SnackbarHelper.error(
           'Error', 'No se pudieron borrar los datos: ${e.toString()}');
     } finally {

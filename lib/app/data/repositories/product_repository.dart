@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/services/supabase_service.dart';
 import 'package:gymads/app/data/services/tenant_query_helper.dart';
@@ -17,7 +18,7 @@ class ProductRepository {
 
       return response.map<Product>((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      print('Error al obtener productos: $e');
+      AppLogger.error('ProductRepository', 'Error al obtener productos', e);
       return [];
     }
   }
@@ -34,7 +35,7 @@ class ProductRepository {
 
       return response.map<Product>((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      print('Error al obtener productos activos: $e');
+      AppLogger.error('ProductRepository', 'Error al obtener productos activos', e);
       return [];
     }
   }
@@ -52,7 +53,7 @@ class ProductRepository {
 
       return response.map<Product>((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      print('Error al obtener productos por categoría: $e');
+      AppLogger.error('ProductRepository', 'Error al obtener productos por categoría', e);
       return [];
     }
   }
@@ -70,7 +71,7 @@ class ProductRepository {
 
       return response.map<Product>((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      print('Error al obtener productos con stock bajo: $e');
+      AppLogger.error('ProductRepository', 'Error al obtener productos con stock bajo', e);
       return [];
     }
   }
@@ -88,7 +89,7 @@ class ProductRepository {
 
       return response.map<Product>((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      print('Error al buscar productos: $e');
+      AppLogger.error('ProductRepository', 'Error al buscar productos', e);
       return [];
     }
   }
@@ -104,7 +105,7 @@ class ProductRepository {
 
       return Product.fromJson(response);
     } catch (e) {
-      print('Error al crear producto: $e');
+      AppLogger.error('ProductRepository', 'Error al crear producto', e);
       return null;
     }
   }
@@ -121,7 +122,7 @@ class ProductRepository {
 
       return Product.fromJson(response);
     } catch (e) {
-      print('Error al actualizar producto: $e');
+      AppLogger.error('ProductRepository', 'Error al actualizar producto', e);
       return null;
     }
   }
@@ -136,7 +137,7 @@ class ProductRepository {
 
       return true;
     } catch (e) {
-      print('Error al actualizar stock: $e');
+      AppLogger.error('ProductRepository', 'Error al actualizar stock', e);
       return false;
     }
   }
@@ -151,7 +152,7 @@ class ProductRepository {
 
       return true;
     } catch (e) {
-      print('Error al desactivar producto: $e');
+      AppLogger.error('ProductRepository', 'Error al desactivar producto', e);
       return false;
     }
   }
@@ -191,7 +192,7 @@ class ProductRepository {
 
       return true;
     } catch (e) {
-      print('Error al registrar transacción: $e');
+      AppLogger.error('ProductRepository', 'Error al registrar transacción', e);
       return false;
     }
   }
@@ -210,7 +211,7 @@ class ProductRepository {
           .map<ProductTransaction>((json) => ProductTransaction.fromJson(json))
           .toList();
     } catch (e) {
-      print('Error al obtener transacciones del producto: $e');
+      AppLogger.error('ProductRepository', 'Error al obtener transacciones del producto', e);
       return [];
     }
   }
@@ -219,7 +220,7 @@ class ProductRepository {
   Future<List<ProductCategory>> getAllCategories() async {
     try {
       final gymId = TenantQueryHelper.gymIdOrNull ?? '';
-      print('🔵 [Repo] Querying categories for gym_id: "$gymId"');
+      AppLogger.info('ProductRepository', 'Querying categories for gym_id: ""');
       final response = await _supabase
           .from('product_categories')
           .select()
@@ -227,12 +228,12 @@ class ProductRepository {
           .eq('is_active', true)
           .order('name', ascending: true);
 
-      print('🔵 [Repo] Got ${response.length} categories from DB');
+      AppLogger.info('ProductRepository', 'Got categories from DB');
       return response
           .map<ProductCategory>((json) => ProductCategory.fromJson(json))
           .toList();
     } catch (e) {
-      print('❌ Error al obtener categorías: $e');
+      AppLogger.error('ProductRepository', 'Error al obtener categorías', e);
       return [];
     }
   }
@@ -248,7 +249,7 @@ class ProductRepository {
 
       return ProductCategory.fromJson(response);
     } catch (e) {
-      print('Error al crear categoría: $e');
+      AppLogger.error('ProductRepository', 'Error al crear categoría', e);
       return null;
     }
   }
@@ -259,7 +260,7 @@ class ProductRepository {
       await _supabase.from('products').delete().eq('id', productId);
       return true;
     } catch (e) {
-      print('Error al eliminar producto: $e');
+      AppLogger.error('ProductRepository', 'Error al eliminar producto', e);
       return false;
     }
   }
@@ -297,7 +298,7 @@ class ProductRepository {
         'lowStockCount': lowStockCount,
       };
     } catch (e) {
-      print('Error al obtener estadísticas de inventario: $e');
+      AppLogger.error('ProductRepository', 'Error al obtener estadísticas de inventario', e);
       return {
         'totalProducts': 0,
         'totalStock': 0,

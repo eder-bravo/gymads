@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/data/services/supabase_service.dart';
 import 'package:gymads/app/data/providers/api_provider.dart';
 import 'package:gymads/app/data/services/tenant_query_helper.dart';
@@ -16,9 +16,7 @@ class SupabaseApiProvider extends ApiProvider {
   @override
   Future<Map<String, dynamic>> getAll({Map<String, String>? headers}) async {
     try {
-      if (kDebugMode) {
-        print('Obteniendo todos los registros de la tabla: $table');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Obteniendo todos los registros de la tabla: $table');
 
       final branchId = TenantQueryHelper.branchIdOrNull;
       var query = SupabaseService.client.from(table).select();
@@ -30,9 +28,7 @@ class SupabaseApiProvider extends ApiProvider {
 
       final response = await query;
 
-      if (kDebugMode) {
-        print('Respuesta de Supabase (getAll): ${response.length} registros');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Respuesta de Supabase (getAll): registros');
 
       return {
         'error': false,
@@ -40,11 +36,8 @@ class SupabaseApiProvider extends ApiProvider {
         'data': response
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en getAll: $e');
-        print('Response body raw: ${e.toString()}');
-      }
-      return {'error': true, 'message': e.toString(), 'data': null};
+      AppLogger.error('SupabaseApiProvider', 'Error en getAll', e);
+            return {'error': true, 'message': e.toString(), 'data': null};
     }
   }
 
@@ -58,9 +51,7 @@ class SupabaseApiProvider extends ApiProvider {
           .eq('id', id)
           .single();
 
-      if (kDebugMode) {
-        print('Respuesta de Supabase (get): $response');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Respuesta de Supabase (get)');
 
       return {
         'error': false,
@@ -68,9 +59,7 @@ class SupabaseApiProvider extends ApiProvider {
         'data': response
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en get: $e');
-      }
+      AppLogger.error('SupabaseApiProvider', 'Error en get', e);
       return {'error': true, 'message': e.toString(), 'data': null};
     }
   }
@@ -79,9 +68,7 @@ class SupabaseApiProvider extends ApiProvider {
   Future<Map<String, dynamic>> add(Map<String, dynamic> data,
       {Map<String, String>? headers}) async {
     try {
-      if (kDebugMode) {
-        print('Insertando datos en tabla $table: $data');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Insertando datos en tabla $table');
 
       // Add tenant data to insert payload
       final tenantData = TenantQueryHelper.withTenant(data);
@@ -89,9 +76,7 @@ class SupabaseApiProvider extends ApiProvider {
       final response =
           await SupabaseService.client.from(table).insert(tenantData).select();
 
-      if (kDebugMode) {
-        print('Respuesta de Supabase (add): $response');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Respuesta de Supabase (add)');
 
       if (response.isEmpty) {
         return {
@@ -107,9 +92,7 @@ class SupabaseApiProvider extends ApiProvider {
         'data': response[0]
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en add: $e');
-      }
+      AppLogger.error('SupabaseApiProvider', 'Error en add', e);
       return {'error': true, 'message': e.toString(), 'data': null};
     }
   }
@@ -132,9 +115,7 @@ class SupabaseApiProvider extends ApiProvider {
           .eq('id', id)
           .select();
 
-      if (kDebugMode) {
-        print('Respuesta de Supabase (update): $response');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Respuesta de Supabase (update)');
 
       if (response.isEmpty) {
         return {
@@ -150,9 +131,7 @@ class SupabaseApiProvider extends ApiProvider {
         'data': response[0]
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en update: $e');
-      }
+      AppLogger.error('SupabaseApiProvider', 'Error en update', e);
       return {'error': true, 'message': e.toString(), 'data': null};
     }
   }
@@ -167,9 +146,7 @@ class SupabaseApiProvider extends ApiProvider {
           .eq('id', id)
           .select();
 
-      if (kDebugMode) {
-        print('Respuesta de Supabase (delete): $response');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Respuesta de Supabase (delete)');
 
       return {
         'error': false,
@@ -177,9 +154,7 @@ class SupabaseApiProvider extends ApiProvider {
         'data': response
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en delete: $e');
-      }
+      AppLogger.error('SupabaseApiProvider', 'Error en delete', e);
       return {'error': true, 'message': e.toString(), 'data': null};
     }
   }
@@ -187,9 +162,7 @@ class SupabaseApiProvider extends ApiProvider {
   /// Método específico para obtener un usuario por su número
   Future<Map<String, dynamic>> getUserByNumber(String userNumber) async {
     try {
-      if (kDebugMode) {
-        print('Buscando usuario por número: $userNumber');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Buscando usuario por número');
 
       final response = await SupabaseService.client
           .from(table)
@@ -198,14 +171,10 @@ class SupabaseApiProvider extends ApiProvider {
               userNumber) // Cambiar de 'userNumber' a 'user_number'
           .limit(1);
 
-      if (kDebugMode) {
-        print('Respuesta de Supabase (getUserByNumber): $response');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Respuesta de Supabase (getUserByNumber)');
 
       if (response.isEmpty) {
-        if (kDebugMode) {
-          print('No se encontró usuario con número: $userNumber');
-        }
+        AppLogger.info('SupabaseApiProvider', 'No se encontró usuario con número');
         return {
           'error': false,
           'message': 'Usuario no encontrado',
@@ -219,9 +188,7 @@ class SupabaseApiProvider extends ApiProvider {
         'data': response[0]
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en getUserByNumber: $e');
-      }
+      AppLogger.error('SupabaseApiProvider', 'Error en getUserByNumber', e);
       return {'error': true, 'message': e.toString(), 'data': null};
     }
   }
@@ -229,9 +196,7 @@ class SupabaseApiProvider extends ApiProvider {
   /// Método específico para obtener un usuario por su tarjeta RFID
   Future<Map<String, dynamic>> getUserByRfid(String rfidUid) async {
     try {
-      if (kDebugMode) {
-        print('Buscando usuario por RFID: $rfidUid');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Buscando usuario por RFID');
 
       final response = await SupabaseService.client
           .from(table)
@@ -239,14 +204,10 @@ class SupabaseApiProvider extends ApiProvider {
           .eq('rfid_card', rfidUid)
           .limit(1);
 
-      if (kDebugMode) {
-        print('Respuesta de Supabase (getUserByRfid): $response');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Respuesta de Supabase (getUserByRfid)');
 
       if (response.isEmpty) {
-        if (kDebugMode) {
-          print('No se encontró usuario con RFID: $rfidUid');
-        }
+        AppLogger.info('SupabaseApiProvider', 'No se encontró usuario con RFID');
         return {
           'error': false,
           'message': 'Usuario no encontrado',
@@ -260,9 +221,7 @@ class SupabaseApiProvider extends ApiProvider {
         'data': response[0]
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en getUserByRfid: $e');
-      }
+      AppLogger.error('SupabaseApiProvider', 'Error en getUserByRfid', e);
       return {'error': true, 'message': e.toString(), 'data': null};
     }
   }
@@ -270,9 +229,7 @@ class SupabaseApiProvider extends ApiProvider {
   /// Método específico para obtener usuarios con información de membresía
   Future<Map<String, dynamic>> getUsersWithMembershipInfo() async {
     try {
-      if (kDebugMode) {
-        print('Obteniendo usuarios con información de membresía');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Obteniendo usuarios con información de membresía');
 
       // Obtener usuarios y tipos de membresía por separado para evitar problemas de JOIN
       final usersResponse = await SupabaseService.client.from('users').select();
@@ -280,11 +237,8 @@ class SupabaseApiProvider extends ApiProvider {
       final membershipTypesResponse =
           await SupabaseService.client.from('membership_types').select();
 
-      if (kDebugMode) {
-        print('Usuarios obtenidos: ${usersResponse.length}');
-        print(
-            'Tipos de membresía obtenidos: ${membershipTypesResponse.length}');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Usuarios obtenidos');
+      AppLogger.info('SupabaseApiProvider', 'Tipos de membresía obtenidos');
 
       // Crear un mapa de precios por tipo de membresía
       final Map<String, double> membershipPrices = {};
@@ -293,9 +247,7 @@ class SupabaseApiProvider extends ApiProvider {
             (type['price'] as num).toDouble();
       }
 
-      if (kDebugMode) {
-        print('Mapa de precios: $membershipPrices');
-      }
+      AppLogger.info('SupabaseApiProvider', 'Mapa de precios');
 
       // Procesar usuarios y agregar precio correspondiente
       final List<Map<String, dynamic>> processedUsers = [];
@@ -307,11 +259,6 @@ class SupabaseApiProvider extends ApiProvider {
         // Buscar precio en el mapa, usar 480.0 como fallback
         userMap['membership_price'] = membershipPrices[membershipType] ?? 480.0;
 
-        if (kDebugMode) {
-          print(
-              'Usuario: ${user['name']}, Tipo: $membershipType, Precio: ${userMap['membership_price']}');
-        }
-
         processedUsers.add(userMap);
       }
 
@@ -321,9 +268,7 @@ class SupabaseApiProvider extends ApiProvider {
         'data': processedUsers
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en getUsersWithMembershipInfo: $e');
-      }
+      AppLogger.error('SupabaseApiProvider', 'Error en getUsersWithMembershipInfo', e);
 
       // Fallback: obtener solo usuarios con precio por defecto
       try {

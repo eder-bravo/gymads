@@ -1,3 +1,5 @@
+import 'package:gymads/app/core/utils/app_logger.dart';
+
 class AccessLogModel {
   final String id;
   final String userId;
@@ -45,7 +47,7 @@ class AccessLogModel {
       try {
         return DateTime.parse(value);
       } catch (e) {
-        print('⚠️ Error parseando fecha: $value - $e');
+        AppLogger.warning('AccessLogModel', 'Fecha con formato inválido');
         return DateTime.now();
       }
     }
@@ -59,12 +61,12 @@ class AccessLogModel {
       try {
         return DateTime.fromMillisecondsSinceEpoch(value);
       } catch (e) {
-        print('⚠️ Error parseando timestamp: $value - $e');
+        AppLogger.warning('AccessLogModel', 'Marca de tiempo con formato inválido');
         return DateTime.now();
       }
     }
     
-    print('⚠️ Tipo de fecha no reconocido: ${value.runtimeType} - $value');
+    AppLogger.warning('AccessLogModel', 'Tipo de fecha no reconocido: ${value.runtimeType}');
     return DateTime.now();
   }
 
@@ -128,30 +130,6 @@ class AccessLogModel {
         return 'Tarjeta RFID';
       default:
         return method;
-    }
-  }
-
-  /// Retorna un icono apropiado para el tipo de acceso
-  String get accessTypeIcon {
-    switch (accessType.toLowerCase()) {
-      case 'entrada':
-        return '🟢'; // Verde para entrada
-      case 'salida':
-        return '🔴'; // Rojo para salida
-      default:
-        return '⚪'; // Blanco por defecto
-    }
-  }
-
-  /// Retorna un icono apropiado para el método
-  String get methodIcon {
-    switch (method.toLowerCase()) {
-      case 'qr':
-        return '📱'; // Teléfono para QR
-      case 'rfid':
-        return '💳'; // Tarjeta para RFID
-      default:
-        return '🔍'; // Lupa por defecto
     }
   }
 

@@ -241,7 +241,7 @@ class EmailConfirmationView extends StatelessWidget {
         type: OtpType.signup,
         email: email,
       );
-        SnackbarHelper.success('✉️ Correo reenviado', 'Revisa tu bandeja de entrada');
+        SnackbarHelper.success('Correo reenviado', 'Revisa tu bandeja de entrada');
     } catch (e) {
         SnackbarHelper.error('Error', 'No se pudo reenviar. Intenta más tarde.');
     }

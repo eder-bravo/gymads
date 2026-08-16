@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import '../config/rfid_config.dart';
 
@@ -9,21 +9,15 @@ class RfidReaderService {
     try {
       // Verificar si hay configuración disponible
       if (!RfidConfig.isConfigured) {
-        if (kDebugMode) {
-          print('ESP32 no configurado - usando IP estática predeterminada');
-        }
+        AppLogger.info('RfidReaderService', 'ESP32 no configurado - usando IP estática predeterminada');
         return null;
       }
       
       final baseUrl = RfidConfig.baseUrl;
       if (baseUrl == null) {
-        if (kDebugMode) {
-          print('No hay URL configurada para el ESP32');
-        }
+        AppLogger.warning('RfidReaderService', 'No hay URL configurada para el ESP32');
         return null;
       }
-      
-
 
       final response = await http.get(
         Uri.parse('$baseUrl/uid'),
@@ -33,24 +27,17 @@ class RfidReaderService {
         final responseText = response.body.trim();
         
         if (responseText.isNotEmpty && responseText != "NO_CARD") {
-          if (kDebugMode) {
-            print('UID detectado: $responseText');
-          }
+          AppLogger.info('RfidReaderService', 'UID detectado');
           return responseText;
         }
         return null;
       } else {
-        if (kDebugMode) {
-          print('Error al verificar tarjeta: ${response.statusCode}');
-          print('Respuesta: ${response.body}');
-        }
+        AppLogger.error('RfidReaderService', 'Error al verificar tarjeta');
         return null;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al verificar tarjeta: $e');
-        print('Verifique que el ESP32 esté encendido en la IP: ${RfidConfig.DEFAULT_ESP32_IP}');
-      }
+      AppLogger.error('RfidReaderService', 'Error al verificar tarjeta', e);
+      AppLogger.info('RfidReaderService', 'Verifique que el ESP32 esté encendido en la IP');
       return null;
     }
   }
@@ -61,20 +48,15 @@ class RfidReaderService {
     try {
       // Verificar si hay configuración disponible
       if (!RfidConfig.isConfigured) {
-        if (kDebugMode) {
-          print('ESP32 no configurado');
-        }
+        AppLogger.info('RfidReaderService', 'ESP32 no configurado');
         return null;
       }
       
       final baseUrl = RfidConfig.baseUrl;
       if (baseUrl == null) {
-        if (kDebugMode) {
-          print('No hay URL configurada para el ESP32');
-        }
+        AppLogger.warning('RfidReaderService', 'No hay URL configurada para el ESP32');
         return null;
       }
-      
 
       final response = await http.get(
         Uri.parse('$baseUrl/uid_only'),
@@ -84,22 +66,16 @@ class RfidReaderService {
         final responseText = response.body.trim();
         
         if (responseText.isNotEmpty && responseText != "NO_CARD") {
-          if (kDebugMode) {
-            print('🔇 UID detectado (silencioso): $responseText');
-          }
+          AppLogger.info('RfidReaderService', 'UID detectado (silencioso)');
           return responseText;
         }
         return null;
       } else {
-        if (kDebugMode) {
-          print('Error al verificar tarjeta (silencioso): ${response.statusCode}');
-        }
+        AppLogger.error('RfidReaderService', 'Error al verificar tarjeta (silencioso)');
         return null;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al verificar tarjeta (silencioso): $e');
-      }
+      AppLogger.error('RfidReaderService', 'Error al verificar tarjeta (silencioso)', e);
       return null;
     }
   }
@@ -112,15 +88,11 @@ class RfidReaderService {
       
       final baseUrl = RfidConfig.baseUrl;
       if (baseUrl == null) {
-        if (kDebugMode) {
-          print('No hay URL configurada para el ESP32, usando IP por defecto: ${RfidConfig.DEFAULT_ESP32_IP}');
-        }
+        AppLogger.warning('RfidReaderService', 'No hay URL configurada para el ESP32, usando IP por defecto');
         return false;
       }
       
-      if (kDebugMode) {
-        print('Intentando conectar con ESP32 en: $baseUrl/status');
-      }
+      AppLogger.info('RfidReaderService', 'Intentando conectar con ESP32');
       
       // Verificamos si podemos conectarnos al ESP32
       final response = await http.get(
@@ -128,23 +100,17 @@ class RfidReaderService {
       ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200) {
-        if (kDebugMode) {
-          print('ESP32 conectado exitosamente');
-          print('Respuesta del ESP32: ${response.body}');
-        }
+        AppLogger.info('RfidReaderService', 'ESP32 conectado exitosamente');
+        AppLogger.info('RfidReaderService', 'Respuesta del ESP32');
         return true;
       } else {
-        if (kDebugMode) {
-          print('ESP32 respondió con código: ${response.statusCode}');
-        }
+        AppLogger.info('RfidReaderService', 'ESP32 respondió con código');
         return false;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al comunicarse con el lector RFID: $e');
-        print('Verificar que el ESP32 esté encendido en la IP: ${RfidConfig.DEFAULT_ESP32_IP}');
-        print('Red WiFi: Asegúrese de que ambos dispositivos estén en la misma red');
-      }
+      AppLogger.error('RfidReaderService', 'Error al comunicarse con el lector RFID', e);
+      AppLogger.info('RfidReaderService', 'Verificar que el ESP32 esté encendido en la IP');
+      AppLogger.info('RfidReaderService', 'Red WiFi: Asegúrese de que ambos dispositivos estén en la misma red');
       return false;
     }
   }
@@ -160,23 +126,17 @@ class RfidReaderService {
     try {
       // Verificar si hay configuración disponible
       if (!RfidConfig.isConfigured) {
-        if (kDebugMode) {
-          print('ESP32 no configurado - no se puede enviar estado de membresía');
-        }
+        AppLogger.info('RfidReaderService', 'ESP32 no configurado - no se puede enviar estado de membresía');
         return false;
       }
       
       final baseUrl = RfidConfig.baseUrl;
       if (baseUrl == null) {
-        if (kDebugMode) {
-          print('No hay URL configurada para el ESP32');
-        }
+        AppLogger.warning('RfidReaderService', 'No hay URL configurada para el ESP32');
         return false;
       }
       
-      if (kDebugMode) {
-        print('Enviando estado de membresía al ESP32: UID=$uid, Status=$status, AccessType=$accessType');
-      }
+      AppLogger.info('RfidReaderService', 'Enviando estado de membresía al lector');
 
       final body = {
         'uid': uid,
@@ -195,20 +155,14 @@ class RfidReaderService {
       ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200) {
-        if (kDebugMode) {
-          print('Estado de membresía enviado correctamente');
-        }
+        AppLogger.info('RfidReaderService', 'Estado de membresía enviado correctamente');
         return true;
       } else {
-        if (kDebugMode) {
-          print('Error al enviar estado de membresía: ${response.statusCode}');
-        }
+        AppLogger.error('RfidReaderService', 'Error al enviar estado de membresía');
         return false;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al enviar estado de membresía: $e');
-      }
+      AppLogger.error('RfidReaderService', 'Error al enviar estado de membresía', e);
       return false;
     }
   }

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import '../models/sale_model.dart';
 import '../services/supabase_service.dart';
 import '../services/tenant_query_helper.dart';
@@ -36,9 +36,7 @@ class SaleRepository {
 
       return createdSale;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al crear venta: $e');
-      }
+      AppLogger.error('SaleRepository', 'Error al crear venta', e);
       return null;
     }
   }
@@ -55,9 +53,7 @@ class SaleRepository {
 
       return response.map<Sale>((json) => Sale.fromJson(json)).toList();
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al obtener ventas: $e');
-      }
+      AppLogger.error('SaleRepository', 'Error al obtener ventas', e);
       return [];
     }
   }
@@ -76,9 +72,7 @@ class SaleRepository {
 
       return response.map<Sale>((json) => Sale.fromJson(json)).toList();
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al obtener ventas por fecha: $e');
-      }
+      AppLogger.error('SaleRepository', 'Error al obtener ventas por fecha', e);
       return [];
     }
   }
@@ -142,9 +136,7 @@ class SaleRepository {
         'average_sale': todayCount > 0 ? todayTotal / todayCount : 0,
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al obtener estadísticas de ventas: $e');
-      }
+      AppLogger.error('SaleRepository', 'Error al obtener estadísticas de ventas', e);
       return {
         'today_total': 0.0,
         'today_count': 0,
@@ -176,9 +168,7 @@ class SaleRepository {
             }),
           );
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al registrar transacción de producto: $e');
-      }
+      AppLogger.error('SaleRepository', 'Error al registrar transacción de producto', e);
     }
   }
 
@@ -200,9 +190,7 @@ class SaleRepository {
           .from('products')
           .update({'stock': newStock}).eq('id', productId);
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al actualizar stock: $e');
-      }
+      AppLogger.error('SaleRepository', 'Error al actualizar stock', e);
     }
   }
 
@@ -242,9 +230,7 @@ class SaleRepository {
 
       return sortedProducts.take(limit).toList();
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al obtener productos más vendidos: $e');
-      }
+      AppLogger.error('SaleRepository', 'Error al obtener productos más vendidos', e);
       return [];
     }
   }

@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
-import '../../../data/services/branding_service.dart';
 import '../../../routes/app_pages.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/background_welcome_dialog.dart';
@@ -92,68 +91,64 @@ class HomeView extends GetView<HomeController> {
   // ─────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, bool isTablet) {
     final topPadding = MediaQuery.of(context).padding.top;
-    return Obx(() {
-      final brandColor = BrandingService.to.brandColor;
-
-      return Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(
-          isTablet ? 32 : 24,
-          topPadding + (isTablet ? 18 : 14),
-          isTablet ? 32 : 24,
-          isTablet ? 16 : 14,
-        ),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            stops: const [0.0, 0.55, 1.0],
-            colors: [
-              const Color(0xFF11151F),
-              const Color(0xFF1A2332),
-              brandColor.withOpacity(0.28),
-            ],
-          ),
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(28),
-            bottomRight: Radius.circular(28),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: brandColor.withOpacity(0.12),
-              blurRadius: 28,
-              offset: const Offset(0, 8),
-            ),
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        isTablet ? 32 : 24,
+        topPadding + (isTablet ? 18 : 14),
+        isTablet ? 32 : 24,
+        isTablet ? 16 : 14,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          stops: const [0.0, 0.55, 1.0],
+          colors: [
+            const Color(0xFF11151F),
+            const Color(0xFF1A2332),
+            AppColors.brand.withOpacity(0.28),
           ],
         ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: brandColor.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                Icons.dashboard_rounded,
-                color: brandColor,
-                size: isTablet ? 26 : 22,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Text(
-              'Inicio',
-              style: TextStyle(
-                fontSize: isTablet ? 26 : 22,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
         ),
-      );
-    });
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.brand.withOpacity(0.12),
+            blurRadius: 28,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.brand.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              Icons.dashboard_rounded,
+              color: AppColors.brand,
+              size: isTablet ? 26 : 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Text(
+            'Inicio',
+            style: TextStyle(
+              fontSize: isTablet ? 26 : 22,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ─────────────────────────────────────────────────────────

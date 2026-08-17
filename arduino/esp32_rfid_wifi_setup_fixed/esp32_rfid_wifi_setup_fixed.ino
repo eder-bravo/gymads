@@ -36,11 +36,11 @@
 
 // =================== CONFIGURACIÓN WIFI ===================
 // TODO: Cambiar estas credenciales por las de tu red WiFi
-//const char* WIFI_SSID = "TD Campus_C";
-//const char* WIFI_PASSWORD = "1Gestudio";
+const char* WIFI_SSID = "TD Campus_C";
+const char* WIFI_PASSWORD = "1Gestudio";
 
-const char* WIFI_SSID = "FamiliaBlanco_2.4";
-const char* WIFI_PASSWORD = "*E2d0e0r46";
+//const char* WIFI_SSID = "FamiliaBlanco_2.4";
+//const char* WIFI_PASSWORD = "*E2d0e0r46";
 
 // =================== CONFIGURACIÓN DE ESCANEO RFID ===================
 // Intervalo mínimo entre lecturas de la misma tarjeta (en milisegundos)

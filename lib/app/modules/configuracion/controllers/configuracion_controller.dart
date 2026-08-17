@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/rfid_reader_service.dart';
 import '../../../data/services/tenant_context_service.dart';
-import '../views/branding_settings_view.dart';
+import '../../../data/services/image_cache_service.dart';
 import '../../../data/models/staff_profile_model.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
@@ -24,7 +24,6 @@ class ConfiguracionController extends GetxController {
   final RxString lastName = ''.obs;
   final RxString gymName = ''.obs;
   final RxString branchName = ''.obs;
-  final RxString brandColor = '#10D5E8'.obs;
 
   // Variables para configuración del lector RFID
   final RxBool rfidConnectionStatus = false.obs;
@@ -92,12 +91,11 @@ class ConfiguracionController extends GetxController {
       if (tenant.currentGymId != null) {
         final gymData = await Supabase.instance.client
             .from('gyms')
-            .select('name, brand_color')
+            .select('name')
             .eq('id', tenant.currentGymId!)
             .maybeSingle();
         if (gymData != null) {
           gymName.value = gymData['name'] as String? ?? '';
-          brandColor.value = gymData['brand_color'] as String? ?? '#10D5E8';
         }
       }
       if (tenant.currentBranchId != null) {
@@ -111,11 +109,12 @@ class ConfiguracionController extends GetxController {
         }
       }
     } catch (e) {
-      AppLogger.warning('ConfiguracionController', 'No se pudo cargar la información del gimnasio');
+      AppLogger.warning('ConfiguracionController',
+          'No se pudo cargar la información del gimnasio');
     }
   }
 
-  // =================== UPDATE GYM BRANDING ===================
+  // =================== UPDATE GYM ===================
 
   Future<void> updateGymName(String value) async {
     final gymId = TenantContextService.to.currentGymId;
@@ -129,24 +128,27 @@ class ConfiguracionController extends GetxController {
       await _refreshTenantProfile();
       SnackbarHelper.success('¡Listo!', 'Nombre del gimnasio actualizado');
     } catch (e) {
-      AppLogger.error('ConfiguracionController', 'Fallo al actualizar el nombre del gimnasio', e);
+      AppLogger.error('ConfiguracionController',
+          'Fallo al actualizar el nombre del gimnasio', e);
       SnackbarHelper.error('Error', 'No se pudo actualizar el nombre');
     }
   }
 
-  Future<void> updateBrandColor(String hexColor) async {
-    final gymId = TenantContextService.to.currentGymId;
-    if (gymId == null) return;
+  /// Renombra la sucursal actual. Solo el dueño puede hacerlo (política RLS
+  /// "Owner can update their branches").
+  Future<void> updateBranchName(String value) async {
+    final branchId = TenantContextService.to.currentBranchId;
+    if (branchId == null) return;
     try {
       await Supabase.instance.client
-          .from('gyms')
-          .update({'brand_color': hexColor}).eq('id', gymId);
-      brandColor.value = hexColor;
-      await _refreshTenantProfile();
-      SnackbarHelper.success('¡Listo!', 'Color de marca actualizado');
+          .from('branches')
+          .update({'name': value}).eq('id', branchId);
+      branchName.value = value;
+      SnackbarHelper.success('¡Listo!', 'Nombre de la sucursal actualizado');
     } catch (e) {
-      AppLogger.error('ConfiguracionController', 'Fallo al actualizar el color de marca', e);
-      SnackbarHelper.error('Error', 'No se pudo actualizar el color');
+      AppLogger.error('ConfiguracionController',
+          'Fallo al actualizar el nombre de la sucursal', e);
+      SnackbarHelper.error('Error', 'No se pudo actualizar el nombre');
     }
   }
 
@@ -156,7 +158,7 @@ class ConfiguracionController extends GetxController {
       if (userId == null) return;
       final response = await Supabase.instance.client
           .from('staff_profiles')
-          .select('*, gyms(name, brand_color, brand_font, created_at)')
+          .select('*, gyms(name, created_at)')
           .eq('user_id', userId)
           .eq('is_active', true)
           .maybeSingle();
@@ -165,7 +167,8 @@ class ConfiguracionController extends GetxController {
         await TenantContextService.to.setProfile(profile);
       }
     } catch (e) {
-      AppLogger.error('ConfiguracionController', 'Fallo al refrescar el perfil', e);
+      AppLogger.error(
+          'ConfiguracionController', 'Fallo al refrescar el perfil', e);
     }
   }
 
@@ -199,19 +202,14 @@ class ConfiguracionController extends GetxController {
         'display_name': displayName,
       }).eq('user_id', userId);
 
-      // Refresh TenantContextService cache
-      final profileData = await Supabase.instance.client
-          .from('staff_profiles')
-          .select()
-          .eq('user_id', userId)
-          .single();
-
-      await TenantContextService.to
-          .setProfile(StaffProfileModel.fromJson(profileData));
+      // Refrescar el caché. Debe hacerse con el join de `gyms`, si no se
+      // pierden el nombre del gimnasio y su fecha de creación.
+      await _refreshTenantProfile();
 
       SnackbarHelper.success('Guardado', 'Información actualizada');
     } catch (e) {
-      AppLogger.error('ConfiguracionController', 'Fallo al actualizar el perfil', e);
+      AppLogger.error(
+          'ConfiguracionController', 'Fallo al actualizar el perfil', e);
       SnackbarHelper.error('Error', 'No se pudo actualizar: $e');
     } finally {
       isLoading.value = false;
@@ -249,7 +247,8 @@ class ConfiguracionController extends GetxController {
         connectionStatusMessage.value = 'Desactivado';
       }
     } catch (e) {
-      AppLogger.error('ConfiguracionController', 'Error al cargar configuración', e);
+      AppLogger.error(
+          'ConfiguracionController', 'Error al cargar configuración', e);
     } finally {
       isLoading.value = false;
     }
@@ -464,35 +463,9 @@ class ConfiguracionController extends GetxController {
     Get.toNamed(Routes.CUENTA);
   }
 
-  /// Open application settings — full-screen branding page
-  void openAppSettings() {
-    Get.to(() => BrandingSettingsView());
-  }
-
   /// Abrir configuración de precios de abonos (precio fijo por periodo)
   void openAbonoPrices() {
     Get.toNamed(Routes.ABONO_PRICES);
-  }
-
-  /// Backup branding to DB (fire-and-forget)
-  Future<void> backupBranding(
-      {String? name, String? color, String? font}) async {
-    final gymId = TenantContextService.to.currentGymId;
-    if (gymId == null) return;
-    try {
-      final updates = <String, dynamic>{};
-      if (name != null) updates['name'] = name;
-      if (color != null) updates['brand_color'] = color;
-      if (font != null) updates['brand_font'] = font;
-      if (updates.isNotEmpty) {
-        await Supabase.instance.client
-            .from('gyms')
-            .update(updates)
-            .eq('id', gymId);
-      }
-    } catch (e) {
-      AppLogger.warning('ConfiguracionController', 'No se pudo respaldar la configuración de marca');
-    }
   }
 
   // =================== LOGOUT ===================
@@ -596,7 +569,8 @@ class ConfiguracionController extends GetxController {
             onPressed: () => Get.back(result: true),
             child: Text(
               'Sí, borrar todo',
-              style: TextStyle(color: Colors.red[400], fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: Colors.red[400], fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -619,8 +593,25 @@ class ConfiguracionController extends GetxController {
       await Supabase.instance.client
           .rpc('delete_gym_cascade', params: {'p_gym_id': gymId});
 
+      // La cuenta ya no existe en el servidor: cerrar sesión para no dejar
+      // el token guardado en el dispositivo.
+      try {
+        await Supabase.instance.client.auth.signOut();
+      } catch (e) {
+        AppLogger.warning(
+            'ConfiguracionController', 'No se pudo cerrar la sesión');
+      }
+
       // Clear local data
       await TenantContextService.to.clearProfile();
+
+      // Las fotos de clientes de un gimnasio borrado no deben quedar en disco
+      try {
+        await ImageCacheService.instance.clearAllCache();
+      } catch (e) {
+        AppLogger.warning('ConfiguracionController',
+            'No se pudo limpiar el caché de imágenes');
+      }
 
       // Navigate to login
       Get.offAllNamed(Routes.LOGIN);
@@ -631,9 +622,12 @@ class ConfiguracionController extends GetxController {
             'Cuenta eliminada', 'Todos los datos han sido borrados');
       });
     } catch (e) {
-      AppLogger.error('ConfiguracionController', 'Fallo al eliminar el gimnasio', e);
-      SnackbarHelper.error(
-          'Error', 'No se pudieron borrar los datos: ${e.toString()}');
+      AppLogger.error(
+          'ConfiguracionController', 'Fallo al eliminar el gimnasio', e);
+      final mensaje = e.toString().contains('Only the gym owner')
+          ? 'Solo el dueño del gimnasio puede borrar los datos'
+          : 'No se pudieron borrar los datos. Revisa tu conexión e inténtalo de nuevo.';
+      SnackbarHelper.error('Error', mensaje);
     } finally {
       isLoading.value = false;
     }
@@ -662,9 +656,12 @@ class _ConfirmDeleteDialog extends StatelessWidget {
             children: [
               RichText(
                 text: TextSpan(
-                  style: const TextStyle(color: AppColors.textSecondary, height: 1.5),
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, height: 1.5),
                   children: [
-                    const TextSpan(text: 'Para confirmar, escribe el nombre de tu gimnasio:\n\n'),
+                    const TextSpan(
+                        text:
+                            'Para confirmar, escribe el nombre de tu gimnasio:\n\n'),
                     TextSpan(
                       text: gymName,
                       style: TextStyle(
@@ -681,7 +678,8 @@ class _ConfirmDeleteDialog extends StatelessWidget {
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Escribe el nombre aquí',
-                  hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+                  hintStyle: TextStyle(
+                      color: AppColors.textSecondary.withOpacity(0.5)),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.red.withOpacity(0.3)),
@@ -694,7 +692,8 @@ class _ConfirmDeleteDialog extends StatelessWidget {
                   fillColor: Colors.white.withOpacity(0.05),
                 ),
                 onChanged: (val) {
-                  isMatch.value = val.trim().toLowerCase() == gymName.trim().toLowerCase();
+                  isMatch.value =
+                      val.trim().toLowerCase() == gymName.trim().toLowerCase();
                 },
               ),
             ],

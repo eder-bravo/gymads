@@ -92,6 +92,18 @@ class TransactionTile extends StatelessWidget {
                     ),
                   ],
                 ),
+                if ((ingreso.referenciaPago ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Ref. ${ingreso.referenciaPago}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ),
           ),

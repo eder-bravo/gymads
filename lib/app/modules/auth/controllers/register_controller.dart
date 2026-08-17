@@ -6,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../data/providers/staff_profile_provider.dart';
 import '../../../data/services/tenant_context_service.dart';
-import '../../../data/services/branding_service.dart';
 import '../../../routes/app_pages.dart';
 
 /// Controller for registration (creating a new gym account)
@@ -242,12 +241,6 @@ class RegisterController extends GetxController {
 
     if (staffProfile != null && staffProfile.isActive) {
       await TenantContextService.to.setProfile(staffProfile);
-      BrandingService.to.syncFromDb(
-        dbGymName: staffProfile.gymName,
-        dbBrandColor: staffProfile.brandColor,
-        dbBrandFont: staffProfile.brandFont,
-        force: true,
-      );
       Get.offAllNamed(Routes.HOME);
     } else {
       final gName = displayName ?? '';
@@ -304,7 +297,6 @@ class RegisterController extends GetxController {
 
       if (staffProfile != null && staffProfile.isActive) {
         await TenantContextService.to.setProfile(staffProfile);
-        BrandingService.to.setGymTitle(gymNameController.text.trim());
         Get.offAllNamed(Routes.HOME);
       } else {
         throw Exception('Error creando el perfil');
@@ -363,7 +355,6 @@ class RegisterController extends GetxController {
 
       if (staffProfile != null && staffProfile.isActive) {
         await TenantContextService.to.setProfile(staffProfile);
-        BrandingService.to.setGymTitle(gymNameController.text.trim());
         Get.offAllNamed(Routes.HOME);
       } else {
         // Fallback: staff profile not ready yet, go to login

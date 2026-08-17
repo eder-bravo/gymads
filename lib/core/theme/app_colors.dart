@@ -10,6 +10,9 @@ class AppColors {
   static const Color primaryDark = Color(0xFF0D47A1);
   static const Color primaryLight = Color(0xFF42A5F5);
 
+  /// Color de acento de la marca (header de Inicio)
+  static const Color brand = Color(0xFF10D5E8);
+
   /// Colores secundarios para acentos y detalles
   static const Color accent = Color(0xFFFF6F00);
   static const Color accentLight = Color(0xFFFFB74D);

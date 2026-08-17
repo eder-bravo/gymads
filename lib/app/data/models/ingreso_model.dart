@@ -17,6 +17,8 @@ class IngresoModel {
   final String usuarioStaff;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  /// Folio / referencia de la operación (tarjeta y transferencia)
+  final String? referenciaPago;
 
   IngresoModel({
     this.id,
@@ -36,6 +38,7 @@ class IngresoModel {
     required this.usuarioStaff,
     this.createdAt,
     this.updatedAt,
+    this.referenciaPago,
   });
 
   /// Factory para crear desde JSON
@@ -65,9 +68,10 @@ class IngresoModel {
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at'])
           : null,
-      updatedAt: json['updated_at'] != null 
+      updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'])
           : null,
+      referenciaPago: json['referencia_pago'],
     );
   }
 
@@ -91,6 +95,7 @@ class IngresoModel {
       'usuario_staff': usuarioStaff,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
+      'referencia_pago': referenciaPago,
     };
   }
 
@@ -113,6 +118,7 @@ class IngresoModel {
     String? usuarioStaff,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? referenciaPago,
   }) {
     return IngresoModel(
       id: id ?? this.id,
@@ -132,6 +138,7 @@ class IngresoModel {
       usuarioStaff: usuarioStaff ?? this.usuarioStaff,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      referenciaPago: referenciaPago ?? this.referenciaPago,
     );
   }
 
@@ -158,6 +165,10 @@ class IngresoModel {
         return 'Efectivo';
       case 'tarjeta':
         return 'Tarjeta';
+      case 'tarjeta_debito':
+        return 'Tarjeta de Débito';
+      case 'tarjeta_credito':
+        return 'Tarjeta de Crédito';
       case 'transferencia':
         return 'Transferencia';
       default:

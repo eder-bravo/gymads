@@ -241,32 +241,34 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                       ),
                       SizedBox(height: isSmallPhone ? 20 : 24),
                       
-                      // Nombre del usuario con animación de entrada
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        duration: const Duration(milliseconds: 1200),
-                        curve: Curves.easeOutQuart,
-                        builder: (context, value, child) {
-                          final safeOpacity = value.clamp(0.0, 1.0);
-                          return Opacity(
-                            opacity: safeOpacity,
-                            child: Transform.translate(
-                              offset: Offset(0, 30 * (1 - value)),
-                              child: Text(
-                                widget.isNotFound ? 'ID: ${widget.userName}' : widget.userName,
-                                style: TextStyle(
-                                  fontSize: widget.isNotFound ? (nameSize * 0.7) : nameSize,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                      if (!widget.isNotFound) ...[
+                        // Nombre del usuario con animación de entrada
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.0, end: 1.0),
+                          duration: const Duration(milliseconds: 1200),
+                          curve: Curves.easeOutQuart,
+                          builder: (context, value, child) {
+                            final safeOpacity = value.clamp(0.0, 1.0);
+                            return Opacity(
+                              opacity: safeOpacity,
+                              child: Transform.translate(
+                                offset: Offset(0, 30 * (1 - value)),
+                                child: Text(
+                                  widget.userName,
+                                  style: TextStyle(
+                                    fontSize: nameSize,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                textAlign: TextAlign.center,
                               ),
-                            ),
-                          );
-                        }
-                      ),
-                      SizedBox(height: isSmallPhone ? 12 : 16),
-                      
+                            );
+                          }
+                        ),
+                        SizedBox(height: isSmallPhone ? 12 : 16),
+                      ],
+
                       if (!widget.isNotFound)
                       // Días restantes con animación de entrada
                       TweenAnimationBuilder<double>(

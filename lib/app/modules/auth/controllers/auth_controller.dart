@@ -7,7 +7,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../data/models/staff_profile_model.dart';
 import '../../../data/providers/staff_profile_provider.dart';
 import '../../../data/services/tenant_context_service.dart';
-import '../../../data/services/branding_service.dart';
 import '../../../routes/app_pages.dart';
 import 'register_controller.dart';
 
@@ -119,14 +118,6 @@ class AuthController extends GetxController {
 
       // 3. Set tenant context
       await TenantContextService.to.setProfile(staffProfile);
-
-      // 3b. Sync branding from DB (force to overwrite any stale local data)
-      BrandingService.to.syncFromDb(
-        dbGymName: staffProfile.gymName,
-        dbBrandColor: staffProfile.brandColor,
-        dbBrandFont: staffProfile.brandFont,
-        force: true,
-      );
 
       // 4. Clear form
       emailController.clear();
@@ -290,12 +281,6 @@ class AuthController extends GetxController {
     if (staffProfile != null && staffProfile.isActive) {
       AppLogger.info('AuthController', 'Existing user, navigating to HOME');
       await TenantContextService.to.setProfile(staffProfile);
-      BrandingService.to.syncFromDb(
-        dbGymName: staffProfile.gymName,
-        dbBrandColor: staffProfile.brandColor,
-        dbBrandFont: staffProfile.brandFont,
-        force: true,
-      );
 
       emailController.clear();
       passwordController.clear();
@@ -321,26 +306,11 @@ class AuthController extends GetxController {
 
   /// Logout current user
   Future<void> logout() async {
-    // Backup current branding to DB before clearing
-    try {
-      final gymId = TenantContextService.to.currentGymId;
-      if (gymId != null) {
-        await _supabase.from('gyms').update({
-          'brand_color': BrandingService.to.brandColorHex.value,
-          'brand_font': BrandingService.to.brandFontName.value,
-        }).eq('id', gymId);
-      }
-    } catch (e) {
-      AppLogger.warning('AuthController', 'Error backing up branding');
-    }
-
     try {
       await _supabase.auth.signOut();
     } catch (e) {
       AppLogger.warning('AuthController', 'Error signing out');
     }
-    // Clear branding so next account starts fresh
-    BrandingService.to.clearBranding();
     await TenantContextService.to.clearProfile();
     Get.offAllNamed(Routes.LOGIN);
   }

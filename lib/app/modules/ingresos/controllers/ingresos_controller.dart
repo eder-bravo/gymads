@@ -504,6 +504,8 @@ class IngresosController extends GetxController {
       case 'efectivo':
         return Colors.green;
       case 'tarjeta':
+      case 'tarjeta_debito':
+      case 'tarjeta_credito':
         return Colors.blue;
       case 'transferencia':
         return Colors.purple;

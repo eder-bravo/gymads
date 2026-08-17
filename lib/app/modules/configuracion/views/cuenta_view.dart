@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../data/services/tenant_context_service.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
 
@@ -78,7 +79,14 @@ class CuentaView extends GetView<ConfiguracionController> {
                   value: controller.gymName.value.isNotEmpty
                       ? controller.gymName.value
                       : 'Cargando...',
-                  editable: false,
+                  // Solo el dueño puede modificar el gimnasio (política RLS)
+                  editable: TenantContextService.to.isOwnerAdmin,
+                  onEdit: () => _showEditDialog(
+                    context,
+                    title: 'Gimnasio',
+                    currentValue: controller.gymName.value,
+                    onSave: (val) => controller.updateGymName(val),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 _buildInfoTile(
@@ -87,62 +95,83 @@ class CuentaView extends GetView<ConfiguracionController> {
                   value: controller.branchName.value.isNotEmpty
                       ? controller.branchName.value
                       : 'Cargando...',
-                  editable: false,
+                  // Solo el dueño puede modificar la sucursal (política RLS)
+                  editable: TenantContextService.to.isOwnerAdmin,
+                  onEdit: () => _showEditDialog(
+                    context,
+                    title: 'Sucursal',
+                    currentValue: controller.branchName.value,
+                    onSave: (val) => controller.updateBranchName(val),
+                  ),
                 ),
 
-                const SizedBox(height: 40),
+                // Solo el dueño puede borrar el gimnasio y la cuenta
+                if (TenantContextService.to.isOwnerAdmin) ...[
+                  const SizedBox(height: 40),
 
-                // Danger zone
-                _buildSectionLabel('Zona de Peligro'),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withOpacity(0.2)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Borrar todos los datos',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Elimina permanentemente tu gimnasio, clientes, inventario, pagos y tu cuenta. Esta acción no se puede deshacer.',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => controller.deleteGymAndAccount(),
-                          icon: const Icon(Icons.delete_forever, size: 20),
-                          label: const Text('Borrar datos'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red[400],
-                            side: BorderSide(color: Colors.red[400]!),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                  // Danger zone
+                  _buildSectionLabel('Zona de Peligro'),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withOpacity(0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Borrar todos los datos',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          'Elimina permanentemente tu gimnasio, clientes, inventario, pagos y tu cuenta. Esta acción no se puede deshacer.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: controller.isLoading.value
+                                ? null
+                                : () => controller.deleteGymAndAccount(),
+                            icon: controller.isLoading.value
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.delete_forever, size: 20),
+                            label: Text(controller.isLoading.value
+                                ? 'Borrando...'
+                                : 'Borrar datos'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red[400],
+                              side: BorderSide(color: Colors.red[400]!),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
+                ],
               ],
             )),
       ),
@@ -284,9 +313,10 @@ class CuentaView extends GetView<ConfiguracionController> {
     BuildContext context, {
     required String title,
     required String currentValue,
-    required Function(String) onSave,
+    required Future<void> Function(String) onSave,
   }) {
     final textController = TextEditingController(text: currentValue);
+    final isSaving = false.obs;
 
     Get.dialog(
       AlertDialog(
@@ -315,22 +345,30 @@ class CuentaView extends GetView<ConfiguracionController> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () {
-              final newValue = textController.text.trim();
-              if (newValue.isNotEmpty) {
-                onSave(newValue);
-                Get.back();
-              }
-            },
-            child: const Text('Guardar'),
-          ),
+          Obx(() => TextButton(
+                onPressed: isSaving.value ? null : () => Get.back(),
+                child: const Text('Cancelar'),
+              )),
+          // Se espera a que termine la escritura antes de cerrar, para que
+          // el error (si lo hay) aparezca con el diálogo todavía abierto.
+          Obx(() => TextButton(
+                onPressed: isSaving.value
+                    ? null
+                    : () async {
+                        final newValue = textController.text.trim();
+                        if (newValue.isEmpty) return;
+                        isSaving.value = true;
+                        try {
+                          await onSave(newValue);
+                        } finally {
+                          isSaving.value = false;
+                        }
+                        Get.back();
+                      },
+                child: Text(isSaving.value ? 'Guardando...' : 'Guardar'),
+              )),
         ],
       ),
-    );
+    ).whenComplete(textController.dispose);
   }
 }

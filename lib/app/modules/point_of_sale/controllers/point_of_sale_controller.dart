@@ -24,6 +24,7 @@ class PointOfSaleController extends GetxController {
   final RxString _selectedPaymentMethod = 'efectivo'.obs;
   final RxDouble _receivedAmount = 0.0.obs;
   final RxDouble _changeAmount = 0.0.obs;
+  final RxString _referenciaPago = ''.obs;
 
   // Lista de productos disponibles
   final RxList<Product> _availableProducts = <Product>[].obs;
@@ -48,6 +49,7 @@ class PointOfSaleController extends GetxController {
   String get selectedPaymentMethod => _selectedPaymentMethod.value;
   double get receivedAmount => _receivedAmount.value;
   double get changeAmount => _changeAmount.value;
+  String get referenciaPago => _referenciaPago.value;
 
   List<Product> get availableProducts => _availableProducts;
   List<Product> get filteredProducts {
@@ -81,6 +83,17 @@ class PointOfSaleController extends GetxController {
     'transferencia',
     'mixto'
   ];
+
+  // Métodos que admiten folio / referencia de la operación
+  static const List<String> _metodosConReferencia = [
+    'tarjeta_debito',
+    'tarjeta_credito',
+    'transferencia',
+  ];
+
+  /// Si el método de pago seleccionado admite folio / referencia
+  bool get usaReferenciaPago =>
+      _metodosConReferencia.contains(_selectedPaymentMethod.value);
 
   @override
   void onInit() {
@@ -218,12 +231,20 @@ class PointOfSaleController extends GetxController {
     // en efectivo, no deben sobrevivir al cambiar de método.
     _receivedAmount.value = 0.0;
     _changeAmount.value = 0.0;
+    // La referencia pertenece a la operación con tarjeta/transferencia
+    // concreta, tampoco debe sobrevivir al cambiar de método.
+    _referenciaPago.value = '';
   }
 
   /// Establecer monto recibido
   void setReceivedAmount(double amount) {
     _receivedAmount.value = amount;
     _changeAmount.value = amount - _finalAmount.value;
+  }
+
+  /// Establecer folio / referencia de la operación
+  void setReferenciaPago(String value) {
+    _referenciaPago.value = value;
   }
 
   /// Aplicar descuento
@@ -277,6 +298,9 @@ class PointOfSaleController extends GetxController {
         cambio: _changeAmount.value,
         ventaTipo: 'producto',
         subtotal: _totalAmount.value,
+        referenciaPago: _referenciaPago.value.trim().isEmpty
+            ? null
+            : _referenciaPago.value.trim(),
       );
 
       // Procesar venta en el repositorio
@@ -289,6 +313,7 @@ class PointOfSaleController extends GetxController {
         // Limpiar carrito y estado
         clearCart();
         _selectedPaymentMethod.value = 'efectivo';
+        _referenciaPago.value = '';
 
         // Recargar productos para actualizar stock
         await loadProducts();

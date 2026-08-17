@@ -48,14 +48,8 @@ class TenantContextService extends GetxService {
   /// Check if current user is branch_staff
   bool get isBranchStaff => _staffProfile.value?.isBranchStaff ?? false;
 
-  /// Gym name (for branding)
+  /// Gym name
   String? get gymName => _staffProfile.value?.gymName;
-
-  /// Gym brand color hex (e.g. '#10D5E8')
-  String? get brandColor => _staffProfile.value?.brandColor;
-
-  /// Gym brand font name
-  String? get brandFont => _staffProfile.value?.brandFont;
 
   /// Fecha de creación de la cuenta (gimnasio). Si no está disponible la
   /// fecha del gimnasio, se usa la del perfil de staff como respaldo.

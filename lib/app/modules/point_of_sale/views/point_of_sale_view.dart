@@ -516,6 +516,56 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 return const SizedBox.shrink();
               }),
 
+              // Campo folio / referencia (tarjeta y transferencia)
+              Obx(() {
+                if (!controller.usaReferenciaPago) {
+                  return const SizedBox.shrink();
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Folio o referencia (opcional)',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      // Fuerza un campo nuevo al cambiar de método de pago,
+                      // para que no arrastre el texto de la operación anterior.
+                      key: ValueKey(
+                          'referencia_${controller.selectedPaymentMethod}'),
+                      style: const TextStyle(color: AppColors.textPrimary),
+                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [
+                        LengthLimitingTextInputFormatter(50),
+                      ],
+                      decoration: InputDecoration(
+                        hintText: 'Ej: 004521',
+                        hintStyle: const TextStyle(color: AppColors.textHint),
+                        prefixIcon: const Icon(
+                          Icons.receipt_long,
+                          color: AppColors.accent,
+                          size: 20,
+                        ),
+                        filled: true,
+                        fillColor: AppColors.containerBackground,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                      ),
+                      onChanged: controller.setReferenciaPago,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                );
+              }),
+
               // Botón procesar
               Obx(() => ElevatedButton(
                     onPressed: controller.canProcessSale() &&

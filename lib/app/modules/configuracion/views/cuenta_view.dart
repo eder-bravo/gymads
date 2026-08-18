@@ -315,60 +315,102 @@ class CuentaView extends GetView<ConfiguracionController> {
     required String currentValue,
     required Future<void> Function(String) onSave,
   }) {
-    final textController = TextEditingController(text: currentValue);
-    final isSaving = false.obs;
-
     Get.dialog(
-      AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: Text(
-          'Editar $title',
-          style: const TextStyle(color: AppColors.textPrimary),
-        ),
-        content: TextField(
-          controller: textController,
-          autofocus: true,
-          style: const TextStyle(color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            labelText: title,
-            labelStyle: TextStyle(color: AppColors.textSecondary),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.titleColor),
-            ),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
-          ),
-        ),
-        actions: [
-          Obx(() => TextButton(
-                onPressed: isSaving.value ? null : () => Get.back(),
-                child: const Text('Cancelar'),
-              )),
-          // Se espera a que termine la escritura antes de cerrar, para que
-          // el error (si lo hay) aparezca con el diálogo todavía abierto.
-          Obx(() => TextButton(
-                onPressed: isSaving.value
-                    ? null
-                    : () async {
-                        final newValue = textController.text.trim();
-                        if (newValue.isEmpty) return;
-                        isSaving.value = true;
-                        try {
-                          await onSave(newValue);
-                        } finally {
-                          isSaving.value = false;
-                        }
-                        Get.back();
-                      },
-                child: Text(isSaving.value ? 'Guardando...' : 'Guardar'),
-              )),
-        ],
+      _EditFieldDialog(
+        title: title,
+        currentValue: currentValue,
+        onSave: onSave,
       ),
-    ).whenComplete(textController.dispose);
+    );
+  }
+}
+
+/// Diálogo de edición de un solo campo de texto.
+///
+/// Es un StatefulWidget (y no un simple Get.dialog con controllers
+/// externos) a propósito: así el TextEditingController se libera en
+/// State.dispose(), que Flutter solo llama cuando el widget se
+/// desmonta de verdad (tras la animación de cierre). Liberarlo antes
+/// —p. ej. con `whenComplete` sobre el Future del diálogo— provoca
+/// "A TextEditingController was used after being disposed" porque el
+/// diálogo sigue montado un instante más mientras se anima su salida.
+class _EditFieldDialog extends StatefulWidget {
+  final String title;
+  final String currentValue;
+  final Future<void> Function(String) onSave;
+
+  const _EditFieldDialog({
+    required this.title,
+    required this.currentValue,
+    required this.onSave,
+  });
+
+  @override
+  State<_EditFieldDialog> createState() => _EditFieldDialogState();
+}
+
+class _EditFieldDialogState extends State<_EditFieldDialog> {
+  late final TextEditingController _textController =
+      TextEditingController(text: widget.currentValue);
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSave() async {
+    final newValue = _textController.text.trim();
+    if (newValue.isEmpty) return;
+    setState(() => _isSaving = true);
+    try {
+      await widget.onSave(newValue);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+    if (mounted) Get.back();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.cardBackground,
+      title: Text(
+        'Editar ${widget.title}',
+        style: const TextStyle(color: AppColors.textPrimary),
+      ),
+      content: TextField(
+        controller: _textController,
+        autofocus: true,
+        style: const TextStyle(color: AppColors.textPrimary),
+        decoration: InputDecoration(
+          labelText: widget.title,
+          labelStyle: TextStyle(color: AppColors.textSecondary),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.titleColor),
+          ),
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.05),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Get.back(),
+          child: const Text('Cancelar'),
+        ),
+        // Se espera a que termine la escritura antes de cerrar, para que
+        // el error (si lo hay) aparezca con el diálogo todavía abierto.
+        TextButton(
+          onPressed: _isSaving ? null : _handleSave,
+          child: Text(_isSaving ? 'Guardando...' : 'Guardar'),
+        ),
+      ],
+    );
   }
 }

@@ -30,9 +30,9 @@ class PointOfSaleController extends GetxController {
   final RxList<Product> _availableProducts = <Product>[].obs;
   final RxString _searchQuery = ''.obs;
 
-  // Filtro de categoría
+  // Filtro de categoría. `null` = todas.
   final RxList<ProductCategory> _categories = <ProductCategory>[].obs;
-  final RxString _selectedCategory = 'Todas'.obs;
+  final RxnString _selectedCategoryId = RxnString();
 
   // Configuración de impuestos
   final RxDouble _taxRate = 0.0.obs; // 0% por defecto, configurable
@@ -53,27 +53,40 @@ class PointOfSaleController extends GetxController {
 
   List<Product> get availableProducts => _availableProducts;
   List<Product> get filteredProducts {
-    return _availableProducts.where((product) {
-      final matchesCategory = _selectedCategory.value == 'Todas' ||
-          product.category == _selectedCategory.value;
+    final query = _searchQuery.value.toLowerCase();
+    final byId = categoryById;
 
-      final matchesSearch = _searchQuery.value.isEmpty ||
-          product.name
-              .toLowerCase()
-              .contains(_searchQuery.value.toLowerCase()) ||
-          product.category
-              .toLowerCase()
-              .contains(_searchQuery.value.toLowerCase());
+    return _availableProducts.where((product) {
+      final matchesCategory = _selectedCategoryId.value == null ||
+          product.categoryId == _selectedCategoryId.value;
+
+      // La búsqueda también mira el nombre de la categoría, como antes; ahora
+      // hay que resolverlo por el mapa porque el producto solo guarda el id.
+      final categoryName =
+          (byId[product.categoryId]?.name ?? '').toLowerCase();
+
+      final matchesSearch = query.isEmpty ||
+          product.name.toLowerCase().contains(query) ||
+          categoryName.contains(query);
 
       return matchesCategory && matchesSearch;
     }).toList();
   }
 
+  /// Búsqueda por id para resolver nombre e icono de la categoría.
+  Map<String, ProductCategory> get categoryById => {
+        for (final c in _categories) c.id: c,
+      };
+
+  /// Categorías que se ofrecen en el filtro.
+  List<ProductCategory> get activeCategories =>
+      _categories.where((c) => c.isActive).toList();
+
   String get searchQuery => _searchQuery.value;
   double get taxRate => _taxRate.value;
 
   List<ProductCategory> get categories => _categories;
-  String get selectedCategory => _selectedCategory.value;
+  String? get selectedCategoryId => _selectedCategoryId.value;
 
   // Métodos de pago disponibles
   final List<String> paymentMethods = [
@@ -125,9 +138,9 @@ class PointOfSaleController extends GetxController {
     }
   }
 
-  /// Establecer la categoría seleccionada del filtro
-  void setSelectedCategory(String category) {
-    _selectedCategory.value = category;
+  /// Establecer la categoría seleccionada del filtro. `null` = todas.
+  void setSelectedCategory(String? categoryId) {
+    _selectedCategoryId.value = categoryId;
   }
 
   /// Buscar productos

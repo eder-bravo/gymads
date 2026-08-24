@@ -468,6 +468,10 @@ class ConfiguracionController extends GetxController {
     Get.toNamed(Routes.ABONO_PRICES);
   }
 
+  void openCategorias() {
+    Get.toNamed(Routes.CATEGORIAS);
+  }
+
   // =================== LOGOUT ===================
 
   /// Cerrar sesión con confirmación

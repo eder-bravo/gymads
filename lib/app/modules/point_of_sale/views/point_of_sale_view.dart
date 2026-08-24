@@ -5,6 +5,7 @@ import '../controllers/point_of_sale_controller.dart';
 import '../../../data/models/product_model.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
+import '../../../core/utils/category_icons.dart';
 import '../../../global_widgets/app_header.dart';
 
 class PointOfSaleView extends GetView<PointOfSaleController> {
@@ -31,9 +32,14 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
             Padding(
               padding: const EdgeInsets.all(12),
               child: Obx(() => CategoryFilterChips(
-                    categories:
-                        controller.categories.map((c) => c.name).toList(),
-                    selected: controller.selectedCategory,
+                    categories: controller.activeCategories
+                        .map((c) => CategoryChipData(
+                              id: c.id,
+                              label: c.name,
+                              icon: CategoryIcons.resolve(c.icon),
+                            ))
+                        .toList(),
+                    selectedId: controller.selectedCategoryId,
                     onSelected: controller.setSelectedCategory,
                   )),
             ),
@@ -131,7 +137,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    _iconForCategory(product.category),
+                    CategoryIcons.resolve(
+                        controller.categoryById[product.categoryId]?.icon),
                     color: AppColors.accent,
                     size: 20,
                   ),
@@ -251,23 +258,6 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         ],
       ),
     );
-  }
-
-  /// Ícono cosmético según categoría del producto (con fallback seguro).
-  IconData _iconForCategory(String category) {
-    final c = category.toLowerCase();
-    if (c.contains('ropa') || c.contains('playera') || c.contains('camiseta')) {
-      return Icons.checkroom;
-    }
-    if (c.contains('bebida')) return Icons.local_drink;
-    if (c.contains('suplemento') ||
-        c.contains('proteina') ||
-        c.contains('proteína')) {
-      return Icons.fitness_center;
-    }
-    if (c.contains('accesorio')) return Icons.watch;
-    if (c.contains('snack') || c.contains('barra')) return Icons.cookie;
-    return Icons.inventory_2;
   }
 
   Widget _buildCartPanel(BuildContext context) {

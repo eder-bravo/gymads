@@ -2,7 +2,11 @@ class Product {
   final String id;
   final String name;
   final String description;
-  final String category;
+
+  /// Id de la categoría (`product_categories.id`). El nombre ya no se guarda
+  /// aquí: se resuelve con el mapa de categorías del controlador, así que
+  /// renombrar una categoría se refleja al instante sin tocar los productos.
+  final String? categoryId;
   final double price;
   final int stock;
   final bool isActive;
@@ -13,7 +17,7 @@ class Product {
     required this.id,
     required this.name,
     required this.description,
-    required this.category,
+    required this.categoryId,
     required this.price,
     required this.stock,
     required this.isActive,
@@ -26,7 +30,7 @@ class Product {
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       description: json['description'] ?? '',
-      category: json['category'] ?? '',
+      categoryId: json['category_id'] as String?,
       price: (json['price'] is num) ? json['price'].toDouble() : 0.0,
       stock: json['stock'] ?? 0,
       isActive: json['is_active'] ?? true,
@@ -44,7 +48,7 @@ class Product {
       'id': id,
       'name': name,
       'description': description,
-      'category': category,
+      'category_id': categoryId,
       'price': price,
       'stock': stock,
       'is_active': isActive,
@@ -58,18 +62,20 @@ class Product {
     return {
       'name': name,
       'description': description,
-      'category': category,
+      'category_id': categoryId,
       'price': price,
       'stock': stock,
       'is_active': isActive,
     };
   }
 
+  /// Nota: al ser `categoryId` nullable, `categoryId ?? this.categoryId` no
+  /// permite vaciar la categoría. Es aceptable porque el formulario la exige.
   Product copyWith({
     String? id,
     String? name,
     String? description,
-    String? category,
+    String? categoryId,
     double? price,
     int? stock,
     bool? isActive,
@@ -80,7 +86,7 @@ class Product {
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
-      category: category ?? this.category,
+      categoryId: categoryId ?? this.categoryId,
       price: price ?? this.price,
       stock: stock ?? this.stock,
       isActive: isActive ?? this.isActive,
@@ -91,7 +97,7 @@ class Product {
 
   @override
   String toString() {
-    return 'Product(id: $id, name: $name, category: $category, price: $price, stock: $stock)';
+    return 'Product(id: $id, name: $name, categoryId: $categoryId, price: $price, stock: $stock)';
   }
 }
 
@@ -99,7 +105,12 @@ class ProductCategory {
   final String id;
   final String name;
   final String description;
+
+  /// Clave corta del icono. Se resuelve con `CategoryIcons.resolve`.
+  final String? icon;
+  final int sortOrder;
   final bool isActive;
+  final String? gymId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -107,7 +118,10 @@ class ProductCategory {
     required this.id,
     required this.name,
     required this.description,
+    required this.icon,
+    required this.sortOrder,
     required this.isActive,
+    this.gymId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -117,7 +131,10 @@ class ProductCategory {
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       description: json['description'] ?? '',
+      icon: json['icon'] as String?,
+      sortOrder: json['sort_order'] ?? 0,
       isActive: json['is_active'] ?? true,
+      gymId: json['gym_id'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -127,15 +144,51 @@ class ProductCategory {
     );
   }
 
-  Map<String, dynamic> toJson() {
+  /// Payload de alta. No incluye `id` ni las marcas de tiempo: la base las
+  /// genera (`gen_random_uuid()`, `now()`), y un reloj de dispositivo
+  /// desviado produciría fechas erróneas.
+  Map<String, dynamic> toJsonForInsert() {
     return {
-      'id': id,
       'name': name,
       'description': description,
+      'icon': icon,
+      'sort_order': sortOrder,
       'is_active': isActive,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
     };
+  }
+
+  /// Payload de edición. `updated_at` lo pone el trigger de la tabla.
+  Map<String, dynamic> toJsonForUpdate() {
+    return {
+      'name': name,
+      'description': description,
+      'icon': icon,
+      'is_active': isActive,
+    };
+  }
+
+  ProductCategory copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? icon,
+    int? sortOrder,
+    bool? isActive,
+    String? gymId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return ProductCategory(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      icon: icon ?? this.icon,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isActive: isActive ?? this.isActive,
+      gymId: gymId ?? this.gymId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
 }
 

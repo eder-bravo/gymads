@@ -83,38 +83,70 @@ class AppSearchField extends StatelessWidget {
   }
 }
 
+/// Datos de un chip de categoría. Tipo de transporte propio para que este
+/// archivo siga siendo genérico y no dependa de los modelos de producto.
+class CategoryChipData {
+  final String id;
+  final String label;
+  final IconData icon;
+
+  const CategoryChipData({
+    required this.id,
+    required this.label,
+    required this.icon,
+  });
+}
+
 /// Filtro de categorías estándar de la aplicación (chips horizontales).
 ///
 /// Diseño base tomado de Inventario: mismos colores, forma y comportamiento
 /// en cualquier vista que necesite filtrar una lista por categoría.
+///
+/// El chip "Todas" vale `null`, no un texto: antes era el literal 'Todas' y
+/// una categoría llamada así rompía el filtro para siempre. Como `null` no
+/// puede ser un id, la colisión ya es imposible.
 class CategoryFilterChips extends StatelessWidget {
-  final List<String> categories;
-  final String selected;
-  final ValueChanged<String> onSelected;
+  final List<CategoryChipData> categories;
+  final String? selectedId;
+  final ValueChanged<String?> onSelected;
   final String allLabel;
+  final IconData allIcon;
 
   const CategoryFilterChips({
     super.key,
     required this.categories,
-    required this.selected,
+    required this.selectedId,
     required this.onSelected,
     this.allLabel = 'Todas',
+    this.allIcon = Icons.apps,
   });
 
   @override
   Widget build(BuildContext context) {
-    final items = [allLabel, ...categories];
+    final items = <CategoryChipData>[
+      CategoryChipData(id: '', label: allLabel, icon: allIcon),
+      ...categories,
+    ];
+
     return SizedBox(
       height: 50,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        children: items.map((category) {
-          final isSelected = selected == category;
+        children: items.map((item) {
+          final isAll = item.id.isEmpty;
+          final isSelected = isAll ? selectedId == null : selectedId == item.id;
+
           return Container(
             margin: const EdgeInsets.only(right: 8),
             child: FilterChip(
+              avatar: Icon(
+                item.icon,
+                size: 18,
+                color:
+                    isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+              ),
               label: Text(
-                category,
+                item.label,
                 style: TextStyle(
                   color: isSelected
                       ? AppColors.textPrimary
@@ -124,10 +156,12 @@ class CategoryFilterChips extends StatelessWidget {
                 ),
               ),
               selected: isSelected,
-              onSelected: (_) => onSelected(category),
+              // Sin esto Material sustituye el avatar por una palomita al
+              // seleccionar, y el icono desaparece justo al mirarlo.
+              showCheckmark: false,
+              onSelected: (_) => onSelected(isAll ? null : item.id),
               backgroundColor: AppColors.cardBackground,
               selectedColor: AppColors.accent,
-              checkmarkColor: AppColors.textPrimary,
               side: BorderSide(
                 color: isSelected
                     ? AppColors.accent

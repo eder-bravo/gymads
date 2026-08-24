@@ -30,7 +30,8 @@ class InventarioController extends GetxController {
           );
         }
       } catch (e) {
-        AppLogger.error('InventarioController', 'No se pudo mostrar la notificación', e);
+        AppLogger.error(
+            'InventarioController', 'No se pudo mostrar la notificación', e);
       }
     });
   }
@@ -42,7 +43,9 @@ class InventarioController extends GetxController {
 
   // Estado para la búsqueda
   final RxString searchQuery = ''.obs;
-  final RxString selectedCategory = 'Todas'.obs;
+
+  /// Id de la categoría filtrada. `null` significa "todas".
+  final RxnString selectedCategoryId = RxnString();
 
   // Estado para el formulario
   final Rx<Product?> currentProduct = Rx<Product?>(null);
@@ -101,19 +104,43 @@ class InventarioController extends GetxController {
 
   Future<void> loadCategories() async {
     try {
-      AppLogger.info('InventarioController', 'Loading categories');
+      // Se cargan también las inactivas: hacen falta para resolver el nombre
+      // de un producto cuya categoría se desactivó.
       categories.value = await productRepository.getAllCategories();
-      AppLogger.info('InventarioController', 'Loaded ${categories.length} categories');
+      filterProducts();
     } catch (e) {
       AppLogger.error('InventarioController', 'Error al cargar categorías', e);
     }
+  }
+
+  /// Categorías que se pueden elegir al crear o filtrar.
+  List<ProductCategory> get activeCategories =>
+      categories.where((c) => c.isActive).toList();
+
+  /// Búsqueda por id para resolver el nombre y el icono de un producto.
+  Map<String, ProductCategory> get categoryById => {
+        for (final c in categories) c.id: c,
+      };
+
+  String categoryNameFor(Product product) =>
+      categoryById[product.categoryId]?.name ?? 'Sin categoría';
+
+  /// Recarga todo. El botón de refrescar solo llamaba a `loadProducts`, así
+  /// que una categoría creada en otro dispositivo nunca aparecía.
+  Future<void> refreshAll() async {
+    await Future.wait([
+      loadCategories(),
+      loadProducts(),
+      loadInventoryStats(),
+    ]);
   }
 
   Future<void> loadInventoryStats() async {
     try {
       inventoryStats.value = await productRepository.getInventoryStats();
     } catch (e) {
-      AppLogger.error('InventarioController', 'Error al cargar estadísticas', e);
+      AppLogger.error(
+          'InventarioController', 'Error al cargar estadísticas', e);
     }
   }
 
@@ -123,8 +150,8 @@ class InventarioController extends GetxController {
           product.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
           product.description.toLowerCase().contains(searchQuery.toLowerCase());
 
-      bool matchesCategory = selectedCategory.value == 'Todas' ||
-          product.category == selectedCategory.value;
+      bool matchesCategory = selectedCategoryId.value == null ||
+          product.categoryId == selectedCategoryId.value;
 
       return matchesSearch && matchesCategory;
     }).toList();
@@ -135,8 +162,8 @@ class InventarioController extends GetxController {
     filterProducts();
   }
 
-  void setSelectedCategory(String category) {
-    selectedCategory.value = category;
+  void setSelectedCategory(String? categoryId) {
+    selectedCategoryId.value = categoryId;
     filterProducts();
   }
 
@@ -151,7 +178,7 @@ class InventarioController extends GetxController {
         final updatedProduct = currentProduct.value!.copyWith(
           name: productData['name'],
           description: productData['description'],
-          category: productData['category'],
+          categoryId: productData['category_id'],
           price: double.parse(productData['price']),
           stock: int.parse(productData['stock']),
           isActive: true,
@@ -176,7 +203,7 @@ class InventarioController extends GetxController {
           id: const Uuid().v4(),
           name: productData['name'],
           description: productData['description'],
-          category: productData['category'],
+          categoryId: productData['category_id'],
           price: double.parse(productData['price']),
           stock: int.parse(productData['stock']),
           isActive: true,
@@ -243,7 +270,8 @@ class InventarioController extends GetxController {
         _showSnackbarSafe('Éxito', 'Producto desactivado correctamente');
       }
     } catch (e) {
-      AppLogger.error('InventarioController', 'Error al desactivar producto', e);
+      AppLogger.error(
+          'InventarioController', 'Error al desactivar producto', e);
       _showSnackbarSafe('Error', 'No se pudo desactivar el producto',
           isError: true);
     }
@@ -315,7 +343,8 @@ class InventarioController extends GetxController {
       transactions.value =
           await productRepository.getProductTransactions(productId);
     } catch (e) {
-      AppLogger.error('InventarioController', 'Error al cargar transacciones', e);
+      AppLogger.error(
+          'InventarioController', 'Error al cargar transacciones', e);
     } finally {
       isLoading.value = false;
     }
@@ -365,46 +394,9 @@ class InventarioController extends GetxController {
         _showSnackbarSafe('Éxito', 'Transacción registrada correctamente');
       }
     } catch (e) {
-      AppLogger.error('InventarioController', 'Error al registrar transacción', e);
+      AppLogger.error(
+          'InventarioController', 'Error al registrar transacción', e);
       _showSnackbarSafe('Error', 'No se pudo registrar la transacción',
-          isError: true);
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  Future<void> saveCategory(String name, String description) async {
-    if (name.isEmpty) {
-      _showSnackbarSafe('Error', 'El nombre de la categoría es obligatorio',
-          isError: true);
-      return;
-    }
-
-    isLoading.value = true;
-    try {
-      final now = DateTime.now();
-
-      final newCategory = ProductCategory(
-        id: const Uuid().v4(),
-        name: name,
-        description: description,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final result = await productRepository.createCategory(newCategory);
-
-      if (result != null) {
-        categories.add(result);
-        categories.refresh();
-
-        Get.back();
-        _showSnackbarSafe('Éxito', 'Categoría creada correctamente');
-      }
-    } catch (e) {
-      AppLogger.error('InventarioController', 'Error al guardar categoría', e);
-      _showSnackbarSafe('Error', 'No se pudo guardar la categoría',
           isError: true);
     } finally {
       isLoading.value = false;

@@ -30,6 +30,8 @@ import '../modules/point_of_sale/views/point_of_sale_view.dart';
 import '../modules/auth/views/google_complete_register_view.dart';
 import '../modules/onboarding/bindings/onboarding_binding.dart';
 import '../modules/onboarding/views/payment_mode_view.dart';
+import '../modules/categorias/bindings/categorias_binding.dart';
+import '../modules/categorias/views/categorias_view.dart';
 
 part 'app_routes.dart';
 
@@ -129,6 +131,11 @@ class AppPages {
       name: _Paths.ONBOARDING_PAYMENT_MODE,
       page: () => const PaymentModeView(),
       binding: OnboardingBinding(),
+    ),
+    GetPage(
+      name: _Paths.CATEGORIAS,
+      page: () => const CategoriasView(),
+      binding: CategoriasBinding(),
     ),
   ];
 }

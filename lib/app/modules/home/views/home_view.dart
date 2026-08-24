@@ -368,8 +368,8 @@ class HomeView extends GetView<HomeController> {
       child: _tourStep(
         key: controller.keyConfiguracion,
         title: 'Configuración',
-        description:
-            'Ajusta tu cuenta, los precios de abonos y el lector de tarjetas.',
+        description: 'Ajusta tu cuenta, los precios de abonos, las '
+            'categorías de productos y el lector de tarjetas.',
         borderRadius: 16,
         child: Material(
           color: Colors.transparent,

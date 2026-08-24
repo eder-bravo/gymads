@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
+import 'package:gymads/app/core/utils/category_icons.dart';
 import '../controllers/inventario_controller.dart';
 
 class ProductFormView extends GetView<InventarioController> {
@@ -18,8 +19,8 @@ class ProductFormView extends GetView<InventarioController> {
     final priceController = TextEditingController();
     final stockController = TextEditingController();
 
-    // Use an Rx variable so the dropdown stays reactive
-    final selectedCategory = RxnString(null);
+    // Id de la categoría, no el nombre: así renombrarla no desenlaza nada.
+    final selectedCategoryId = RxnString(null);
 
     // Si estamos editando, llenar los campos con los datos del producto actual
     if (isEditing && controller.currentProduct.value != null) {
@@ -28,7 +29,7 @@ class ProductFormView extends GetView<InventarioController> {
       descriptionController.text = product.description;
       priceController.text = product.price.toString();
       stockController.text = product.stock.toString();
-      selectedCategory.value = product.category;
+      selectedCategoryId.value = product.categoryId;
     }
 
     return Scaffold(
@@ -52,7 +53,7 @@ class ProductFormView extends GetView<InventarioController> {
                         controller.saveProduct({
                           'name': nameController.text,
                           'description': descriptionController.text,
-                          'category': selectedCategory.value ?? '',
+                          'category_id': selectedCategoryId.value,
                           'price': priceController.text,
                           'stock': stockController.text,
                         });
@@ -102,8 +103,8 @@ class ProductFormView extends GetView<InventarioController> {
                       ),
                       textCapitalization: TextCapitalization.words,
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(
-                            r'[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s.,\-()]')),
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s.,\-()]')),
                         LengthLimitingTextInputFormatter(100),
                       ],
                       validator: (value) {
@@ -122,7 +123,8 @@ class ProductFormView extends GetView<InventarioController> {
                       style: const TextStyle(color: AppColors.textPrimary),
                       decoration: const InputDecoration(
                         labelText: 'Descripción',
-                        hintText: 'Describe las características del producto...',
+                        hintText:
+                            'Describe las características del producto...',
                         prefixIcon:
                             Icon(Icons.description, color: AppColors.accent),
                         helperText: 'Opcional - Máximo 500 caracteres',
@@ -139,11 +141,13 @@ class ProductFormView extends GetView<InventarioController> {
 
                     // Category dropdown — reactive with Obx
                     Obx(() {
-                      final cats = controller.categories;
-                      final currentVal = selectedCategory.value;
+                      // Solo las activas se pueden asignar a un producto.
+                      final cats = controller.activeCategories;
+                      final currentVal = selectedCategoryId.value;
 
-                      // Ensure value is valid in list
-                      final validValue = cats.any((c) => c.name == currentVal)
+                      // Red de seguridad por si la categoría se borró estando
+                      // el formulario abierto (con ids esto ya es raro).
+                      final validValue = cats.any((c) => c.id == currentVal)
                           ? currentVal
                           : null;
 
@@ -152,28 +156,29 @@ class ProductFormView extends GetView<InventarioController> {
                         style: const TextStyle(color: AppColors.textPrimary),
                         decoration: InputDecoration(
                           labelText: 'Categoría *',
-                          prefixIcon:
-                              const Icon(Icons.category, color: AppColors.accent),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.add_circle_outline,
-                                color: AppColors.accent, size: 22),
-                            tooltip: 'Crear categoría',
-                            onPressed: () => _showCreateCategoryDialog(),
-                          ),
+                          prefixIcon: const Icon(Icons.category,
+                              color: AppColors.accent),
                         ),
                         dropdownColor: AppColors.cardBackground,
                         items: cats.map((category) {
                           return DropdownMenuItem<String>(
-                            value: category.name,
-                            child: Text(
-                              category.name,
-                              style:
-                                  const TextStyle(color: AppColors.textPrimary),
+                            value: category.id,
+                            child: Row(
+                              children: [
+                                Icon(CategoryIcons.resolve(category.icon),
+                                    size: 18, color: AppColors.accent),
+                                const SizedBox(width: 10),
+                                Text(
+                                  category.name,
+                                  style: const TextStyle(
+                                      color: AppColors.textPrimary),
+                                ),
+                              ],
                             ),
                           );
                         }).toList(),
                         onChanged: (value) {
-                          selectedCategory.value = value;
+                          selectedCategoryId.value = value;
                         },
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -183,7 +188,7 @@ class ProductFormView extends GetView<InventarioController> {
                         },
                         hint: Text(
                           cats.isEmpty
-                              ? 'Crea una categoría primero'
+                              ? 'Crea categorías desde Configuración'
                               : 'Selecciona una categoría',
                           style: TextStyle(
                               color: AppColors.textSecondary.withOpacity(0.6)),
@@ -203,7 +208,9 @@ class ProductFormView extends GetView<InventarioController> {
                     TextFormField(
                       controller: priceController,
                       style: const TextStyle(
-                          color: AppColors.textPrimary, fontSize: 22, fontWeight: FontWeight.bold),
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold),
                       decoration: InputDecoration(
                         labelText: 'Precio de venta *',
                         hintText: '0.00',
@@ -218,8 +225,8 @@ class ProductFormView extends GetView<InventarioController> {
                         helperStyle: const TextStyle(
                             fontSize: 11, color: AppColors.textSecondary),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(
                             RegExp(r'^\d+\.?\d{0,2}')),
@@ -252,7 +259,9 @@ class ProductFormView extends GetView<InventarioController> {
                     TextFormField(
                       controller: stockController,
                       style: const TextStyle(
-                          color: AppColors.textPrimary, fontSize: 22, fontWeight: FontWeight.bold),
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold),
                       decoration: InputDecoration(
                         labelText: 'Cantidad disponible *',
                         hintText: '0',
@@ -292,66 +301,6 @@ class ProductFormView extends GetView<InventarioController> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  void _showCreateCategoryDialog() {
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: const Text(
-          'Nueva Categoría',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Nombre *',
-                hintText: 'Ej: Suplementos',
-                prefixIcon: Icon(Icons.label, color: AppColors.accent),
-              ),
-              textCapitalization: TextCapitalization.words,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descCtrl,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Descripción (opcional)',
-                prefixIcon: Icon(Icons.notes, color: AppColors.accent),
-              ),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nameCtrl.text.trim().isNotEmpty) {
-                controller.saveCategory(
-                    nameCtrl.text.trim(), descCtrl.text.trim());
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Crear'),
-          ),
-        ],
       ),
     );
   }

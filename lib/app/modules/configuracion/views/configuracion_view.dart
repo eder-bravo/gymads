@@ -98,6 +98,19 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
               size: 16, color: AppColors.textSecondary),
         ),
 
+        const SizedBox(height: 12),
+
+        // Categorías de productos (inventario y punto de venta)
+        _buildOptionTile(
+          icon: Icons.category,
+          iconColor: AppColors.accent,
+          title: 'Categorías de productos',
+          subtitle: 'Organiza el inventario y el punto de venta',
+          onTap: () => controller.openCategorias(),
+          trailing: const Icon(Icons.arrow_forward_ios,
+              size: 16, color: AppColors.textSecondary),
+        ),
+
         const SizedBox(height: 24),
 
         // Sección de acciones peligrosas

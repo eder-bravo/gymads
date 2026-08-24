@@ -106,7 +106,45 @@ class HomeView extends GetView<HomeController> {
     required String description,
     required double borderRadius,
     required Widget child,
+    bool isFirstStep = false,
+    bool isLastStep = false,
   }) {
+    final actions = <TooltipActionButton>[
+      // En el último paso no tiene sentido saltar: ya no queda nada por ver.
+      if (!isLastStep)
+        TooltipActionButton(
+          type: TooltipDefaultActionType.skip,
+          name: 'Saltar',
+          backgroundColor: Colors.transparent,
+          textStyle: TextStyle(
+            color: AppColors.textSecondary.withOpacity(0.7),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      // En el primer paso no hay a dónde volver.
+      if (!isFirstStep)
+        TooltipActionButton(
+          type: TooltipDefaultActionType.previous,
+          name: 'Anterior',
+          backgroundColor: Colors.white.withOpacity(0.08),
+          textStyle: const TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      TooltipActionButton(
+        // `next` en el último paso ya termina el tour por sí solo (según la
+        // API de showcaseview); solo cambia la etiqueta para que lo diga.
+        type: TooltipDefaultActionType.next,
+        name: isLastStep ? 'Entendido' : 'Siguiente',
+        backgroundColor: AppColors.brand,
+        textStyle: const TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ];
+
     return Showcase(
       key: key,
       title: title,
@@ -135,35 +173,7 @@ class HomeView extends GetView<HomeController> {
         position: TooltipActionPosition.inside,
         gapBetweenContentAndAction: 14,
       ),
-      tooltipActions: [
-        TooltipActionButton(
-          type: TooltipDefaultActionType.skip,
-          name: 'Saltar',
-          backgroundColor: Colors.transparent,
-          textStyle: TextStyle(
-            color: AppColors.textSecondary.withOpacity(0.7),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        TooltipActionButton(
-          type: TooltipDefaultActionType.previous,
-          name: 'Anterior',
-          backgroundColor: Colors.white.withOpacity(0.08),
-          textStyle: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const TooltipActionButton(
-          type: TooltipDefaultActionType.next,
-          name: 'Siguiente',
-          backgroundColor: AppColors.brand,
-          textStyle: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
+      tooltipActions: actions,
       child: child,
     );
   }
@@ -179,6 +189,7 @@ class HomeView extends GetView<HomeController> {
       description:
           'Este es tu panel principal: desde aquí llegas a todo lo del día a día.',
       borderRadius: 28,
+      isFirstStep: true,
       child: Container(
         width: double.infinity,
         padding: EdgeInsets.fromLTRB(
@@ -371,6 +382,7 @@ class HomeView extends GetView<HomeController> {
         description: 'Ajusta tu cuenta, los precios de abonos, las '
             'categorías de productos y el lector de tarjetas.',
         borderRadius: 16,
+        isLastStep: true,
         child: Material(
           color: Colors.transparent,
           child: InkWell(

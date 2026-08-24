@@ -19,6 +19,7 @@ abstract class Routes {
   static const POINT_OF_SALE = _Paths.POINT_OF_SALE;
   static const ACCESS_LOGS = _Paths.ACCESS_LOGS;
   static const GOOGLE_COMPLETE = _Paths.GOOGLE_COMPLETE;
+  static const ONBOARDING_PAYMENT_MODE = _Paths.ONBOARDING_PAYMENT_MODE;
 }
 
 abstract class _Paths {
@@ -39,4 +40,5 @@ abstract class _Paths {
   static const POINT_OF_SALE = '/point-of-sale';
   static const ACCESS_LOGS = '/access-logs';
   static const GOOGLE_COMPLETE = '/google-complete-register';
+  static const ONBOARDING_PAYMENT_MODE = '/onboarding/modo-cobro';
 }

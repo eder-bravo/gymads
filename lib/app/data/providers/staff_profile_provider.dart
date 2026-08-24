@@ -14,7 +14,7 @@ class StaffProfileProvider {
     try {
       final response = await _supabase
           .from('staff_profiles')
-          .select('*, gyms(name, created_at)')
+          .select('*, gyms(name, created_at, payment_mode)')
           .eq('user_id', userId)
           .eq('is_active', true)
           .maybeSingle();

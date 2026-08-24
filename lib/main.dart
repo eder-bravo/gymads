@@ -10,6 +10,7 @@ import 'package:gymads/app/data/services/background_rfid_service.dart';
 import 'package:gymads/app/data/services/image_cache_service.dart';
 import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
+import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/modules/auth/controllers/auth_controller.dart';
 import 'package:gymads/app/routes/app_pages.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -44,6 +45,10 @@ void main() async {
   Get.put(TenantContextService(), permanent: true);
   await TenantContextService.to.init();
   AppLogger.info('Main', 'TenantContextService inicializado');
+
+  // Tour de bienvenida: debe quedar registrado antes de que se construya
+  // cualquier widget Showcase de Inicio.
+  Get.put(WelcomeTourService(), permanent: true).init();
 
   // Check for existing session
   final authController = Get.put(AuthController(), permanent: true);
@@ -112,9 +117,11 @@ class _MyAppState extends State<MyApp> {
       try {
         final bool connected = await RfidReaderService.startReading();
         if (connected) {
-          AppLogger.info('Main', 'RFID conectado. Iniciando escaneo en segundo plano');
+          AppLogger.info(
+              'Main', 'RFID conectado. Iniciando escaneo en segundo plano');
           Get.find<BackgroundRfidService>().startScanning();
-          AppLogger.info('Main', 'Servicio de escaneo RFID iniciado correctamente');
+          AppLogger.info(
+              'Main', 'Servicio de escaneo RFID iniciado correctamente');
         } else {
           AppLogger.warning('Main', 'No se pudo conectar al lector RFID');
         }

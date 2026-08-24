@@ -16,6 +16,9 @@ class StaffProfileModel {
   // Gym creation date (joined from gyms table) — used as the lower bound
   // for date navigation (e.g. income months can't go before the account existed)
   final DateTime? gymCreatedAt;
+  // Modo de cobro del gimnasio (joined from gyms table): 'fijo' | 'libre'.
+  // Null significa que el asistente de configuración inicial está pendiente.
+  final String? paymentMode;
 
   StaffProfileModel({
     required this.id,
@@ -31,6 +34,7 @@ class StaffProfileModel {
     required this.updatedAt,
     this.gymName,
     this.gymCreatedAt,
+    this.paymentMode,
   });
 
   factory StaffProfileModel.fromJson(Map<String, dynamic> json) {
@@ -49,8 +53,10 @@ class StaffProfileModel {
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       gymName: gymData?['name'] as String? ?? json['gym_name'] as String?,
-      gymCreatedAt: _parseDate(
-          gymData?['created_at'] ?? json['gym_created_at']),
+      gymCreatedAt:
+          _parseDate(gymData?['created_at'] ?? json['gym_created_at']),
+      paymentMode: gymData?['payment_mode'] as String? ??
+          json['payment_mode'] as String?,
     );
   }
 
@@ -77,6 +83,7 @@ class StaffProfileModel {
       'updated_at': updatedAt.toIso8601String(),
       'gym_name': gymName,
       'gym_created_at': gymCreatedAt?.toIso8601String(),
+      'payment_mode': paymentMode,
     };
   }
 
@@ -108,6 +115,7 @@ class StaffProfileModel {
     DateTime? updatedAt,
     String? gymName,
     DateTime? gymCreatedAt,
+    String? paymentMode,
   }) {
     return StaffProfileModel(
       id: id ?? this.id,
@@ -123,6 +131,7 @@ class StaffProfileModel {
       updatedAt: updatedAt ?? this.updatedAt,
       gymName: gymName ?? this.gymName,
       gymCreatedAt: gymCreatedAt ?? this.gymCreatedAt,
+      paymentMode: paymentMode ?? this.paymentMode,
     );
   }
 

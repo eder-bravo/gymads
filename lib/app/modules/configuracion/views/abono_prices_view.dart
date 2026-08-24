@@ -99,9 +99,9 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                                 strokeWidth: 2,
                               ),
                             )
-                          : const Text(
-                              'Guardar',
-                              style: TextStyle(
+                          : Text(
+                              controller.isOnboarding ? 'Continuar' : 'Guardar',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,

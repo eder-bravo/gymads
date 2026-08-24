@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
@@ -14,6 +15,13 @@ class HomeView extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     final bool isTablet = MediaQuery.of(context).size.width > 600;
+
+    // Asistente inicial / tour de bienvenida. Va aquí además de en onReady
+    // porque al volver del asistente GetX puede reutilizar el controlador; la
+    // comprobación es idempotente y barata una vez resuelta.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.checkOnboarding();
+    });
 
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
@@ -87,66 +95,147 @@ class HomeView extends GetView<HomeController> {
   }
 
   // ─────────────────────────────────────────────────────────
+  // TOUR DE BIENVENIDA
+  // ─────────────────────────────────────────────────────────
+
+  /// Envuelve un objetivo del tour con la burbuja explicativa y su flecha.
+  /// Centraliza el estilo para que los ocho pasos se vean igual.
+  Widget _tourStep({
+    required GlobalKey key,
+    required String title,
+    required String description,
+    required double borderRadius,
+    required Widget child,
+  }) {
+    return Showcase(
+      key: key,
+      title: title,
+      description: description,
+      tooltipBackgroundColor: AppColors.cardBackground,
+      textColor: AppColors.textPrimary,
+      titleTextStyle: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+      ),
+      descTextStyle: TextStyle(
+        fontSize: 13,
+        height: 1.35,
+        color: AppColors.textSecondary.withOpacity(0.85),
+      ),
+      tooltipPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      tooltipBorderRadius: BorderRadius.circular(16),
+      targetBorderRadius: BorderRadius.circular(borderRadius),
+      targetPadding: const EdgeInsets.all(6),
+      // Sin esto, tocar la tarjeta resaltada navegaría al módulo en vez de
+      // avanzar el tour.
+      disableDefaultTargetGestures: true,
+      tooltipActionConfig: const TooltipActionConfig(
+        alignment: MainAxisAlignment.spaceBetween,
+        position: TooltipActionPosition.inside,
+        gapBetweenContentAndAction: 14,
+      ),
+      tooltipActions: [
+        TooltipActionButton(
+          type: TooltipDefaultActionType.skip,
+          name: 'Saltar',
+          backgroundColor: Colors.transparent,
+          textStyle: TextStyle(
+            color: AppColors.textSecondary.withOpacity(0.7),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        TooltipActionButton(
+          type: TooltipDefaultActionType.previous,
+          name: 'Anterior',
+          backgroundColor: Colors.white.withOpacity(0.08),
+          textStyle: const TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const TooltipActionButton(
+          type: TooltipDefaultActionType.next,
+          name: 'Siguiente',
+          backgroundColor: AppColors.brand,
+          textStyle: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+      child: child,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
   // HEADER
   // ─────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, bool isTablet) {
     final topPadding = MediaQuery.of(context).padding.top;
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        isTablet ? 32 : 24,
-        topPadding + (isTablet ? 18 : 14),
-        isTablet ? 32 : 24,
-        isTablet ? 16 : 14,
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: const [0.0, 0.55, 1.0],
-          colors: [
-            const Color(0xFF11151F),
-            const Color(0xFF1A2332),
-            AppColors.brand.withOpacity(0.28),
+    return _tourStep(
+      key: controller.keyHeader,
+      title: '¡Te damos la bienvenida!',
+      description:
+          'Este es tu panel principal: desde aquí llegas a todo lo del día a día.',
+      borderRadius: 28,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+          isTablet ? 32 : 24,
+          topPadding + (isTablet ? 18 : 14),
+          isTablet ? 32 : 24,
+          isTablet ? 16 : 14,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: const [0.0, 0.55, 1.0],
+            colors: [
+              const Color(0xFF11151F),
+              const Color(0xFF1A2332),
+              AppColors.brand.withOpacity(0.28),
+            ],
+          ),
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(28),
+            bottomRight: Radius.circular(28),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.brand.withOpacity(0.12),
+              blurRadius: 28,
+              offset: const Offset(0, 8),
+            ),
           ],
         ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.brand.withOpacity(0.18),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                Icons.dashboard_rounded,
+                color: AppColors.brand,
+                size: isTablet ? 26 : 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Text(
+              'Inicio',
+              style: TextStyle(
+                fontSize: isTablet ? 26 : 22,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.brand.withOpacity(0.12),
-            blurRadius: 28,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.brand.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              Icons.dashboard_rounded,
-              color: AppColors.brand,
-              size: isTablet ? 26 : 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Text(
-            'Inicio',
-            style: TextStyle(
-              fontSize: isTablet ? 26 : 22,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -162,6 +251,9 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Gestión de miembros',
         gradient: const [Color(0xFF667eea), Color(0xFF764ba2)],
         onTap: controller.goToClientes,
+        showcaseKey: controller.keyClientes,
+        tourDescription: 'Da de alta a tus miembros, edita sus datos y '
+            'consulta cuándo vence su abono.',
       ),
       _ModuleItem(
         icon: Icons.payments_outlined,
@@ -169,6 +261,9 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Cobrar membresías',
         gradient: const [Color(0xFFf093fb), Color(0xFFf5576c)],
         onTap: controller.goToAbonar,
+        showcaseKey: controller.keyAbonar,
+        tourDescription: 'Cobra y renueva membresías: eliges el periodo y '
+            'registras el pago.',
       ),
       _ModuleItem(
         icon: Icons.storefront_outlined,
@@ -176,6 +271,9 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Punto de venta',
         gradient: const [Color(0xFF4facfe), Color(0xFF00f2fe)],
         onTap: controller.goToPointOfSale,
+        showcaseKey: controller.keyVender,
+        tourDescription: 'Punto de venta para cobrar productos: bebidas, '
+            'suplementos y lo que ofrezcas.',
       ),
       _ModuleItem(
         icon: Icons.inventory_2_outlined,
@@ -183,6 +281,9 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Productos y stock',
         gradient: const [Color(0xFF43e97b), Color(0xFF38f9d7)],
         onTap: controller.goToInventario,
+        showcaseKey: controller.keyInventario,
+        tourDescription:
+            'Administra tus productos y controla el stock disponible.',
       ),
     ];
 
@@ -200,7 +301,14 @@ class HomeView extends GetView<HomeController> {
         ),
         itemCount: modules.length,
         itemBuilder: (context, index) {
-          return _ModuleCard(module: modules[index]);
+          final module = modules[index];
+          return _tourStep(
+            key: module.showcaseKey,
+            title: module.label,
+            description: module.tourDescription,
+            borderRadius: 20,
+            child: _ModuleCard(module: module),
+          );
         },
       ),
     );
@@ -217,6 +325,9 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Historial de pagos',
         color: const Color(0xFFFFB74D),
         onTap: controller.goToPaymentRegistration,
+        showcaseKey: controller.keyIngresos,
+        tourDescription:
+            'Consulta el historial de todos los pagos y ventas registrados.',
       ),
       _QuickAction(
         icon: Icons.door_sliding_outlined,
@@ -224,6 +335,8 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Registro de accesos',
         color: const Color(0xFF81C784),
         onTap: controller.goToAccessLogs,
+        showcaseKey: controller.keyEntradas,
+        tourDescription: 'Revisa quién entró al gimnasio y a qué hora.',
       ),
     ];
 
@@ -233,7 +346,13 @@ class HomeView extends GetView<HomeController> {
         children: actions.map((action) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: _QuickActionTile(action: action),
+            child: _tourStep(
+              key: action.showcaseKey,
+              title: action.label,
+              description: action.tourDescription,
+              borderRadius: 16,
+              child: _QuickActionTile(action: action),
+            ),
           );
         }).toList(),
       ),
@@ -246,52 +365,59 @@ class HomeView extends GetView<HomeController> {
   Widget _buildSettingsTile(BuildContext context, bool isTablet) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => Get.toNamed(Routes.CONFIGURACION),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.06),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.settings_outlined,
-                    color: Colors.white70,
-                    size: 24,
-                  ),
+      child: _tourStep(
+        key: controller.keyConfiguracion,
+        title: 'Configuración',
+        description:
+            'Ajusta tu cuenta, los precios de abonos y el lector de tarjetas.',
+        borderRadius: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => Get.toNamed(Routes.CONFIGURACION),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              decoration: BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.06),
+                  width: 1,
                 ),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Text(
-                    'Configuración',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.settings_outlined,
+                      color: Colors.white70,
+                      size: 24,
                     ),
                   ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: Colors.white.withOpacity(0.2),
-                  size: 16,
-                ),
-              ],
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Text(
+                      'Configuración',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: Colors.white.withOpacity(0.2),
+                    size: 16,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -310,6 +436,8 @@ class _ModuleItem {
   final String subtitle;
   final List<Color> gradient;
   final VoidCallback onTap;
+  final GlobalKey showcaseKey;
+  final String tourDescription;
 
   const _ModuleItem({
     required this.icon,
@@ -317,6 +445,8 @@ class _ModuleItem {
     required this.subtitle,
     required this.gradient,
     required this.onTap,
+    required this.showcaseKey,
+    required this.tourDescription,
   });
 }
 
@@ -326,6 +456,8 @@ class _QuickAction {
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
+  final GlobalKey showcaseKey;
+  final String tourDescription;
 
   const _QuickAction({
     required this.icon,
@@ -333,6 +465,8 @@ class _QuickAction {
     required this.subtitle,
     required this.color,
     required this.onTap,
+    required this.showcaseKey,
+    required this.tourDescription,
   });
 }
 

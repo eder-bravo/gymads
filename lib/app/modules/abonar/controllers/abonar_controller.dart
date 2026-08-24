@@ -102,8 +102,14 @@ class AbonarController extends GetxController {
   Future<void> _loadPrices() async {
     final result = await pricesRepository.getPrices();
     prices.value = result;
-    // Sin precios configurados el modo fijo no tiene nada que ofrecer
-    isPrecioFijo.value = result.hasAnyPrice;
+    // Punto de partida del toggle: el modo que configuró el gimnasio. Sin modo
+    // configurado se conserva la heurística anterior. En ambos casos el modo
+    // fijo necesita al menos un precio para tener algo que ofrecer, y el staff
+    // puede cambiarlo libremente en cada cobro.
+    final mode = result.paymentMode;
+    isPrecioFijo.value = mode == null
+        ? result.hasAnyPrice
+        : mode == 'fijo' && result.hasAnyPrice;
     applyFixedPrice();
   }
 

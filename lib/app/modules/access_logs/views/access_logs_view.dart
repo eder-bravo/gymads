@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../controllers/access_logs_controller.dart';
 import '../../../data/models/access_log_model.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/widgets/tour_step.dart';
 import '../../../global_widgets/app_header.dart';
 
 class AccessLogsView extends GetView<AccessLogsController> {
@@ -27,11 +28,26 @@ class AccessLogsView extends GetView<AccessLogsController> {
         child: Column(
           children: [
             // Estadísticas superiores
-            _buildStatsSection(),
-            
+            TourStep(
+              tourKey: controller.keyResumen,
+              title: 'Resumen',
+              description: 'Cuántas personas han entrado y cuántos registros '
+                  'hay en total.',
+              borderRadius: 20,
+              isFirstStep: true,
+              child: _buildStatsSection(),
+            ),
+
             // Lista de logs
             Expanded(
-              child: _buildLogsList(),
+              child: TourStep(
+                tourKey: controller.keyLista,
+                title: 'Historial de accesos',
+                description: 'Quién entró al gimnasio, a qué hora y quién lo '
+                    'registró. Desliza hacia abajo para actualizar.',
+                isLastStep: true,
+                child: _buildLogsList(),
+              ),
             ),
           ],
         ),

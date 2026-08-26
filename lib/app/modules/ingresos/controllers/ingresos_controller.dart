@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/core/utils/snackbar_helper.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
+import 'package:gymads/app/data/services/welcome_tour_service.dart';
 
-class IngresosController extends GetxController {
+class IngresosController extends GetxController with ScreenTourMixin {
   final IngresoService ingresoService;
 
   IngresosController({required this.ingresoService});
@@ -71,6 +73,19 @@ class IngresosController extends GetxController {
     'nov',
     'dic',
   ];
+
+  // ─── Tour de bienvenida ───
+  final keyPeriodo = GlobalKey();
+  final keyTotal = GlobalKey();
+  final keyVerTodas = GlobalKey();
+  final keyLista = GlobalKey();
+
+  @override
+  String get tourId => AppTours.ingresos;
+
+  @override
+  List<GlobalKey> get tourSteps =>
+      [keyPeriodo, keyTotal, keyVerTodas, keyLista];
 
   @override
   void onInit() {

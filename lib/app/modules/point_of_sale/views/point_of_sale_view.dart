@@ -6,6 +6,7 @@ import '../../../data/models/product_model.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../core/utils/category_icons.dart';
+import '../../../core/widgets/tour_step.dart';
 import '../../../global_widgets/app_header.dart';
 
 class PointOfSaleView extends GetView<PointOfSaleController> {
@@ -22,75 +23,102 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
             // Barra de búsqueda
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: AppSearchField(
-                hintText: 'Buscar productos...',
-                onChanged: controller.searchProducts,
+              child: TourStep(
+                tourKey: controller.keyBuscar,
+                title: 'Buscador',
+                description: 'Encuentra un producto por su nombre sin tener '
+                    'que recorrer toda la lista.',
+                isFirstStep: true,
+                child: AppSearchField(
+                  hintText: 'Buscar productos...',
+                  onChanged: controller.searchProducts,
+                ),
               ),
             ),
 
             // Filtro de categorías
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Obx(() => CategoryFilterChips(
-                    categories: controller.activeCategories
-                        .map((c) => CategoryChipData(
-                              id: c.id,
-                              label: c.name,
-                              icon: CategoryIcons.resolve(c.icon),
-                            ))
-                        .toList(),
-                    selectedId: controller.selectedCategoryId,
-                    onSelected: controller.setSelectedCategory,
-                  )),
+              child: TourStep(
+                tourKey: controller.keyCategorias,
+                title: 'Categorías',
+                description: 'Filtra los productos por categoría para llegar '
+                    'más rápido a lo que vendes a diario.',
+                child: Obx(() => CategoryFilterChips(
+                      categories: controller.activeCategories
+                          .map((c) => CategoryChipData(
+                                id: c.id,
+                                label: c.name,
+                                icon: CategoryIcons.resolve(c.icon),
+                              ))
+                          .toList(),
+                      selectedId: controller.selectedCategoryId,
+                      onSelected: controller.setSelectedCategory,
+                    )),
+              ),
             ),
 
             // Grid de productos
             Expanded(
-              child: Obx(() {
-                if (controller.isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.accent),
-                  );
-                }
+              child: TourStep(
+                tourKey: controller.keyProductos,
+                title: 'Tus productos',
+                description: 'Toca un producto para agregarlo a la venta. '
+                    'Déjalo presionado para fijarlo arriba y tener a mano lo '
+                    'que más vendes.',
+                child: Obx(() {
+                  if (controller.isLoading) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: AppColors.accent),
+                    );
+                  }
 
-                final products = controller.filteredProducts;
+                  final products = controller.filteredProducts;
 
-                if (products.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.inventory_2_outlined,
-                            size: 64, color: AppColors.textSecondary),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No hay productos disponibles',
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                      ],
+                  if (products.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inventory_2_outlined,
+                              size: 64, color: AppColors.textSecondary),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No hay productos disponibles',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final isTablet = MediaQuery.of(context).size.width > 600;
+                  return GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: isTablet ? 4 : 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.8,
                     ),
+                    itemCount: products.length,
+                    itemBuilder: (context, index) {
+                      return _buildProductCard(products[index]);
+                    },
                   );
-                }
-
-                final isTablet = MediaQuery.of(context).size.width > 600;
-                return GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: isTablet ? 4 : 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.8,
-                  ),
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    return _buildProductCard(products[index]);
-                  },
-                );
-              }),
+                }),
+              ),
             ),
 
             // Panel inferior fijo del carrito
-            _buildCartPanel(context),
+            TourStep(
+              tourKey: controller.keyCarrito,
+              title: 'Carrito y cobro',
+              description: 'Aquí ves el total de la venta y cobras eligiendo '
+                  'el método de pago.',
+              isLastStep: true,
+              child: _buildCartPanel(context),
+            ),
           ],
         ),
       ),
@@ -104,77 +132,96 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       );
       final quantity = cartItem?.quantity ?? 0;
       final inCart = quantity > 0;
+      final pinned = controller.isPinned(product.id);
 
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: inCart ? AppColors.accent : AppColors.accent.withOpacity(0.12),
-            width: inCart ? 2 : 1,
+      return GestureDetector(
+        // Fijar arriba es un atajo de mostrador, por eso va en la pulsación
+        // larga: no estorba al toque normal, que es agregar a la venta.
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          controller.togglePinned(product);
+        },
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: inCart ? AppColors.accent : AppColors.accent.withOpacity(0.12),
+              width: inCart ? 2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Ícono de categoría + badge de stock
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: AppColors.containerBackground,
-                    shape: BoxShape.circle,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Ícono de categoría + badge de stock
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: AppColors.containerBackground,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      CategoryIcons.resolve(
+                          controller.categoryById[product.categoryId]?.icon),
+                      color: AppColors.accent,
+                      size: 20,
+                    ),
                   ),
-                  child: Icon(
-                    CategoryIcons.resolve(
-                        controller.categoryById[product.categoryId]?.icon),
-                    color: AppColors.accent,
-                    size: 20,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (pinned) ...[
+                        const Icon(Icons.push_pin,
+                            size: 14, color: AppColors.accent),
+                        const SizedBox(width: 6),
+                      ],
+                      _buildStockBadge(product.stock),
+                    ],
                   ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Nombre
+              Text(
+                product.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
                 ),
-                _buildStockBadge(product.stock),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Nombre
-            Text(
-              product.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: AppColors.textPrimary,
               ),
-            ),
-            const Spacer(),
+              const Spacer(),
 
-            // Precio
-            Text(
-              '\$${product.price.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 17,
-                color: AppColors.accent,
+              // Precio
+              Text(
+                '\$${product.price.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                  color: AppColors.accent,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
+              const SizedBox(height: 10),
 
-            // Control de cantidad
-            _buildQuantityControl(product, quantity),
-          ],
+              // Control de cantidad
+              _buildQuantityControl(product, quantity),
+            ],
+          ),
         ),
       );
     });

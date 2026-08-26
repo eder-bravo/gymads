@@ -3,14 +3,16 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/image_cache_service.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
+import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 
-class ClientesController extends GetxController {
+class ClientesController extends GetxController with ScreenTourMixin {
   final UserRepository userRepository;
   final IngresoService? ingresoService; // Opcional
 
@@ -41,6 +43,19 @@ class ClientesController extends GetxController {
   final rfidController = TextEditingController();
   final emailController = TextEditingController(); // NUEVO
   final addressController = TextEditingController(); // NUEVO
+
+  // ─── Tour de bienvenida ───
+  // Las claves viven aquí y no en el `build` de la vista para que sigan siendo
+  // las mismas entre reconstrucciones.
+  final keyAgregar = GlobalKey();
+  final keyBuscar = GlobalKey();
+  final keyLista = GlobalKey();
+
+  @override
+  String get tourId => AppTours.clientes;
+
+  @override
+  List<GlobalKey> get tourSteps => [keyAgregar, keyBuscar, keyLista];
 
   @override
   void onInit() {

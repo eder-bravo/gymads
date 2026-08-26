@@ -6,13 +6,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/rfid_reader_service.dart';
 import '../../../data/services/tenant_context_service.dart';
+import '../../../data/services/welcome_tour_service.dart';
 import '../../../data/services/image_cache_service.dart';
 import '../../../data/models/staff_profile_model.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../routes/app_pages.dart';
 
-class ConfiguracionController extends GetxController {
+class ConfiguracionController extends GetxController with ScreenTourMixin {
   // Variables observables para la configuración
   final RxBool isLoading = false.obs;
 
@@ -40,6 +42,17 @@ class ConfiguracionController extends GetxController {
   // Variables para configuración de audio
   final RxBool soundEnabled = true.obs;
   final RxDouble soundVolume = 0.8.obs;
+
+  // ─── Tour de bienvenida ───
+  final keyCuenta = GlobalKey();
+  final keyPrecios = GlobalKey();
+  final keyCategorias = GlobalKey();
+
+  @override
+  String get tourId => AppTours.configuracion;
+
+  @override
+  List<GlobalKey> get tourSteps => [keyCuenta, keyPrecios, keyCategorias];
 
   @override
   void onInit() {

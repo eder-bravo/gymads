@@ -5,6 +5,7 @@ import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/routes/app_pages.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/core/utils/category_icons.dart';
+import 'package:gymads/app/core/widgets/tour_step.dart';
 import '../controllers/inventario_controller.dart';
 
 class InventarioView extends GetView<InventarioController> {
@@ -21,22 +22,37 @@ class InventarioView extends GetView<InventarioController> {
             icon: const Icon(Icons.refresh),
             onPressed: () => controller.refreshAll(),
           ),
-          IconButton(
-            icon: const Icon(Icons.category_outlined),
-            tooltip: 'Categorías',
-            onPressed: () async {
-              await Get.toNamed(Routes.CATEGORIAS);
-              // Al volver pueden haber cambiado nombres, iconos u orden.
-              controller.loadCategories();
-            },
+          TourStep(
+            tourKey: controller.keyCategorias,
+            title: 'Categorías',
+            description: 'Crea y ordena las categorías con las que agrupas '
+                'tus productos aquí y en el punto de venta.',
+            borderRadius: 24,
+            child: IconButton(
+              icon: const Icon(Icons.category_outlined),
+              tooltip: 'Categorías',
+              onPressed: () async {
+                await Get.toNamed(Routes.CATEGORIAS);
+                // Al volver pueden haber cambiado nombres, iconos u orden.
+                controller.loadCategories();
+              },
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              controller.resetForm();
-              Get.toNamed(Routes.PRODUCT_FORM);
-            },
-            tooltip: 'Agregar producto',
+          TourStep(
+            tourKey: controller.keyAgregar,
+            title: 'Agregar producto',
+            description: 'Registra un producto nuevo con su precio, su stock '
+                'y la categoría a la que pertenece.',
+            borderRadius: 24,
+            isFirstStep: true,
+            child: IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () {
+                controller.resetForm();
+                Get.toNamed(Routes.PRODUCT_FORM);
+              },
+              tooltip: 'Agregar producto',
+            ),
           ),
         ],
       ),
@@ -44,10 +60,22 @@ class InventarioView extends GetView<InventarioController> {
         child: Column(
           children: [
             _buildStatsSection(),
-            _buildSearchBar(),
+            TourStep(
+              tourKey: controller.keyBuscar,
+              title: 'Buscador',
+              description: 'Localiza cualquier producto escribiendo su nombre.',
+              child: _buildSearchBar(),
+            ),
             _buildCategoryFilter(),
             Expanded(
-              child: _buildProductList(),
+              child: TourStep(
+                tourKey: controller.keyLista,
+                title: 'Tus productos',
+                description: 'Toca un producto para ver su detalle, editarlo '
+                    'o registrar entradas y salidas de stock.',
+                isLastStep: true,
+                child: _buildProductList(),
+              ),
             ),
           ],
         ),

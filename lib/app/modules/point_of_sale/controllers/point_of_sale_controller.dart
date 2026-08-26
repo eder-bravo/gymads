@@ -1,13 +1,18 @@
+import 'package:flutter/widgets.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/models/sale_model.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/sale_repository.dart';
+import '../../../data/services/tenant_context_service.dart';
+import '../../../data/services/welcome_tour_service.dart';
 import '../../ingresos/controllers/ingresos_controller.dart';
 
-class PointOfSaleController extends GetxController {
+class PointOfSaleController extends GetxController with ScreenTourMixin {
   final ProductRepository _productRepository = ProductRepository();
   final SaleRepository _saleRepository = SaleRepository();
 
@@ -34,6 +39,10 @@ class PointOfSaleController extends GetxController {
   final RxList<ProductCategory> _categories = <ProductCategory>[].obs;
   final RxnString _selectedCategoryId = RxnString();
 
+  /// Productos fijados arriba, los que más se venden. Se guardan por gimnasio
+  /// en el dispositivo: es una comodidad del mostrador, no un dato del negocio.
+  final RxSet<String> _pinnedProductIds = <String>{}.obs;
+
   // Configuración de impuestos
   final RxDouble _taxRate = 0.0.obs; // 0% por defecto, configurable
 
@@ -56,7 +65,7 @@ class PointOfSaleController extends GetxController {
     final query = _searchQuery.value.toLowerCase();
     final byId = categoryById;
 
-    return _availableProducts.where((product) {
+    final matches = _availableProducts.where((product) {
       final matchesCategory = _selectedCategoryId.value == null ||
           product.categoryId == _selectedCategoryId.value;
 
@@ -70,7 +79,53 @@ class PointOfSaleController extends GetxController {
           categoryName.contains(query);
 
       return matchesCategory && matchesSearch;
-    }).toList();
+    });
+
+    // Los fijados primero. Se reparte en dos listas en vez de ordenar porque
+    // `List.sort` no es estable y revolvería el orden dentro de cada grupo.
+    final pinned = <Product>[];
+    final rest = <Product>[];
+    for (final product in matches) {
+      (isPinned(product.id) ? pinned : rest).add(product);
+    }
+    return [...pinned, ...rest];
+  }
+
+  bool isPinned(String productId) => _pinnedProductIds.contains(productId);
+
+  /// Fija o suelta un producto (pulsación larga sobre su tarjeta).
+  Future<void> togglePinned(Product product) async {
+    final wasPinned = isPinned(product.id);
+    if (wasPinned) {
+      _pinnedProductIds.remove(product.id);
+    } else {
+      _pinnedProductIds.add(product.id);
+    }
+
+    SnackbarHelper.info(
+      product.name,
+      wasPinned ? 'Ya no está fijado arriba' : 'Fijado arriba',
+    );
+    await _savePinnedProducts();
+  }
+
+  static String? _pinnedKey() {
+    final gymId = TenantContextService.to.currentGymId;
+    return gymId == null ? null : 'pos_pinned_products_$gymId';
+  }
+
+  Future<void> _loadPinnedProducts() async {
+    final key = _pinnedKey();
+    if (key == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    _pinnedProductIds.addAll(prefs.getStringList(key) ?? const []);
+  }
+
+  Future<void> _savePinnedProducts() async {
+    final key = _pinnedKey();
+    if (key == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(key, _pinnedProductIds.toList());
   }
 
   /// Búsqueda por id para resolver nombre e icono de la categoría.
@@ -108,11 +163,25 @@ class PointOfSaleController extends GetxController {
   bool get usaReferenciaPago =>
       _metodosConReferencia.contains(_selectedPaymentMethod.value);
 
+  // ─── Tour de bienvenida ───
+  final keyBuscar = GlobalKey();
+  final keyCategorias = GlobalKey();
+  final keyProductos = GlobalKey();
+  final keyCarrito = GlobalKey();
+
+  @override
+  String get tourId => AppTours.puntoDeVenta;
+
+  @override
+  List<GlobalKey> get tourSteps =>
+      [keyBuscar, keyCategorias, keyProductos, keyCarrito];
+
   @override
   void onInit() {
     super.onInit();
     loadProducts();
     loadCategories();
+    _loadPinnedProducts();
   }
 
   /// Cargar productos disponibles

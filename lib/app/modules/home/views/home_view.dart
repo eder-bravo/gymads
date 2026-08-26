@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:showcaseview/showcaseview.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/widgets/tour_step.dart';
 
 import '../../../routes/app_pages.dart';
 import '../controllers/home_controller.dart';
@@ -95,96 +95,12 @@ class HomeView extends GetView<HomeController> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // TOUR DE BIENVENIDA
-  // ─────────────────────────────────────────────────────────
-
-  /// Envuelve un objetivo del tour con la burbuja explicativa y su flecha.
-  /// Centraliza el estilo para que los ocho pasos se vean igual.
-  Widget _tourStep({
-    required GlobalKey key,
-    required String title,
-    required String description,
-    required double borderRadius,
-    required Widget child,
-    bool isFirstStep = false,
-    bool isLastStep = false,
-  }) {
-    final actions = <TooltipActionButton>[
-      // En el último paso no tiene sentido saltar: ya no queda nada por ver.
-      if (!isLastStep)
-        TooltipActionButton(
-          type: TooltipDefaultActionType.skip,
-          name: 'Saltar',
-          backgroundColor: Colors.transparent,
-          textStyle: TextStyle(
-            color: AppColors.textSecondary.withOpacity(0.7),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      // En el primer paso no hay a dónde volver.
-      if (!isFirstStep)
-        TooltipActionButton(
-          type: TooltipDefaultActionType.previous,
-          name: 'Anterior',
-          backgroundColor: Colors.white.withOpacity(0.08),
-          textStyle: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      TooltipActionButton(
-        // `next` en el último paso ya termina el tour por sí solo (según la
-        // API de showcaseview); solo cambia la etiqueta para que lo diga.
-        type: TooltipDefaultActionType.next,
-        name: isLastStep ? 'Entendido' : 'Siguiente',
-        backgroundColor: AppColors.brand,
-        textStyle: const TextStyle(
-          color: Colors.black,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    ];
-
-    return Showcase(
-      key: key,
-      title: title,
-      description: description,
-      tooltipBackgroundColor: AppColors.cardBackground,
-      textColor: AppColors.textPrimary,
-      titleTextStyle: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
-      ),
-      descTextStyle: TextStyle(
-        fontSize: 13,
-        height: 1.35,
-        color: AppColors.textSecondary.withOpacity(0.85),
-      ),
-      tooltipPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      tooltipBorderRadius: BorderRadius.circular(16),
-      targetBorderRadius: BorderRadius.circular(borderRadius),
-      targetPadding: const EdgeInsets.all(6),
-      // Sin esto, tocar la tarjeta resaltada navegaría al módulo en vez de
-      // avanzar el tour.
-      disableDefaultTargetGestures: true,
-      tooltipActionConfig: const TooltipActionConfig(
-        alignment: MainAxisAlignment.spaceBetween,
-        position: TooltipActionPosition.inside,
-        gapBetweenContentAndAction: 14,
-      ),
-      tooltipActions: actions,
-      child: child,
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────
   // HEADER
   // ─────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, bool isTablet) {
     final topPadding = MediaQuery.of(context).padding.top;
-    return _tourStep(
-      key: controller.keyHeader,
+    return TourStep(
+      tourKey: controller.keyHeader,
       title: '¡Te damos la bienvenida!',
       description:
           'Este es tu panel principal: desde aquí llegas a todo lo del día a día.',
@@ -313,8 +229,8 @@ class HomeView extends GetView<HomeController> {
         itemCount: modules.length,
         itemBuilder: (context, index) {
           final module = modules[index];
-          return _tourStep(
-            key: module.showcaseKey,
+          return TourStep(
+            tourKey: module.showcaseKey,
             title: module.label,
             description: module.tourDescription,
             borderRadius: 20,
@@ -357,8 +273,8 @@ class HomeView extends GetView<HomeController> {
         children: actions.map((action) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: _tourStep(
-              key: action.showcaseKey,
+            child: TourStep(
+              tourKey: action.showcaseKey,
               title: action.label,
               description: action.tourDescription,
               borderRadius: 16,
@@ -376,8 +292,8 @@ class HomeView extends GetView<HomeController> {
   Widget _buildSettingsTile(BuildContext context, bool isTablet) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
-      child: _tourStep(
-        key: controller.keyConfiguracion,
+      child: TourStep(
+        tourKey: controller.keyConfiguracion,
         title: 'Configuración',
         description: 'Ajusta tu cuenta, los precios de abonos, las '
             'categorías de productos y el lector de tarjetas.',

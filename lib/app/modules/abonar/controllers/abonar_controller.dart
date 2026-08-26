@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/data/models/abono_prices_model.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
+import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
 import 'package:gymads/app/modules/ingresos/controllers/ingresos_controller.dart';
 import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/app/modules/shared/widgets/rfid_reader_animation.dart';
 import 'dart:async';
 
-class AbonarController extends GetxController {
+class AbonarController extends GetxController with ScreenTourMixin {
   final UserRepository userRepository;
   final IngresoService ingresoService;
   final AbonoPricesRepository pricesRepository;
@@ -27,9 +29,15 @@ class AbonarController extends GetxController {
 
   // Buscador
   final searchController = TextEditingController();
-  final isSearching = false.obs;
+  final isLoadingClients = false.obs;
+
+  /// Lo que se ve en la lista: todos los clientes, o los que casan con lo
+  /// escrito en el buscador.
   final searchResults = <UserModel>[].obs;
-  Timer? _debounce;
+
+  /// Catálogo completo, ya ordenado alfabéticamente. Se carga una vez al
+  /// entrar y el buscador filtra sobre él, sin volver a la red en cada tecla.
+  final _allClients = <UserModel>[];
 
   // Cliente seleccionado
   final Rx<UserModel?> selectedClient = Rx<UserModel?>(null);
@@ -78,6 +86,18 @@ class AbonarController extends GetxController {
   // Suscripción al stream RFID
   StreamSubscription<String>? _rfidSubscription;
 
+  // ─── Tour de bienvenida ───
+  // Solo cubre la pantalla de búsqueda: el formulario de cobro no existe
+  // todavía cuando arranca el tour, porque aparece al elegir un cliente.
+  final keyBuscar = GlobalKey();
+  final keyResultados = GlobalKey();
+
+  @override
+  String get tourId => AppTours.abonar;
+
+  @override
+  List<GlobalKey> get tourSteps => [keyBuscar, keyResultados];
+
   @override
   void onInit() {
     super.onInit();
@@ -90,7 +110,9 @@ class AbonarController extends GetxController {
     _setupRfidListener();
 
     // Escuchar cambios en el buscador
-    searchController.addListener(_onSearchChanged);
+    searchController.addListener(_applyFilter);
+
+    loadClients();
 
     // Mantener el estado reactivo en sincronía con los campos de texto
     unitPriceController.addListener(_onUnitPriceChanged);
@@ -156,7 +178,6 @@ class AbonarController extends GetxController {
     searchController.dispose();
     unitPriceController.dispose();
     durationController.dispose();
-    _debounce?.cancel();
     _rfidSubscription?.cancel();
     super.onClose();
   }
@@ -175,37 +196,57 @@ class AbonarController extends GetxController {
     }
   }
 
-  void _onSearchChanged() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      final query = searchController.text.trim();
-      if (query.length >= 3) {
-        _searchClients(query);
-      } else {
-        searchResults.clear();
-      }
-    });
-  }
-
-  Future<void> _searchClients(String query) async {
-    isSearching.value = true;
+  /// Trae la lista de clientes y la deja ordenada por nombre.
+  ///
+  /// Se llama al entrar y al volver del formulario de cobro, para que los días
+  /// restantes que se ven en la lista sean los de después del abono.
+  Future<void> loadClients() async {
+    isLoadingClients.value = true;
     try {
-      final allUsers = await userRepository.getAllUsers();
-      final results = allUsers.where((user) {
-        return user.name.toLowerCase().contains(query.toLowerCase()) ||
-               user.phone.contains(query);
-      }).toList();
-      searchResults.assignAll(results);
+      final all = await userRepository.getAllUsers();
+      all.sort((a, b) => _sortKey(a.name).compareTo(_sortKey(b.name)));
+      _allClients
+        ..clear()
+        ..addAll(all);
+      _applyFilter();
     } catch (e) {
-      AppLogger.error('AbonarController', 'Error buscando clientes', e);
-      _showSnackbar('Error', 'No se pudo buscar clientes', isError: true);
+      AppLogger.error('AbonarController', 'Error cargando clientes', e);
+      _showSnackbar('Error', 'No se pudo cargar la lista de clientes',
+          isError: true);
     } finally {
-      isSearching.value = false;
+      isLoadingClients.value = false;
     }
   }
 
+  /// Con el buscador vacío se ven todos los clientes; ese es el estado normal
+  /// de la pantalla, no un caso especial.
+  void _applyFilter() {
+    final query = _sortKey(searchController.text.trim());
+    if (query.isEmpty) {
+      searchResults.assignAll(_allClients);
+      return;
+    }
+    searchResults.assignAll(
+      _allClients.where((user) =>
+          _sortKey(user.name).contains(query) || user.phone.contains(query)),
+    );
+  }
+
+  /// Minúsculas y sin acentos, para que "angel" encuentre a "Ángel" y para que
+  /// al ordenar no se vaya al final de la lista.
+  static String _sortKey(String value) {
+    const accents = 'áàäâãéèëêíìïîóòöôõúùüûñç';
+    const plain = 'aaaaaeeeeiiiiooooouuuunc';
+    final buffer = StringBuffer();
+    for (final char in value.toLowerCase().split('')) {
+      final index = accents.indexOf(char);
+      buffer.write(index == -1 ? char : plain[index]);
+    }
+    return buffer.toString();
+  }
+
   Future<void> _searchByRfid(String rfid) async {
-    isSearching.value = true;
+    isLoadingClients.value = true;
     try {
       final allUsers = await userRepository.getAllUsers();
       final user = allUsers.firstWhereOrNull((u) => u.rfidCard == rfid);
@@ -219,7 +260,7 @@ class AbonarController extends GetxController {
     } catch (e) {
       AppLogger.error('AbonarController', 'Error buscando por RFID', e);
     } finally {
-      isSearching.value = false;
+      isLoadingClients.value = false;
     }
   }
 
@@ -273,8 +314,9 @@ class AbonarController extends GetxController {
 
   void selectClient(UserModel client) {
     selectedClient.value = client;
+    // Limpiar el buscador ya repuebla la lista con todos los clientes, así que
+    // al volver aquí sigue estando lista.
     searchController.clear();
-    searchResults.clear();
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
@@ -285,6 +327,7 @@ class AbonarController extends GetxController {
     durationType.value = 'Meses';
     applyFixedPrice();
     isSuccess.value = false;
+    loadClients();
   }
 
   /// Fecha desde la que se cuenta el nuevo periodo: la expiración vigente si

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
+import 'package:gymads/app/core/widgets/tour_step.dart';
 import 'package:gymads/app/global_widgets/cliente_card.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/core/utils/responsive_utils.dart';
@@ -23,10 +24,18 @@ class ClientesView extends GetView<ClientesController> {
             onPressed: () => controller.fetchClientes(),
             tooltip: 'Actualizar',
           ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddDialog(),
-            tooltip: 'Agregar cliente',
+          TourStep(
+            tourKey: controller.keyAgregar,
+            title: 'Agregar cliente',
+            description: 'Da de alta a un miembro nuevo: nombre, teléfono, '
+                'foto y su tarjeta de acceso.',
+            borderRadius: 24,
+            isFirstStep: true,
+            child: IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () => _showAddDialog(),
+              tooltip: 'Agregar cliente',
+            ),
           ),
         ],
       ),
@@ -58,10 +67,16 @@ class ClientesView extends GetView<ClientesController> {
                     mobile: 16, smallPhone: 12, tablet: 24)),
                 child: Column(
                   children: [
-                    AppSearchField(
-                      hintText: 'Buscar cliente...',
-                      onChanged: (value) =>
-                          controller.searchQuery.value = value,
+                    TourStep(
+                      tourKey: controller.keyBuscar,
+                      title: 'Buscador',
+                      description: 'Encuentra a cualquier miembro escribiendo '
+                          'su nombre o su teléfono.',
+                      child: AppSearchField(
+                        hintText: 'Buscar cliente...',
+                        onChanged: (value) =>
+                            controller.searchQuery.value = value,
+                      ),
                     ),
                     SizedBox(
                         height: ResponsiveValues.getSpacing(context,
@@ -70,50 +85,57 @@ class ClientesView extends GetView<ClientesController> {
                 ),
               ),
               Expanded(
-                child: Obx(() {
-                  final filteredClientes = controller.filteredClientes;
+                child: TourStep(
+                  tourKey: controller.keyLista,
+                  title: 'Tus clientes',
+                  description: 'Toca a cualquiera para ver su ficha, editar '
+                      'sus datos o revisar cuándo vence su abono.',
+                  isLastStep: true,
+                  child: Obx(() {
+                    final filteredClientes = controller.filteredClientes;
 
-                  if (filteredClientes.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.people_outline,
-                            size: ResponsiveValues.getIconSize(context,
-                                mobile: 80, smallPhone: 60, tablet: 100),
-                            color: AppColors.textSecondary,
-                          ),
-                          SizedBox(
-                              height: ResponsiveValues.getSpacing(context,
-                                  mobile: 20, smallPhone: 16, tablet: 24)),
-                          Text(
-                            controller.clientes.isEmpty
-                                ? 'No hay clientes registrados'
-                                : 'No hay resultados para tu búsqueda',
-                            style: const TextStyle(
-                              fontSize: 16,
+                    if (filteredClientes.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              size: ResponsiveValues.getIconSize(context,
+                                  mobile: 80, smallPhone: 60, tablet: 100),
                               color: AppColors.textSecondary,
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    itemCount: filteredClientes.length,
-                    padding: const EdgeInsets.only(bottom: 80),
-                    itemBuilder: (context, index) {
-                      final cliente = filteredClientes[index];
-
-                      return ClienteCard(
-                        cliente: cliente,
-                        onTap: () => _showClienteDetails(cliente),
+                            SizedBox(
+                                height: ResponsiveValues.getSpacing(context,
+                                    mobile: 20, smallPhone: 16, tablet: 24)),
+                            Text(
+                              controller.clientes.isEmpty
+                                  ? 'No hay clientes registrados'
+                                  : 'No hay resultados para tu búsqueda',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
                       );
-                    },
-                  );
-                }),
+                    }
+
+                    return ListView.builder(
+                      itemCount: filteredClientes.length,
+                      padding: const EdgeInsets.only(bottom: 80),
+                      itemBuilder: (context, index) {
+                        final cliente = filteredClientes[index];
+
+                        return ClienteCard(
+                          cliente: cliente,
+                          onTap: () => _showClienteDetails(cliente),
+                        );
+                      },
+                    );
+                  }),
+                ),
               ),
             ],
           );

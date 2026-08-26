@@ -1,10 +1,13 @@
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../data/models/access_log_model.dart';
 import '../../../data/services/access_log_service.dart';
+import '../../../data/services/welcome_tour_service.dart';
 
-class AccessLogsController extends GetxController {
+class AccessLogsController extends GetxController with ScreenTourMixin {
   // Estados reactivos
   final isLoading = false.obs;
   final accessLogs = <AccessLogModel>[].obs;
@@ -13,6 +16,16 @@ class AccessLogsController extends GetxController {
   // Estadísticas
   final totalEntries = 0.obs;
   final totalRfidAccesses = 0.obs;
+
+  // ─── Tour de bienvenida ───
+  final keyResumen = GlobalKey();
+  final keyLista = GlobalKey();
+
+  @override
+  String get tourId => AppTours.entradas;
+
+  @override
+  List<GlobalKey> get tourSteps => [keyResumen, keyLista];
 
   @override
   void onInit() {

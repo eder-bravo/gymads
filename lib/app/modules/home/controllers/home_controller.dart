@@ -83,7 +83,14 @@ class HomeController extends GetxController {
         return;
       }
 
-      await WelcomeTourService.to.startIfPending(_tourSteps);
+      // Solo con Inicio realmente en pantalla. HomeView sigue montada debajo
+      // del asistente y se reconstruye mientras este se cierra, así que sin
+      // esta guarda el tour llegaría a arrancar apuntando a unos widgets que
+      // `Get.offAllNamed` está a punto de destruir: se cerraría solo, sin
+      // enseñar nada.
+      if (Get.currentRoute != Routes.HOME) return;
+
+      await WelcomeTourService.to.startIfPending(AppTours.home, _tourSteps);
     } finally {
       _checkingOnboarding = false;
     }

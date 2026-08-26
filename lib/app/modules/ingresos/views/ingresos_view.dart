@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
+import 'package:gymads/app/core/widgets/tour_step.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import '../controllers/ingresos_controller.dart';
 import '../widgets/transaction_tile.dart';
@@ -27,10 +28,25 @@ class IngresosView extends GetView<IngresosController> {
         child: Column(
           children: [
             // Selector de mes (compacto, en español)
-            _buildMonthSelector(),
+            TourStep(
+              tourKey: controller.keyPeriodo,
+              title: 'Periodo',
+              description: 'Elige si quieres ver el día, la semana o el mes, '
+                  'o define tu propio rango de fechas.',
+              borderRadius: 20,
+              isFirstStep: true,
+              child: _buildMonthSelector(),
+            ),
 
             // Total de ingresos del mes
-            _buildMonthTotal(),
+            TourStep(
+              tourKey: controller.keyTotal,
+              title: 'Total del periodo',
+              description: 'La suma de todo lo cobrado en el periodo que '
+                  'tengas seleccionado: abonos y ventas.',
+              borderRadius: 20,
+              child: _buildMonthTotal(),
+            ),
 
             const SizedBox(height: 12),
 
@@ -48,12 +64,19 @@ class IngresosView extends GetView<IngresosController> {
                     ),
                   ),
                   const Spacer(),
-                  TextButton.icon(
-                    onPressed: _verTodasLasTransacciones,
-                    icon: const Icon(Icons.list_alt_outlined, size: 18),
-                    label: const Text('Ver todas'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.accent,
+                  TourStep(
+                    tourKey: controller.keyVerTodas,
+                    title: 'Ver todas',
+                    description: 'Abre el historial completo, sin el filtro '
+                        'de periodo.',
+                    borderRadius: 12,
+                    child: TextButton.icon(
+                      onPressed: _verTodasLasTransacciones,
+                      icon: const Icon(Icons.list_alt_outlined, size: 18),
+                      label: const Text('Ver todas'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.accent,
+                      ),
                     ),
                   ),
                 ],
@@ -62,7 +85,16 @@ class IngresosView extends GetView<IngresosController> {
             const SizedBox(height: 8),
 
             // Lista de transacciones a pantalla completa
-            Expanded(child: _buildTransactionsList()),
+            Expanded(
+              child: TourStep(
+                tourKey: controller.keyLista,
+                title: 'Transacciones',
+                description: 'Cada cobro registrado, con su fecha, su monto y '
+                    'de dónde vino.',
+                isLastStep: true,
+                child: _buildTransactionsList(),
+              ),
+            ),
           ],
         ),
       ),

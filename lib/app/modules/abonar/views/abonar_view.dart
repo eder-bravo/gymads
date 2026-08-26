@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/core/widgets/cached_user_image.dart';
+import 'package:gymads/app/core/widgets/tour_step.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:intl/intl.dart';
 
@@ -38,56 +39,73 @@ class AbonarView extends GetView<AbonarController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AppSearchField(
-            hintText: 'Buscar cliente...',
-            controller: controller.searchController,
-            keyboardType: TextInputType.phone,
+          TourStep(
+            tourKey: controller.keyBuscar,
+            title: 'Busca al cliente',
+            description: 'Escribe su teléfono o su nombre para encontrarlo. '
+                'También puedes pasar su tarjeta por el lector.',
+            isFirstStep: true,
+            child: AppSearchField(
+              hintText: 'Buscar cliente...',
+              controller: controller.searchController,
+              keyboardType: TextInputType.phone,
+            ),
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: Obx(() {
-              if (controller.isSearching.value) {
-                return const Center(child: CircularProgressIndicator(color: AppColors.accent));
-              }
+            child: TourStep(
+              tourKey: controller.keyResultados,
+              title: 'Cobra su membresía',
+              description: 'Aquí están todos tus clientes en orden '
+                  'alfabético. Toca a uno para elegir el periodo, el monto y '
+                  'registrar el pago.',
+              isLastStep: true,
+              child: Obx(() {
+                if (controller.isLoadingClients.value) {
+                  return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+                }
 
-              if (controller.searchResults.isEmpty && controller.searchController.text.length >= 3) {
-                return const Center(
-                  child: Text(
-                    'No se encontraron resultados',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                );
-              }
-
-              return ListView.builder(
-                itemCount: controller.searchResults.length,
-                itemBuilder: (context, index) {
-                  final client = controller.searchResults[index];
-                  return Card(
-                    color: AppColors.cardBackground,
-                    margin: const EdgeInsets.only(bottom: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      onTap: () => controller.selectClient(client),
-                      leading: UserThumbnail(
-                        imageUrl: client.photoUrl,
-                        userName: client.name,
-                        size: 40,
-                      ),
-                      title: Text(
-                        client.name,
-                        style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(
-                        'Tel: ${client.phone}',
-                        style: const TextStyle(color: AppColors.textSecondary),
-                      ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.accent),
+                if (controller.searchResults.isEmpty) {
+                  return Center(
+                    child: Text(
+                      controller.searchController.text.trim().isEmpty
+                          ? 'No hay clientes registrados'
+                          : 'No se encontraron resultados',
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   );
-                },
-              );
-            }),
+                }
+
+                return ListView.builder(
+                  itemCount: controller.searchResults.length,
+                  itemBuilder: (context, index) {
+                    final client = controller.searchResults[index];
+                    return Card(
+                      color: AppColors.cardBackground,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: ListTile(
+                        onTap: () => controller.selectClient(client),
+                        leading: UserThumbnail(
+                          imageUrl: client.photoUrl,
+                          userName: client.name,
+                          size: 40,
+                        ),
+                        title: Text(
+                          client.name,
+                          style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'Tel: ${client.phone}',
+                          style: const TextStyle(color: AppColors.textSecondary),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.accent),
+                      ),
+                    );
+                  },
+                );
+              }),
+            ),
           ),
         ],
       ),

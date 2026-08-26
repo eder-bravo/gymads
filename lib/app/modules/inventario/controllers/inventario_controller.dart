@@ -2,10 +2,12 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/repositories/product_repository.dart';
+import 'package:gymads/app/data/services/welcome_tour_service.dart';
 
-class InventarioController extends GetxController {
+class InventarioController extends GetxController with ScreenTourMixin {
   final ProductRepository productRepository = ProductRepository();
 
   // Método helper para mostrar snackbars de forma segura
@@ -63,6 +65,19 @@ class InventarioController extends GetxController {
   final TextEditingController quantityController = TextEditingController();
   final TextEditingController notesController = TextEditingController();
   final TextEditingController priceController = TextEditingController();
+
+  // ─── Tour de bienvenida ───
+  final keyAgregar = GlobalKey();
+  final keyCategorias = GlobalKey();
+  final keyBuscar = GlobalKey();
+  final keyLista = GlobalKey();
+
+  @override
+  String get tourId => AppTours.inventario;
+
+  @override
+  List<GlobalKey> get tourSteps =>
+      [keyAgregar, keyCategorias, keyBuscar, keyLista];
 
   @override
   void onInit() {

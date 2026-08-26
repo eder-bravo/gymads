@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/widgets/tour_step.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
 
@@ -76,39 +77,62 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
     return Column(
       children: [
         // Opción de Cuenta
-        _buildOptionTile(
-          icon: Icons.account_circle,
-          iconColor: AppColors.info,
+        TourStep(
+          tourKey: controller.keyCuenta,
           title: 'Cuenta',
-          subtitle: 'Información personal y configuración de cuenta',
-          onTap: () => controller.openAccountSettings(),
-          trailing: _buildStatusIndicator(true),
+          description: 'Tus datos personales, el nombre del gimnasio y el '
+              'lector de tarjetas.',
+          borderRadius: 12,
+          isFirstStep: true,
+          child: _buildOptionTile(
+            icon: Icons.account_circle,
+            iconColor: AppColors.info,
+            title: 'Cuenta',
+            subtitle: 'Información personal y configuración de cuenta',
+            onTap: () => controller.openAccountSettings(),
+            trailing: _buildStatusIndicator(true),
+          ),
         ),
 
         const SizedBox(height: 12),
 
         // Opción de Precios de Abonos (precio fijo por periodo)
-        _buildOptionTile(
-          icon: Icons.attach_money,
-          iconColor: AppColors.success,
-          title: 'Precios de Abonos',
-          subtitle: 'Precio por día, semana, mes y año',
-          onTap: () => controller.openAbonoPrices(),
-          trailing: const Icon(Icons.arrow_forward_ios,
-              size: 16, color: AppColors.textSecondary),
+        TourStep(
+          tourKey: controller.keyPrecios,
+          title: 'Precios de abonos',
+          description: 'Define cuánto cuesta un día, una semana, un mes o un '
+              'año. Al cobrar, el monto se calcula solo.',
+          borderRadius: 12,
+          child: _buildOptionTile(
+            icon: Icons.attach_money,
+            iconColor: AppColors.success,
+            title: 'Precios de Abonos',
+            subtitle: 'Precio por día, semana, mes y año',
+            onTap: () => controller.openAbonoPrices(),
+            trailing: const Icon(Icons.arrow_forward_ios,
+                size: 16, color: AppColors.textSecondary),
+          ),
         ),
 
         const SizedBox(height: 12),
 
         // Categorías de productos (inventario y punto de venta)
-        _buildOptionTile(
-          icon: Icons.category,
-          iconColor: AppColors.accent,
+        TourStep(
+          tourKey: controller.keyCategorias,
           title: 'Categorías de productos',
-          subtitle: 'Organiza el inventario y el punto de venta',
-          onTap: () => controller.openCategorias(),
-          trailing: const Icon(Icons.arrow_forward_ios,
-              size: 16, color: AppColors.textSecondary),
+          description: 'Los grupos con los que ordenas tus productos en el '
+              'inventario y en el punto de venta.',
+          borderRadius: 12,
+          isLastStep: true,
+          child: _buildOptionTile(
+            icon: Icons.category,
+            iconColor: AppColors.accent,
+            title: 'Categorías de productos',
+            subtitle: 'Organiza el inventario y el punto de venta',
+            onTap: () => controller.openCategorias(),
+            trailing: const Icon(Icons.arrow_forward_ios,
+                size: 16, color: AppColors.textSecondary),
+          ),
         ),
 
         const SizedBox(height: 24),

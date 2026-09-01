@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get_storage/get_storage.dart';
 import '../models/staff_profile_model.dart';
+import 'gym_settings_service.dart';
 
 /// Service that manages the current tenant context (gym/branch)
 ///
@@ -83,6 +84,13 @@ class TenantContextService extends GetxService {
   Future<void> clearProfile() async {
     _staffProfile.value = null;
     await _storage.remove(_profileKey);
+
+    // Punto único por el que pasan todos los cierres de sesión: si no se
+    // limpia aquí, el siguiente gimnasio heredaría el horario y el modo de
+    // salidas del anterior.
+    if (Get.isRegistered<GymSettingsService>()) {
+      GymSettingsService.to.clear();
+    }
   }
 
   /// Load cached profile from local storage

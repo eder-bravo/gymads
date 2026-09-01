@@ -7,6 +7,7 @@ import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/bindings/initial_binding.dart';
 import 'package:gymads/app/data/config/rfid_config.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
+import 'package:gymads/app/data/services/gym_settings_service.dart';
 import 'package:gymads/app/data/services/image_cache_service.dart';
 import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
@@ -45,6 +46,10 @@ void main() async {
   Get.put(TenantContextService(), permanent: true);
   await TenantContextService.to.init();
   AppLogger.info('Main', 'TenantContextService inicializado');
+
+  // Configuración de accesos (salidas y horario). Se registra sin cargar:
+  // hace falta el gimnasio, que llega con la sesión.
+  Get.put(GymSettingsService(), permanent: true);
 
   // Tour de bienvenida: debe quedar registrado antes de que se construya
   // cualquier widget Showcase de Inicio.

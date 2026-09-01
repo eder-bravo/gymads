@@ -54,13 +54,17 @@ class CuentaView extends GetView<ConfiguracionController> {
                 // Account info section
                 _buildSectionLabel('Cuenta'),
                 const SizedBox(height: 12),
-                _buildInfoTile(
-                  icon: Icons.email_outlined,
-                  label: 'Correo electrónico',
-                  value: controller.userEmail.value,
-                  editable: false,
-                ),
-                const SizedBox(height: 8),
+                // El staff entra con código, sin correo: no tiene sentido
+                // mostrar una fila vacía.
+                if (controller.userEmail.value.isNotEmpty) ...[
+                  _buildInfoTile(
+                    icon: Icons.email_outlined,
+                    label: 'Correo electrónico',
+                    value: controller.userEmail.value,
+                    editable: false,
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 _buildInfoTile(
                   icon: Icons.badge_outlined,
                   label: 'Rol',

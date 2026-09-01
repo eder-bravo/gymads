@@ -13,6 +13,7 @@ import '../../../data/services/storage_service.dart';
 import '../../../data/services/access_log_service.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../core/utils/auth_utils.dart';
+import '../../../data/services/gym_settings_service.dart';
 
 class RfidCheckinController extends GetxController with GetSingleTickerProviderStateMixin {
   final UserRepository userRepository;
@@ -34,6 +35,10 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
   // Datos del usuario
   final isShowingDialog = false.obs;
   final userName = ''.obs;
+
+  /// Si el último pase fue una salida, para despedir en vez de saludar.
+  /// Siempre false mientras el gimnasio no tenga las salidas activadas.
+  final esSalida = false.obs;
   final daysLeft = 0.obs;
   final userPhotoUrl = ''.obs;
   final membershipType = ''.obs;
@@ -252,21 +257,24 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         // Membresía por vencer
         membershipStatus = RfidConfig.membershipExpiring;
         
-        // Siempre es entrada (sin salidas)
-        const accessType = 'entrada';
-        
-        AppLogger.info('RfidCheckinController', 'Registrando entrada RFID');
-        
         // Actualizar datos para mostrar
         userName.value = user.name;
         daysLeft.value = user.daysRemaining;
         userPhotoUrl.value = user.photoUrl ?? '';
         expirationDate.value = user.expirationDate;
-        
-        // Reproducir sonido y mostrar bienvenida
+
+        // El tipo lo decide el servicio: con salidas activas, el segundo pase
+        // del día es una salida.
+        final accessType =
+            await _registerAccessInSupabase(user, 'rfid') ?? 'entrada';
+        esSalida.value = accessType == 'salida';
+
+        // Reproducir sonido y mostrar el mensaje que corresponda
         AudioService.playWelcomeSound();
-        successMessage.value = '¡Bienvenido(a)! Tu membresía vence pronto';
-        
+        successMessage.value = esSalida.value
+            ? '¡Hasta pronto! Tu membresía vence pronto'
+            : '¡Bienvenido(a)! Tu membresía vence pronto';
+
         // Mostrar diálogo de bienvenida
         isShowingDialog.value = true;
         
@@ -274,12 +282,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         Future.delayed(const Duration(seconds: 3), () {
           isShowingDialog.value = false;
         });
-        
-        // Registrar el acceso en Supabase EN SEGUNDO PLANO
-        if (user.id != null) {
-          _registerAccessInSupabase(user, accessType, 'rfid');
-        }
-        
+
         // Registrar también en el modelo del usuario (para compatibilidad)
         if (user.id != null) {
           _registerAccessInBackground(user);
@@ -291,21 +294,23 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         // Membresía activa
         membershipStatus = RfidConfig.membershipActive;
         
-        // Siempre es entrada (sin salidas)
-        const accessType = 'entrada';
-        
-        AppLogger.info('RfidCheckinController', 'Registrando entrada RFID');
-        
         // Actualizar datos para mostrar
         userName.value = user.name;
         daysLeft.value = user.daysRemaining;
         userPhotoUrl.value = user.photoUrl ?? '';
         expirationDate.value = user.expirationDate;
-        
-        // Reproducir sonido y mostrar bienvenida
+
+        // El tipo lo decide el servicio: con salidas activas, el segundo pase
+        // del día es una salida.
+        final accessType =
+            await _registerAccessInSupabase(user, 'rfid') ?? 'entrada';
+        esSalida.value = accessType == 'salida';
+
+        // Reproducir sonido y mostrar el mensaje que corresponda
         AudioService.playWelcomeSound();
-        successMessage.value = '¡Bienvenido(a)!';
-        
+        successMessage.value =
+            esSalida.value ? '¡Hasta pronto!' : '¡Bienvenido(a)!';
+
         // Mostrar diálogo de bienvenida
         isShowingDialog.value = true;
                 
@@ -313,11 +318,6 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         Future.delayed(const Duration(seconds: 3), () {
           isShowingDialog.value = false;
         });
-        
-        // Registrar el acceso en Supabase EN SEGUNDO PLANO
-        if (user.id != null) {
-          _registerAccessInSupabase(user, accessType, 'rfid');
-        }
         
         // Registrar también en el modelo del usuario (para compatibilidad)
         if (user.id != null) {
@@ -444,43 +444,42 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
   }
 
   // Registrar acceso en Supabase con tabla access_logs
-  void _registerAccessInSupabase(UserModel user, String accessType, String method) {
-    Future(() async {
-      try {
-        if (user.id == null) {
-          AppLogger.error('RfidCheckinController', 'No se puede registrar acceso: ID de usuario nulo');
-          return;
-        }
-
-        // Salvaguarda: nunca registrar entrada de una membresía inactiva o vencida
-        if (!user.isActive || user.daysRemaining <= 0) {
-          AppLogger.error('RfidCheckinController', 'Registro de acceso bloqueado (membresía no válida)');
-          return;
-        }
-
-        AppLogger.info('RfidCheckinController',
-            'Registrando acceso (tipo: $accessType, método: $method)');
-
-        final staffUser = AuthUtils.getStaffIdentifier();
-
-
-        final success = await AccessLogService.registerAccess(
-          userId: user.id!,
-          userName: user.name,
-          userNumber: user.userNumber,
-          accessType: accessType,
-          method: method,
-          staffUser: staffUser,
-        );
-
-        if (success) {
-        } else {
-          AppLogger.warning('RfidCheckinController', 'No se registró el acceso: Ya existe una entrada para hoy');
-          AppLogger.info('RfidCheckinController', 'El usuario ya tiene una entrada registrada hoy');
-        }
-      } catch (e) {
-        AppLogger.error('RfidCheckinController', 'Excepción al registrar acceso en Supabase', e);
+  //
+  // Devuelve el tipo que se registró ('entrada' o 'salida'), o null si no se
+  // registró nada. Quien llama lo usa para saludar o despedir.
+  Future<String?> _registerAccessInSupabase(UserModel user, String method) async {
+    try {
+      if (user.id == null) {
+        AppLogger.error('RfidCheckinController', 'No se puede registrar acceso: ID de usuario nulo');
+        return null;
       }
-    });
+
+      // Salvaguarda: nunca registrar entrada de una membresía inactiva o vencida
+      if (!user.isActive || user.daysRemaining <= 0) {
+        AppLogger.error('RfidCheckinController', 'Registro de acceso bloqueado (membresía no válida)');
+        return null;
+      }
+
+      final staffUser = AuthUtils.getStaffIdentifier();
+      final ajustes = await GymSettingsService.current();
+
+      final tipo = await AccessLogService.registerAccess(
+        userId: user.id!,
+        userName: user.name,
+        userNumber: user.userNumber,
+        method: method,
+        staffUser: staffUser,
+        registrarSalidas: ajustes.registrarSalidas,
+      );
+
+      if (tipo == null) {
+        AppLogger.info('RfidCheckinController',
+            'No se registró el acceso: ya estaba marcado');
+      }
+      return tipo;
+    } catch (e) {
+      AppLogger.error('RfidCheckinController', 'Excepción al registrar acceso en Supabase', e);
+      return null;
+    }
   }
 }

@@ -228,11 +228,15 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   }
 
   Widget _buildStockBadge(int stock) {
-    final bool lowStock = stock <= 5;
+    // Tres estados: agotado o en negativo (faltante), bajo, y normal.
+    final Color color = stock <= 0
+        ? AppColors.error
+        : (stock <= 5 ? AppColors.warning : AppColors.success);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: lowStock ? AppColors.warning : AppColors.success,
+        color: color,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
@@ -455,6 +459,42 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
+
+              // Aviso de faltantes: el cobro sigue adelante, pero el stock de
+              // estos productos quedará en negativo.
+              Obx(() {
+                final sinExistencias = controller.itemsSinExistencias;
+                if (sinExistencias.isEmpty) return const SizedBox.shrink();
+                final cuantos = sinExistencias.length;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.error.withOpacity(0.35)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: AppColors.error, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          cuantos == 1
+                              ? '${sinExistencias.first.productName} quedará como faltante'
+                              : '$cuantos productos quedarán como faltantes',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
 
               // Resumen rápido
               Container(

@@ -13,6 +13,7 @@ import '../modules/configuracion/bindings/configuracion_binding.dart';
 import '../modules/configuracion/views/configuracion_view.dart';
 import '../modules/configuracion/views/cuenta_view.dart';
 import '../modules/configuracion/views/abono_prices_view.dart';
+import '../modules/configuracion/views/control_accesos_view.dart';
 import '../modules/home/bindings/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/ingresos/bindings/ingresos_binding.dart';
@@ -32,6 +33,10 @@ import '../modules/onboarding/bindings/onboarding_binding.dart';
 import '../modules/onboarding/views/payment_mode_view.dart';
 import '../modules/categorias/bindings/categorias_binding.dart';
 import '../modules/categorias/views/categorias_view.dart';
+import '../modules/staff_accesos/bindings/staff_accesos_binding.dart';
+import '../modules/staff_accesos/views/staff_accesos_view.dart';
+import '../modules/auth/views/staff_code_view.dart';
+import '../modules/auth/controllers/staff_code_controller.dart';
 
 part 'app_routes.dart';
 
@@ -136,6 +141,23 @@ class AppPages {
       name: _Paths.CATEGORIAS,
       page: () => const CategoriasView(),
       binding: CategoriasBinding(),
+    ),
+    GetPage(
+      name: _Paths.STAFF_ACCESOS,
+      page: () => const StaffAccesosView(),
+      binding: StaffAccesosBinding(),
+    ),
+    GetPage(
+      name: _Paths.CONTROL_ACCESOS,
+      page: () => const ControlAccesosView(),
+      binding: ConfiguracionBinding(),
+    ),
+    GetPage(
+      name: _Paths.STAFF_CODE,
+      page: () => const StaffCodeView(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<StaffCodeController>(() => StaffCodeController());
+      }),
     ),
   ];
 }

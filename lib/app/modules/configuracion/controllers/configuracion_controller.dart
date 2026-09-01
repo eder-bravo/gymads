@@ -8,7 +8,9 @@ import '../../../data/services/rfid_reader_service.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../../data/services/image_cache_service.dart';
+import '../../../data/models/gym_settings_model.dart';
 import '../../../data/models/staff_profile_model.dart';
+import '../../../data/services/gym_settings_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
@@ -47,12 +49,21 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   final keyCuenta = GlobalKey();
   final keyPrecios = GlobalKey();
   final keyCategorias = GlobalKey();
+  final keyAccesos = GlobalKey();
+  final keyControlAccesos = GlobalKey();
+
+  /// Las opciones de administración solo existen para el dueño.
+  bool get isOwner => TenantContextService.to.isOwnerAdmin;
 
   @override
   String get tourId => AppTours.configuracion;
 
   @override
-  List<GlobalKey> get tourSteps => [keyCuenta, keyPrecios, keyCategorias];
+  List<GlobalKey> get tourSteps => isOwner
+      ? [keyCuenta, keyPrecios, keyCategorias, keyAccesos, keyControlAccesos]
+      // El staff no ve precios ni accesos: apuntar a esos widgets dejaría el
+      // tour señalando al vacío.
+      : [keyCuenta, keyCategorias];
 
   @override
   void onInit() {
@@ -171,7 +182,10 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
       if (userId == null) return;
       final response = await Supabase.instance.client
           .from('staff_profiles')
-          .select('*, gyms(name, created_at)')
+          // payment_mode es obligatorio: si se queda fuera del join llega
+          // null al caché y checkOnboarding reabre el asistente de
+          // configuración inicial ya completado.
+          .select('*, gyms(name, created_at, payment_mode)')
           .eq('user_id', userId)
           .eq('is_active', true)
           .maybeSingle();
@@ -484,6 +498,54 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   void openCategorias() {
     Get.toNamed(Routes.CATEGORIAS);
   }
+
+  /// Accesos del personal. Solo para el dueño.
+  void openStaffAccesos() {
+    Get.toNamed(Routes.STAFF_ACCESOS);
+  }
+
+  /// Entradas y salidas de los clientes, y horario del gimnasio.
+  void openControlAccesos() {
+    Get.toNamed(Routes.CONTROL_ACCESOS);
+  }
+
+  // =================== CONTROL DE ACCESOS ===================
+
+  /// Copia editable de la configuración; se guarda al cambiar cada control.
+  final Rx<GymSettingsModel> accesosSettings = const GymSettingsModel().obs;
+  final RxBool isLoadingAccesos = false.obs;
+
+  Future<void> loadControlAccesos() async {
+    isLoadingAccesos.value = true;
+    try {
+      accesosSettings.value = await GymSettingsService.to.refresh();
+    } finally {
+      isLoadingAccesos.value = false;
+    }
+  }
+
+  /// Guarda y revierte la vista si la base lo rechaza, para que el
+  /// interruptor no se quede mostrando algo que no se llegó a guardar.
+  Future<void> _guardarAccesos(GymSettingsModel nuevos) async {
+    final anterior = accesosSettings.value;
+    accesosSettings.value = nuevos;
+
+    final ok = await GymSettingsService.to.save(nuevos);
+    if (!ok) {
+      accesosSettings.value = anterior;
+      SnackbarHelper.error(
+          'Error', 'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.');
+    }
+  }
+
+  Future<void> setRegistrarSalidas(bool valor) =>
+      _guardarAccesos(accesosSettings.value.copyWith(registrarSalidas: valor));
+
+  Future<void> setHoraApertura(HoraDelDia hora) =>
+      _guardarAccesos(accesosSettings.value.copyWith(horaApertura: hora));
+
+  Future<void> setHoraCierre(HoraDelDia hora) =>
+      _guardarAccesos(accesosSettings.value.copyWith(horaCierre: hora));
 
   // =================== LOGOUT ===================
 

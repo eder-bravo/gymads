@@ -94,25 +94,26 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           ),
         ),
 
-        const SizedBox(height: 12),
-
-        // Opción de Precios de Abonos (precio fijo por periodo)
-        TourStep(
-          tourKey: controller.keyPrecios,
-          title: 'Precios de abonos',
-          description: 'Define cuánto cuesta un día, una semana, un mes o un '
-              'año. Al cobrar, el monto se calcula solo.',
-          borderRadius: 12,
-          child: _buildOptionTile(
-            icon: Icons.attach_money,
-            iconColor: AppColors.success,
-            title: 'Precios de Abonos',
-            subtitle: 'Precio por día, semana, mes y año',
-            onTap: () => controller.openAbonoPrices(),
-            trailing: const Icon(Icons.arrow_forward_ios,
-                size: 16, color: AppColors.textSecondary),
+        // Precios de abonos: administración, solo el dueño.
+        if (controller.isOwner) ...[
+          const SizedBox(height: 12),
+          TourStep(
+            tourKey: controller.keyPrecios,
+            title: 'Precios de abonos',
+            description: 'Define cuánto cuesta un día, una semana, un mes o un '
+                'año. Al cobrar, el monto se calcula solo.',
+            borderRadius: 12,
+            child: _buildOptionTile(
+              icon: Icons.attach_money,
+              iconColor: AppColors.success,
+              title: 'Precios de Abonos',
+              subtitle: 'Precio por día, semana, mes y año',
+              onTap: () => controller.openAbonoPrices(),
+              trailing: const Icon(Icons.arrow_forward_ios,
+                  size: 16, color: AppColors.textSecondary),
+            ),
           ),
-        ),
+        ],
 
         const SizedBox(height: 12),
 
@@ -123,7 +124,9 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           description: 'Los grupos con los que ordenas tus productos en el '
               'inventario y en el punto de venta.',
           borderRadius: 12,
-          isLastStep: true,
+          // Para el staff este es el último paso; para el dueño aún viene
+          // "Accesos del personal".
+          isLastStep: !controller.isOwner,
           child: _buildOptionTile(
             icon: Icons.category,
             iconColor: AppColors.accent,
@@ -134,6 +137,47 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
                 size: 16, color: AppColors.textSecondary),
           ),
         ),
+
+        // Accesos del personal: solo el dueño puede crear y revocar.
+        if (controller.isOwner) ...[
+          const SizedBox(height: 12),
+          TourStep(
+            tourKey: controller.keyAccesos,
+            title: 'Accesos del personal',
+            description: 'Da acceso a tus empleados con un código. Entran sin '
+                'correo ni contraseña y no ven esta configuración.',
+            borderRadius: 12,
+            child: _buildOptionTile(
+              icon: Icons.badge,
+              iconColor: AppColors.brand,
+              title: 'Accesos del personal',
+              subtitle: 'Códigos de entrada para tus empleados',
+              onTap: () => controller.openStaffAccesos(),
+              trailing: const Icon(Icons.arrow_forward_ios,
+                  size: 16, color: AppColors.textSecondary),
+            ),
+          ),
+
+          // Entradas y salidas de los clientes, y horario del gimnasio.
+          const SizedBox(height: 12),
+          TourStep(
+            tourKey: controller.keyControlAccesos,
+            title: 'Control de accesos',
+            description: 'Decide si además de la entrada quieres marcar la '
+                'salida de tus clientes, y en qué horario abres.',
+            borderRadius: 12,
+            isLastStep: true,
+            child: _buildOptionTile(
+              icon: Icons.door_front_door_outlined,
+              iconColor: AppColors.info,
+              title: 'Control de accesos',
+              subtitle: 'Entradas, salidas y horario del gimnasio',
+              onTap: () => controller.openControlAccesos(),
+              trailing: const Icon(Icons.arrow_forward_ios,
+                  size: 16, color: AppColors.textSecondary),
+            ),
+          ),
+        ],
 
         const SizedBox(height: 24),
 

@@ -5,6 +5,7 @@ import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/core/utils/category_icons.dart';
 import '../controllers/inventario_controller.dart';
+import 'stock_adjust_dialog.dart';
 
 class ProductFormView extends GetView<InventarioController> {
   const ProductFormView({super.key});
@@ -55,7 +56,8 @@ class ProductFormView extends GetView<InventarioController> {
                           'description': descriptionController.text,
                           'category_id': selectedCategoryId.value,
                           'price': priceController.text,
-                          'stock': stockController.text,
+                          // Al editar el stock no se toca aquí.
+                          if (!isEditing) 'stock': stockController.text,
                         });
                       }
                     },
@@ -251,50 +253,59 @@ class ProductFormView extends GetView<InventarioController> {
 
                 const SizedBox(height: 24),
 
-                // Sección de stock
-                _buildSectionCard(
-                  title: 'Stock Inicial',
-                  icon: Icons.inventory_2_outlined,
-                  children: [
-                    TextFormField(
-                      controller: stockController,
-                      style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold),
-                      decoration: InputDecoration(
-                        labelText: 'Cantidad disponible *',
-                        hintText: '0',
-                        prefixIcon: const Icon(Icons.inventory,
-                            color: AppColors.accent),
-                        suffixText: 'unidades',
-                        suffixStyle: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 14),
-                        helperText: 'Unidades en existencia',
-                        helperStyle: const TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
+                // Sección de stock.
+                //
+                // Al editar es de solo lectura: este campo se cargaba al abrir
+                // la pantalla y se reenviaba tal cual, así que cambiar el
+                // precio devolvía el stock a como estaba y borraba las ventas
+                // hechas mientras tanto. El stock solo se mueve por diferencia,
+                // desde "Ajustar stock".
+                if (isEditing)
+                  _buildStockSoloLectura()
+                else
+                  _buildSectionCard(
+                    title: 'Stock Inicial',
+                    icon: Icons.inventory_2_outlined,
+                    children: [
+                      TextFormField(
+                        controller: stockController,
+                        style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold),
+                        decoration: InputDecoration(
+                          labelText: 'Cantidad disponible *',
+                          hintText: '0',
+                          prefixIcon: const Icon(Icons.inventory,
+                              color: AppColors.accent),
+                          suffixText: 'unidades',
+                          suffixStyle: TextStyle(
+                              color: AppColors.textSecondary, fontSize: 14),
+                          helperText: 'Unidades en existencia',
+                          helperStyle: const TextStyle(
+                              fontSize: 11, color: AppColors.textSecondary),
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(6),
+                        ],
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Ingresa la cantidad';
+                          }
+                          final stock = int.tryParse(value);
+                          if (stock == null || stock < 0) {
+                            return 'Debe ser 0 o mayor';
+                          }
+                          if (stock > 999999) {
+                            return 'Stock muy alto';
+                          }
+                          return null;
+                        },
                       ),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(6),
-                      ],
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Ingresa la cantidad';
-                        }
-                        final stock = int.tryParse(value);
-                        if (stock == null || stock < 0) {
-                          return 'Debe ser 0 o mayor';
-                        }
-                        if (stock > 999999) {
-                          return 'Stock muy alto';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
 
                 const SizedBox(height: 24),
               ],
@@ -303,6 +314,64 @@ class ProductFormView extends GetView<InventarioController> {
         ),
       ),
     );
+  }
+
+  /// Stock del producto en edición: se muestra, no se escribe. Para moverlo
+  /// está "Ajustar", que trabaja por diferencia.
+  Widget _buildStockSoloLectura() {
+    return Obx(() {
+      final product = controller.currentProduct.value;
+      if (product == null) return const SizedBox.shrink();
+
+      final faltante = product.stock < 0;
+
+      return _buildSectionCard(
+        title: 'Stock',
+        icon: Icons.inventory_2_outlined,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      faltante
+                          ? 'Faltan ${-product.stock}'
+                          : '${product.stock}',
+                      style: TextStyle(
+                        color:
+                            faltante ? AppColors.error : AppColors.textPrimary,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      faltante
+                          ? 'unidades vendidas sin existencias'
+                          : 'unidades en existencia',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => showStockAdjustDialog(product),
+                icon: const Icon(Icons.sync_alt, size: 18),
+                label: const Text('Ajustar'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    });
   }
 
   Widget _buildSectionCard({

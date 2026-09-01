@@ -2,13 +2,17 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/auth_utils.dart';
 import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/repositories/product_repository.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 
 class InventarioController extends GetxController with ScreenTourMixin {
-  final ProductRepository productRepository = ProductRepository();
+  // `late` a propósito: el repositorio abre el cliente de Supabase al
+  // construirse, y como campo directo obligaba a tener Supabase inicializado
+  // solo por crear el controller.
+  late final ProductRepository productRepository = ProductRepository();
 
   // Método helper para mostrar snackbars de forma segura
   void _showSnackbarSafe(String title, String message,
@@ -48,6 +52,9 @@ class InventarioController extends GetxController with ScreenTourMixin {
 
   /// Id de la categoría filtrada. `null` significa "todas".
   final RxnString selectedCategoryId = RxnString();
+
+  /// Muestra solo lo que hay que reponer (stock negativo).
+  final RxBool soloFaltantes = false.obs;
 
   // Estado para el formulario
   final Rx<Product?> currentProduct = Rx<Product?>(null);
@@ -168,8 +175,17 @@ class InventarioController extends GetxController with ScreenTourMixin {
       bool matchesCategory = selectedCategoryId.value == null ||
           product.categoryId == selectedCategoryId.value;
 
-      return matchesSearch && matchesCategory;
+      bool matchesFaltante = !soloFaltantes.value || product.stock < 0;
+
+      return matchesSearch && matchesCategory && matchesFaltante;
     }).toList();
+  }
+
+  /// Muestra solo los productos con faltante. Lo activa el aviso de
+  /// "vendidos sin existencias" para ir directo a lo que hay que reponer.
+  void toggleSoloFaltantes() {
+    soloFaltantes.value = !soloFaltantes.value;
+    filterProducts();
   }
 
   void setSearchQuery(String query) {
@@ -189,13 +205,15 @@ class InventarioController extends GetxController with ScreenTourMixin {
       final now = DateTime.now();
 
       if (isEditing.value && currentProduct.value != null) {
-        // Actualizar producto existente
+        // Actualizar producto existente.
+        // El stock no viaja aquí: se mueve solo por deltas desde "Ajustar
+        // stock". `updateProduct` tampoco lo envía, así que una venta hecha
+        // mientras esta pantalla estaba abierta no se pierde.
         final updatedProduct = currentProduct.value!.copyWith(
           name: productData['name'],
           description: productData['description'],
           categoryId: productData['category_id'],
           price: double.parse(productData['price']),
-          stock: int.parse(productData['stock']),
           isActive: true,
           updatedAt: now,
         );
@@ -365,56 +383,85 @@ class InventarioController extends GetxController with ScreenTourMixin {
     }
   }
 
-  Future<void> recordTransaction(String productId, String productName) async {
-    if (quantityController.text.isEmpty) {
-      _showSnackbarSafe('Error', 'Debes ingresar una cantidad', isError: true);
-      return;
-    }
+  // ══════════════════════════════════════════════════════════
+  // AJUSTE DE STOCK
+  // ══════════════════════════════════════════════════════════
 
-    isLoading.value = true;
+  /// Suma [delta] al stock del producto y deja constancia del movimiento.
+  ///
+  /// Siempre es un delta, nunca un valor absoluto: así "tengo 9 y entran 5"
+  /// da 14, y reponer sobre un faltante lo salda solo (-3 + 10 = 7).
+  ///
+  /// Devuelve el stock resultante, o null si falló.
+  Future<int?> ajustarStock(Product product, int delta,
+      {String? nota, double? precioUnitario}) async {
+    if (delta == 0) return product.stock;
+
     try {
-      final int quantity = int.parse(quantityController.text);
-      final String notes = notesController.text;
-      final double unitPrice = priceController.text.isNotEmpty
-          ? double.parse(priceController.text)
-          : 0.0;
-
       final transaction = ProductTransaction(
         id: const Uuid().v4(),
-        productId: productId,
-        productName: productName,
-        type: selectedTransactionType.value,
-        quantity: quantity,
-        unitPrice: unitPrice,
-        notes: notes,
-        staffUser: 'Admin', // Esto debería venir del usuario logueado
+        productId: product.id,
+        productName: product.name,
+        type: delta > 0 ? TransactionType.entrada : TransactionType.salida,
+        quantity: delta.abs(),
+        unitPrice: precioUnitario ?? 0.0,
+        notes: nota ?? '',
+        staffUser: AuthUtils.getStaffIdentifier(),
         transactionDate: DateTime.now(),
         createdAt: DateTime.now(),
       );
 
-      final result = await productRepository.recordTransaction(transaction);
-
-      if (result) {
-        // Recargar el producto y las transacciones
-        await loadProducts();
-        await loadProductTransactions(productId);
-        await loadInventoryStats();
-
-        quantityController.clear();
-        notesController.clear();
-        priceController.clear();
-
-        Get.back(); // Cerrar el diálogo
-
-        _showSnackbarSafe('Éxito', 'Transacción registrada correctamente');
+      final nuevoStock = await productRepository.recordTransaction(transaction);
+      if (nuevoStock == null) {
+        _showSnackbarSafe('Error', 'No se pudo actualizar el stock',
+            isError: true);
+        return null;
       }
+
+      // Refleja el nuevo stock sin recargar toda la lista: el ajuste rápido
+      // con +/- se dispara muchas veces seguidas.
+      final index = products.indexWhere((p) => p.id == product.id);
+      if (index >= 0) {
+        products[index] = products[index].copyWith(stock: nuevoStock);
+        products.refresh();
+      }
+
+      // El formulario de edición muestra el stock desde aquí; sin esto
+      // seguiría enseñando el valor de antes del ajuste.
+      if (currentProduct.value?.id == product.id) {
+        currentProduct.value =
+            currentProduct.value!.copyWith(stock: nuevoStock);
+      }
+      filterProducts();
+      loadInventoryStats();
+
+      return nuevoStock;
     } catch (e) {
-      AppLogger.error(
-          'InventarioController', 'Error al registrar transacción', e);
-      _showSnackbarSafe('Error', 'No se pudo registrar la transacción',
+      AppLogger.error('InventarioController', 'Error al ajustar stock', e);
+      _showSnackbarSafe('Error', 'No se pudo actualizar el stock',
           isError: true);
-    } finally {
-      isLoading.value = false;
+      return null;
     }
   }
+
+  // ══════════════════════════════════════════════════════════
+  // FALTANTES
+  //
+  // Un stock negativo son unidades que se vendieron sin existencias. No se
+  // guarda en ninguna parte: se deriva del propio stock, así que desaparece
+  // solo cuando se repone.
+  // ══════════════════════════════════════════════════════════
+
+  List<Product> get productosConFaltante =>
+      products.where((p) => p.stock < 0).toList();
+
+  /// Unidades que se deben en total.
+  int get unidadesFaltantes =>
+      productosConFaltante.fold(0, (suma, p) => suma - p.stock);
+
+  /// Lo que valen esas unidades a precio de venta.
+  double get valorFaltante => productosConFaltante.fold(
+      0.0, (suma, p) => suma + (-p.stock) * p.price);
+
+  bool get hayFaltantes => productosConFaltante.isNotEmpty;
 }

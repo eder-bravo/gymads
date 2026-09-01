@@ -196,7 +196,44 @@ class LoginView extends GetView<AuthController> {
 
           // Google Sign-In button
           _buildGoogleButton(),
+          const SizedBox(height: 12),
+
+          // Entrada del personal con código de un solo uso
+          _buildStaffButton(),
         ],
+      ),
+    );
+  }
+
+  /// Los empleados no tienen cuenta: entran con el código que les dio el
+  /// dueño desde Configuración.
+  Widget _buildStaffButton() {
+    return SizedBox(
+      height: 50,
+      child: OutlinedButton(
+        onPressed: () => Get.toNamed(Routes.STAFF_CODE),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.white24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          backgroundColor: Colors.white.withOpacity(0.05),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.badge_outlined, size: 20, color: Colors.white),
+            SizedBox(width: 12),
+            Text(
+              'Entrar como staff',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

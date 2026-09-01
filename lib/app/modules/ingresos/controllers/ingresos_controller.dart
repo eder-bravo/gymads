@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/periodo_filtro_mixin.dart';
 import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/core/utils/snackbar_helper.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
-import 'package:gymads/app/data/services/tenant_context_service.dart';
+import 'package:gymads/app/data/services/pdf_report_service.dart';
+import 'package:gymads/app/modules/ingresos/services/ingresos_pdf_builder.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 
-class IngresosController extends GetxController with ScreenTourMixin {
+class IngresosController extends GetxController
+    with ScreenTourMixin, PeriodoFiltroMixin {
   final IngresoService ingresoService;
 
   IngresosController({required this.ingresoService});
@@ -27,12 +30,9 @@ class IngresosController extends GetxController with ScreenTourMixin {
   final RxList<IngresoModel> todasTransacciones = <IngresoModel>[].obs;
   final RxBool isLoadingTodas = false.obs;
 
-  // Filtros
-  final selectedPeriodo = 'mes'.obs; // 'dia', 'semana', 'mes'
+  // Filtros. El periodo y su rango los aporta PeriodoFiltroMixin.
   final selectedConcepto = Rx<String?>(null);
   final selectedMetodoPago = Rx<String?>(null);
-  final fechaInicio = Rx<DateTime?>(null);
-  final fechaFin = Rx<DateTime?>(null);
 
   // Tipo de gráfica
   final selectedChartType = 'barras'.obs; // 'barras', 'pastel', 'lineas'
@@ -42,37 +42,6 @@ class IngresosController extends GetxController with ScreenTourMixin {
   final List<String> periodos = ['dia', 'semana', 'mes'];
   final List<String> conceptos = ['registro', 'renovacion', 'producto'];
   final List<String> metodosPago = ['efectivo', 'tarjeta', 'transferencia'];
-
-  // Nombres de meses en español (evita depender de locale de intl)
-  static const List<String> nombresMeses = [
-    'Enero',
-    'Febrero',
-    'Marzo',
-    'Abril',
-    'Mayo',
-    'Junio',
-    'Julio',
-    'Agosto',
-    'Septiembre',
-    'Octubre',
-    'Noviembre',
-    'Diciembre',
-  ];
-
-  static const List<String> nombresMesesCortos = [
-    'ene',
-    'feb',
-    'mar',
-    'abr',
-    'may',
-    'jun',
-    'jul',
-    'ago',
-    'sep',
-    'oct',
-    'nov',
-    'dic',
-  ];
 
   // ─── Tour de bienvenida ───
   final keyPeriodo = GlobalKey();
@@ -90,16 +59,14 @@ class IngresosController extends GetxController with ScreenTourMixin {
   @override
   void onInit() {
     super.onInit();
-    // Inicializar con el mes actual
-    final now = DateTime.now();
-    fechaInicio.value = DateTime(now.year, now.month, 1);
-    fechaFin.value = DateTime(now.year, now.month + 1, 0);
-
-    // Cargar datos iniciales
-    fetchEstadisticas();
-    fetchIngresos();
-    fetchDatosGrafica();
+    // Abre en el día de hoy: lo que se consulta a diario es lo cobrado hoy.
+    // `iniciarEnHoy` fija el rango completo (00:00 a 23:59:59) y dispara la
+    // carga por `onPeriodoChanged`.
+    iniciarEnHoy();
   }
+
+  @override
+  Future<void> onPeriodoChanged() => refreshData();
 
   /// Obtiene las estadísticas de ingresos
   Future<void> fetchEstadisticas() async {
@@ -184,52 +151,6 @@ class IngresosController extends GetxController with ScreenTourMixin {
     }
   }
 
-  /// Actualiza el período seleccionado y salta al periodo actual (hoy)
-  void changePeriodo(String nuevoPeriodo) {
-    try {
-      selectedPeriodo.value = nuevoPeriodo;
-      final now = DateTime.now();
-
-      switch (nuevoPeriodo) {
-        case 'dia':
-          _setDia(now);
-          break;
-        case 'semana':
-          _setSemana(now);
-          break;
-        case 'mes':
-          _setMonth(now.year, now.month);
-          break;
-        default:
-          AppLogger.warning('IngresosController', 'Período no reconocido: $nuevoPeriodo');
-          _setMonth(now.year, now.month);
-      }
-    } catch (e) {
-      AppLogger.error('IngresosController', 'Error al cambiar período', e);
-      SnackbarHelper.error('Error', 'Error al cambiar período: $e');
-    }
-  }
-
-  /// Lunes (00:00) de la semana que contiene [d].
-  DateTime _inicioSemana(DateTime d) =>
-      DateTime(d.year, d.month, d.day).subtract(Duration(days: d.weekday - 1));
-
-  /// Fija el rango a un solo día completo.
-  void _setDia(DateTime day) {
-    fechaInicio.value = DateTime(day.year, day.month, day.day);
-    fechaFin.value = DateTime(day.year, day.month, day.day, 23, 59, 59);
-    refreshData();
-  }
-
-  /// Fija el rango a la semana (lunes→domingo) que contiene [any].
-  void _setSemana(DateTime any) {
-    final inicio = _inicioSemana(any);
-    fechaInicio.value = inicio;
-    fechaFin.value = inicio
-        .add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
-    refreshData();
-  }
-
   /// Actualiza el filtro de concepto
   void changeConcepto(String? concepto) {
     try {
@@ -250,14 +171,6 @@ class IngresosController extends GetxController with ScreenTourMixin {
       AppLogger.error('IngresosController', 'Error al cambiar método de pago', e);
       SnackbarHelper.error('Error', 'Error al aplicar filtro: $e');
     }
-  }
-
-  /// Establece un rango de fechas personalizado
-  void setFechasPersonalizadas(DateTime inicio, DateTime fin) {
-    selectedPeriodo.value = ''; // rango personalizado: sin chip resaltado
-    fechaInicio.value = inicio;
-    fechaFin.value = fin;
-    refreshData();
   }
 
   /// Recarga todos los datos
@@ -317,186 +230,49 @@ class IngresosController extends GetxController with ScreenTourMixin {
     return '\$${amount.toStringAsFixed(2)}';
   }
 
-  /// Etiqueta del mes seleccionado, ej: "Mayo 2026"
-  String get mesSeleccionadoLabel {
-    final f = fechaInicio.value ?? DateTime.now();
-    return '${nombresMeses[f.month - 1]} ${f.year}';
-  }
+  // ══════════════════════════════════════════════════════════
+  // REPORTE EN PDF
+  // ══════════════════════════════════════════════════════════
 
-  /// Solo el nombre del mes seleccionado, ej: "mayo"
-  String get nombreMesSeleccionado {
-    final f = fechaInicio.value ?? DateTime.now();
-    return nombresMeses[f.month - 1].toLowerCase();
-  }
+  final RxBool isExportando = false.obs;
 
-  /// Formatea una fecha de forma corta en español, ej: "27 may"
-  String formatFechaCorta(DateTime date) {
-    return '${date.day} ${nombresMesesCortos[date.month - 1]}';
-  }
+  /// Genera el reporte del periodo activo y lo abre en vista previa.
+  Future<void> exportarPdf() async {
+    if (isExportando.value) return;
 
-  /// Indica si se puede avanzar al mes siguiente (no permite meses futuros)
-  bool get puedeAvanzarMes {
-    final f = fechaInicio.value ?? DateTime.now();
-    final now = DateTime.now();
-    return f.year < now.year || (f.year == now.year && f.month < now.month);
-  }
+    try {
+      isExportando.value = true;
 
-  /// Primer día del mes en que se creó la cuenta (límite inferior de navegación).
-  /// Retorna null si no hay contexto de cuenta disponible.
-  DateTime? get _mesCreacionCuenta {
-    if (!Get.isRegistered<TenantContextService>()) return null;
-    final created = TenantContextService.to.accountCreatedAt;
-    if (created == null) return null;
-    return DateTime(created.year, created.month, 1);
-  }
+      // Se vuelve a consultar en vez de usar `ingresos`: esa lista está
+      // capada a 50 para la pantalla, mientras que el total de la tarjeta
+      // cubre hasta 1000. Reutilizarla daría un PDF recortado cuyo detalle no
+      // cuadraría con su propio total.
+      final detalle = await ingresoService.getIngresos(
+        fechaInicio: fechaInicio.value,
+        fechaFin: fechaFin.value,
+        concepto: selectedConcepto.value,
+        metodoPago: selectedMetodoPago.value,
+        limit: 1000,
+      );
 
-  /// Año de creación de la cuenta (para limitar el navegador de año)
-  int? get anioCreacionCuenta => _mesCreacionCuenta?.year;
+      final doc = IngresosPdfBuilder.construir(
+        periodoLabel: periodoLabel,
+        totalLabel: periodoTotalLabel,
+        estadisticas: estadisticas.value,
+        ingresos: detalle,
+      );
 
-  /// Indica si se puede retroceder al mes anterior (no antes de la creación)
-  bool get puedeRetrocederMes {
-    final limite = _mesCreacionCuenta;
-    if (limite == null) return true;
-    final f = fechaInicio.value ?? DateTime.now();
-    return DateTime(f.year, f.month, 1).isAfter(limite);
-  }
-
-  /// Indica si un mes/año es anterior al mes de creación de la cuenta
-  bool esMesAnteriorACreacion(int year, int month) {
-    final limite = _mesCreacionCuenta;
-    if (limite == null) return false;
-    return DateTime(year, month, 1).isBefore(limite);
-  }
-
-  /// Indica si se puede avanzar al siguiente periodo según el modo activo
-  /// (nunca al futuro). En modo rango personalizado ('') retorna false.
-  bool get puedeAvanzar {
-    final f = fechaInicio.value ?? DateTime.now();
-    final now = DateTime.now();
-    switch (selectedPeriodo.value) {
-      case 'dia':
-        final hoy = DateTime(now.year, now.month, now.day);
-        return DateTime(f.year, f.month, f.day).isBefore(hoy);
-      case 'semana':
-        return _inicioSemana(f).isBefore(_inicioSemana(now));
-      case 'mes':
-        return puedeAvanzarMes;
-      default:
-        return false;
+      await PdfReportService.mostrarPreview(
+        doc,
+        titulo: 'Reporte de ingresos',
+        nombreArchivo: PdfReportService.nombreArchivo('ingresos'),
+      );
+    } catch (e) {
+      AppLogger.error('IngresosController', 'Error al generar el PDF', e);
+      SnackbarHelper.error('Error', 'No se pudo generar el reporte');
+    } finally {
+      isExportando.value = false;
     }
-  }
-
-  /// Indica si se puede retroceder al periodo anterior (no antes de la
-  /// creación de la cuenta). En modo rango personalizado ('') retorna false.
-  bool get puedeRetroceder {
-    switch (selectedPeriodo.value) {
-      case 'mes':
-        return puedeRetrocederMes;
-      case 'dia':
-      case 'semana':
-        final limite = _mesCreacionCuenta;
-        if (limite == null) return true;
-        final f = fechaInicio.value ?? DateTime.now();
-        return f.isAfter(limite);
-      default:
-        return false;
-    }
-  }
-
-  /// Etiqueta del periodo activo, adaptada al modo.
-  String get periodoLabel {
-    final ini = fechaInicio.value ?? DateTime.now();
-    final fin = fechaFin.value ?? DateTime.now();
-    switch (selectedPeriodo.value) {
-      case 'dia':
-        return '${ini.day} ${nombresMesesCortos[ini.month - 1]} ${ini.year}';
-      case 'semana':
-        if (ini.month == fin.month) {
-          return '${ini.day} – ${fin.day} ${nombresMesesCortos[ini.month - 1]}';
-        }
-        return '${ini.day} ${nombresMesesCortos[ini.month - 1]} – '
-            '${fin.day} ${nombresMesesCortos[fin.month - 1]}';
-      case 'mes':
-        return '${nombresMeses[ini.month - 1]} ${ini.year}';
-      default: // rango personalizado
-        return '${ini.day} ${nombresMesesCortos[ini.month - 1]} – '
-            '${fin.day} ${nombresMesesCortos[fin.month - 1]}';
-    }
-  }
-
-  /// Etiqueta del total según el periodo activo.
-  String get periodoTotalLabel {
-    switch (selectedPeriodo.value) {
-      case 'dia':
-        return 'Total del día';
-      case 'semana':
-        return 'Total de la semana';
-      case 'mes':
-        return 'Total del mes';
-      default:
-        return 'Total del periodo';
-    }
-  }
-
-  /// Salta a un día específico (modo día).
-  void seleccionarDia(DateTime day) => _setDia(day);
-
-  /// Salta a la semana que contiene un día específico (modo semana).
-  void seleccionarSemana(DateTime day) => _setSemana(day);
-
-  void _setMonth(int year, int month) {
-    selectedPeriodo.value = 'mes';
-    fechaInicio.value = DateTime(year, month, 1);
-    fechaFin.value = DateTime(year, month + 1, 0, 23, 59, 59);
-    refreshData();
-  }
-
-  /// Navega al periodo anterior según el modo activo (día/semana/mes).
-  void goToPrevious() {
-    if (!puedeRetroceder) return;
-    final f = fechaInicio.value ?? DateTime.now();
-    switch (selectedPeriodo.value) {
-      case 'dia':
-        _setDia(f.subtract(const Duration(days: 1)));
-        break;
-      case 'semana':
-        _setSemana(f.subtract(const Duration(days: 7)));
-        break;
-      default: // mes
-        final prev = DateTime(f.year, f.month - 1, 1);
-        _setMonth(prev.year, prev.month);
-    }
-  }
-
-  /// Navega al periodo siguiente según el modo activo (día/semana/mes).
-  void goToNext() {
-    if (!puedeAvanzar) return;
-    final f = fechaInicio.value ?? DateTime.now();
-    switch (selectedPeriodo.value) {
-      case 'dia':
-        _setDia(f.add(const Duration(days: 1)));
-        break;
-      case 'semana':
-        _setSemana(f.add(const Duration(days: 7)));
-        break;
-      default: // mes
-        final next = DateTime(f.year, f.month + 1, 1);
-        _setMonth(next.year, next.month);
-    }
-  }
-
-  /// Selecciona un mes específico (no permite meses futuros ni anteriores a
-  /// la creación de la cuenta)
-  void seleccionarMes(int year, int month) {
-    if (esMesFuturo(year, month)) return;
-    if (esMesAnteriorACreacion(year, month)) return;
-    _setMonth(year, month);
-  }
-
-  /// Indica si un mes/año dado es futuro (no seleccionable)
-  bool esMesFuturo(int year, int month) {
-    final now = DateTime.now();
-    return year > now.year || (year == now.year && month > now.month);
   }
 
   /// Obtiene el color para un concepto

@@ -8,6 +8,7 @@ import '../repositories/user_repository.dart';
 import 'rfid_reader_service.dart';
 import 'audio_service.dart';
 import 'access_log_service.dart';
+import 'gym_settings_service.dart';
 import '../../core/utils/auth_utils.dart';
 import '../../routes/app_pages.dart';
 import '../config/rfid_config.dart';
@@ -384,16 +385,21 @@ class BackgroundRfidService extends GetxService {
 
         final staffUser = AuthUtils.getStaffIdentifier();
 
-        await AccessLogService.registerAccess(
+        // El servicio decide si toca entrada o salida según lo que tenga
+        // configurado el gimnasio.
+        final ajustes = await GymSettingsService.current();
+
+        final tipo = await AccessLogService.registerAccess(
           userId: user.id!,
           userName: user.name,
           userNumber: user.userNumber,
-          accessType: 'entrada',
           method: 'rfid_background',
           staffUser: staffUser,
+          registrarSalidas: ajustes.registrarSalidas,
         );
 
-        AppLogger.info('BackgroundRfidService', 'Acceso registrado');
+        AppLogger.info('BackgroundRfidService',
+            tipo == null ? 'Acceso no registrado' : 'Acceso registrado: $tipo');
       } catch (e) {
         AppLogger.error('BackgroundRfidService', 'Error registrando acceso', e);
       }

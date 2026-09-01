@@ -7,24 +7,32 @@ import 'tenant_query_helper.dart';
 class AccessLogService {
   static final _supabase = Supabase.instance.client;
 
-  /// Registra un acceso (entrada o salida) en la base de datos
-  static Future<bool> registerAccess({
+  /// Tiempo mínimo entre dos pases del mismo cliente cuando las salidas están
+  /// activas. Sin esto, pasar la tarjeta dos veces seguidas por nervios
+  /// registraría una salida inmediata.
+  static const Duration _antirrebote = Duration(minutes: 1);
+
+  /// Registra el acceso de un cliente y devuelve qué se registró.
+  ///
+  /// Con [registrarSalidas] apagado (lo normal) solo se registran entradas, y
+  /// una segunda pasada el mismo día se ignora. Encendido, el pase alterna:
+  /// si la última marca del día fue una entrada, la siguiente es la salida.
+  ///
+  /// Devuelve el tipo registrado ('entrada' o 'salida'), o null si no se
+  /// registró nada — porque ya estaba marcado o por un fallo.
+  static Future<String?> registerAccess({
     required String userId,
     required String userName,
     required String userNumber,
-    required String accessType, // 'entrada' o 'salida'
     required String method, // 'qr' o 'rfid'
     required String staffUser,
+    bool registrarSalidas = false,
   }) async {
     try {
-      AppLogger.info('AccessLogService',
-          'Registrando acceso (tipo: $accessType, método: $method)');
-
-      // Verificar si ya existe una entrada en el día actual (desde 1:00 AM)
+      // La jornada empieza a la 1:00 AM: alguien que entrena de noche sigue
+      // contando como el mismo día de gimnasio.
       final now = DateTime.now();
-      DateTime startOfDay;
-
-      // Si es antes de la 1:00 AM, considerar el día anterior
+      final DateTime startOfDay;
       if (now.hour < 1) {
         final yesterday = now.subtract(const Duration(days: 1));
         startOfDay =
@@ -32,24 +40,32 @@ class AccessLogService {
       } else {
         startOfDay = DateTime(now.year, now.month, now.day, 1, 0, 0);
       }
-
       final endOfDay = startOfDay.add(const Duration(hours: 24));
 
+      final ultimo = await _ultimoAccesoDelDia(userId, startOfDay, endOfDay);
 
-      // Verificar si ya hay una entrada registrada en el rango de tiempo
-      final existingAccess = await _supabase
-          .from('access_logs')
-          .select()
-          .eq('user_id', userId)
-          .eq('access_type', 'entrada')
-          .gte('access_time', startOfDay.toIso8601String())
-          .lt('access_time', endOfDay.toIso8601String())
-          .limit(1);
-
-      if (existingAccess.isNotEmpty) {
-        AppLogger.warning('AccessLogService', 'Ya existe una entrada registrada para hoy');
-        return false; // No registrar entrada duplicada
+      final String accessType;
+      if (!registrarSalidas) {
+        // Modo solo entradas: una por jornada.
+        if (ultimo != null) {
+          AppLogger.info('AccessLogService',
+              'Ya existe una entrada registrada para hoy');
+          return null;
+        }
+        accessType = 'entrada';
+      } else {
+        if (ultimo != null &&
+            now.difference(ultimo.accessTime) < _antirrebote) {
+          AppLogger.info('AccessLogService',
+              'Pase repetido dentro del margen de rebote, se ignora');
+          return null;
+        }
+        // Alterna: tras una entrada toca la salida, y viceversa.
+        accessType = ultimo?.accessType == 'entrada' ? 'salida' : 'entrada';
       }
+
+      AppLogger.info('AccessLogService',
+          'Registrando acceso (tipo: $accessType, método: $method)');
 
       final accessData = TenantQueryHelper.withTenant({
         'user_id': userId,
@@ -58,24 +74,44 @@ class AccessLogService {
         'access_type': accessType,
         'method': method,
         'staff_user': staffUser,
-        'access_time': DateTime.now().toIso8601String(),
+        'access_time': now.toIso8601String(),
       });
-
-      AppLogger.info('AccessLogService', 'Data to insert');
 
       await _supabase.from('access_logs').insert(accessData).select();
 
-      AppLogger.info('AccessLogService', 'Respuesta de Supabase');
       AppLogger.info('AccessLogService', 'Acceso registrado exitosamente');
-
-      return true;
+      return accessType;
     } catch (e) {
       AppLogger.error('AccessLogService', 'Fallo al registrar el acceso', e);
       if (e is PostgrestException) {
         AppLogger.error('AccessLogService', 'Código de error de base de datos: ${e.code}');
       }
-      return false;
+      return null;
     }
+  }
+
+  /// Última marca del cliente dentro de la jornada, para decidir si toca
+  /// entrada o salida.
+  ///
+  /// Filtra por sucursal: sin ese filtro, la marca de otra sede haría creer
+  /// que el cliente ya está dentro de esta.
+  static Future<AccessLogModel?> _ultimoAccesoDelDia(
+      String userId, DateTime desde, DateTime hasta) async {
+    final branchId = TenantQueryHelper.branchIdOrNull;
+    var query = _supabase.from('access_logs').select().eq('user_id', userId);
+
+    if (branchId != null) {
+      query = query.eq('branch_id', branchId);
+    }
+
+    final response = await query
+        .gte('access_time', desde.toIso8601String())
+        .lt('access_time', hasta.toIso8601String())
+        .order('access_time', ascending: false)
+        .limit(1);
+
+    if (response.isEmpty) return null;
+    return AccessLogModel.fromJson(response.first);
   }
 
   /// Obtiene el último acceso de un usuario específico
@@ -96,26 +132,6 @@ class AccessLogService {
     } catch (e) {
       AppLogger.error('AccessLogService', 'Error al obtener último acceso', e);
       return null;
-    }
-  }
-
-  /// Determina si el próximo acceso debe ser entrada o salida
-  static Future<String> determineAccessType(String userId) async {
-    try {
-      final lastAccess = await getLastUserAccess(userId);
-
-      if (lastAccess == null) {
-        // Si no hay registros previos, el primer acceso es entrada
-        return 'entrada';
-      }
-
-      // Si el último acceso fue entrada, el siguiente debe ser salida
-      // Si el último acceso fue salida, el siguiente debe ser entrada
-      return lastAccess.accessType == 'entrada' ? 'salida' : 'entrada';
-    } catch (e) {
-      AppLogger.error('AccessLogService', 'Error al determinar tipo de acceso', e);
-      // En caso de error, por defecto asumimos entrada
-      return 'entrada';
     }
   }
 
@@ -391,9 +407,14 @@ class AccessLogService {
     try {
       AppLogger.info('AccessLogService', 'Obteniendo logs entre ${startDate.toIso8601String()} y ${endDate.toIso8601String()}');
 
-      final response = await _supabase
-          .from('access_logs')
-          .select()
+      final branchId = TenantQueryHelper.branchIdOrNull;
+      var query = _supabase.from('access_logs').select();
+
+      if (branchId != null) {
+        query = query.eq('branch_id', branchId);
+      }
+
+      final response = await query
           .gte('access_time', startDate.toIso8601String())
           .lte('access_time', endDate.toIso8601String())
           .order('access_time', ascending: false);

@@ -7,6 +7,7 @@ import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/core/utils/category_icons.dart';
 import 'package:gymads/app/core/widgets/tour_step.dart';
 import '../controllers/inventario_controller.dart';
+import 'stock_adjust_dialog.dart';
 
 class InventarioView extends GetView<InventarioController> {
   const InventarioView({super.key});
@@ -60,6 +61,7 @@ class InventarioView extends GetView<InventarioController> {
         child: Column(
           children: [
             _buildStatsSection(),
+            _buildFaltantesBanner(),
             TourStep(
               tourKey: controller.keyBuscar,
               title: 'Buscador',
@@ -109,6 +111,88 @@ class InventarioView extends GetView<InventarioController> {
     });
   }
   
+  /// Resumen de lo vendido sin existencias. Solo aparece si hay faltantes,
+  /// para no robar espacio cuando el inventario está sano.
+  Widget _buildFaltantesBanner() {
+    return Obx(() {
+      if (!controller.hayFaltantes) return const SizedBox.shrink();
+
+      final productos = controller.productosConFaltante.length;
+      final unidades = controller.unidadesFaltantes;
+      final valor = controller.valorFaltante;
+
+      final filtrando = controller.soloFaltantes.value;
+
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          // Deja en la lista solo lo que hay que reponer.
+          onTap: controller.toggleSoloFaltantes,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.error.withOpacity(filtrando ? 0.2 : 0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.error.withOpacity(filtrando ? 0.7 : 0.35),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    color: AppColors.error, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Vendidos sin existencias',
+                        style: TextStyle(
+                          color: AppColors.error,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$productos ${productos == 1 ? 'producto' : 'productos'} · '
+                        '$unidades ${unidades == 1 ? 'unidad' : 'unidades'} · '
+                        '\$${valor.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        filtrando
+                            ? 'Toca para ver todos los productos'
+                            : 'Se descontarán solas al reponer stock',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  filtrando ? Icons.filter_alt : Icons.chevron_right,
+                  color: AppColors.error,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
   Widget _buildStatItem(String label, String value) {
     return Column(
       children: [
@@ -292,7 +376,11 @@ class InventarioView extends GetView<InventarioController> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'Stock: ${product.stock}',
+                    // En negativo el número suelto no dice nada: son unidades
+                    // que ya se vendieron y hay que reponer.
+                    product.stock < 0
+                        ? 'Faltan ${-product.stock}'
+                        : 'Stock: ${product.stock}',
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 12,
@@ -313,15 +401,20 @@ class InventarioView extends GetView<InventarioController> {
             ),
           ],
         ),
-        trailing: PopupMenuButton<String>(
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Ajuste rápido de una unidad, para corregir sin abrir el diálogo.
+            _buildStockStepper(product),
+            PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
           color: AppColors.cardBackground,
           onSelected: (value) {
             if (value == 'edit') {
               controller.editProduct(product);
               Get.toNamed(Routes.PRODUCT_FORM, arguments: {'isEditing': true});
-            } else if (value == 'transaction') {
-              _showTransactionDialog(Get.context!, product);
+            } else if (value == 'stock') {
+              showStockAdjustDialog(product);
             } else if (value == 'deactivate') {
               controller.deactivateProduct(product.id);
             } else if (value == 'delete') {
@@ -340,17 +433,18 @@ class InventarioView extends GetView<InventarioController> {
               ),
             ),
             PopupMenuItem<String>(
-              value: 'transaction',
+              value: 'stock',
               child: Row(
                 children: [
                   Icon(Icons.sync_alt, color: AppColors.info, size: 20),
                   const SizedBox(width: 12),
-                  Text('Registrar transacción', style: TextStyle(color: AppColors.textPrimary)),
+                  Text('Ajustar stock', style: TextStyle(color: AppColors.textPrimary)),
                 ],
               ),
             ),
-            // Solo mostrar "Desactivar" si hay stock
-            if (product.stock > 0)
+            // Desactivar exige no tener existencias; ofrecerlo con stock solo
+            // llevaba al aviso de que no se puede.
+            if (product.stock <= 0)
               PopupMenuItem<String>(
                 value: 'deactivate',
                 child: Row(
@@ -373,12 +467,48 @@ class InventarioView extends GetView<InventarioController> {
               ),
             ),
           ],
+            ),
+          ],
         ),
         onTap: () => _showProductDetail(product),
       ),
     );
   }
-  
+
+  /// Botones de una unidad para corregir el stock sin abrir nada.
+  Widget _buildStockStepper(Product product) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _stepperButton(
+          Icons.remove,
+          AppColors.warning,
+          'Quitar una unidad',
+          () => controller.ajustarStock(product, -1, nota: 'Ajuste rápido'),
+        ),
+        _stepperButton(
+          Icons.add,
+          AppColors.success,
+          'Agregar una unidad',
+          () => controller.ajustarStock(product, 1, nota: 'Ajuste rápido'),
+        ),
+      ],
+    );
+  }
+
+  Widget _stepperButton(
+      IconData icon, Color color, String tooltip, VoidCallback onTap) {
+    return IconButton(
+      icon: Icon(icon, size: 18, color: color),
+      tooltip: tooltip,
+      onPressed: onTap,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+    );
+  }
+
+
   void _showProductDetail(Product product) {
     Get.dialog(
       AlertDialog(
@@ -391,7 +521,13 @@ class InventarioView extends GetView<InventarioController> {
             _buildDetailRow('Descripción', product.description),
             _buildDetailRow('Categoría', controller.categoryNameFor(product)),
             _buildDetailRow('Precio de venta', '\$${product.price.toStringAsFixed(2)}'),
-            _buildDetailRow('Stock actual', '${product.stock} unidades'),
+            _buildDetailRow(
+              'Stock actual',
+              product.stock < 0
+                  ? 'Faltan ${-product.stock} unidades'
+                  : '${product.stock} unidades',
+              valueColor: product.stock < 0 ? AppColors.error : null,
+            ),
             _buildDetailRow('Estado', product.isActive ? 'Activo' : 'Inactivo'),
             _buildDetailRow('Creado', '${product.createdAt.day}/${product.createdAt.month}/${product.createdAt.year}'),
           ],
@@ -418,7 +554,7 @@ class InventarioView extends GetView<InventarioController> {
     );
   }
   
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -437,135 +573,12 @@ class InventarioView extends GetView<InventarioController> {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(
+                color: valueColor ?? AppColors.textPrimary,
+                fontWeight:
+                    valueColor == null ? FontWeight.normal : FontWeight.w600,
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showTransactionDialog(BuildContext context, Product product) {
-    controller.selectedTransactionType.value = TransactionType.entrada;
-    controller.quantityController.clear();
-    controller.notesController.clear();
-    controller.priceController.clear();
-    
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: Text(
-          'Registrar Transacción - ${product.name}',
-          style: const TextStyle(color: AppColors.textPrimary),
-        ),
-        content: Form(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Obx(() {
-                return DropdownButtonFormField<TransactionType>(
-                  value: controller.selectedTransactionType.value,
-                  dropdownColor: AppColors.cardBackground,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    labelText: 'Tipo de transacción',
-                    labelStyle: const TextStyle(color: AppColors.textSecondary),
-                    filled: true,
-                    fillColor: AppColors.containerBackground,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  items: TransactionType.values.map((type) {
-                    return DropdownMenuItem<TransactionType>(
-                      value: type,
-                      child: Text(type == TransactionType.entrada ? 'Entrada' : 'Salida'),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      controller.selectedTransactionType.value = value;
-                    }
-                  },
-                );
-              }),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: controller.quantityController,
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'Cantidad',
-                  labelStyle: const TextStyle(color: AppColors.textSecondary),
-                  filled: true,
-                  fillColor: AppColors.containerBackground,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Requerido';
-                  }
-                  final quantity = int.tryParse(value);
-                  if (quantity == null || quantity <= 0) {
-                    return 'Cantidad inválida';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: controller.priceController,
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'Precio unitario',
-                  labelStyle: const TextStyle(color: AppColors.textSecondary),
-                  filled: true,
-                  fillColor: AppColors.containerBackground,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  prefixText: '\$',
-                ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: controller.notesController,
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'Notas (opcional)',
-                  labelStyle: const TextStyle(color: AppColors.textSecondary),
-                  filled: true,
-                  fillColor: AppColors.containerBackground,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                maxLines: 2,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              controller.recordTransaction(product.id, product.name);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              foregroundColor: AppColors.textPrimary,
-            ),
-            child: const Text('Registrar'),
           ),
         ],
       ),

@@ -93,11 +93,24 @@ class ProductRepository {
   }
 
   // Actualizar un producto existente
+  //
+  // El payload se arma campo a campo en vez de mandar `toJson()` entero para
+  // dejar fuera `stock`: el formulario lo carga al abrirse y lo reenviaba tal
+  // cual, así que editar el precio pisaba el stock con un valor viejo y
+  // borraba las ventas hechas mientras la pantalla estaba abierta. El stock
+  // solo se mueve por deltas, en `ajustarStock`.
   Future<Product?> updateProduct(Product product) async {
     try {
       final response = await _supabase
           .from('products')
-          .update(product.toJson())
+          .update({
+            'name': product.name,
+            'description': product.description,
+            'category_id': product.categoryId,
+            'price': product.price,
+            'is_active': product.isActive,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', product.id)
           .select()
           .single();
@@ -109,19 +122,19 @@ class ProductRepository {
     }
   }
 
-  // Actualizar stock de un producto
-  Future<bool> updateProductStock(String productId, int newStock) async {
-    try {
-      await _supabase.from('products').update({
-        'stock': newStock,
-        'updated_at': DateTime.now().toIso8601String()
-      }).eq('id', productId);
-
-      return true;
-    } catch (e) {
-      AppLogger.error('ProductRepository', 'Error al actualizar stock', e);
-      return false;
-    }
+  /// Suma [delta] al stock del producto y devuelve el stock resultante.
+  ///
+  /// El cálculo lo hace la base en un solo UPDATE (`ajustar_stock_producto`),
+  /// no la app: dos cajas leyendo y escribiendo por separado se pisaban.
+  ///
+  /// El resultado puede ser negativo a propósito — es el faltante, lo vendido
+  /// sin existencias. Por eso reponer lo salda solo: -3 + 10 = 7.
+  Future<int> ajustarStock(String productId, int delta) async {
+    final nuevoStock = await _supabase.rpc('ajustar_stock_producto', params: {
+      'p_product_id': productId,
+      'p_delta': delta,
+    });
+    return nuevoStock as int;
   }
 
   // Eliminar un producto (cambiar a inactivo)
@@ -139,43 +152,34 @@ class ProductRepository {
     }
   }
 
-  // Registrar una transacción de producto
-  Future<bool> recordTransaction(ProductTransaction transaction) async {
+  /// Registra el movimiento y mueve el stock, devolviendo el stock resultante.
+  ///
+  /// Ya no recorta a 0 en las salidas: un stock negativo es información — son
+  /// las unidades que salieron sin existencias — y recortarlo las perdía, de
+  /// modo que al reponer se contaba de más.
+  Future<int?> recordTransaction(ProductTransaction transaction) async {
     try {
       await _supabase.from('product_transactions').insert(
             TenantQueryHelper.withTenant(transaction.toJson()),
           );
 
-      // Actualizar el stock del producto según el tipo de transacción
-      final product = await _supabase
-          .from('products')
-          .select('stock')
-          .eq('id', transaction.productId)
-          .single();
+      final delta = switch (transaction.type) {
+        TransactionType.entrada => transaction.quantity,
+        TransactionType.salida || TransactionType.venta => -transaction.quantity,
+        // El ajuste fija el stock en un valor concreto, así que necesita saber
+        // dónde está para calcular el salto.
+        TransactionType.ajuste => transaction.quantity -
+            ((await _supabase
+                    .from('products')
+                    .select('stock')
+                    .eq('id', transaction.productId)
+                    .single())['stock'] as int),
+      };
 
-      int currentStock = product['stock'];
-      int newStock = currentStock;
-
-      switch (transaction.type) {
-        case TransactionType.entrada:
-          newStock = currentStock + transaction.quantity;
-          break;
-        case TransactionType.salida:
-        case TransactionType.venta:
-          newStock = currentStock - transaction.quantity;
-          if (newStock < 0) newStock = 0;
-          break;
-        case TransactionType.ajuste:
-          newStock = transaction.quantity; // Ajuste directo
-          break;
-      }
-
-      await updateProductStock(transaction.productId, newStock);
-
-      return true;
+      return await ajustarStock(transaction.productId, delta);
     } catch (e) {
       AppLogger.error('ProductRepository', 'Error al registrar transacción', e);
-      return false;
+      return null;
     }
   }
 
@@ -351,47 +355,51 @@ class ProductRepository {
     }
   }
 
+  static const Map<String, dynamic> _emptyInventoryStats = {
+    'totalProducts': 0,
+    'totalStock': 0,
+    'totalValue': 0.0,
+    'averagePrice': 0.0,
+    'lowStockCount': 0,
+    'faltanteCount': 0,
+  };
+
   // Estadísticas básicas de inventario
   Future<Map<String, dynamic>> getInventoryStats() async {
     try {
       final products = await getAllProducts();
 
-      if (products.isEmpty) {
-        return {
-          'totalProducts': 0,
-          'totalStock': 0,
-          'totalValue': 0.0,
-          'averagePrice': 0.0,
-          'lowStockCount': 0,
-        };
-      }
+      if (products.isEmpty) return _emptyInventoryStats;
 
       int totalStock = 0;
       double totalValue = 0.0;
       int lowStockCount = 0;
+      int faltanteCount = 0;
 
       for (var product in products) {
         totalStock += product.stock;
         totalValue += (product.price * product.stock);
-        if (product.stock <= 5) lowStockCount++;
+        // El stock bajo y el faltante se cuentan aparte: antes `stock <= 5`
+        // metía en el mismo saco a un producto con 3 unidades y a otro con -3,
+        // que necesitan acciones distintas.
+        if (product.stock < 0) {
+          faltanteCount++;
+        } else if (product.stock <= 5) {
+          lowStockCount++;
+        }
       }
 
       return {
         'totalProducts': products.length,
         'totalStock': totalStock,
         'totalValue': totalValue,
-        'averagePrice': products.isEmpty ? 0.0 : (totalValue / totalStock),
+        'averagePrice': totalStock == 0 ? 0.0 : (totalValue / totalStock),
         'lowStockCount': lowStockCount,
+        'faltanteCount': faltanteCount,
       };
     } catch (e) {
       AppLogger.error('ProductRepository', 'Error al obtener estadísticas de inventario', e);
-      return {
-        'totalProducts': 0,
-        'totalStock': 0,
-        'totalValue': 0.0,
-        'averagePrice': 0.0,
-        'lowStockCount': 0,
-      };
+      return _emptyInventoryStats;
     }
   }
 }

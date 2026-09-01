@@ -12,6 +12,10 @@ class WelcomeScreenWidget extends StatefulWidget {
   final bool isVisible;
   final bool isExpired;
   final bool isNotFound;
+
+  /// Despide en vez de saludar. Solo llega en true si el gimnasio tiene el
+  /// registro de salidas activado.
+  final bool isSalida;
   final VoidCallback? onClose;
   final VoidCallback? onAbonar;
   final VoidCallback? onEditar;
@@ -26,6 +30,7 @@ class WelcomeScreenWidget extends StatefulWidget {
     required this.isVisible,
     this.isExpired = false,
     this.isNotFound = false,
+    this.isSalida = false,
     this.onClose,
     this.onAbonar,
     this.onEditar,
@@ -136,9 +141,13 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                             child: Transform.translate(
                               offset: Offset(0, 20 * (1 - value)),
                               child: Text(
-                                widget.isNotFound 
-                                    ? 'Tarjeta No Registrada' 
-                                    : (widget.isExpired ? 'Membresía Vencida' : '¡Bienvenido!'),
+                                widget.isNotFound
+                                    ? 'Tarjeta No Registrada'
+                                    : widget.isExpired
+                                        ? 'Membresía Vencida'
+                                        : widget.isSalida
+                                            ? '¡Hasta pronto!'
+                                            : '¡Bienvenido!',
                                 style: TextStyle(
                                   fontSize: widget.isNotFound ? (isTabletSize ? 50.0 : (isSmallPhone ? 30.0 : 40.0)) : titleSize,
                                   fontWeight: FontWeight.bold,

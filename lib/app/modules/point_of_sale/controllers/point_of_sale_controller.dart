@@ -1,7 +1,8 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../data/models/product_model.dart';
@@ -42,6 +43,11 @@ class PointOfSaleController extends GetxController with ScreenTourMixin {
   /// Productos fijados arriba, los que más se venden. Se guardan por gimnasio
   /// en el dispositivo: es una comodidad del mostrador, no un dato del negocio.
   final RxSet<String> _pinnedProductIds = <String>{}.obs;
+
+  /// Productos para los que ya se aceptó vender sin existencias en esta venta.
+  /// Evita repetir el aviso en cada unidad del mismo producto. Se limpia con
+  /// el carrito.
+  final Set<String> _faltantesConfirmados = <String>{};
 
   // Configuración de impuestos
   final RxDouble _taxRate = 0.0.obs; // 0% por defecto, configurable
@@ -185,11 +191,16 @@ class PointOfSaleController extends GetxController with ScreenTourMixin {
   }
 
   /// Cargar productos disponibles
+  ///
+  /// Se muestran también los agotados y los que están en negativo: sin
+  /// existencias se sigue pudiendo cobrar, y el stock queda como faltante.
+  /// Filtra por activos porque, al dejar de esconder los de stock 0, un
+  /// producto desactivado aparecería en el mostrador.
   Future<void> loadProducts() async {
     try {
       _isLoading.value = true;
-      final products = await _productRepository.getAllProducts();
-      _availableProducts.assignAll(products.where((p) => p.stock > 0));
+      final products = await _productRepository.getActiveProducts();
+      _availableProducts.assignAll(products);
     } catch (e) {
       AppLogger.error('PointOfSaleController', 'Error al cargar productos', e);
       SnackbarHelper.error('Error', 'No se pudieron cargar los productos');
@@ -217,77 +228,130 @@ class PointOfSaleController extends GetxController with ScreenTourMixin {
     _searchQuery.value = query;
   }
 
-  /// Agregar producto al carrito
-  void addProductToCart(Product product, {int quantity = 1}) {
-    if (product.stock < quantity) {
-      SnackbarHelper.error('Stock insuficiente',
-          'Solo hay ${product.stock} unidades disponibles');
-      return;
-    }
+  /// Cuánto quedará el stock de un producto si se cobra el carrito tal como
+  /// está. Negativo significa faltante: unidades que salen sin existencias.
+  int stockProyectado(String productId) {
+    final product = _availableProducts.firstWhereOrNull((p) => p.id == productId);
+    if (product == null) return 0;
+    final enCarrito = _cartItems
+        .firstWhereOrNull((item) => item.productId == productId)
+        ?.quantity ??
+        0;
+    return product.stock - enCarrito;
+  }
 
-    // Verificar si el producto ya está en el carrito
+  /// Productos del carrito que dejarán el stock en negativo al cobrar.
+  List<SaleItem> get itemsSinExistencias => _cartItems
+      .where((item) => stockProyectado(item.productId) < 0)
+      .toList();
+
+  /// Agregar producto al carrito
+  ///
+  /// Nunca bloquea por falta de stock: si no hay existencias la venta se hace
+  /// igual y el stock queda negativo (el faltante). Solo pide confirmación la
+  /// primera vez que un producto cruza a negativo dentro de esta venta.
+  Future<void> addProductToCart(Product product, {int quantity = 1}) async {
     final existingIndex =
         _cartItems.indexWhere((item) => item.productId == product.id);
+    final cantidadActual =
+        existingIndex != -1 ? _cartItems[existingIndex].quantity : 0;
+    final nuevaCantidad = cantidadActual + quantity;
+
+    if (!await _confirmarFaltante(product, nuevaCantidad)) return;
 
     if (existingIndex != -1) {
-      // Actualizar cantidad existente
-      final existingItem = _cartItems[existingIndex];
-      final newQuantity = existingItem.quantity + quantity;
-
-      if (newQuantity > product.stock) {
-        SnackbarHelper.error('Stock insuficiente',
-            'Solo hay ${product.stock} unidades disponibles');
-        return;
-      }
-
-      _cartItems[existingIndex] = existingItem.copyWith(quantity: newQuantity);
+      _cartItems[existingIndex] =
+          _cartItems[existingIndex].copyWith(quantity: nuevaCantidad);
     } else {
-      // Agregar nuevo item
-      final saleItem = SaleItem(
+      _cartItems.add(SaleItem(
         productId: product.id,
         productName: product.name,
         quantity: quantity,
         unitPrice: product.price,
         total: product.price * quantity,
-      );
-      _cartItems.add(saleItem);
+      ));
     }
 
     _calculateTotals();
   }
 
   /// Actualizar cantidad de un item en el carrito
-  void updateCartItemQuantity(String productId, int newQuantity) {
+  Future<void> updateCartItemQuantity(String productId, int newQuantity) async {
     if (newQuantity <= 0) {
       removeFromCart(productId);
       return;
     }
 
     final index = _cartItems.indexWhere((item) => item.productId == productId);
-    if (index != -1) {
-      // Verificar stock disponible
-      final product =
-          _availableProducts.firstWhereOrNull((p) => p.id == productId);
-      if (product != null && newQuantity > product.stock) {
-        SnackbarHelper.error('Stock insuficiente',
-            'Solo hay ${product.stock} unidades disponibles');
-        return;
-      }
+    if (index == -1) return;
 
-      _cartItems[index] = _cartItems[index].copyWith(quantity: newQuantity);
-      _calculateTotals();
+    final product =
+        _availableProducts.firstWhereOrNull((p) => p.id == productId);
+    if (product != null && !await _confirmarFaltante(product, newQuantity)) {
+      return;
     }
+
+    _cartItems[index] = _cartItems[index].copyWith(quantity: newQuantity);
+    _calculateTotals();
+  }
+
+  /// Pide confirmación si [cantidad] deja el stock del producto en negativo y
+  /// aún no se aceptó para este producto en esta venta. Devuelve false solo si
+  /// el usuario cancela.
+  Future<bool> _confirmarFaltante(Product product, int cantidad) async {
+    final restante = product.stock - cantidad;
+    if (restante >= 0) return true;
+    if (_faltantesConfirmados.contains(product.id)) return true;
+
+    final confirmado = await Get.dialog<bool>(
+          AlertDialog(
+            backgroundColor: AppColors.cardBackground,
+            title: const Text('Sin existencias',
+                style: TextStyle(color: AppColors.textPrimary)),
+            content: Text(
+              product.stock > 0
+                  ? 'Solo quedan ${product.stock} de ${product.name}.\n\n'
+                      'Puedes venderlo igual: el stock quedará en ${-restante} '
+                      'unidades faltantes y se descontarán solas cuando repongas.'
+                  : 'No hay existencias de ${product.name}.\n\n'
+                      'Puedes venderlo igual: el stock quedará en ${-restante} '
+                      'unidades faltantes y se descontarán solas cuando repongas.',
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: const Text('Cancelar',
+                    style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: () => Get.back(result: true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Vender igual'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (confirmado) _faltantesConfirmados.add(product.id);
+    return confirmado;
   }
 
   /// Remover producto del carrito
   void removeFromCart(String productId) {
     _cartItems.removeWhere((item) => item.productId == productId);
+    _faltantesConfirmados.remove(productId);
     _calculateTotals();
   }
 
   /// Limpiar carrito
   void clearCart() {
     _cartItems.clear();
+    _faltantesConfirmados.clear();
     _calculateTotals();
     _receivedAmount.value = 0.0;
     _changeAmount.value = 0.0;
@@ -386,7 +450,18 @@ class PointOfSaleController extends GetxController with ScreenTourMixin {
       );
 
       // Procesar venta en el repositorio
-      final result = await _saleRepository.createSale(sale);
+      final resultado = await _saleRepository.createSale(sale);
+      final result = resultado.sale;
+
+      // El cobro salió bien pero algún stock no se movió: hay que avisarlo,
+      // porque el inventario queda mal y solo se arregla a mano.
+      if (result != null && resultado.stockFallido.isNotEmpty) {
+        SnackbarHelper.error(
+          'Revisa el inventario',
+          'La venta se registró, pero no se pudo descontar el stock de '
+              '${resultado.stockFallido.join(', ')}.',
+        );
+      }
 
       if (result != null) {
         // La notificación de éxito la muestra la vista tras cerrar el modal,

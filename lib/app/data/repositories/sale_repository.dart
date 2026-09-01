@@ -8,37 +8,52 @@ class SaleRepository {
   final SupabaseClient _supabase = SupabaseService.client;
 
   /// Crear una nueva venta
-  /// La venta se registra en la tabla 'ingresos' y las transacciones de productos se actualizan
-  Future<Sale?> createSale(Sale sale) async {
+  ///
+  /// La venta se registra en la tabla 'ingresos' y luego se descuenta el stock
+  /// de cada producto.
+  ///
+  /// El cobro y el inventario se reportan por separado a propósito. Una vez
+  /// insertado el ingreso el dinero ya se cobró; si después falla el descuento
+  /// de stock, decir que la venta falló haría que se cobrara dos veces. Por eso
+  /// [sale] llega null solo cuando no se registró nada, y los productos cuyo
+  /// stock no se pudo mover se devuelven aparte en [stockFallido] para avisar
+  /// que hay que corregirlos a mano.
+  Future<({Sale? sale, List<String> stockFallido})> createSale(Sale sale) async {
+    final Sale createdSale;
     try {
-      // Iniciar transacción
       final response = await _supabase
           .from('ingresos')
           .insert(TenantQueryHelper.withTenant(sale.toJson()))
           .select()
           .single();
 
-      final createdSale = Sale.fromJson(response);
-
-      // Registrar transacciones de productos para cada item vendido
-      for (final item in sale.items) {
-        await _registerProductTransaction(
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          staffUser: sale.usuarioStaff,
-        );
-
-        // Actualizar stock del producto
-        await _updateProductStock(item.productId, -item.quantity);
-      }
-
-      return createdSale;
+      createdSale = Sale.fromJson(response);
     } catch (e) {
       AppLogger.error('SaleRepository', 'Error al crear venta', e);
-      return null;
+      return (sale: null, stockFallido: const <String>[]);
     }
+
+    // A partir de aquí la venta ya está cobrada.
+    final stockFallido = <String>[];
+    for (final item in sale.items) {
+      await _registerProductTransaction(
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        staffUser: sale.usuarioStaff,
+      );
+
+      try {
+        await _updateProductStock(item.productId, -item.quantity);
+      } catch (e) {
+        AppLogger.error('SaleRepository',
+            'Error al descontar stock de ${item.productName}', e);
+        stockFallido.add(item.productName);
+      }
+    }
+
+    return (sale: createdSale, stockFallido: stockFallido);
   }
 
   /// Obtener todas las ventas de productos
@@ -172,26 +187,19 @@ class SaleRepository {
     }
   }
 
-  /// Actualizar stock de producto
+  /// Descuenta [quantityChange] del stock del producto en un solo UPDATE.
+  ///
+  /// El resultado puede quedar negativo a propósito: es el faltante, las
+  /// unidades que salieron sin existencias. Se salda solo al reponer.
+  ///
+  /// A diferencia del resto del repositorio, este error NO se traga: si el
+  /// stock no se movió, la venta no está bien registrada y quien cobra tiene
+  /// que enterarse.
   Future<void> _updateProductStock(String productId, int quantityChange) async {
-    try {
-      // Obtener stock actual
-      final productResponse = await _supabase
-          .from('products')
-          .select('stock')
-          .eq('id', productId)
-          .single();
-
-      final currentStock = productResponse['stock'] ?? 0;
-      final newStock = currentStock + quantityChange;
-
-      // Actualizar stock
-      await _supabase
-          .from('products')
-          .update({'stock': newStock}).eq('id', productId);
-    } catch (e) {
-      AppLogger.error('SaleRepository', 'Error al actualizar stock', e);
-    }
+    await _supabase.rpc('ajustar_stock_producto', params: {
+      'p_product_id': productId,
+      'p_delta': quantityChange,
+    });
   }
 
   /// Obtener productos más vendidos

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../controllers/access_logs_controller.dart';
 import '../../../data/models/access_log_model.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/widgets/periodo_selector.dart';
 import '../../../core/widgets/tour_step.dart';
 import '../../../global_widgets/app_header.dart';
 
@@ -17,6 +18,20 @@ class AccessLogsView extends GetView<AccessLogsController> {
       appBar: GymAppBar(
         title: 'Entradas',
         actions: [
+          Obx(() => IconButton(
+                icon: controller.isExportando.value
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppColors.accent),
+                      )
+                    : const Icon(Icons.picture_as_pdf_outlined),
+                onPressed: controller.isExportando.value
+                    ? null
+                    : controller.exportarPdf,
+                tooltip: 'Reporte en PDF',
+              )),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: controller.refreshData,
@@ -27,15 +42,30 @@ class AccessLogsView extends GetView<AccessLogsController> {
       body: SafeArea(
         child: Column(
           children: [
-            // Estadísticas superiores
+            // Periodo: día, semana, mes o rango a medida
+            TourStep(
+              tourKey: controller.keyPeriodo,
+              title: 'Periodo',
+              description: 'Elige si quieres ver el día, la semana o el mes, '
+                  'o define tu propio rango de fechas.',
+              borderRadius: 20,
+              isFirstStep: true,
+              child: PeriodoSelector(controller: controller),
+            ),
+
+            // Estadísticas y afluencia por hora
             TourStep(
               tourKey: controller.keyResumen,
               title: 'Resumen',
-              description: 'Cuántas personas han entrado y cuántos registros '
-                  'hay en total.',
+              description: 'Cuántas personas entraron y a qué horas se llena '
+                  'más el gimnasio.',
               borderRadius: 20,
-              isFirstStep: true,
-              child: _buildStatsSection(),
+              child: Column(
+                children: [
+                  _buildStatsSection(),
+                  _buildFranjasSection(),
+                ],
+              ),
             ),
 
             // Lista de logs
@@ -57,25 +87,116 @@ class AccessLogsView extends GetView<AccessLogsController> {
 
   Widget _buildStatsSection() {
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Obx(() {
-        final stats = controller.getFormattedStats();
         return Row(
           children: [
             _buildStatCard(
               'Entradas',
-              stats['totalEntries'] ?? '0',
+              '${controller.totalEntries.value}',
               AppColors.success,
             ),
+            // Solo tiene sentido si el gimnasio registra salidas.
+            if (controller.muestraSalidas)
+              _buildStatCard(
+                'Salidas',
+                '${controller.totalExits.value}',
+                AppColors.warning,
+              ),
             _buildStatCard(
-              'Total',
-              stats['totalLogs'] ?? '0',
+              'Hora pico',
+              controller.franjaPicoLabel,
               AppColors.accent,
             ),
           ],
         );
       }),
     );
+  }
+
+  /// Afluencia por franja de dos horas, dentro del horario configurado.
+  Widget _buildFranjasSection() {
+    return Obx(() {
+      final porFranja = controller.entradasPorFranja;
+      final maximo = controller.maximoPorFranja;
+      if (porFranja.isEmpty || maximo == 0) return const SizedBox.shrink();
+
+      final pico = controller.franjaPico;
+
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.accent.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Entradas por hora',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final entrada in porFranja.entries)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 92,
+                      child: Text(
+                        controller.etiquetaFranja(entrada.key),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontWeight: entrada.key == pico
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: entrada.value / maximo,
+                          minHeight: 10,
+                          backgroundColor: AppColors.containerBackground,
+                          valueColor: AlwaysStoppedAnimation(
+                            entrada.key == pico
+                                ? AppColors.accent
+                                : AppColors.accent.withOpacity(0.45),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 32,
+                      child: Text(
+                        '${entrada.value}',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textPrimary,
+                          fontWeight: entrada.key == pico
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _buildStatCard(String title, String value, Color color) {
@@ -95,14 +216,19 @@ class AccessLogsView extends GetView<AccessLogsController> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: color,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              // "18:00 – 20:00" no cabe al mismo tamaño que un número suelto;
+              // encogerlo es mejor que recortarlo con puntos suspensivos.
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+                maxLines: 1,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 6),
             Text(
@@ -189,7 +315,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No se encontraron registros',
+                  'Sin entradas en este periodo',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 16,

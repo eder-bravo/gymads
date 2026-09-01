@@ -40,6 +40,8 @@ dependencies:
   get_storage: ^2.1.1
   showcaseview: ^5.1.0
   google_sign_in: ^6.1.6
+  pdf: ^3.11.1
+  printing: ^5.13.4
 
 dev_dependencies:
   flutter_test:

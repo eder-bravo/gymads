@@ -195,8 +195,8 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
       context: context,
       initialTime: TimeOfDay(hour: actual.hora, minute: actual.minuto),
       helpText: 'Selecciona la hora',
-      // Tema oscuro propio: el tema claro de la app deja el reloj con texto
-      // negro sobre fondo oscuro.
+      // El reloj sale en 12 h por MaterialLocalizations12h (ver main.dart);
+      // el idioma por sí solo lo daría en 24 h.
       builder: (context, child) => Theme(
         data: ThemeData(
           useMaterial3: true,

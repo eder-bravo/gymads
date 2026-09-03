@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/register_controller.dart';
+import '../widgets/horario_selector.dart';
 
 /// Registration view — single-form with email/password + Google option
 class RegisterView extends GetView<RegisterController> {
@@ -175,6 +176,12 @@ class RegisterView extends GetView<RegisterController> {
               textInputAction: TextInputAction.done,
               hint: 'Ej: Col. Centro, Monterrey',
             ),
+            const SizedBox(height: 14),
+            Obx(() => HorarioSelector(
+                  apertura: controller.horaApertura.value,
+                  cierre: controller.horaCierre.value,
+                  onChanged: controller.setHorario,
+                )),
           ],
         ),
         const SizedBox(height: 24),

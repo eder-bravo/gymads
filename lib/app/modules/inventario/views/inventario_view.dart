@@ -352,12 +352,31 @@ class InventarioView extends GetView<InventarioController> {
             ),
           ),
         ),
-        title: Text(
-          product.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
+        // El precio va en la línea del nombre, no junto al stock: abajo
+        // comparte fila con los botones de ajuste y no cabían los tres.
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                product.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '\$${product.price.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.accent,
+                fontSize: 16,
+              ),
+            ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -365,6 +384,8 @@ class InventarioView extends GetView<InventarioController> {
             Text(
               product.description,
               style: const TextStyle(color: AppColors.textSecondary),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
             Row(
@@ -388,25 +409,14 @@ class InventarioView extends GetView<InventarioController> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '\$${product.price.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.accent,
-                    fontSize: 16,
-                  ),
-                ),
+                const SizedBox(width: 4),
+                // Ajuste de una unidad, pegado al stock que modifica.
+                _buildStockStepper(product),
               ],
             ),
           ],
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Ajuste rápido de una unidad, para corregir sin abrir el diálogo.
-            _buildStockStepper(product),
-            PopupMenuButton<String>(
+        trailing: PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
           color: AppColors.cardBackground,
           onSelected: (value) {
@@ -465,8 +475,6 @@ class InventarioView extends GetView<InventarioController> {
                   Text('Eliminar permanentemente', style: TextStyle(color: AppColors.textPrimary)),
                 ],
               ),
-            ),
-          ],
             ),
           ],
         ),

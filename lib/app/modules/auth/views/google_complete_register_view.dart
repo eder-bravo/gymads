@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/register_controller.dart';
+import '../widgets/horario_selector.dart';
 
 /// Screen shown to Google Sign-In users who don't have a gym yet.
 /// They only need to provide gym name + location.
@@ -155,6 +156,14 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                           textInputAction: TextInputAction.done,
                           hint: 'Ej: Col. Centro, Monterrey',
                         ),
+                        const SizedBox(height: 16),
+
+                        // Horario
+                        Obx(() => HorarioSelector(
+                              apertura: controller.horaApertura.value,
+                              cierre: controller.horaCierre.value,
+                              onChanged: controller.setHorario,
+                            )),
                         const SizedBox(height: 24),
 
                         // Error + Button (single Obx to avoid GetX issues)

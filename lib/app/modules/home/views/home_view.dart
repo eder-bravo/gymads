@@ -14,14 +14,22 @@ class HomeView extends GetView<HomeController> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isTablet = MediaQuery.of(context).size.width > 600;
+    // `sizeOf` y no `of`: este último crea dependencia con el MediaQueryData
+    // entero —`viewInsets` incluido—, así que la animación del teclado
+    // reconstruía esta pantalla en cada frame aunque estuviera oculta debajo.
+    final bool isTablet = MediaQuery.sizeOf(context).width > 600;
 
     // Asistente inicial / tour de bienvenida. Va aquí además de en onReady
     // porque al volver del asistente GetX puede reutilizar el controlador; la
     // comprobación es idempotente y barata una vez resuelta.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.checkOnboarding();
-    });
+    //
+    // Solo con Inicio en primer plano: esta vista sigue montada bajo las
+    // pantallas que se apilan encima, y desde ahí no le toca decidir nada.
+    if (Get.currentRoute == Routes.HOME) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.checkOnboarding();
+      });
+    }
 
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,

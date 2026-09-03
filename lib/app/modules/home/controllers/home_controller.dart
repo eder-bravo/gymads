@@ -27,6 +27,18 @@ class HomeController extends GetxController {
 
   bool _checkingOnboarding = false;
 
+  /// Pantallas que forman el asistente inicial.
+  ///
+  /// "Abonos fijos" lleva a la de precios, que es su segundo paso, y hasta que
+  /// no se confirman los precios el `payment_mode` sigue nulo. Sin tener las
+  /// dos en cuenta, cualquier reconstrucción de Inicio (por ejemplo al abrirse
+  /// el teclado) vuelve a empujar el asistente encima y le roba el foco al
+  /// campo que se está escribiendo.
+  static const Set<String> _rutasAsistente = {
+    Routes.ONBOARDING_PAYMENT_MODE,
+    Routes.ABONO_PRICES,
+  };
+
   List<GlobalKey> get _tourSteps => [
         keyHeader,
         keyClientes,
@@ -77,7 +89,7 @@ class HomeController extends GetxController {
       // Solo el dueño puede escribir en `gyms` (política RLS), así que a nadie
       // más se le puede pedir completar el asistente.
       if (tenant.isOwnerAdmin && tenant.staffProfile?.paymentMode == null) {
-        if (Get.currentRoute != Routes.ONBOARDING_PAYMENT_MODE) {
+        if (!_rutasAsistente.contains(Get.currentRoute)) {
           Get.toNamed(Routes.ONBOARDING_PAYMENT_MODE);
         }
         return;

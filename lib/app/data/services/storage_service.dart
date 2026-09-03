@@ -46,7 +46,15 @@ class StorageService {
     Duration ttl = _ttl,
   }) async {
     final parsed = _parse(stored, bucket ?? SupabaseConfig.bucketName);
-    if (parsed == null) return null;
+    if (parsed == null) {
+      // Distinto de un fallo de firma: aquí el valor guardado no apunta a
+      // ningún objeto reconocible.
+      if (stored != null && stored.isNotEmpty) {
+        AppLogger.warning('StorageService',
+            'No se reconoce el objeto en el valor guardado: $stored');
+      }
+      return null;
+    }
 
     final key = '${parsed.bucket}/${parsed.path}';
     final now = DateTime.now();
@@ -63,7 +71,13 @@ class StorageService {
       _cache[key] = _SignedEntry(url, now.add(ttl));
       return url;
     } catch (e) {
-      AppLogger.error('StorageService', 'No se pudo firmar ""', e);
+      // El mensaje tiene que decir qué objeto falló: sin esto la imagen se
+      // cae a las iniciales y no queda ni rastro de por qué.
+      AppLogger.error(
+        'StorageService',
+        'No se pudo firmar el objeto "$key" (bucket "${parsed.bucket}")',
+        e,
+      );
       return null;
     }
   }

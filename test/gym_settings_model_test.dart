@@ -7,7 +7,7 @@ void main() {
       final hora = HoraDelDia.parse('06:30:00', fallback: 0);
       expect(hora.hora, 6);
       expect(hora.minuto, 30);
-      expect(hora.etiqueta, '06:30');
+      expect(hora.etiqueta, '6:30 a.m.');
     });
 
     test('usa el respaldo si el valor viene vacío o nulo', () {

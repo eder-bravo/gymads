@@ -1,3 +1,5 @@
+import '../../core/utils/hora_formato.dart';
+
 /// Configuración de accesos del gimnasio: si se registran salidas y en qué
 /// horario abre.
 ///
@@ -76,9 +78,9 @@ class HoraDelDia {
   String toSql() =>
       '${hora.toString().padLeft(2, '0')}:${minuto.toString().padLeft(2, '0')}:00';
 
-  /// Para mostrar: "06:00".
-  String get etiqueta =>
-      '${hora.toString().padLeft(2, '0')}:${minuto.toString().padLeft(2, '0')}';
+  /// Para mostrar: "6:00 a.m.". El `toSql()` de arriba sigue en 24 h, que es
+  /// lo que espera el tipo `time` de Postgres.
+  String get etiqueta => HoraFormato.completa(hora, minuto);
 
   int get enMinutos => hora * 60 + minuto;
 

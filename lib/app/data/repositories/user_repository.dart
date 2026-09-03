@@ -249,49 +249,72 @@ class UserRepository {
   }
 
   /// Actualiza un usuario existente
+  ///
+  /// La foto solo se toca si se manda una nueva. `UserModel.toJson()` incluye
+  /// siempre `photo_url`, y varios formularios arman el modelo sin ella, así
+  /// que enviarla vacía borraba la que ya estaba guardada. Como ninguna
+  /// pantalla ofrece "quitar la foto", aquí un `photo_url` vacío significa
+  /// *no la cambies*, nunca *bórrala*.
   Future<bool> updateUser(String id, UserModel user, {File? photoFile}) async {
     try {
-      // Si se proporciona una nueva foto, primero subirla
+      String? fotoAnterior;
+      String? fotoNueva;
+
       if (photoFile != null) {
+        // La foto vigente se lee de la BD y no del modelo: quien llama pone
+        // `photoUrl` en null al mandar una foto nueva, de modo que el modelo
+        // ya no la trae.
+        fotoAnterior = (await getUserById(id))?.photoUrl ?? user.photoUrl;
+
         // Verificar que el archivo existe ANTES de leer sus metadatos
         // (photoFile.length() lanza PathNotFoundException si ya no existe)
         if (!await photoFile.exists()) {
           AppLogger.warning('UserRepository', 'La foto seleccionada ya no existe, no se actualiza la foto');
-          // Continuamos sin actualizar la foto
         } else {
-          final photoUrl = await _storageProvider.uploadUserPhoto(
+          fotoNueva = await _storageProvider.uploadUserPhoto(
             photoFile,
             id, // Usar el ID real del usuario para la foto
           );
 
-          if (photoUrl != null) {
-            // Si el usuario ya tenía una foto anterior, intentar eliminarla
-            if (user.photoUrl != null && user.photoUrl!.isNotEmpty) {
-              try {
-                await _storageProvider.deleteUserPhoto(user.photoUrl!);
-              } catch (e) {
-                AppLogger.warning('UserRepository', 'No se pudo eliminar la foto anterior');
-                // Continuamos aunque no se pueda eliminar la foto anterior
-              }
-            }
-
-            // Actualizar el modelo de usuario con la URL de la nueva foto
-            user = user.copyWith(photoUrl: photoUrl);
+          if (fotoNueva != null) {
+            user = user.copyWith(photoUrl: fotoNueva);
           } else {
+            // El resto de la edición (nombre, teléfono…) sí se guarda; la foto
+            // anterior se queda como estaba.
             AppLogger.error('UserRepository', 'Fallo al subir la nueva foto del usuario');
-            // Continuamos con la actualización del usuario aunque no se pudo subir la foto
           }
         }
       }
 
-      final response = await _apiProvider.update(id, user.toJson());
+      final payload = user.toJson();
+      final photoUrl = payload['photo_url'] as String?;
+      if (photoUrl == null || photoUrl.isEmpty) {
+        payload.remove('photo_url');
+      }
 
-      if (!response['error']) {
-        return true;
-      } else {
+      final response = await _apiProvider.update(id, payload);
+
+      if (response['error']) {
         AppLogger.error('UserRepository', 'Fallo al actualizar el usuario');
         return false;
       }
+
+      // La anterior se borra al final, con la nueva ya confirmada en la BD.
+      // Borrándola antes, un fallo en el update dejaba al cliente sin foto y
+      // apuntando a un objeto que ya no existe.
+      if (fotoNueva != null &&
+          fotoAnterior != null &&
+          fotoAnterior.isNotEmpty &&
+          fotoAnterior != fotoNueva) {
+        try {
+          await _storageProvider.deleteUserPhoto(fotoAnterior);
+        } catch (e) {
+          AppLogger.warning('UserRepository', 'No se pudo eliminar la foto anterior');
+          // Un objeto huérfano es preferible a fallar una actualización válida
+        }
+      }
+
+      return true;
     } catch (e) {
       AppLogger.error('UserRepository', 'Fallo al actualizar el usuario', e);
       return false;

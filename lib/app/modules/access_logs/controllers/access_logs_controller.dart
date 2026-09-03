@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/hora_formato.dart';
 import 'package:gymads/app/core/utils/periodo_filtro_mixin.dart';
 import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
@@ -174,10 +175,10 @@ class AccessLogsController extends GetxController
     return maximo == 0 ? null : mejor;
   }
 
-  /// "18:00 – 20:00"
+  /// "6 – 8 a.m." · "10 a.m. – 12 p.m."
   String etiquetaFranja(int horaInicio) {
     final fin = (horaInicio + _horasPorFranja) % 24;
-    return '${_dosDigitos(horaInicio)}:00 – ${_dosDigitos(fin)}:00';
+    return HoraFormato.rango(horaInicio, fin);
   }
 
   String get franjaPicoLabel {
@@ -192,7 +193,6 @@ class AccessLogsController extends GetxController
     return valores.reduce((a, b) => a > b ? a : b);
   }
 
-  static String _dosDigitos(int n) => n.toString().padLeft(2, '0');
 
   // ══════════════════════════════════════════════════════════
   // REPORTE EN PDF

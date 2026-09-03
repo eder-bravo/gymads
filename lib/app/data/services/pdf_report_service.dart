@@ -1,4 +1,6 @@
 import 'package:get/get.dart';
+
+import '../../core/utils/hora_formato.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -282,8 +284,7 @@ class PdfReportService {
       '${_dosDigitos(d.day)}/${_dosDigitos(d.month)}/${d.year} '
       '${_dosDigitos(d.hour)}:${_dosDigitos(d.minute)}';
 
-  static String horaLegible(DateTime d) =>
-      '${_dosDigitos(d.hour)}:${_dosDigitos(d.minute)}';
+  static String horaLegible(DateTime d) => HoraFormato.deFecha(d);
 
   static String fechaCorta(DateTime d) =>
       '${_dosDigitos(d.day)}/${_dosDigitos(d.month)}';

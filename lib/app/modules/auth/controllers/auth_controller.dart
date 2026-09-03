@@ -154,11 +154,11 @@ class AuthController extends GetxController {
     isLoading.value = true;
 
     try {
-      if (GetPlatform.isAndroid) {
-        return await _loginWithGoogleAndroid();
+      if (GetPlatform.isAndroid || GetPlatform.isIOS) {
+        return await _loginWithGoogleNativo();
       } else {
-        // iOS / other platforms — use Supabase OAuth flow
-        return await _loginWithGoogleiOS();
+        // Escritorio y web: no hay Google nativo, queda el flujo por navegador.
+        return await _loginWithGoogleNavegador();
       }
     } on AuthException catch (e) {
       AppLogger.error('AuthController', 'Fallo de autenticación', e);
@@ -191,8 +191,18 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Android: use google_sign_in plugin + signInWithIdToken
-  Future<bool> _loginWithGoogleAndroid() async {
+  /// Android e iOS: hoja nativa de Google + signInWithIdToken.
+  ///
+  /// Sin navegador de por medio, así que no hay ninguna URL de retorno que
+  /// validar. iOS estaba usando el flujo por navegador y acababa en
+  /// `http://localhost:3000`: Supabase rechazaba el `redirectTo` porque su
+  /// lista de Redirect URLs está vacía y caía al Site URL por defecto.
+  ///
+  /// En iOS el `idToken` sale audienciado al client ID del Info.plist
+  /// (`GIDClientID`) y en Android al `serverClientId`; ambos están dados de
+  /// alta en el proveedor de Google del proyecto, así que Supabase acepta los
+  /// dos.
+  Future<bool> _loginWithGoogleNativo() async {
     AppLogger.info('AuthController', 'Starting Google Sign-In');
     final srvClientId = dotenv.env['GOOGLE_SERVER_CLIENT_ID'];
     final googleSignIn = GoogleSignIn(
@@ -232,8 +242,12 @@ class AuthController extends GetxController {
     return await _handleGoogleAuthResult(response.user!.id, googleUser.displayName, googleUser.email);
   }
 
-  /// iOS: use Supabase native OAuth flow (no google_sign_in plugin)
-  Future<bool> _loginWithGoogleiOS() async {
+  /// Plataformas sin Google nativo: flujo OAuth por navegador.
+  ///
+  /// Para que funcione hacen falta dos cosas que hoy no están: el esquema
+  /// `redirectTo` en la lista de Redirect URLs del proyecto, y ese mismo
+  /// esquema registrado en el `Info.plist` de la plataforma.
+  Future<bool> _loginWithGoogleNavegador() async {
     AppLogger.info('AuthController', 'Starting Supabase OAuth flow');
 
     final success = await _supabase.auth.signInWithOAuth(

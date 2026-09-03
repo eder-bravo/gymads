@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gymads/app/data/models/gym_settings_model.dart';
 import '../../../data/providers/staff_profile_provider.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
@@ -25,6 +26,16 @@ class RegisterController extends GetxController {
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
   final gymNameController = TextEditingController();
+
+  /// Horario del gimnasio. Nace con el valor más común para que quien no lo
+  /// toque no alargue el registro; se guarda junto con el gimnasio.
+  final horaApertura = const HoraDelDia(6, 0).obs;
+  final horaCierre = const HoraDelDia(22, 0).obs;
+
+  void setHorario(HoraDelDia apertura, HoraDelDia cierre) {
+    horaApertura.value = apertura;
+    horaCierre.value = cierre;
+  }
   final locationController = TextEditingController();
 
   // State
@@ -144,11 +155,11 @@ class RegisterController extends GetxController {
     isLoading.value = true;
 
     try {
-      if (GetPlatform.isAndroid) {
-        await _registerWithGoogleAndroid();
+      if (GetPlatform.isAndroid || GetPlatform.isIOS) {
+        await _registerWithGoogleNativo();
       } else {
-        // iOS / other platforms — use Supabase OAuth flow
-        await _registerWithGoogleiOS();
+        // Escritorio y web: no hay Google nativo, queda el flujo por navegador.
+        await _registerWithGoogleNavegador();
       }
     } on AuthException catch (e) {
       AppLogger.error('RegisterController', 'Fallo de autenticación con Google', e);
@@ -161,8 +172,12 @@ class RegisterController extends GetxController {
     }
   }
 
-  /// Android: use google_sign_in plugin
-  Future<void> _registerWithGoogleAndroid() async {
+  /// Android e iOS: hoja nativa de Google + signInWithIdToken.
+  ///
+  /// Mismo motivo que en el inicio de sesión: por navegador, iOS terminaba en
+  /// `http://localhost:3000` porque el proyecto no tiene ninguna Redirect URL
+  /// permitida y Supabase caía a su Site URL.
+  Future<void> _registerWithGoogleNativo() async {
     final googleSignIn = GoogleSignIn(
       serverClientId: dotenv.env['GOOGLE_SERVER_CLIENT_ID'],
       scopes: ['email', 'profile'],
@@ -199,8 +214,10 @@ class RegisterController extends GetxController {
     );
   }
 
-  /// iOS: use Supabase native OAuth flow
-  Future<void> _registerWithGoogleiOS() async {
+  /// Plataformas sin Google nativo: flujo OAuth por navegador. Necesita el
+  /// esquema `redirectTo` tanto en las Redirect URLs del proyecto como en el
+  /// `Info.plist` de la plataforma.
+  Future<void> _registerWithGoogleNavegador() async {
     AppLogger.info('RegisterController', 'Starting Supabase OAuth flow for registration');
 
     final success = await _supabase.auth.signInWithOAuth(
@@ -288,6 +305,8 @@ class RegisterController extends GetxController {
         'p_last_name': lastNameController.text.trim(),
         'p_gym_name': gymNameController.text.trim(),
         'p_main_branch_name': locationController.text.trim(),
+        'p_hora_apertura': horaApertura.value.toSql(),
+        'p_hora_cierre': horaCierre.value.toSql(),
       });
 
       AppLogger.info('RegisterController', 'Gym registered via Google flow');
@@ -345,6 +364,8 @@ class RegisterController extends GetxController {
         'p_last_name': lastNameController.text.trim(),
         'p_gym_name': gymNameController.text.trim(),
         'p_main_branch_name': locationController.text.trim(),
+        'p_hora_apertura': horaApertura.value.toSql(),
+        'p_hora_cierre': horaCierre.value.toSql(),
       });
 
       AppLogger.info('RegisterController', 'Gym registered');

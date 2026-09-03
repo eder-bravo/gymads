@@ -94,7 +94,7 @@ class EntradasPdfBuilder {
               crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
                 pw.SizedBox(
-                  width: 90,
+                  width: 104,
                   child: pw.Text(
                     etiquetaFranja(hora),
                     style: pw.TextStyle(

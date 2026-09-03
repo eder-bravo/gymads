@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 import '../controllers/access_logs_controller.dart';
 import '../../../data/models/access_log_model.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/utils/hora_formato.dart';
 import '../../../core/widgets/periodo_selector.dart';
 import '../../../core/widgets/tour_step.dart';
 import '../../../global_widgets/app_header.dart';
@@ -149,7 +149,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
                 child: Row(
                   children: [
                     SizedBox(
-                      width: 92,
+                      // "10 a.m. – 12 p.m." es lo más ancho que puede salir.
+                      width: 116,
                       child: Text(
                         controller.etiquetaFranja(entrada.key),
                         style: TextStyle(
@@ -218,7 +219,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
           children: [
             FittedBox(
               fit: BoxFit.scaleDown,
-              // "18:00 – 20:00" no cabe al mismo tamaño que un número suelto;
+              // "10 a.m. – 12 p.m." no cabe al mismo tamaño que un número suelto;
               // encogerlo es mejor que recortarlo con puntos suspensivos.
               child: Text(
                 value,
@@ -419,7 +420,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  DateFormat('dd/MM HH:mm').format(log.accessTime),
+                  HoraFormato.fechaYHora(log.accessTime),
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 13,

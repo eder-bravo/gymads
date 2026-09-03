@@ -105,7 +105,7 @@ void main() {
         _acceso(20),
       ];
       expect(controller.franjaPico, 18);
-      expect(controller.franjaPicoLabel, '18:00 – 20:00');
+      expect(controller.franjaPicoLabel, '6 – 8 p.m.');
       expect(controller.maximoPorFranja, 2);
     });
 

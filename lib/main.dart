@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/material_localizations_12h.dart';
 import 'package:gymads/app/bindings/initial_binding.dart';
 import 'package:gymads/app/data/config/rfid_config.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
@@ -147,6 +148,9 @@ class _MyAppState extends State<MyApp> {
       locale: const Locale('es'),
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
+        // Va primero: Flutter usa el primer delegado que soporte el idioma,
+        // y este es el español con el reloj en 12 h (a.m./p.m.).
+        MaterialLocalizations12h.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

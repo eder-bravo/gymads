@@ -479,11 +479,10 @@ class ClienteDetailView extends GetView<ClientesController> {
             joinDate: cliente.joinDate,
             accessHistory: cliente.accessHistory,
             photoUrl: photoFile == null ? cliente.photoUrl : null,
-            // Conservar los datos de membresía: el formulario no los edita y
+            // Conservar los datos de vigencia: el formulario no los edita y
             // enviarlos vacíos borraría la vigencia del cliente en la BD.
             expirationDate: cliente.expirationDate,
             lastPaymentDate: cliente.lastPaymentDate,
-            membershipType: cliente.membershipType,
             isActive: cliente.isActive,
           );
 

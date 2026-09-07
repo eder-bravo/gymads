@@ -67,8 +67,8 @@ IPAddress dns(8, 8, 8, 8);             // Servidor DNS (Google)
 
 // =================== PINES DEL HARDWARE ===================
 // Pines del lector RFID PN532 (I2C)
-#define PN532_SDA     26   // GPIO 21
-#define PN532_SCL     27   // GPIO 22
+#define PN532_SDA     26   // GPIO 26
+#define PN532_SCL     27   // GPIO 27
 
 // Pines de LEDs indicadores
 #define LED_WIFI      2    // LED integrado del ESP32

@@ -6,7 +6,6 @@ class UserModel {
   final String phone;
   final String? email;
   final String? address;
-  final String? membershipType; // Ahora opcional/etiqueta
   final DateTime joinDate;
   final DateTime? expirationDate;
   final bool isActive;
@@ -23,7 +22,6 @@ class UserModel {
     required this.phone,
     this.email,
     this.address,
-    this.membershipType,
     required this.joinDate,
     this.expirationDate,
     this.isActive = true,
@@ -69,7 +67,6 @@ class UserModel {
       phone: (json['phone'] ?? '').toString().trim(),
       email: json['email']?.toString().trim(),
       address: json['address']?.toString().trim(),
-      membershipType: json['membership_type']?.toString().trim() ?? json['membershipType']?.toString().trim(),
       joinDate: joinDate,
       expirationDate: expDate,
       isActive: json['is_active'] ?? json['isActive'] == true,
@@ -89,7 +86,6 @@ class UserModel {
       'phone': phone,
       'email': email,
       'address': address,
-      'membership_type': membershipType,
       'join_date': joinDate.toUtc().toIso8601String(),
       'expiration_date': expirationDate?.toUtc().toIso8601String(),
       'is_active': isActive,
@@ -106,7 +102,6 @@ class UserModel {
     String? phone,
     String? email,
     String? address,
-    String? membershipType,
     DateTime? joinDate,
     DateTime? expirationDate,
     bool? isActive,
@@ -122,7 +117,6 @@ class UserModel {
       phone: phone ?? this.phone,
       email: email ?? this.email,
       address: address ?? this.address,
-      membershipType: membershipType ?? this.membershipType,
       joinDate: joinDate ?? this.joinDate,
       expirationDate: expirationDate ?? this.expirationDate,
       isActive: isActive ?? this.isActive,

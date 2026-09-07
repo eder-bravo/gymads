@@ -41,7 +41,6 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
   final esSalida = false.obs;
   final daysLeft = 0.obs;
   final userPhotoUrl = ''.obs;
-  final membershipType = ''.obs;
   final expirationDate = Rx<DateTime?>(null);
   
   // Timer para verificar periódicamente la tarjeta RFID

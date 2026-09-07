@@ -143,19 +143,10 @@ class UserRepository {
     }
   }
 
-  /// Obtiene todos los usuarios disponibles con precios de membresía
+  /// Obtiene todos los usuarios de la sucursal actual
   Future<List<UserModel>> getAllUsers() async {
     try {
-      // Verificar si el provider es SupabaseApiProvider para usar el método especializado
-      Map<String, dynamic> response;
-      
-      if (_apiProvider.runtimeType.toString().contains('SupabaseApiProvider')) {
-        final supabaseProvider = _apiProvider as dynamic;
-        response = await supabaseProvider.getUsersWithMembershipInfo();
-      } else {
-        // Fallback para otros providers
-        response = await _apiProvider.getAll();
-      }
+      final response = await _apiProvider.getAll();
 
       if (response['error'] || response['data'] == null) {
         AppLogger.error('UserRepository', 'Fallo al obtener la lista de usuarios');
@@ -324,8 +315,32 @@ class UserRepository {
   /// Elimina un usuario por su ID
   Future<bool> deleteUser(String id) async {
     try {
+      // La foto se lee ANTES del delete: después de borrar la fila ya no hay
+      // forma de saber qué objeto del bucket le pertenecía (el nombre del
+      // archivo no contiene el id real del usuario).
+      final foto = (await getUserById(id))?.photoUrl;
+
       final response = await _apiProvider.delete(id);
-      return !response['error'];
+
+      if (response['error']) {
+        AppLogger.error('UserRepository', 'Fallo al eliminar el usuario');
+        return false;
+      }
+
+      // Se borra al final, con la fila ya eliminada: si el delete fallara
+      // después de quitar la foto, el cliente quedaría apuntando a un objeto
+      // inexistente.
+      if (foto != null && foto.isNotEmpty) {
+        try {
+          await _storageProvider.deleteUserPhoto(foto);
+        } catch (e) {
+          AppLogger.warning('UserRepository', 'No se pudo eliminar la foto del usuario');
+          // Un objeto huérfano es preferible a reportar como fallida una
+          // eliminación que sí se completó en la base de datos
+        }
+      }
+
+      return true;
     } catch (e) {
       AppLogger.error('UserRepository', 'Fallo al eliminar el usuario', e);
       return false;

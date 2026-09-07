@@ -26,18 +26,6 @@ class InitialBinding extends Bindings {
       fenix: true
     );
     
-    Get.lazyPut<SupabaseApiProvider>(
-      () => SupabaseApiProvider(table: 'memberships'),
-      tag: 'memberships_provider',
-      fenix: true
-    );
-    
-    Get.lazyPut<SupabaseApiProvider>(
-      () => SupabaseApiProvider(table: 'check_ins'),
-      tag: 'check_ins_provider',
-      fenix: true
-    );
-    
     // Repositorios globales
     Get.lazyPut<UserRepository>(
       () => UserRepository(Get.find<SupabaseApiProvider>(tag: 'users_provider')),

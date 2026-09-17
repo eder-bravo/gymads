@@ -56,4 +56,56 @@ class AccessCodeGenerator {
     if (limpio.length != _largo) return limpio;
     return '${limpio.substring(0, 4)}-${limpio.substring(4)}';
   }
+
+  /// Cuántos caracteres tiene el código, sin contar el separador.
+  static int get largo => _largo;
+
+  /// Da forma a un código a medio escribir, para el campo de entrada.
+  ///
+  /// A diferencia de [formatear], acepta cualquier longitud: recorta lo que
+  /// sobre de [largo] y pone el guion en su sitio. El separador aparece solo
+  /// a partir del quinto carácter, nunca colgando al final de los cuatro
+  /// primeros: si se pusiera antes, al borrar se regeneraría solo y la tecla
+  /// de retroceso parecería no hacer nada.
+  ///
+  /// Si lo que llega no es un código limpio sino un texto más largo —lo
+  /// típico es que el empleado no copie solo el código, sino todo el mensaje
+  /// de WhatsApp que arma `codigo_generado_dialog.dart` ("Hola María, este es
+  /// tu código para entrar a...")—, tomar a ciegas los primeros 8 caracteres
+  /// válidos saldría de la prosa, no del código. Antes de recortar así, se
+  /// busca el código de verdad dentro del texto con [_buscarIncrustado].
+  static String formatearParcial(String codigo) {
+    final limpio = normalizar(codigo);
+    final acotado =
+        limpio.length > _largo ? limpio.substring(0, _largo) : limpio;
+
+    // El recorte a ciegas solo es sospechoso cuando llegó más de lo que
+    // cabe: mientras se escribe carácter a carácter nunca se pasa de 8, así
+    // que este camino no se toca para nada de lo que ya funcionaba.
+    if (limpio.length > _largo && !acotado.split('').every(_alfabeto.contains)) {
+      final incrustado = _buscarIncrustado(codigo);
+      if (incrustado != null) return formatear(incrustado);
+    }
+
+    if (acotado.length <= 4) return acotado;
+    return '${acotado.substring(0, 4)}-${acotado.substring(4)}';
+  }
+
+  /// Busca un código de verdad dentro de un texto más largo.
+  ///
+  /// Recorre las "palabras" del texto —tandas de letras, dígitos y guiones,
+  /// cortadas por espacios, saltos de línea o puntuación— y se queda con la
+  /// primera que, ya normalizada, tiene exactamente 8 caracteres y ninguno
+  /// fuera del alfabeto del código. Una palabra de la prosa rara vez cae en
+  /// esa forma exacta: basta con que tenga una I, una O, un 0 o un 1 —muy
+  /// comunes en español— para quedar descartada.
+  static String? _buscarIncrustado(String texto) {
+    for (final match in RegExp(r'[A-Za-z0-9-]+').allMatches(texto)) {
+      final palabra = normalizar(match.group(0)!);
+      if (palabra.length == _largo && palabra.split('').every(_alfabeto.contains)) {
+        return palabra;
+      }
+    }
+    return null;
+  }
 }

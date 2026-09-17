@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../core/utils/category_icons.dart';
 import '../../../core/widgets/tour_step.dart';
+import '../../../core/widgets/refrescable.dart';
 import '../../../global_widgets/app_header.dart';
 
 class PointOfSaleView extends GetView<PointOfSaleController> {
@@ -16,7 +17,16 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: const GymAppBar(title: 'Punto de Venta'),
+      appBar: GymAppBar(
+        title: 'Punto de Venta',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: controller.refrescar,
+            tooltip: 'Actualizar',
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -76,7 +86,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   final products = controller.filteredProducts;
 
                   if (products.isEmpty) {
-                    return Center(
+                    return Refrescable.centrado(
+                      onRefresh: controller.refrescar,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -93,18 +104,21 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   }
 
                   final isTablet = MediaQuery.of(context).size.width > 600;
-                  return GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: isTablet ? 4 : 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.8,
+                  return Refrescable(
+                    onRefresh: controller.refrescar,
+                    child: GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: isTablet ? 4 : 2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 0.8,
+                      ),
+                      itemCount: products.length,
+                      itemBuilder: (context, index) {
+                        return _buildProductCard(products[index]);
+                      },
                     ),
-                    itemCount: products.length,
-                    itemBuilder: (context, index) {
-                      return _buildProductCard(products[index]);
-                    },
                   );
                 }),
               ),
@@ -147,7 +161,9 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
             color: AppColors.cardBackground,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: inCart ? AppColors.accent : AppColors.accent.withOpacity(0.12),
+              color: inCart
+                  ? AppColors.accent
+                  : AppColors.accent.withOpacity(0.12),
               width: inCart ? 2 : 1,
             ),
             boxShadow: [
@@ -318,7 +334,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       final isEmpty = itemCount == 0;
 
       return Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: isEmpty ? 14 : 16),
+        padding:
+            EdgeInsets.symmetric(horizontal: 16, vertical: isEmpty ? 14 : 16),
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
           boxShadow: [
@@ -335,7 +352,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               ? Center(
                   child: Text(
                     'Selecciona productos para cobrar',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    style:
+                        TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   ),
                 )
               : Row(
@@ -472,7 +490,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   decoration: BoxDecoration(
                     color: AppColors.error.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.error.withOpacity(0.35)),
+                    border:
+                        Border.all(color: AppColors.error.withOpacity(0.35)),
                   ),
                   child: Row(
                     children: [
@@ -552,8 +571,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       const SizedBox(height: 8),
                       TextField(
                         style: const TextStyle(color: AppColors.textPrimary),
-                        keyboardType:
-                            const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
                               RegExp(r'^\d+\.?\d{0,2}')),
@@ -701,7 +720,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
             return GestureDetector(
               onTap: () => controller.setPaymentMethod(method),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: selected ? AppColors.accent : AppColors.cardBackground,
                   borderRadius: BorderRadius.circular(12),
@@ -724,8 +744,10 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     Text(
                       _getPaymentMethodName(method),
                       style: TextStyle(
-                        color: selected ? Colors.white : AppColors.textSecondary,
-                        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                        color:
+                            selected ? Colors.white : AppColors.textSecondary,
+                        fontWeight:
+                            selected ? FontWeight.bold : FontWeight.normal,
                         fontSize: 13,
                       ),
                     ),

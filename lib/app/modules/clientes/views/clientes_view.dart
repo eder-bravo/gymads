@@ -7,6 +7,7 @@ import 'package:gymads/app/global_widgets/cliente_card.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/core/utils/responsive_utils.dart';
 import 'cliente_detail_view.dart';
+import '../../../core/widgets/refrescable.dart';
 import '../controllers/clientes_controller.dart';
 
 class ClientesView extends GetView<ClientesController> {
@@ -95,7 +96,8 @@ class ClientesView extends GetView<ClientesController> {
                     final filteredClientes = controller.filteredClientes;
 
                     if (filteredClientes.isEmpty) {
-                      return Center(
+                      return Refrescable.centrado(
+                        onRefresh: controller.fetchClientes,
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -122,17 +124,20 @@ class ClientesView extends GetView<ClientesController> {
                       );
                     }
 
-                    return ListView.builder(
-                      itemCount: filteredClientes.length,
-                      padding: const EdgeInsets.only(bottom: 80),
-                      itemBuilder: (context, index) {
-                        final cliente = filteredClientes[index];
+                    return Refrescable(
+                      onRefresh: controller.fetchClientes,
+                      child: ListView.builder(
+                        itemCount: filteredClientes.length,
+                        padding: const EdgeInsets.only(bottom: 80),
+                        itemBuilder: (context, index) {
+                          final cliente = filteredClientes[index];
 
-                        return ClienteCard(
-                          cliente: cliente,
-                          onTap: () => _showClienteDetails(cliente),
-                        );
-                      },
+                          return ClienteCard(
+                            cliente: cliente,
+                            onTap: () => _showClienteDetails(cliente),
+                          );
+                        },
+                      ),
                     );
                   }),
                 ),

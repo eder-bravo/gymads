@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/permissions/staff_role.dart';
 import '../../../data/models/staff_acceso_model.dart';
 import '../controllers/staff_accesos_controller.dart';
 
 /// Alta de un acceso nuevo o renombrado de uno existente.
 ///
-/// Solo pide el nombre: el empleado no tiene correo ni contraseña, entra con
-/// el código. Al crear devuelve el nombre y el código en claro; al renombrar
-/// devuelve null.
+/// Al crear pide el nombre y el rol; al renombrar, solo el nombre (el rol se
+/// cambia desde la lista, sin tener que regenerar el código). El empleado no
+/// tiene correo ni contraseña: entra con el código.
+///
+/// Devuelve el nombre y el código en claro al crear, y null al renombrar.
 Future<({String nombre, String codigo})?> showStaffAccesoFormDialog({
   StaffAccesoModel? existing,
 }) {
@@ -30,6 +33,12 @@ class _StaffAccesoFormDialog extends StatefulWidget {
 
 class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
   late final TextEditingController _nombreCtrl;
+
+  /// El rol que se entregará. Arranca en Staff, que es el trabajo más común y
+  /// el que menos permisos concede: si alguien acepta el valor por defecto sin
+  /// leerlo, se equivoca por el lado seguro.
+  late StaffRole _rol;
+
   String? _error;
 
   StaffAccesosController get _controller => Get.find<StaffAccesosController>();
@@ -40,6 +49,12 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
   void initState() {
     super.initState();
     _nombreCtrl = TextEditingController(text: widget.existing?.nombre ?? '');
+
+    final asignables = _controller.rolesAsignables;
+    _rol = widget.existing?.rol ??
+        (asignables.contains(StaffRole.branchStaff)
+            ? StaffRole.branchStaff
+            : asignables.first);
   }
 
   @override
@@ -63,8 +78,72 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
       return;
     }
 
-    final codigo = await _controller.crear(nombre);
+    final codigo = await _controller.crear(nombre, _rol);
     if (codigo != null) Get.back(result: (nombre: nombre, codigo: codigo));
+  }
+
+  /// Una opción del selector: el nombre del rol y, debajo, qué alcance tiene.
+  /// La descripción va a la vista porque elegir mal aquí es lo que abre o
+  /// cierra medio menú al empleado.
+  Widget _buildOpcionRol(StaffRole rol) {
+    final seleccionado = rol == _rol;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => setState(() => _rol = rol),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.containerBackground,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: seleccionado
+                  ? AppColors.accent
+                  : Colors.white.withOpacity(0.06),
+              width: seleccionado ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                seleccionado
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                size: 20,
+                color:
+                    seleccionado ? AppColors.accent : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      rol.label,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      rol.descripcion,
+                      style: TextStyle(
+                        color: AppColors.textSecondary.withOpacity(0.8),
+                        fontSize: 12,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -120,6 +199,21 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
                 ),
               ),
             ),
+            // El rol se elige al crear. Para cambiarlo después está
+            // "Cambiar rol" en la lista, que no obliga a regenerar el código.
+            if (!_isEditing) ...[
+              const SizedBox(height: 20),
+              const Text(
+                'Qué podrá hacer',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ..._controller.rolesAsignables.map(_buildOpcionRol),
+            ],
             const SizedBox(height: 20),
             Obx(() {
               final saving = _controller.isSaving.value;

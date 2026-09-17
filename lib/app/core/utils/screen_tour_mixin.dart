@@ -20,6 +20,22 @@ mixin ScreenTourMixin on GetxController {
   /// frame y el tour no encontraría a qué apuntar.
   List<GlobalKey> get tourSteps;
 
+  /// Si [key] es el primer paso del recorrido tal y como quedó.
+  ///
+  /// La vista no puede saberlo por su cuenta cuando los pasos dependen del
+  /// rol: el que era primero puede estar oculto. Y acertar importa, porque de
+  /// esto depende que el primer paso no ofrezca un "Anterior" que no lleva a
+  /// ninguna parte.
+  bool esPrimerPasoDelTour(GlobalKey key) =>
+      tourSteps.isNotEmpty && tourSteps.first == key;
+
+  /// Si [key] es el último paso del recorrido tal y como quedó.
+  ///
+  /// Igual que [esPrimerPasoDelTour], pero para el otro extremo: el último
+  /// paso dice "Entendido" y pierde el botón "Saltar".
+  bool esUltimoPasoDelTour(GlobalKey key) =>
+      tourSteps.isNotEmpty && tourSteps.last == key;
+
   @override
   void onReady() {
     super.onReady();

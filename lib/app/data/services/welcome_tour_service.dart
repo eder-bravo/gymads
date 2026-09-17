@@ -73,9 +73,16 @@ class WelcomeTourService extends GetxService {
   /// a la hora de darlo por visto.
   bool _activeTourShown = false;
 
-  /// Clave (por gimnasio y recorrido) que lo marca como pendiente. Solo las
-  /// escribe el asistente de configuración inicial, así que los gimnasios que
-  /// ya existían antes de esta función nunca las tienen y nunca ven los tours.
+  /// Clave (por gimnasio y recorrido) que lo marca como pendiente.
+  ///
+  /// Las escriben los dos puntos de entrada a un gimnasio: el asistente de
+  /// configuración inicial, para el dueño recién registrado, y el canje del
+  /// código, para cada empleado nuevo. Los gimnasios que ya existían antes de
+  /// esta función nunca las tienen y por eso nunca ven los recorridos.
+  ///
+  /// Ojo: vive en el disco del dispositivo, no en la base. Marcarlas en el
+  /// teléfono del dueño no hace nada por el del empleado; de ahí que cada
+  /// entrada tenga que marcarlas por su cuenta.
   static String _pendingKey(String gymId, String tourId) =>
       'onboarding_tour_pending_${gymId}_$tourId';
 
@@ -94,6 +101,11 @@ class WelcomeTourService extends GetxService {
   }
 
   /// Marca todos los recorridos como pendientes para el gimnasio actual.
+  ///
+  /// La llaman el asistente de configuración inicial (dueño) y el canje del
+  /// código (empleado). Necesita que [TenantContextService] ya tenga el
+  /// perfil cargado: sin `gym_id` no hay clave que escribir y sale en
+  /// silencio.
   Future<void> markPending() async {
     final gymId = TenantContextService.to.currentGymId;
     if (gymId == null) return;

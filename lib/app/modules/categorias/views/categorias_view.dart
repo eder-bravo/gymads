@@ -214,7 +214,7 @@ class CategoriasView extends GetView<CategoriasController> {
                   value: 'toggle',
                   child: Text(isInactive ? 'Reactivar' : 'Desactivar'),
                 ),
-                if (controller.isOwner)
+                if (controller.puedeGestionar)
                   const PopupMenuItem(
                     value: 'delete',
                     child: Text('Eliminar',

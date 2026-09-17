@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get_storage/get_storage.dart';
+import '../../core/permissions/permissions.dart';
+import '../../core/permissions/staff_role.dart';
 import '../models/staff_profile_model.dart';
 import 'gym_settings_service.dart';
 
@@ -28,8 +30,31 @@ class TenantContextService extends GetxService {
   /// Current branch ID
   String? get currentBranchId => _staffProfile.value?.branchId;
 
-  /// Current user role ('owner_admin' or 'branch_staff')
+  /// Current user role, as stored in the database.
   String? get currentRole => _staffProfile.value?.role;
+
+  /// El rol del usuario actual. Sin perfil se asume el rol más limitado.
+  StaffRole get rol => StaffRole.fromString(_staffProfile.value?.role);
+
+  /// Si el usuario actual puede hacer [permiso].
+  ///
+  /// Es la única forma correcta de decidir qué mostrar. Sin sesión no se
+  /// puede nada: la respuesta es siempre false.
+  bool can(Permission permiso) {
+    if (_staffProfile.value == null) return false;
+    return kPermisosPorRol[rol]?.contains(permiso) ?? false;
+  }
+
+  /// Si el usuario actual puede entregar o modificar accesos con el rol [otro].
+  ///
+  /// Espeja a `public.puede_gestionar_rol()`: hace falta el permiso y, además,
+  /// mandar sobre ese rol. Así un encargado no puede nombrar a otro encargado.
+  bool puedeGestionarRol(StaffRole otro) =>
+      can(Permission.gestionarAccesosStaff) && rol.mandaSobre(otro);
+
+  /// Los roles que este usuario puede entregar al crear un acceso.
+  List<StaffRole> get rolesAsignables =>
+      StaffRole.asignables.where(puedeGestionarRol).toList();
 
   /// Display name of current staff
   String? get displayName => _staffProfile.value?.displayName;

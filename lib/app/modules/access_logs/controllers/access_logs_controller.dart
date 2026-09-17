@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/hora_formato.dart';
 import 'package:gymads/app/core/utils/periodo_filtro_mixin.dart';
@@ -29,6 +30,17 @@ class AccessLogsController extends GetxController
 
   final RxBool isExportando = false.obs;
 
+  /// Si el desglose por franja horaria está desplegado.
+  ///
+  /// Ocupa toda la pantalla en gimnasios con horario largo, y quien solo viene
+  /// a consultar la lista de entradas no lo necesita. Al plegarlo no se pierde
+  /// la hora pico: sigue en las tarjetas de resumen, justo encima.
+  final franjasExpandidas = true.obs;
+
+  /// Preferencia del dispositivo, no del gimnasio: quien pliega el desglose lo
+  /// quiere plegado la próxima vez que entre.
+  static const String _kFranjasExpandidas = 'entradas_franjas_expandidas';
+
   // ─── Tour de bienvenida ───
   final keyPeriodo = GlobalKey();
   final keyResumen = GlobalKey();
@@ -44,8 +56,21 @@ class AccessLogsController extends GetxController
   void onInit() {
     super.onInit();
     _cargarAjustes();
+    _cargarPreferenciaFranjas();
     // Abre en el día de hoy; `iniciarEnHoy` dispara la carga.
     iniciarEnHoy();
+  }
+
+  Future<void> _cargarPreferenciaFranjas() async {
+    final prefs = await SharedPreferences.getInstance();
+    franjasExpandidas.value = prefs.getBool(_kFranjasExpandidas) ?? true;
+  }
+
+  /// Pliega o despliega el desglose por franja horaria, y lo recuerda.
+  Future<void> alternarFranjas() async {
+    franjasExpandidas.value = !franjasExpandidas.value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kFranjasExpandidas, franjasExpandidas.value);
   }
 
   @override

@@ -1,12 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/permissions/staff_role.dart';
 import '../../core/utils/access_code_generator.dart';
 import '../../core/utils/app_logger.dart';
 import '../models/staff_acceso_model.dart';
 import '../services/supabase_service.dart';
 import '../services/tenant_query_helper.dart';
 
-/// Accesos del personal. Solo el dueño del gimnasio puede usarlo.
+/// Accesos del personal. Lo usan el dueño y el encargado, cada uno solo sobre
+/// los roles por debajo del suyo.
 ///
 /// Las lecturas van directas a la tabla (protegidas por RLS owner-only) y
 /// todas las escrituras pasan por funciones SECURITY DEFINER, igual que el
@@ -35,22 +37,43 @@ class StaffAccesoRepository {
     }
   }
 
-  /// Crea un acceso y devuelve el código en claro.
+  /// Crea un acceso con el rol indicado y devuelve el código en claro.
   ///
   /// Es la ÚNICA vez que ese código existe fuera del dispositivo: al servidor
   /// solo viaja su hash. Si el dueño lo pierde, hay que regenerarlo.
-  Future<String> crear(String nombre) async {
+  ///
+  /// El servidor vuelve a comprobar el rol: solo se puede entregar uno por
+  /// debajo del propio, así que un encargado no puede nombrar a otro.
+  Future<String> crear(String nombre, StaffRole rol) async {
     try {
       final codigo = AccessCodeGenerator.generar();
 
       await _supabase.rpc('crear_acceso_staff', params: {
         'p_nombre': nombre.trim(),
         'p_codigo_hash': AccessCodeGenerator.hash(codigo),
+        'p_role': rol.value,
       });
 
       return codigo;
     } catch (e) {
       AppLogger.error('StaffAccesoRepository', 'Error al crear acceso', e);
+      throw _mapError(e);
+    }
+  }
+
+  /// Cambia el rol de un acceso, ya sea que esté pendiente o en uso.
+  ///
+  /// Si el empleado ya canjeó su código, su perfil cambia con él y verá el
+  /// menú nuevo en cuanto su app relea el perfil. No hace falta regenerar el
+  /// código ni volver a darlo de alta.
+  Future<void> cambiarRol(String accesoId, StaffRole rol) async {
+    try {
+      await _supabase.rpc('cambiar_rol_staff', params: {
+        'p_acceso_id': accesoId,
+        'p_role': rol.value,
+      });
+    } catch (e) {
+      AppLogger.error('StaffAccesoRepository', 'Error al cambiar el rol', e);
       throw _mapError(e);
     }
   }
@@ -136,7 +159,7 @@ class StaffAccesoRepository {
 
 /// Motivos por los que una operación sobre accesos puede fallar.
 enum StaffAccesoFailure {
-  /// Solo el dueño del gimnasio puede gestionar los accesos.
+  /// Falta el permiso, o el acceso tiene un rol igual o superior al propio.
   notAllowed,
 
   /// El acceso ya no existe o no pertenece a este gimnasio.
@@ -154,7 +177,9 @@ class StaffAccesoException implements Exception {
   String message() {
     switch (kind) {
       case StaffAccesoFailure.notAllowed:
-        return 'Solo el dueño del gimnasio puede gestionar los accesos.';
+        return 'No puedes gestionar ese acceso. Solo el dueño y el encargado '
+            'administran al personal, y cada uno solo sobre los roles por '
+            'debajo del suyo.';
       case StaffAccesoFailure.notFound:
         return 'Ese acceso ya no existe. Actualiza la lista.';
       case StaffAccesoFailure.emptyName:

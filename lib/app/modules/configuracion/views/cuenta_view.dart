@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/permissions/permissions.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
@@ -83,8 +84,9 @@ class CuentaView extends GetView<ConfiguracionController> {
                   value: controller.gymName.value.isNotEmpty
                       ? controller.gymName.value
                       : 'Cargando...',
-                  // Solo el dueño puede modificar el gimnasio (política RLS)
-                  editable: TenantContextService.to.isOwnerAdmin,
+                  // Espeja la política RLS de `gyms`: dueño y encargado.
+                  editable: TenantContextService.to
+                      .can(Permission.editarGimnasio),
                   onEdit: () => _showEditDialog(
                     context,
                     title: 'Gimnasio',
@@ -99,8 +101,9 @@ class CuentaView extends GetView<ConfiguracionController> {
                   value: controller.branchName.value.isNotEmpty
                       ? controller.branchName.value
                       : 'Cargando...',
-                  // Solo el dueño puede modificar la sucursal (política RLS)
-                  editable: TenantContextService.to.isOwnerAdmin,
+                  // Espeja la política RLS de `branches`: dueño y encargado.
+                  editable: TenantContextService.to
+                      .can(Permission.editarGimnasio),
                   onEdit: () => _showEditDialog(
                     context,
                     title: 'Sucursal',
@@ -109,8 +112,10 @@ class CuentaView extends GetView<ConfiguracionController> {
                   ),
                 ),
 
-                // Solo el dueño puede borrar el gimnasio y la cuenta
-                if (TenantContextService.to.isOwnerAdmin) ...[
+                // Borrar el gimnasio es lo único que ni el encargado puede:
+                // queda solo para el dueño.
+                if (TenantContextService.to
+                    .can(Permission.eliminarGimnasio)) ...[
                   const SizedBox(height: 40),
 
                   // Danger zone

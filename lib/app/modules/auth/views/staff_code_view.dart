@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../../core/utils/access_code_generator.dart';
 import '../controllers/staff_code_controller.dart';
 
 /// Entrada del personal con su código de acceso.
@@ -143,11 +144,10 @@ class StaffCodeView extends GetView<StaffCodeController> {
       textInputAction: TextInputAction.go,
       onSubmitted: (_) => controller.entrar(),
       onChanged: (_) => controller.clearError(),
-      // El guion se acepta pero no es obligatorio: la normalización lo ignora.
-      inputFormatters: [
-        UpperCaseTextFormatter(),
-        LengthLimitingTextInputFormatter(9),
-      ],
+      // El guion lo pone el formateador: el empleado solo teclea los 8
+      // caracteres, y pegar el código completo también funciona. El largo lo
+      // acota el propio formateador, así que no hace falta limitarlo aquí.
+      inputFormatters: [CodigoAccesoFormatter()],
       style: const TextStyle(
         color: Colors.white,
         fontSize: 26,
@@ -247,16 +247,49 @@ class StaffCodeView extends GetView<StaffCodeController> {
   }
 }
 
-/// Fuerza mayúsculas mientras se escribe: los códigos solo usan A-Z y 2-9.
-class UpperCaseTextFormatter extends TextInputFormatter {
+/// Da forma al código mientras se escribe.
+///
+/// Pone las mayúsculas, descarta lo que no puede formar parte de un código y
+/// coloca el guion solo al llegar al quinto carácter. Así nadie tiene que
+/// teclear el separador, y pegar el código entero —con guion o sin él, en
+/// minúsculas, con espacios alrededor o incluso dentro del mensaje completo
+/// que se comparte por WhatsApp— cae siempre en `XXXX-XXXX`.
+class CodigoAccesoFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
+    final texto = AccessCodeGenerator.formatearParcial(newValue.text);
+
+    // Más de un carácter de golpe solo pasa al pegar (un tecleo normal, o
+    // incluso reemplazar una selección con una tecla, nunca crece más de 1).
+    // En ese caso no tiene sentido calcular "dónde iba el cursor": pudo
+    // pegarse un mensaje entero mucho más largo que el código que queda, así
+    // que se manda al final del resultado, listo para revisar o enviar.
+    final fuePegado = newValue.text.length > oldValue.text.length + 1;
+
+    final int posicion;
+    if (fuePegado) {
+      posicion = texto.length;
+    } else {
+      // El cursor se recoloca contando caracteres ÚTILES, no posiciones: el
+      // guion que se acaba de insertar corre un sitio todo lo que va detrás,
+      // y sin esto el cursor se quedaría encima de él o saltaría al final al
+      // corregir algo en medio.
+      final utilesAntesDelCursor = AccessCodeGenerator.normalizar(
+        newValue.text.substring(
+            0, newValue.selection.end.clamp(0, newValue.text.length)),
+      ).length.clamp(0, AccessCodeGenerator.largo);
+
+      posicion = utilesAntesDelCursor + (utilesAntesDelCursor > 4 ? 1 : 0);
+    }
+
     return TextEditingValue(
-      text: newValue.text.toUpperCase(),
-      selection: newValue.selection,
+      text: texto,
+      selection: TextSelection.collapsed(
+        offset: posicion.clamp(0, texto.length),
+      ),
     );
   }
 }

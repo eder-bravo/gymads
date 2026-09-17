@@ -14,6 +14,7 @@ import '../../../data/services/access_log_service.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../core/utils/auth_utils.dart';
 import '../../../data/services/gym_settings_service.dart';
+import '../../../data/services/background_rfid_service.dart';
 
 class RfidCheckinController extends GetxController with GetSingleTickerProviderStateMixin {
   final UserRepository userRepository;
@@ -83,9 +84,27 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
       checkRfidConnection();
     });
     
+    // Esta pantalla hace su propio sondeo del lector. Si el servicio de fondo
+    // sigue activo, los dos leen el mismo `lastUid` del ESP32 y cada uno
+    // registra su entrada: dos filas en access_logs por un solo pase. Se pausa
+    // mientras la pantalla está abierta, igual que hacen el alta de clientes y
+    // la pantalla de abonos.
+    _pausarEscaneoDeFondo();
+
     // Iniciar verificación periódica de RFID solo si está conectado
     startRfidChecking();
   }
+
+  /// El servicio de fondo, si está registrado. Puede no estarlo: se crea solo
+  /// cuando el gimnasio tiene el lector activado.
+  BackgroundRfidService? get _servicioDeFondo =>
+      Get.isRegistered<BackgroundRfidService>()
+          ? Get.find<BackgroundRfidService>()
+          : null;
+
+  void _pausarEscaneoDeFondo() => _servicioDeFondo?.pauseScanning();
+
+  void _reanudarEscaneoDeFondo() => _servicioDeFondo?.resumeScanning();
   
   // Verificar conexión del ESP32
   Future<void> checkRfidConnection() async {
@@ -210,6 +229,7 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
   
   @override
   void onClose() {
+    _reanudarEscaneoDeFondo();
     rfidTextController.dispose();
     _rfidCheckTimer?.cancel();
     _connectionCheckTimer?.cancel();

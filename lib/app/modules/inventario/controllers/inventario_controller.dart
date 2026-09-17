@@ -1,11 +1,13 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:gymads/app/core/permissions/permissions.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/auth_utils.dart';
 import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/repositories/product_repository.dart';
+import 'package:gymads/app/data/services/tenant_context_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 
 class InventarioController extends GetxController with ScreenTourMixin {
@@ -82,9 +84,22 @@ class InventarioController extends GetxController with ScreenTourMixin {
   @override
   String get tourId => AppTours.inventario;
 
+  /// Si el usuario actual puede [permiso]. La vista decide con esto qué
+  /// botones dibuja: el precio es de quien gestiona el inventario, el stock
+  /// también lo mueve el staff.
+  bool can(Permission permiso) => TenantContextService.to.can(permiso);
+
+  /// Los pasos del tour, sin los botones que este rol no tiene delante.
+  ///
+  /// El orden sigue al de la pantalla: en la barra superior Categorías va
+  /// antes que Agregar, y al revés el recorrido saltaba hacia atrás.
   @override
-  List<GlobalKey> get tourSteps =>
-      [keyAgregar, keyCategorias, keyBuscar, keyLista];
+  List<GlobalKey> get tourSteps => [
+        if (can(Permission.gestionarCategorias)) keyCategorias,
+        if (can(Permission.gestionarProductos)) keyAgregar,
+        keyBuscar,
+        keyLista,
+      ];
 
   @override
   void onInit() {

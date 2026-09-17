@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/permissions/permissions.dart';
 import '../../../core/widgets/tour_step.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
@@ -84,6 +85,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
               'lector de tarjetas.',
           borderRadius: 12,
           isFirstStep: true,
+          isLastStep: controller.esUltimoPasoDelTour(controller.keyCuenta),
           child: _buildOptionTile(
             icon: Icons.account_circle,
             iconColor: AppColors.info,
@@ -94,8 +96,8 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           ),
         ),
 
-        // Precios de abonos: administración, solo el dueño.
-        if (controller.isOwner) ...[
+        // Precios de abonos: los fija quien puede tocar el gimnasio.
+        if (controller.can(Permission.gestionarPreciosAbonos)) ...[
           const SizedBox(height: 12),
           TourStep(
             tourKey: controller.keyPrecios,
@@ -103,6 +105,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
             description: 'Define cuánto cuesta un día, una semana, un mes o un '
                 'año. Al cobrar, el monto se calcula solo.',
             borderRadius: 12,
+            isLastStep: controller.esUltimoPasoDelTour(controller.keyPrecios),
             child: _buildOptionTile(
               icon: Icons.attach_money,
               iconColor: AppColors.success,
@@ -115,18 +118,16 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           ),
         ],
 
-        const SizedBox(height: 12),
-
         // Categorías de productos (inventario y punto de venta)
+        if (controller.can(Permission.gestionarCategorias)) ...[
+        const SizedBox(height: 12),
         TourStep(
           tourKey: controller.keyCategorias,
           title: 'Categorías de productos',
           description: 'Los grupos con los que ordenas tus productos en el '
               'inventario y en el punto de venta.',
           borderRadius: 12,
-          // Para el staff este es el último paso; para el dueño aún viene
-          // "Accesos del personal".
-          isLastStep: !controller.isOwner,
+          isLastStep: controller.esUltimoPasoDelTour(controller.keyCategorias),
           child: _buildOptionTile(
             icon: Icons.category,
             iconColor: AppColors.accent,
@@ -137,9 +138,11 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
                 size: 16, color: AppColors.textSecondary),
           ),
         ),
+        ],
 
-        // Accesos del personal: solo el dueño puede crear y revocar.
-        if (controller.isOwner) ...[
+        // Accesos del personal: el dueño y el encargado, cada uno solo sobre
+        // los roles por debajo del suyo.
+        if (controller.can(Permission.gestionarAccesosStaff)) ...[
           const SizedBox(height: 12),
           TourStep(
             tourKey: controller.keyAccesos,
@@ -147,6 +150,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
             description: 'Da acceso a tus empleados con un código. Entran sin '
                 'correo ni contraseña y no ven esta configuración.',
             borderRadius: 12,
+            isLastStep: controller.esUltimoPasoDelTour(controller.keyAccesos),
             child: _buildOptionTile(
               icon: Icons.badge,
               iconColor: AppColors.brand,
@@ -157,8 +161,10 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
                   size: 16, color: AppColors.textSecondary),
             ),
           ),
+        ],
 
-          // Entradas y salidas de los clientes, y horario del gimnasio.
+        // Entradas y salidas de los clientes, y horario del gimnasio.
+        if (controller.can(Permission.gestionarControlAccesos)) ...[
           const SizedBox(height: 12),
           TourStep(
             tourKey: controller.keyControlAccesos,
@@ -166,7 +172,8 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
             description: 'Decide si además de la entrada quieres marcar la '
                 'salida de tus clientes, y en qué horario abres.',
             borderRadius: 12,
-            isLastStep: true,
+            isLastStep:
+                controller.esUltimoPasoDelTour(controller.keyControlAccesos),
             child: _buildOptionTile(
               icon: Icons.door_front_door_outlined,
               iconColor: AppColors.info,

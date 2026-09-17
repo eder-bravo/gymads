@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/permissions/permissions.dart';
+import '../../../core/permissions/staff_role.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/rfid_reader_service.dart';
 import '../../../data/services/tenant_context_service.dart';
@@ -53,17 +55,28 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   final keyControlAccesos = GlobalKey();
 
   /// Las opciones de administración solo existen para el dueño.
+  ///
+  /// Se conserva para las llamadas que aún la usan, pero lo nuevo pregunta por
+  /// el permiso concreto: con cinco roles, "es el dueño" ya no describe quién
+  /// puede tocar cada ajuste.
   bool get isOwner => TenantContextService.to.isOwnerAdmin;
+
+  /// Si el usuario actual puede [permiso].
+  bool can(Permission permiso) => TenantContextService.to.can(permiso);
 
   @override
   String get tourId => AppTours.configuracion;
 
+  /// Los pasos del tour, con el mismo filtro que oculta cada opción: apuntar a
+  /// un widget que ese rol no tiene delante deja el tour señalando al vacío.
   @override
-  List<GlobalKey> get tourSteps => isOwner
-      ? [keyCuenta, keyPrecios, keyCategorias, keyAccesos, keyControlAccesos]
-      // El staff no ve precios ni accesos: apuntar a esos widgets dejaría el
-      // tour señalando al vacío.
-      : [keyCuenta, keyCategorias];
+  List<GlobalKey> get tourSteps => [
+        keyCuenta,
+        if (can(Permission.gestionarPreciosAbonos)) keyPrecios,
+        if (can(Permission.gestionarCategorias)) keyCategorias,
+        if (can(Permission.gestionarAccesosStaff)) keyAccesos,
+        if (can(Permission.gestionarControlAccesos)) keyControlAccesos,
+      ];
 
   @override
   void onInit() {
@@ -98,16 +111,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     _loadGymInfo();
   }
 
-  String _formatRole(String? role) {
-    switch (role) {
-      case 'owner_admin':
-        return 'Dueño / Admin';
-      case 'branch_staff':
-        return 'Staff de Sucursal';
-      default:
-        return 'Admin';
-    }
-  }
+  String _formatRole(String? role) => StaffRole.fromString(role).label;
 
   Future<void> _loadGymInfo() async {
     try {

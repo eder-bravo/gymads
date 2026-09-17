@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/permissions/permissions.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../../routes/app_pages.dart';
@@ -39,14 +40,36 @@ class HomeController extends GetxController {
     Routes.ABONO_PRICES,
   };
 
+  /// Si el usuario actual puede [permiso]. Es lo que decide qué módulos se
+  /// dibujan en Inicio; la vista lo consulta para armar sus listas.
+  bool can(Permission permiso) => TenantContextService.to.can(permiso);
+
+  /// El permiso que abre cada módulo del menú, en el orden en que se dibujan.
+  ///
+  /// Vive aquí y no en la vista porque el tour necesita el mismo criterio: si
+  /// las dos listas se separan, el tour termina apuntando a widgets que ese
+  /// rol no tiene delante.
+  static const Map<String, Permission> permisoPorModulo = {
+    'Clientes': Permission.gestionarClientes,
+    'Abonar': Permission.cobrarAbonos,
+    'Vender': Permission.vender,
+    'Inventario': Permission.verInventario,
+    'Ingresos': Permission.verIngresos,
+    'Entradas': Permission.verAccesos,
+  };
+
+  /// Los pasos del tour, saltándose los módulos que este rol no ve.
+  ///
+  /// Un paso apuntando a un widget que no existe deja el tour colgado, así que
+  /// se filtra con el mismo permiso que oculta la tarjeta.
   List<GlobalKey> get _tourSteps => [
         keyHeader,
-        keyClientes,
-        keyAbonar,
-        keyVender,
-        keyInventario,
-        keyIngresos,
-        keyEntradas,
+        if (can(Permission.gestionarClientes)) keyClientes,
+        if (can(Permission.cobrarAbonos)) keyAbonar,
+        if (can(Permission.vender)) keyVender,
+        if (can(Permission.verInventario)) keyInventario,
+        if (can(Permission.verIngresos)) keyIngresos,
+        if (can(Permission.verAccesos)) keyEntradas,
         keyConfiguracion,
       ];
 

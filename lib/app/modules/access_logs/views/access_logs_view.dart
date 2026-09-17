@@ -122,6 +122,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
       if (porFranja.isEmpty || maximo == 0) return const SizedBox.shrink();
 
       final pico = controller.franjaPico;
+      final expandido = controller.franjasExpandidas.value;
 
       return Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -134,66 +135,84 @@ class AccessLogsView extends GetView<AccessLogsController> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Entradas por hora',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (final entrada in porFranja.entries)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      // "10 a.m. – 12 p.m." es lo más ancho que puede salir.
-                      width: 116,
-                      child: Text(
-                        controller.etiquetaFranja(entrada.key),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          fontWeight: entrada.key == pico
-                              ? FontWeight.w700
-                              : FontWeight.w400,
-                        ),
+            // El encabezado entero es el botón: el área de toque es más
+            // holgada que la del icono solo.
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: controller.alternarFranjas,
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Entradas por hora',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: entrada.value / maximo,
-                          minHeight: 10,
-                          backgroundColor: AppColors.containerBackground,
-                          valueColor: AlwaysStoppedAnimation(
-                            entrada.key == pico
-                                ? AppColors.accent
-                                : AppColors.accent.withOpacity(0.45),
+                  ),
+                  Icon(
+                    expandido ? Icons.expand_less : Icons.expand_more,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+            if (expandido) const SizedBox(height: 8),
+            if (expandido)
+              for (final entrada in porFranja.entries)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        // "10 a.m. – 12 p.m." es lo más ancho que puede salir.
+                        width: 116,
+                        child: Text(
+                          controller.etiquetaFranja(entrada.key),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontWeight: entrada.key == pico
+                                ? FontWeight.w700
+                                : FontWeight.w400,
                           ),
                         ),
                       ),
-                    ),
-                    SizedBox(
-                      width: 32,
-                      child: Text(
-                        '${entrada.value}',
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textPrimary,
-                          fontWeight: entrada.key == pico
-                              ? FontWeight.w700
-                              : FontWeight.w500,
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: entrada.value / maximo,
+                            minHeight: 10,
+                            backgroundColor: AppColors.containerBackground,
+                            valueColor: AlwaysStoppedAnimation(
+                              entrada.key == pico
+                                  ? AppColors.accent
+                                  : AppColors.accent.withOpacity(0.45),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      SizedBox(
+                        width: 32,
+                        child: Text(
+                          '${entrada.value}',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textPrimary,
+                            fontWeight: entrada.key == pico
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
           ],
         ),
       );
@@ -404,7 +423,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: color.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),

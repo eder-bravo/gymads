@@ -1,3 +1,5 @@
+import '../../core/permissions/staff_role.dart';
+
 /// Acceso de un empleado al gimnasio.
 ///
 /// Cada fila representa a una persona del personal. El código en sí no se
@@ -8,6 +10,10 @@ class StaffAccesoModel {
   final String gymId;
   final String branchId;
   final String nombre;
+
+  /// El rol que entrega este acceso. Nunca `owner_admin`: se es dueño
+  /// registrando el gimnasio, no canjeando un código.
+  final StaffRole rol;
 
   /// 'pendiente' | 'activo' | 'revocado'
   final String estado;
@@ -23,6 +29,7 @@ class StaffAccesoModel {
     required this.gymId,
     required this.branchId,
     required this.nombre,
+    required this.rol,
     required this.estado,
     this.userId,
     this.redeemedAt,
@@ -36,6 +43,7 @@ class StaffAccesoModel {
       gymId: json['gym_id'] as String,
       branchId: json['branch_id'] as String,
       nombre: json['nombre'] as String? ?? '',
+      rol: StaffRole.fromString(json['role'] as String?),
       estado: json['estado'] as String? ?? 'pendiente',
       userId: json['user_id'] as String?,
       redeemedAt: _parseDate(json['redeemed_at']),
@@ -69,6 +77,7 @@ class StaffAccesoModel {
 
   StaffAccesoModel copyWith({
     String? nombre,
+    StaffRole? rol,
     String? estado,
     String? userId,
     DateTime? redeemedAt,
@@ -78,6 +87,7 @@ class StaffAccesoModel {
       gymId: gymId,
       branchId: branchId,
       nombre: nombre ?? this.nombre,
+      rol: rol ?? this.rol,
       estado: estado ?? this.estado,
       userId: userId ?? this.userId,
       redeemedAt: redeemedAt ?? this.redeemedAt,
@@ -87,5 +97,6 @@ class StaffAccesoModel {
   }
 
   @override
-  String toString() => 'StaffAccesoModel(id: $id, nombre: $nombre, estado: $estado)';
+  String toString() =>
+      'StaffAccesoModel(id: $id, nombre: $nombre, rol: ${rol.value}, estado: $estado)';
 }

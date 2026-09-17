@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/permissions/staff_role.dart';
 import '../../../data/models/staff_acceso_model.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../global_widgets/app_header.dart';
@@ -54,6 +55,74 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
       codigo: creado.codigo,
       gymName: TenantContextService.to.gymName ?? 'el gimnasio',
     );
+  }
+
+  /// Cambia el rol sin regenerar el código: si la persona ya está trabajando,
+  /// su perfil cambia con el acceso y no tiene que volver a entrar.
+  Future<void> _cambiarRol(StaffAccesoModel acceso) async {
+    final elegido = await Get.dialog<StaffRole>(
+      SimpleDialog(
+        backgroundColor: AppColors.cardBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          'Rol de ${acceso.nombre}',
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        children: controller.rolesAsignables.map((rol) {
+          final actual = rol == acceso.rol;
+          return SimpleDialogOption(
+            onPressed: () => Get.back(result: rol),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    actual
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    size: 20,
+                    color: actual ? AppColors.accent : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          rol.label,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          rol.descripcion,
+                          style: TextStyle(
+                            color: AppColors.textSecondary.withOpacity(0.8),
+                            fontSize: 12,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+
+    if (elegido != null) await controller.cambiarRol(acceso, elegido);
   }
 
   Future<void> _regenerar(StaffAccesoModel acceso) async {
@@ -252,39 +321,60 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
                 acceso.estadoTexto,
                 style: TextStyle(color: color, fontSize: 13),
               ),
+              // El rol es lo que decide qué ve esta persona al entrar, así que
+              // se lee de un vistazo sin abrir el menú.
+              Text(
+                '  ·  ${acceso.rol.label}',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
-        trailing: PopupMenuButton<String>(
-          color: AppColors.cardBackground,
-          icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
-          onSelected: (value) {
-            switch (value) {
-              case 'renombrar':
-                showStaffAccesoFormDialog(existing: acceso);
-                break;
-              case 'regenerar':
-                _regenerar(acceso);
-                break;
-              case 'revocar':
-                _revocar(acceso);
-                break;
-              case 'eliminar':
-                _eliminar(acceso);
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            _menuItem('renombrar', Icons.edit, 'Cambiar nombre'),
-            _menuItem('regenerar', Icons.autorenew, 'Generar código nuevo'),
-            // Revocar solo tiene sentido si todavía hay algo que cortar.
-            if (!acceso.estaRevocado)
-              _menuItem('revocar', Icons.block, 'Revocar acceso',
-                  color: AppColors.warning),
-            _menuItem('eliminar', Icons.delete_outline, 'Eliminar',
-                color: AppColors.error),
-          ],
-        ),
+        // La lista muestra a todo el equipo, pero solo se puede actuar sobre
+        // los roles por debajo del propio: un encargado ve a otro encargado y
+        // al dueño, y sin esto tendría un menú cuyas opciones fallan todas.
+        trailing: !controller.puedeGestionar(acceso)
+            ? null
+            : PopupMenuButton<String>(
+                color: AppColors.cardBackground,
+                icon:
+                    const Icon(Icons.more_vert, color: AppColors.textSecondary),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'renombrar':
+                      showStaffAccesoFormDialog(existing: acceso);
+                      break;
+                    case 'rol':
+                      _cambiarRol(acceso);
+                      break;
+                    case 'regenerar':
+                      _regenerar(acceso);
+                      break;
+                    case 'revocar':
+                      _revocar(acceso);
+                      break;
+                    case 'eliminar':
+                      _eliminar(acceso);
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  _menuItem('renombrar', Icons.edit, 'Cambiar nombre'),
+                  _menuItem('rol', Icons.badge_outlined, 'Cambiar rol'),
+                  _menuItem(
+                      'regenerar', Icons.autorenew, 'Generar código nuevo'),
+                  // Revocar solo tiene sentido si todavía hay algo que cortar.
+                  if (!acceso.estaRevocado)
+                    _menuItem('revocar', Icons.block, 'Revocar acceso',
+                        color: AppColors.warning),
+                  _menuItem('eliminar', Icons.delete_outline, 'Eliminar',
+                      color: AppColors.error),
+                ],
+              ),
       ),
     );
   }

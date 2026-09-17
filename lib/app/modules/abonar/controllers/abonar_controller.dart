@@ -121,6 +121,18 @@ class AbonarController extends GetxController with ScreenTourMixin {
     _loadPrices();
   }
 
+  /// Recarga la lista de clientes y los precios de abono.
+  ///
+  /// Los precios entran aquí a propósito: si el dueño los cambia mientras
+  /// alguien tiene la pantalla abierta, seguir cobrando con los viejos es un
+  /// error de dinero, no de pantalla.
+  Future<void> refrescar() async {
+    await Future.wait([
+      loadClients(),
+      _loadPrices(),
+    ]);
+  }
+
   Future<void> _loadPrices() async {
     final result = await pricesRepository.getPrices();
     prices.value = result;

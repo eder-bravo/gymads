@@ -6,12 +6,14 @@ import 'package:gymads/app/routes/app_pages.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/core/utils/category_icons.dart';
 import 'package:gymads/app/core/widgets/tour_step.dart';
+import '../../../core/permissions/permissions.dart';
+import '../../../core/widgets/refrescable.dart';
 import '../controllers/inventario_controller.dart';
 import 'stock_adjust_dialog.dart';
 
 class InventarioView extends GetView<InventarioController> {
   const InventarioView({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -23,38 +25,46 @@ class InventarioView extends GetView<InventarioController> {
             icon: const Icon(Icons.refresh),
             onPressed: () => controller.refreshAll(),
           ),
-          TourStep(
-            tourKey: controller.keyCategorias,
-            title: 'Categorías',
-            description: 'Crea y ordena las categorías con las que agrupas '
-                'tus productos aquí y en el punto de venta.',
-            borderRadius: 24,
-            child: IconButton(
-              icon: const Icon(Icons.category_outlined),
-              tooltip: 'Categorías',
-              onPressed: () async {
-                await Get.toNamed(Routes.CATEGORIAS);
-                // Al volver pueden haber cambiado nombres, iconos u orden.
-                controller.loadCategories();
-              },
+          // Las categorías las ordena quien gestiona el inventario.
+          if (controller.can(Permission.gestionarCategorias))
+            TourStep(
+              tourKey: controller.keyCategorias,
+              isFirstStep:
+                  controller.esPrimerPasoDelTour(controller.keyCategorias),
+              title: 'Categorías',
+              description: 'Crea y ordena las categorías con las que agrupas '
+                  'tus productos aquí y en el punto de venta.',
+              borderRadius: 24,
+              child: IconButton(
+                icon: const Icon(Icons.category_outlined),
+                tooltip: 'Categorías',
+                onPressed: () async {
+                  await Get.toNamed(Routes.CATEGORIAS);
+                  // Al volver pueden haber cambiado nombres, iconos u orden.
+                  controller.loadCategories();
+                },
+              ),
             ),
-          ),
-          TourStep(
-            tourKey: controller.keyAgregar,
-            title: 'Agregar producto',
-            description: 'Registra un producto nuevo con su precio, su stock '
-                'y la categoría a la que pertenece.',
-            borderRadius: 24,
-            isFirstStep: true,
-            child: IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () {
-                controller.resetForm();
-                Get.toNamed(Routes.PRODUCT_FORM);
-              },
-              tooltip: 'Agregar producto',
+          // Dar de alta un producto fija su precio: es de quien gestiona el
+          // inventario, no de quien solo mueve existencias.
+          if (controller.can(Permission.gestionarProductos))
+            TourStep(
+              tourKey: controller.keyAgregar,
+              title: 'Agregar producto',
+              description: 'Registra un producto nuevo con su precio, su stock '
+                  'y la categoría a la que pertenece.',
+              borderRadius: 24,
+              isFirstStep:
+                  controller.esPrimerPasoDelTour(controller.keyAgregar),
+              child: IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: () {
+                  controller.resetForm();
+                  Get.toNamed(Routes.PRODUCT_FORM);
+                },
+                tooltip: 'Agregar producto',
+              ),
             ),
-          ),
         ],
       ),
       body: SafeArea(
@@ -66,6 +76,7 @@ class InventarioView extends GetView<InventarioController> {
               tourKey: controller.keyBuscar,
               title: 'Buscador',
               description: 'Localiza cualquier producto escribiendo su nombre.',
+              isFirstStep: controller.esPrimerPasoDelTour(controller.keyBuscar),
               child: _buildSearchBar(),
             ),
             _buildCategoryFilter(),
@@ -75,7 +86,7 @@ class InventarioView extends GetView<InventarioController> {
                 title: 'Tus productos',
                 description: 'Toca un producto para ver su detalle, editarlo '
                     'o registrar entradas y salidas de stock.',
-                isLastStep: true,
+                isLastStep: controller.esUltimoPasoDelTour(controller.keyLista),
                 child: _buildProductList(),
               ),
             ),
@@ -84,13 +95,13 @@ class InventarioView extends GetView<InventarioController> {
       ),
     );
   }
-  
+
   Widget _buildStatsSection() {
     return Obx(() {
       if (controller.inventoryStats.isEmpty) {
         return const SizedBox.shrink();
       }
-      
+
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -102,15 +113,18 @@ class InventarioView extends GetView<InventarioController> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildStatItem('Total Productos', '${controller.inventoryStats['totalProducts'] ?? 0}'),
-            _buildStatItem('Stock Total', '${controller.inventoryStats['totalStock'] ?? 0}'),
-            _buildStatItem('Valor Total', '\$${(controller.inventoryStats['totalValue'] ?? 0.0).toStringAsFixed(2)}'),
+            _buildStatItem('Total Productos',
+                '${controller.inventoryStats['totalProducts'] ?? 0}'),
+            _buildStatItem('Stock Total',
+                '${controller.inventoryStats['totalStock'] ?? 0}'),
+            _buildStatItem('Valor Total',
+                '\$${(controller.inventoryStats['totalValue'] ?? 0.0).toStringAsFixed(2)}'),
           ],
         ),
       );
     });
   }
-  
+
   /// Resumen de lo vendido sin existencias. Solo aparece si hay faltantes,
   /// para no robar espacio cuando el inventario está sano.
   Widget _buildFaltantesBanner() {
@@ -214,7 +228,7 @@ class InventarioView extends GetView<InventarioController> {
       ],
     );
   }
-  
+
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -224,7 +238,7 @@ class InventarioView extends GetView<InventarioController> {
       ),
     );
   }
-  
+
   Widget _buildCategoryFilter() {
     return Obx(() {
       return Container(
@@ -243,7 +257,7 @@ class InventarioView extends GetView<InventarioController> {
       );
     });
   }
-  
+
   Widget _buildProductList() {
     return Obx(() {
       if (controller.isLoading.value) {
@@ -253,10 +267,11 @@ class InventarioView extends GetView<InventarioController> {
           ),
         );
       }
-      
+
       // Inventario realmente vacío.
       if (controller.products.isEmpty) {
-        return Center(
+        return Refrescable.centrado(
+          onRefresh: controller.refreshAll,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -270,18 +285,19 @@ class InventarioView extends GetView<InventarioController> {
                 ),
               ),
               const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () {
-                  controller.resetForm();
-                  Get.toNamed(Routes.PRODUCT_FORM);
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Agregar primer producto'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.textPrimary,
+              if (controller.can(Permission.gestionarProductos))
+                ElevatedButton.icon(
+                  onPressed: () {
+                    controller.resetForm();
+                    Get.toNamed(Routes.PRODUCT_FORM);
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Agregar primer producto'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.textPrimary,
+                  ),
                 ),
-              ),
             ],
           ),
         );
@@ -290,8 +306,10 @@ class InventarioView extends GetView<InventarioController> {
       // Hay productos, pero ninguno pasa el filtro. Antes esto no se
       // comprobaba y quedaba un hueco en blanco sin ningún mensaje.
       if (controller.filteredProducts.isEmpty) {
-        final hayFiltroDeCategoria = controller.selectedCategoryId.value != null;
-        return Center(
+        final hayFiltroDeCategoria =
+            controller.selectedCategoryId.value != null;
+        return Refrescable.centrado(
+          onRefresh: controller.refreshAll,
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Column(
@@ -325,17 +343,19 @@ class InventarioView extends GetView<InventarioController> {
         );
       }
 
-
-      return ListView.builder(
-        itemCount: controller.filteredProducts.length,
-        itemBuilder: (context, index) {
-          final product = controller.filteredProducts[index];
-          return _buildProductCard(product);
-        },
+      return Refrescable(
+        onRefresh: controller.refreshAll,
+        child: ListView.builder(
+          itemCount: controller.filteredProducts.length,
+          itemBuilder: (context, index) {
+            final product = controller.filteredProducts[index];
+            return _buildProductCard(product);
+          },
+        ),
       );
     });
   }
-  
+
   Widget _buildProductCard(Product product) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -391,9 +411,11 @@ class InventarioView extends GetView<InventarioController> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: product.stock > 0 ? AppColors.success : AppColors.error,
+                    color:
+                        product.stock > 0 ? AppColors.success : AppColors.error,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -432,50 +454,62 @@ class InventarioView extends GetView<InventarioController> {
             }
           },
           itemBuilder: (BuildContext context) => [
-            PopupMenuItem<String>(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, color: AppColors.accent, size: 20),
-                  const SizedBox(width: 12),
-                  Text('Editar', style: TextStyle(color: AppColors.textPrimary)),
-                ],
+            // "Editar" abre el formulario con el precio. El staff no lo ve:
+            // solo ajusta existencias.
+            if (controller.can(Permission.gestionarProductos))
+              PopupMenuItem<String>(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, color: AppColors.accent, size: 20),
+                    const SizedBox(width: 12),
+                    Text('Editar',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                  ],
+                ),
               ),
-            ),
-            PopupMenuItem<String>(
-              value: 'stock',
-              child: Row(
-                children: [
-                  Icon(Icons.sync_alt, color: AppColors.info, size: 20),
-                  const SizedBox(width: 12),
-                  Text('Ajustar stock', style: TextStyle(color: AppColors.textPrimary)),
-                ],
+            if (controller.can(Permission.ajustarStock))
+              PopupMenuItem<String>(
+                value: 'stock',
+                child: Row(
+                  children: [
+                    Icon(Icons.sync_alt, color: AppColors.info, size: 20),
+                    const SizedBox(width: 12),
+                    Text('Ajustar stock',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                  ],
+                ),
               ),
-            ),
             // Desactivar exige no tener existencias; ofrecerlo con stock solo
             // llevaba al aviso de que no se puede.
-            if (product.stock <= 0)
+            if (product.stock <= 0 &&
+                controller.can(Permission.gestionarProductos))
               PopupMenuItem<String>(
                 value: 'deactivate',
                 child: Row(
                   children: [
-                    Icon(Icons.visibility_off, color: AppColors.warning, size: 20),
+                    Icon(Icons.visibility_off,
+                        color: AppColors.warning, size: 20),
                     const SizedBox(width: 12),
-                    Text('Desactivar', style: TextStyle(color: AppColors.textPrimary)),
+                    Text('Desactivar',
+                        style: TextStyle(color: AppColors.textPrimary)),
                   ],
                 ),
               ),
             // Siempre mostrar "Eliminar permanentemente"
-            PopupMenuItem<String>(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete_forever, color: AppColors.error, size: 20),
-                  const SizedBox(width: 12),
-                  Text('Eliminar permanentemente', style: TextStyle(color: AppColors.textPrimary)),
-                ],
+            if (controller.can(Permission.gestionarProductos))
+              PopupMenuItem<String>(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_forever,
+                        color: AppColors.error, size: 20),
+                    const SizedBox(width: 12),
+                    Text('Eliminar permanentemente',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
         onTap: () => _showProductDetail(product),
@@ -485,6 +519,9 @@ class InventarioView extends GetView<InventarioController> {
 
   /// Botones de una unidad para corregir el stock sin abrir nada.
   Widget _buildStockStepper(Product product) {
+    if (!controller.can(Permission.ajustarStock)) {
+      return const SizedBox.shrink();
+    }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -516,19 +553,20 @@ class InventarioView extends GetView<InventarioController> {
     );
   }
 
-
   void _showProductDetail(Product product) {
     Get.dialog(
       AlertDialog(
         backgroundColor: AppColors.cardBackground,
-        title: Text(product.name, style: const TextStyle(color: AppColors.textPrimary)),
+        title: Text(product.name,
+            style: const TextStyle(color: AppColors.textPrimary)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildDetailRow('Descripción', product.description),
             _buildDetailRow('Categoría', controller.categoryNameFor(product)),
-            _buildDetailRow('Precio de venta', '\$${product.price.toStringAsFixed(2)}'),
+            _buildDetailRow(
+                'Precio de venta', '\$${product.price.toStringAsFixed(2)}'),
             _buildDetailRow(
               'Stock actual',
               product.stock < 0
@@ -537,31 +575,35 @@ class InventarioView extends GetView<InventarioController> {
               valueColor: product.stock < 0 ? AppColors.error : null,
             ),
             _buildDetailRow('Estado', product.isActive ? 'Activo' : 'Inactivo'),
-            _buildDetailRow('Creado', '${product.createdAt.day}/${product.createdAt.month}/${product.createdAt.year}'),
+            _buildDetailRow('Creado',
+                '${product.createdAt.day}/${product.createdAt.month}/${product.createdAt.year}'),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
-            child: const Text('Cerrar', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Cerrar',
+                style: TextStyle(color: AppColors.textSecondary)),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              controller.editProduct(product);
-              Get.toNamed(Routes.PRODUCT_FORM, arguments: {'isEditing': true});
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              foregroundColor: AppColors.textPrimary,
+          if (controller.can(Permission.gestionarProductos))
+            ElevatedButton(
+              onPressed: () {
+                Get.back();
+                controller.editProduct(product);
+                Get.toNamed(Routes.PRODUCT_FORM,
+                    arguments: {'isEditing': true});
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: AppColors.textPrimary,
+              ),
+              child: const Text('Editar'),
             ),
-            child: const Text('Editar'),
-          ),
         ],
       ),
     );
   }
-  
+
   Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),

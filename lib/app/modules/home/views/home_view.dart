@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/permissions/permissions.dart';
 import '../../../core/widgets/tour_step.dart';
 
 import '../../../routes/app_pages.dart';
@@ -175,6 +176,19 @@ class HomeView extends GetView<HomeController> {
     );
   }
 
+  /// Si el rol actual puede entrar a esta entrada del menú.
+  ///
+  /// Los módulos que no corresponden se OCULTAN, no se muestran en gris: un
+  /// candado en pantalla solo invita a pedir la llave. El permiso de cada uno
+  /// está en `HomeController.permisoPorModulo`, que es la misma tabla con la
+  /// que se filtran los pasos del tour.
+  bool _permitido(_EntradaMenu entrada) {
+    final Permission? permiso = HomeController.permisoPorModulo[entrada.label];
+    // Una entrada sin permiso declarado se muestra: olvidarse de añadirlo no
+    // debe esconder una función a todo el mundo en silencio.
+    return permiso == null || controller.can(permiso);
+  }
+
   // ─────────────────────────────────────────────────────────
   // MAIN MODULES (cards grandes con iconos)
   // ─────────────────────────────────────────────────────────
@@ -220,7 +234,7 @@ class HomeView extends GetView<HomeController> {
         tourDescription:
             'Administra tus productos y controla el stock disponible.',
       ),
-    ];
+    ].where(_permitido).toList();
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
@@ -273,7 +287,7 @@ class HomeView extends GetView<HomeController> {
         showcaseKey: controller.keyEntradas,
         tourDescription: 'Revisa quién entró al gimnasio y a qué hora.',
       ),
-    ];
+    ].where(_permitido).toList();
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
@@ -366,8 +380,15 @@ class HomeView extends GetView<HomeController> {
 // DATA MODELS
 // ═════════════════════════════════════════════════════════════
 
-class _ModuleItem {
+/// Lo único que necesita el filtro de permisos: la etiqueta con la que se
+/// busca el permiso de la entrada en `HomeController.permisoPorModulo`.
+abstract class _EntradaMenu {
+  String get label;
+}
+
+class _ModuleItem implements _EntradaMenu {
   final IconData icon;
+  @override
   final String label;
   final String subtitle;
   final List<Color> gradient;
@@ -386,8 +407,9 @@ class _ModuleItem {
   });
 }
 
-class _QuickAction {
+class _QuickAction implements _EntradaMenu {
   final IconData icon;
+  @override
   final String label;
   final String subtitle;
   final Color color;

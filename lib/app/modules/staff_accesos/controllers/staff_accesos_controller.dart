@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
 
+import '../../../core/permissions/permissions.dart';
+import '../../../core/permissions/staff_role.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../data/models/staff_acceso_model.dart';
@@ -8,9 +10,11 @@ import '../../../data/services/tenant_context_service.dart';
 
 /// Accesos del personal del gimnasio.
 ///
-/// Solo el dueño llega hasta aquí: la pantalla está oculta para el staff y,
-/// por debajo, tanto la política RLS de lectura como las funciones de
-/// escritura exigen `is_owner_admin()`.
+/// Llegan hasta aquí el dueño y el encargado: la pantalla está oculta para el
+/// resto y, por debajo, tanto la política RLS de lectura como las funciones de
+/// escritura exigen `staff_puede('gestionar_accesos_staff')`. Además, cada uno
+/// solo puede tocar accesos con un rol por debajo del suyo, de modo que un
+/// encargado no puede nombrar ni degradar a otro encargado.
 class StaffAccesosController extends GetxController {
   final StaffAccesoRepository _repository = StaffAccesoRepository();
 
@@ -20,7 +24,18 @@ class StaffAccesosController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxBool isSaving = false.obs;
 
-  bool get isOwner => TenantContextService.to.isOwnerAdmin;
+  bool get isOwner =>
+      TenantContextService.to.can(Permission.gestionarAccesosStaff);
+
+  /// Los roles que este usuario puede entregar. El dueño nunca está: se es
+  /// dueño registrando el gimnasio, no canjeando un código.
+  List<StaffRole> get rolesAsignables =>
+      TenantContextService.to.rolesAsignables;
+
+  /// Si este usuario puede tocar [acceso]. La lista muestra los que no puede
+  /// (para que sepa quién hay en el equipo) pero sin acciones.
+  bool puedeGestionar(StaffAccesoModel acceso) =>
+      TenantContextService.to.puedeGestionarRol(acceso.rol);
 
   @override
   void onInit() {
@@ -43,11 +58,11 @@ class StaffAccesosController extends GetxController {
 
   /// Crea el acceso y devuelve el código en claro para mostrarlo una vez.
   /// Devuelve null si falló (el usuario ya fue avisado).
-  Future<String?> crear(String nombre) async {
+  Future<String?> crear(String nombre, StaffRole rol) async {
     if (isSaving.value) return null;
     isSaving.value = true;
     try {
-      final codigo = await _repository.crear(nombre);
+      final codigo = await _repository.crear(nombre, rol);
       // Se relee en vez de construir la fila a mano: el id, el estado y las
       // fechas los pone la base.
       await load();
@@ -55,6 +70,23 @@ class StaffAccesosController extends GetxController {
     } on StaffAccesoException catch (e) {
       SnackbarHelper.error('No se pudo crear', e.message());
       return null;
+    } finally {
+      isSaving.value = false;
+    }
+  }
+
+  /// Cambia el rol de alguien que ya está trabajando, sin regenerar su código.
+  Future<bool> cambiarRol(StaffAccesoModel acceso, StaffRole rol) async {
+    if (isSaving.value || rol == acceso.rol) return false;
+    isSaving.value = true;
+    try {
+      await _repository.cambiarRol(acceso.id, rol);
+      _replace(acceso.copyWith(rol: rol));
+      SnackbarHelper.success('Listo', '${acceso.nombre} ahora es ${rol.label}');
+      return true;
+    } on StaffAccesoException catch (e) {
+      SnackbarHelper.error('No se pudo cambiar el rol', e.message());
+      return false;
     } finally {
       isSaving.value = false;
     }

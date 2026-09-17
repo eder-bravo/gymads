@@ -15,10 +15,13 @@ class PaymentModes {
 
 /// Asistente de configuración inicial para gimnasios recién registrados.
 ///
-/// Solo se llega aquí cuando `gyms.payment_mode` es null, así que este
-/// controlador es también el único punto donde se marca el tour de bienvenida
-/// como pendiente: los gimnasios que ya existían nunca pasan por aquí y por
-/// eso nunca ven el tour.
+/// Solo se llega aquí cuando `gyms.payment_mode` es null, así que este es el
+/// punto donde se le marca el tour de bienvenida al DUEÑO: los gimnasios que
+/// ya existían nunca pasan por aquí y por eso nunca lo ven.
+///
+/// Al personal se le marca en otro sitio —`StaffCodeController.entrar()`, al
+/// canjear su código—, porque no pasa por este asistente y porque las
+/// banderas viven en el disco de cada dispositivo.
 class OnboardingController extends GetxController {
   final isSaving = false.obs;
 

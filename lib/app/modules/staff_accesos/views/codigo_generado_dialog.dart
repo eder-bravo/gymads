@@ -168,19 +168,25 @@ class _CodigoGeneradoDialog extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _compartir,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  // El Builder da el contexto del propio botón, que es lo que
+                  // necesita _compartir para saber de dónde sale la hoja.
+                  child: Builder(
+                    builder: (contextBoton) => ElevatedButton.icon(
+                      onPressed: () => _compartir(contextBoton),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
+                      icon: const Icon(Icons.share,
+                          size: 18, color: Colors.white),
+                      label: const Text('Compartir',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                     ),
-                    icon: const Icon(Icons.share, size: 18, color: Colors.white),
-                    label: const Text('Compartir',
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -204,7 +210,27 @@ class _CodigoGeneradoDialog extends StatelessWidget {
     SnackbarHelper.success('Copiado', 'El código está en el portapapeles');
   }
 
-  Future<void> _compartir() async {
-    await Share.share(_mensajeCompartir);
+  Future<void> _compartir(BuildContext context) async {
+    // iOS exige un rectángulo de origen no vacío: en iPad es el ancla desde la
+    // que sale el popover, y sin él la llamada revienta con
+    // "sharePositionOrigin: argument must be set". Se ancla al propio botón,
+    // que es de donde el usuario espera que salga la hoja.
+    final box = context.findRenderObject() as RenderBox?;
+
+    final Rect origen;
+    if (box != null && box.hasSize && !box.size.isEmpty) {
+      origen = box.localToGlobal(Offset.zero) & box.size;
+    } else {
+      // Sin medidas no hay ancla, pero un rect vacío vuelve a romper: se cae
+      // al centro de la pantalla, que siempre está dentro del área válida.
+      final pantalla = MediaQuery.sizeOf(context);
+      origen = Rect.fromCenter(
+        center: Offset(pantalla.width / 2, pantalla.height / 2),
+        width: 1,
+        height: 1,
+      );
+    }
+
+    await Share.share(_mensajeCompartir, sharePositionOrigin: origen);
   }
 }

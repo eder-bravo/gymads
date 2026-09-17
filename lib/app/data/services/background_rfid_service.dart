@@ -6,9 +6,13 @@ import 'package:gymads/main.dart' show rootScaffoldMessengerKey;
 import '../models/user_model.dart';
 import '../repositories/user_repository.dart';
 import 'rfid_reader_service.dart';
+import 'supabase_service.dart';
+import 'tenant_context_service.dart';
 import 'audio_service.dart';
 import 'access_log_service.dart';
 import 'gym_settings_service.dart';
+import '../../core/permissions/permissions.dart';
+import '../../core/permissions/staff_role.dart';
 import '../../core/utils/auth_utils.dart';
 import '../../routes/app_pages.dart';
 import '../config/rfid_config.dart';
@@ -35,6 +39,51 @@ class BackgroundRfidService extends GetxService {
 
   // Guard para evitar peticiones concurrentes
   bool _isChecking = false;
+
+  /// Si a este dispositivo le tocan los avisos del lector.
+  ///
+  /// El aviso es del mostrador. Antes lo recibían TODOS los dispositivos a la
+  /// vez: el ESP32 responde el mismo `lastUid` a quien pregunte y no lo limpia
+  /// al leerlo, así que cada app sonaba, mostraba el diálogo y además escribía
+  /// su propia fila en `access_logs` por un único pase de tarjeta.
+  final atiendeLector = false.obs;
+
+  /// Decide si este dispositivo atiende el lector.
+  ///
+  /// Respaldo deliberado: si el gimnasio todavía no tiene a nadie en
+  /// mostrador, el dueño sigue recibiendo los avisos. Sin esto, un dueño que
+  /// trabaja solo se quedaría sin ningún aviso.
+  Future<void> resolverDestinatario() async {
+    final tenant = TenantContextService.to;
+
+    if (tenant.can(Permission.recibirAlertasNfc)) {
+      atiendeLector.value = true;
+      return;
+    }
+
+    final gymId = tenant.currentGymId;
+    if (tenant.rol != StaffRole.ownerAdmin || gymId == null) {
+      atiendeLector.value = false;
+      return;
+    }
+
+    try {
+      final filas = await SupabaseService.client
+          .from('staff_profiles')
+          .select('id')
+          .eq('gym_id', gymId)
+          .eq('role', StaffRole.mostrador.value)
+          .eq('is_active', true)
+          .limit(1);
+
+      atiendeLector.value = (filas as List).isEmpty;
+    } catch (e) {
+      // Sin respuesta se atiende igual: perder un aviso es peor que duplicarlo.
+      AppLogger.warning('BackgroundRfidService',
+          'No se pudo consultar el mostrador; el dueño atiende el lector');
+      atiendeLector.value = true;
+    }
+  }
 
   /// Método para mostrar notificación usando el ScaffoldMessenger global
   void _showSnackbarSafe(String title, String message, {bool isError = false}) {
@@ -100,7 +149,20 @@ class BackgroundRfidService extends GetxService {
   void onInit() {
     super.onInit();
     AppLogger.info('BackgroundRfidService', 'BackgroundRfidService inicializado');
-    // Siempre iniciar el escaneo al instanciar el servicio
+
+    // El rol decide quién atiende el lector, así que hay que reevaluarlo cada
+    // vez que cambia el perfil: al entrar, al salir y si el dueño cambia el
+    // rol del empleado desde su propio dispositivo.
+    //
+    // Se para y se vuelve a arrancar porque las dos direcciones importan: quien
+    // deja de ser mostrador tiene que dejar de sondear, y quien acaba de entrar
+    // como mostrador tiene que empezar sin reiniciar la app. startScanning()
+    // resuelve de nuevo el destinatario y no hace nada si no le toca.
+    ever(TenantContextService.to.staffProfileRx, (_) {
+      stopScanning();
+      startScanning();
+    });
+
     startScanning();
   }
 
@@ -108,6 +170,13 @@ class BackgroundRfidService extends GetxService {
   Future<void> startScanning() async {
     if (isScanning.value) {
       AppLogger.warning('BackgroundRfidService', 'El escaneo ya está activo');
+      return;
+    }
+
+    await resolverDestinatario();
+    if (!atiendeLector.value) {
+      AppLogger.info('BackgroundRfidService',
+          'Este dispositivo no atiende el lector: no se inicia el escaneo');
       return;
     }
 
@@ -168,6 +237,12 @@ class BackgroundRfidService extends GetxService {
     try {
       // Si el servicio está pausado, no hacer nada
       if (isPaused.value) {
+        return;
+      }
+
+      // El rol pudo cambiar con el escaneo ya en marcha (el dueño contrata a
+      // alguien de mostrador, o revoca un acceso).
+      if (!atiendeLector.value) {
         return;
       }
 

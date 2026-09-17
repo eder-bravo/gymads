@@ -190,6 +190,19 @@ class PointOfSaleController extends GetxController with ScreenTourMixin {
     _loadPinnedProducts();
   }
 
+  /// Recarga todo lo que se ve en el mostrador.
+  ///
+  /// Recarga las tres cosas y no solo los productos: el stock cambia con cada
+  /// venta, pero una categoría nueva o un producto fijado desde otro
+  /// dispositivo tampoco aparecerían nunca.
+  Future<void> refrescar() async {
+    await Future.wait([
+      loadProducts(),
+      loadCategories(),
+      _loadPinnedProducts(),
+    ]);
+  }
+
   /// Cargar productos disponibles
   ///
   /// Se muestran también los agotados y los que están en negativo: sin

@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../../../core/permissions/permissions.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../data/models/product_model.dart';
@@ -23,8 +24,12 @@ class CategoriasController extends GetxController {
   final RxBool isSaving = false.obs;
   final RxBool isReordering = false.obs;
 
-  /// Solo el dueño puede borrar (política RLS de la tabla).
-  bool get isOwner => TenantContextService.to.isOwnerAdmin;
+  /// Quién puede crear, renombrar y borrar categorías.
+  ///
+  /// Espeja la política RLS de `product_categories`: dueño, encargado y
+  /// almacén. El staff y el mostrador las usan pero no las tocan.
+  bool get puedeGestionar =>
+      TenantContextService.to.can(Permission.gestionarCategorias);
 
   int countFor(String categoryId) => productCounts[categoryId] ?? 0;
 

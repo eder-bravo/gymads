@@ -7,6 +7,7 @@ import 'package:gymads/app/core/widgets/tour_step.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/refrescable.dart';
 import '../controllers/abonar_controller.dart';
 
 class AbonarView extends GetView<AbonarController> {
@@ -16,7 +17,23 @@ class AbonarView extends GetView<AbonarController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: const GymAppBar(title: 'Abonar'),
+      appBar: GymAppBar(
+        title: 'Abonar',
+        actions: [
+          // Solo mientras se busca: con un cobro a medias o ya hecho, el botón
+          // no recargaría nada de lo que hay en pantalla.
+          Obx(() {
+            final buscando = !controller.isSuccess.value &&
+                controller.selectedClient.value == null;
+            if (!buscando) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: controller.refrescar,
+              tooltip: 'Actualizar',
+            );
+          }),
+        ],
+      ),
       body: SafeArea(
         child: Obx(() {
           if (controller.isSuccess.value) {
@@ -62,11 +79,14 @@ class AbonarView extends GetView<AbonarController> {
               isLastStep: true,
               child: Obx(() {
                 if (controller.isLoadingClients.value) {
-                  return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+                  return const Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.accent));
                 }
 
                 if (controller.searchResults.isEmpty) {
-                  return Center(
+                  return Refrescable.centrado(
+                    onRefresh: controller.refrescar,
                     child: Text(
                       controller.searchController.text.trim().isEmpty
                           ? 'No hay clientes registrados'
@@ -76,33 +96,41 @@ class AbonarView extends GetView<AbonarController> {
                   );
                 }
 
-                return ListView.builder(
-                  itemCount: controller.searchResults.length,
-                  itemBuilder: (context, index) {
-                    final client = controller.searchResults[index];
-                    return Card(
-                      color: AppColors.cardBackground,
-                      margin: const EdgeInsets.only(bottom: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: ListTile(
-                        onTap: () => controller.selectClient(client),
-                        leading: UserThumbnail(
-                          imageUrl: client.photoUrl,
-                          userName: client.name,
-                          size: 40,
+                return Refrescable(
+                  onRefresh: controller.refrescar,
+                  child: ListView.builder(
+                    itemCount: controller.searchResults.length,
+                    itemBuilder: (context, index) {
+                      final client = controller.searchResults[index];
+                      return Card(
+                        color: AppColors.cardBackground,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          onTap: () => controller.selectClient(client),
+                          leading: UserThumbnail(
+                            imageUrl: client.photoUrl,
+                            userName: client.name,
+                            size: 40,
+                          ),
+                          title: Text(
+                            client.name,
+                            style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            'Tel: ${client.phone}',
+                            style:
+                                const TextStyle(color: AppColors.textSecondary),
+                          ),
+                          trailing: const Icon(Icons.arrow_forward_ios,
+                              size: 16, color: AppColors.accent),
                         ),
-                        title: Text(
-                          client.name,
-                          style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          'Tel: ${client.phone}',
-                          style: const TextStyle(color: AppColors.textSecondary),
-                        ),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.accent),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 );
               }),
             ),
@@ -114,7 +142,7 @@ class AbonarView extends GetView<AbonarController> {
 
   Widget _buildAbonarForm() {
     final client = controller.selectedClient.value!;
-    
+
     return Column(
       children: [
         // Cabecera Cliente
@@ -149,11 +177,13 @@ class AbonarView extends GetView<AbonarController> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      client.isActive && client.daysRemaining > 0 
-                        ? 'Activo - Le quedan ${client.daysRemaining} días'
-                        : 'Inactivo o Vencido',
+                      client.isActive && client.daysRemaining > 0
+                          ? 'Activo - Le quedan ${client.daysRemaining} días'
+                          : 'Inactivo o Vencido',
                       style: TextStyle(
-                        color: client.isActive && client.daysRemaining > 0 ? AppColors.success : AppColors.error,
+                        color: client.isActive && client.daysRemaining > 0
+                            ? AppColors.success
+                            : AppColors.error,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -168,7 +198,7 @@ class AbonarView extends GetView<AbonarController> {
             ],
           ),
         ),
-        
+
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -202,7 +232,8 @@ class AbonarView extends GetView<AbonarController> {
                     decoration: BoxDecoration(
                       color: AppColors.accent.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+                      border:
+                          Border.all(color: AppColors.accent.withOpacity(0.3)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -231,83 +262,98 @@ class AbonarView extends GetView<AbonarController> {
 
                 // Metodo de pago
                 Obx(() => DropdownButtonFormField<String>(
-                  value: controller.paymentMethod.value,
-                  decoration: InputDecoration(
-                    labelText: 'Método de Pago',
-                    prefixIcon: const Icon(Icons.payments_outlined, color: AppColors.accent),
-                    filled: true,
-                    fillColor: AppColors.containerBackground,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  dropdownColor: AppColors.cardBackground,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  items: controller.paymentMethods.map((method) {
-                    return DropdownMenuItem(value: method, child: Text(method));
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) controller.paymentMethod.value = val;
-                  },
-                )),
+                      value: controller.paymentMethod.value,
+                      decoration: InputDecoration(
+                        labelText: 'Método de Pago',
+                        prefixIcon: const Icon(Icons.payments_outlined,
+                            color: AppColors.accent),
+                        filled: true,
+                        fillColor: AppColors.containerBackground,
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                      ),
+                      dropdownColor: AppColors.cardBackground,
+                      style: const TextStyle(color: AppColors.textPrimary),
+                      items: controller.paymentMethods.map((method) {
+                        return DropdownMenuItem(
+                            value: method, child: Text(method));
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) controller.paymentMethod.value = val;
+                      },
+                    )),
                 const SizedBox(height: 30),
-                
+
                 // Proyección de Fecha
                 Obx(() {
-                    final newExp = controller.calculateNewExpirationDate();
-                    final formattedDate = DateFormat('dd/MM/yyyy').format(newExp);
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.info.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.info.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.event_available, color: AppColors.info),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Nueva Fecha de Expiración',
-                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  final newExp = controller.calculateNewExpirationDate();
+                  final formattedDate = DateFormat('dd/MM/yyyy').format(newExp);
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border:
+                          Border.all(color: AppColors.info.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.event_available,
+                            color: AppColors.info),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Nueva Fecha de Expiración',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12),
+                              ),
+                              Text(
+                                formattedDate,
+                                style: const TextStyle(
+                                  color: AppColors.info,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
-                                Text(
-                                  formattedDate,
-                                  style: const TextStyle(
-                                    color: AppColors.info,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    );
+                        ),
+                      ],
+                    ),
+                  );
                 }),
                 const SizedBox(height: 40),
-                
+
                 // Botón Enviar
                 Obx(() => ElevatedButton(
-                  onPressed: controller.isLoading.value ? null : () => controller.procesarAbono(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: controller.isLoading.value
-                    ? const SizedBox(
-                        height: 24, width: 24,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Text(
-                        'Registrar Abono',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      onPressed: controller.isLoading.value
+                          ? null
+                          : () => controller.procesarAbono(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                       ),
-                )),
+                      child: controller.isLoading.value
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Registrar Abono',
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
+                    )),
               ],
             ),
           ),
@@ -381,25 +427,31 @@ class AbonarView extends GetView<AbonarController> {
                   labelText: 'Cantidad',
                   filled: true,
                   fillColor: AppColors.containerBackground,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
-                  prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+                  prefixIconConstraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
                   prefixIcon: IconButton(
                     onPressed: controller.decrementDuration,
                     icon: const Icon(Icons.remove, size: 18),
                     color: AppColors.accent,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    constraints:
+                        const BoxConstraints(minWidth: 36, minHeight: 36),
                     splashRadius: 18,
                     tooltip: 'Restar',
                   ),
-                  suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  suffixIconConstraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
                   suffixIcon: IconButton(
                     onPressed: controller.incrementDuration,
                     icon: const Icon(Icons.add, size: 18),
                     color: AppColors.accent,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    constraints:
+                        const BoxConstraints(minWidth: 36, minHeight: 36),
                     splashRadius: 18,
                     tooltip: 'Sumar',
                   ),
@@ -410,22 +462,24 @@ class AbonarView extends GetView<AbonarController> {
             Expanded(
               flex: 3,
               child: Obx(() => DropdownButtonFormField<String>(
-                value: controller.durationType.value,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: AppColors.containerBackground,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
-                ),
-                dropdownColor: AppColors.cardBackground,
-                style: const TextStyle(color: AppColors.textPrimary),
-                items: controller.durationTypes.map((type) {
-                  return DropdownMenuItem(value: type, child: Text(type));
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) controller.setDurationType(val);
-                },
-              )),
+                    value: controller.durationType.value,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: AppColors.containerBackground,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 18),
+                    ),
+                    dropdownColor: AppColors.cardBackground,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    items: controller.durationTypes.map((type) {
+                      return DropdownMenuItem(value: type, child: Text(type));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) controller.setDurationType(val);
+                    },
+                  )),
             ),
           ],
         ),
@@ -439,26 +493,34 @@ class AbonarView extends GetView<AbonarController> {
             controller: controller.unitPriceController,
             readOnly: fijo,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.bold),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
+            ],
+            style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 24,
+                fontWeight: FontWeight.bold),
             decoration: InputDecoration(
               labelText: 'Precio por ${controller.durationUnitLabel}',
               helperText: fijo ? 'Precio configurado' : 'Precio libre',
               helperStyle: const TextStyle(color: AppColors.textSecondary),
-              errorText: sinPrecio
-                  ? 'Sin precio configurado para este periodo'
-                  : null,
+              errorText:
+                  sinPrecio ? 'Sin precio configurado para este periodo' : null,
               suffixIcon: fijo
                   ? const Icon(Icons.lock_outline,
                       size: 18, color: AppColors.textSecondary)
                   : null,
               prefixText: '\$ ',
-              prefixStyle: const TextStyle(color: AppColors.accent, fontSize: 24, fontWeight: FontWeight.bold),
+              prefixStyle: const TextStyle(
+                  color: AppColors.accent,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold),
               filled: true,
               fillColor: fijo
                   ? AppColors.containerBackground.withOpacity(0.5)
                   : AppColors.containerBackground,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
             ),
           );
         }),
@@ -481,7 +543,8 @@ class AbonarView extends GetView<AbonarController> {
                 color: AppColors.success.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle, size: 80, color: AppColors.success),
+              child: const Icon(Icons.check_circle,
+                  size: 80, color: AppColors.success),
             ),
             const SizedBox(height: 32),
             const Text(
@@ -496,19 +559,25 @@ class AbonarView extends GetView<AbonarController> {
             Text(
               'Se registró el abono para ${client.name} correctamente.',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              style:
+                  const TextStyle(fontSize: 16, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 40),
             ElevatedButton(
               onPressed: controller.clearSelection,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               child: const Text(
                 'Abonar a otro cliente',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
               ),
             ),
           ],

@@ -6,6 +6,7 @@ import '../../../core/utils/access_code_generator.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../data/models/staff_profile_model.dart';
 import '../../../data/services/tenant_context_service.dart';
+import '../../../data/services/welcome_tour_service.dart';
 import '../../../routes/app_pages.dart';
 
 /// Entrada del personal con un código de un solo uso.
@@ -66,6 +67,16 @@ class StaffCodeController extends GetxController {
 
       // 3. Contexto de tenant y a Inicio.
       await TenantContextService.to.setProfile(profile);
+
+      // 4. El recorrido guiado. Se marca aquí y no en el asistente de
+      //    configuración inicial porque el empleado no pasa por él: ese
+      //    asistente es solo del dueño de un gimnasio recién creado. Va
+      //    DESPUÉS de setProfile, porque markPending necesita el gym_id, y
+      //    con await, porque si Inicio se monta antes de que las banderas
+      //    lleguen al disco, isPending() aún lee false y se pierde justo el
+      //    primer recorrido, el que más falta hace.
+      await WelcomeTourService.to.markPending();
+
       codigoController.clear();
       Get.offAllNamed(Routes.HOME);
       return true;

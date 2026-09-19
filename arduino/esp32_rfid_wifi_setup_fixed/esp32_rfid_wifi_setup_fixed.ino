@@ -2,13 +2,17 @@
  * GYMADS - ESP32 RFID Reader con WiFi
  * LECTOR RFID CON CONEXIÓN WIFI AUTOMÁTICA PARA GYMADS
  * 
- * Versión 5.0.0 - Solo WiFi (Sin Bluetooth) - PN532 RFID Only + Auto-Recovery
+ * Versión 5.1.0 - Solo WiFi (Sin Bluetooth) - PN532 RFID Only + Auto-Recovery + Buzzer
  * Dispositivo: ESP32
  * 
  * Función: Leer tarjetas RFID físicas y llaveros NFC
  * Sistema simplificado para lectura de tarjetas RFID con conectividad WiFi
- * Versión: 5.0.0 - WiFi robusto con reconexión automática + Watchdog + Keep-alive
+ * Versión: 5.1.0 - WiFi robusto con reconexión automática + Watchdog + Keep-alive
  * 
+ * CAMBIOS v5.1.0:
+ * - Buzzer en GPIO25: beep corto al detectar una tarjeta durante el escaneo
+ * - Usa tone()/noTone(): no bloquea el loop (corre en su propia tarea)
+ *
  * CAMBIOS v5.0.0:
  * - Eliminada emulación HCE (Host Card Emulation)
  * - Solo lectura de tarjetas y llaveros RFID físicos
@@ -36,14 +40,14 @@
 
 // =================== CONFIGURACIÓN WIFI ===================
 // TODO: Cambiar estas credenciales por las de tu red WiFi
-//const char* WIFI_SSID = "TD Campus_C";
-//const char* WIFI_PASSWORD = "1Gestudio";
+const char* WIFI_SSID = "TD Campus_C";
+const char* WIFI_PASSWORD = "1Gestudio";
 
 //const char* WIFI_SSID = "FamiliaBlanco_2.4";
 //const char* WIFI_PASSWORD = "*E2d0e0r46";
 
-const char* WIFI_SSID = "Totalplay-2.4G-2368";
-const char* WIFI_PASSWORD = "N5q6aS55GGjDsYt7";
+//const char* WIFI_SSID = "Totalplay-2.4G-2368";
+//const char* WIFI_PASSWORD = "N5q6aS55GGjDsYt7";
 
 
 // =================== CONFIGURACIÓN DE ESCANEO RFID ===================
@@ -52,11 +56,26 @@ const char* WIFI_PASSWORD = "N5q6aS55GGjDsYt7";
 // Por defecto: 3000 ms (3 segundos)
 const unsigned long CARD_READ_INTERVAL_MS = 3000;
 
+// =================== CONFIGURACIÓN DEL BUZZER ===================
+// Beep corto que confirma cada lectura de tarjeta. tone() con duración no
+// bloquea: en este core (arduino-esp32 3.x) corre en su propia tarea de
+// FreeRTOS y se apaga sola, así que el watchdog y el servidor HTTP siguen
+// respondiendo mientras suena.
+#define BUZZER_BEEP_HZ   2500   // Frecuencia del beep (Hz)
+#define BUZZER_BEEP_MS   120    // Duración del beep (ms)
+
+// Mientras no se sepa si el buzzer es activo o pasivo, ni su frecuencia de
+// resonancia (donde suena más fuerte), este modo hace un barrido de
+// frecuencias UNA vez al arrancar y avisa por Serial cuál está sonando en
+// cada momento. Escucha cuál suena más fuerte y dime el número: esa pasa a
+// ser BUZZER_BEEP_HZ y este modo se apaga con `false`.
+#define BUZZER_MODO_PRUEBA true
+
 // =================== CONFIGURACIÓN DE IP ESTÁTICA ===================
 // Configuración de IP estática
 bool useStaticIP = true;  // Establecer a false para usar DHCP
-IPAddress staticIP(192, 168, 100, 100);  // IP estática que quieres asignar al ESP32
-IPAddress gateway(192, 168, 100, 1);     // IP del router (puerta de enlace) - CORREGIDO
+IPAddress staticIP(192, 168, 1, 100);  // IP estática que quieres asignar al ESP32
+IPAddress gateway(192, 168, 1, 1);     // IP del router (puerta de enlace) - CORREGIDO
 IPAddress subnet(255, 255, 255, 0);    // Máscara de subred
 IPAddress dns(8, 8, 8, 8);             // Servidor DNS (Google)
 
@@ -76,6 +95,9 @@ IPAddress dns(8, 8, 8, 8);             // Servidor DNS (Google)
 
 // Pines de LEDs indicadores
 #define LED_WIFI      2    // LED integrado del ESP32
+
+// Pin del buzzer (activo o pasivo: tone() funciona con ambos)
+#define BUZZER_PIN    25   // GPIO 25
 
 // =================== ESTADOS DE MEMBRESÍA ===================
 #define MEMBERSHIP_ACTIVE      "active"
@@ -124,6 +146,8 @@ void handleGetUidOnly();
 void handleStatus();
 void handleDiscover();
 void handleStatusLeds();
+void beepLectura();
+void pruebaVolumenBuzzer();
 String getCardUID(uint8_t* uid, uint8_t uidLength);
 bool isStaticIPConfigured();
 
@@ -131,7 +155,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   
-  Serial.println("=== GYMADS v5.0.0 ===");
+  Serial.println("=== GYMADS v5.1.0 ===");
   Serial.println("PN532 RFID Only + Auto-Recovery");
 
   // Inicializar Watchdog Timer para auto-reinicio si el sistema se congela
@@ -154,6 +178,14 @@ void setup() {
 
   // Apagar todos los LEDs al inicio
   digitalWrite(LED_WIFI, LOW);
+
+  // Configurar buzzer (apagado al inicio)
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+
+#if BUZZER_MODO_PRUEBA
+  pruebaVolumenBuzzer();
+#endif
 
   // Inicializar I2C para PN532
   Serial.println("Init I2C...");
@@ -275,6 +307,7 @@ void loop() {
       if (cardUid != lastScannedCard || (currentTime - lastCardReadTime >= CARD_READ_INTERVAL_MS)) {
         lastScannedCard = cardUid;
         lastCardReadTime = currentTime;
+        beepLectura();
 
         if (cardUid != lastUid) {
           lastUid = cardUid;
@@ -525,7 +558,7 @@ void handleDiscover() {
   DynamicJsonDocument doc(512);
   doc["device_id"] = "ESP32_RFID_GYMADS";
   doc["device_type"] = "RFID_READER";
-  doc["version"] = "5.0.0";
+  doc["version"] = "5.1.0";
   doc["rfid_reader"] = "PN532";
   doc["manufacturer"] = "GYMADS";
   doc["wifi_connected"] = wifiConnected;
@@ -552,6 +585,44 @@ void handleDiscover() {
   serializeJson(doc, response);
   server.send(200, "application/json", response);
 }
+
+// =================== CONTROL DE SONIDO ===================
+
+// Beep corto de confirmación al leer una tarjeta durante el escaneo.
+// No bloquea: tone() con duración se apaga sola en su propia tarea, así
+// que el loop sigue su curso normal mientras suena.
+void beepLectura() {
+  tone(BUZZER_PIN, BUZZER_BEEP_HZ, BUZZER_BEEP_MS);
+}
+
+#if BUZZER_MODO_PRUEBA
+// Barrido de frecuencias para encontrar dónde suena más fuerte este buzzer
+// en concreto. Corre una sola vez, en el arranque, ANTES de conectar WiFi:
+// bloquea unos 4 segundos con delay(), cosa que en cualquier otro punto del
+// programa estaría prohibida, pero aquí el watchdog todavía tiene sus 30
+// segundos completos por delante y no hay servidor HTTP que deba responder.
+void pruebaVolumenBuzzer() {
+  // Primer barrido (300-5000 Hz, a saltos de 300-500) dio los agudos como
+  // rango más fuerte. Este segundo barrido peina 3500-5000 Hz a saltos de
+  // 150 Hz para encontrar el pico exacto dentro de ese rango.
+  const int frecuencias[] = {3500, 3650, 3800, 3950, 4100, 4250, 4400, 4550, 4700, 4850, 5000};
+  const int cantidad = sizeof(frecuencias) / sizeof(frecuencias[0]);
+
+  Serial.println("[BUZZER] Prueba de volumen (afinada): 11 frecuencias, una cada 400 ms.");
+  Serial.println("[BUZZER] Escucha cuál suena MÁS FUERTE y avisa el número en Hz.");
+
+  for (int i = 0; i < cantidad; i++) {
+    esp_task_wdt_reset();  // el barrido bloquea, pero el watchdog sigue vivo
+    Serial.print("[BUZZER] Sonando ahora: ");
+    Serial.print(frecuencias[i]);
+    Serial.println(" Hz");
+    tone(BUZZER_PIN, frecuencias[i], 250);
+    delay(400);
+  }
+
+  Serial.println("[BUZZER] Fin de la prueba.");
+}
+#endif
 
 // =================== CONTROL DE LEDS ===================
 

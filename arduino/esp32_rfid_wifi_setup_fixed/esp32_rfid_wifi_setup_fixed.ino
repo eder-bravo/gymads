@@ -71,15 +71,13 @@ const unsigned long CARD_READ_INTERVAL_MS = 3000;
 // bloquea: en este core (arduino-esp32 3.x) corre en su propia tarea de
 // FreeRTOS y se apaga sola, así que el watchdog y el servidor HTTP siguen
 // respondiendo mientras suena.
-#define BUZZER_BEEP_HZ   2500   // Frecuencia del beep (Hz)
+#define BUZZER_BEEP_HZ   3000   // Frecuencia del beep (Hz) — la más fuerte del barrido de prueba
 #define BUZZER_BEEP_MS   120    // Duración del beep (ms)
 
-// Mientras no se sepa si el buzzer es activo o pasivo, ni su frecuencia de
-// resonancia (donde suena más fuerte), este modo hace un barrido de
-// frecuencias UNA vez al arrancar y avisa por Serial cuál está sonando en
-// cada momento. Escucha cuál suena más fuerte y dime el número: esa pasa a
-// ser BUZZER_BEEP_HZ y este modo se apaga con `false`.
-#define BUZZER_MODO_PRUEBA true
+// El barrido de frecuencias ya cumplió su propósito: 3000 Hz fue la más
+// fuerte de las que se probaron. Se deja el modo aquí, apagado, por si hace
+// falta volver a afinarlo con otro buzzer más adelante.
+#define BUZZER_MODO_PRUEBA false
 
 // =================== CONFIGURACIÓN DE IP ESTÁTICA ===================
 // Configuración de IP estática
@@ -198,6 +196,7 @@ bool peticionAutorizada();
 void responderNoAutorizado();
 void handleClaim();
 void handleUnclaim();
+void handleReset();
 void handleNetwork();
 void revisarBotonReset();
 String gymIdDeLaPeticion();
@@ -601,6 +600,7 @@ void setupServerRoutes() {
   // Vinculación del lector con un gimnasio
   server.on("/api/claim", HTTP_POST, handleClaim);
   server.on("/api/unclaim", HTTP_POST, handleUnclaim);
+  server.on("/api/reset", HTTP_POST, handleReset);
   server.on("/api/network", HTTP_POST, handleNetwork);
 
   // Configurar headers CORS manualmente para mayor compatibilidad
@@ -810,6 +810,35 @@ void handleUnclaim() {
   gymIdVinculado = "";
 
   Serial.println("[VINCULACION] Lector liberado: queda sin dueño.");
+  server.send(200, "application/json", "{\"ok\":true}");
+}
+
+// POST /api/reset — libera el lector SIN comprobar quién lo pide.
+//
+// Es lo único que lo separa de /api/unclaim, que sí exige ser el dueño. Existe
+// para poder recuperar un lector que quedó vinculado a un gimnasio al que ya no
+// se tiene acceso (una cuenta borrada, un encargado que se fue con el teléfono)
+// sin depender del botón físico del aparato.
+//
+// El precio, asumido a propósito: cualquiera en la red puede formatear
+// cualquier lector. Por eso pita mientras lo hace — un lector robado en
+// silencio pasa desapercibido; uno que se pone a sonar, no.
+//
+// NO borra la IP guardada: si se borrara, el aparato saltaría a la IP de
+// fábrica y podrías quedarte sin saber dónde encontrarlo.
+void handleReset() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+
+  prefs.begin("gymone", false);
+  prefs.remove("gym_id");
+  prefs.end();
+  gymIdVinculado = "";
+
+  Serial.println("[RESET] Lector formateado desde la red: queda sin dueño.");
+  tone(BUZZER_PIN, BUZZER_BEEP_HZ, 2000);  // que se oiga quién lo suelta
+
+  // Responde 200 aunque ya estuviera libre: así, si la app reintenta tras un
+  // timeout, no se encuentra con un error de algo que en realidad ya salió bien.
   server.send(200, "application/json", "{\"ok\":true}");
 }
 

@@ -6,13 +6,12 @@ import '../config/rfid_config.dart';
 import 'tenant_context_service.dart';
 
 class RfidReaderService {
-  /// Cierto cuando el lector contestó que pertenece a OTRO gimnasio.
+  /// Por qué el lector se negó a contestar, si es que se negó.
   ///
-  /// Lo levanta cualquier respuesta 403. Existe porque un 403 no es un fallo
-  /// de red del que valga la pena reintentar: por más veces que se pregunte,
-  /// ese lector nunca va a contestar. Quien sondea lo mira para dejar de
-  /// hacerlo y para poder decírselo al usuario con esas palabras.
-  static final RxBool lectorDeOtroGimnasio = false.obs;
+  /// Un 403 no es un fallo de red del que valga la pena reintentar: por más
+  /// veces que se pregunte, ese lector nunca va a contestar. Quien sondea lo
+  /// mira para dejar de hacerlo y para decirle al usuario qué hacer.
+  static final Rx<RechazoLector> rechazo = RechazoLector.ninguno.obs;
 
   /// Añade el gym_id a la URL, que es lo que el lector compara para decidir
   /// si contesta. Sin esto, cualquier app de la red se llevaba los pases.
@@ -23,13 +22,33 @@ class RfidReaderService {
     return '$url$separador' 'gym_id=$gymId';
   }
 
-  /// Deja constancia de que el lector es ajeno y corta el sondeo.
-  static void _marcarAjeno(String metodo) {
-    if (!lectorDeOtroGimnasio.value) {
-      AppLogger.warning('RfidReaderService',
-          'El lector configurado pertenece a otro gimnasio ($metodo)');
+  /// Anota POR QUÉ el lector rechazó la petición, y corta el sondeo.
+  ///
+  /// El firmware usa 403 para dos situaciones muy distintas y las separa con
+  /// el campo `claimed` del cuerpo: `false` significa que el lector está
+  /// libre y solo falta vincularlo; `true`, que es de otro gimnasio.
+  /// Confundirlas manda al usuario a buscar un problema que no tiene.
+  static void _marcarRechazo(String metodo, String cuerpo) {
+    var motivo = RechazoLector.deOtroGimnasio;
+
+    try {
+      final datos = jsonDecode(cuerpo);
+      if (datos is Map && datos['claimed'] == false) {
+        motivo = RechazoLector.sinVincular;
+      }
+    } catch (_) {
+      // Sin cuerpo legible se asume el caso más restrictivo: es preferible
+      // decir "es de otro gimnasio" que invitar a vincular algo ajeno.
     }
-    lectorDeOtroGimnasio.value = true;
+
+    if (rechazo.value != motivo) {
+      AppLogger.warning(
+          'RfidReaderService',
+          motivo == RechazoLector.sinVincular
+              ? 'El lector todavía no está vinculado a ningún gimnasio ($metodo)'
+              : 'El lector configurado pertenece a otro gimnasio ($metodo)');
+    }
+    rechazo.value = motivo;
   }
   // Método para verificar si hay un UID disponible desde el ESP32
   static Future<String?> checkForCard() async {
@@ -51,12 +70,12 @@ class RfidReaderService {
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 403) {
-        _marcarAjeno('checkForCard');
+        _marcarRechazo('checkForCard', response.body);
         return null;
       }
 
       if (response.statusCode == 200) {
-        lectorDeOtroGimnasio.value = false;
+        rechazo.value = RechazoLector.ninguno;
         final responseText = response.body.trim();
         
         if (responseText.isNotEmpty && responseText != "NO_CARD") {
@@ -96,7 +115,7 @@ class RfidReaderService {
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 403) {
-        _marcarAjeno('checkForCardSilent');
+        _marcarRechazo('checkForCardSilent', response.body);
         return null;
       }
 
@@ -206,4 +225,21 @@ class RfidReaderService {
   }
   
   // Este es el fin de la clase RfidReaderService
+}
+
+/// Por qué el lector se negó a entregar los pases de tarjeta.
+///
+/// El firmware responde 403 en los dos casos de rechazo; lo que los separa es
+/// el campo `claimed` del cuerpo JSON.
+enum RechazoLector {
+  /// No hubo rechazo.
+  ninguno,
+
+  /// El lector existe y responde, pero todavía no pertenece a ningún
+  /// gimnasio. Se arregla vinculándolo desde Configuración.
+  sinVincular,
+
+  /// El lector es de otro gimnasio. Su dueño tiene que liberarlo, o hay que
+  /// hacerle el reset de fábrica con el botón.
+  deOtroGimnasio,
 }

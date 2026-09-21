@@ -284,6 +284,30 @@ class RfidConfig {
     }
   }
 
+  /// Formatea un lector aunque NO sea de este gimnasio.
+  ///
+  /// Es el camino para recuperar un aparato que quedó vinculado a un gimnasio
+  /// al que ya no se tiene acceso. A diferencia de [desvincular], no manda el
+  /// gym_id porque el lector no lo comprueba: por eso apunta a una IP
+  /// explícita y no a [baseUrl], que sería la del lector propio.
+  ///
+  /// El aparato pita mientras lo hace, así que un formateo ajeno se oye.
+  static Future<bool> formatear(String ip) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('http://$ip/api/reset'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      return response.statusCode == 200;
+    } catch (e) {
+      AppLogger.error('RfidConfig', 'Error al formatear el lector', e);
+      return false;
+    }
+  }
+
   /// Libera el lector para que otro gimnasio pueda reclamarlo.
   static Future<bool> desvincular() async {
     final base = baseUrl;

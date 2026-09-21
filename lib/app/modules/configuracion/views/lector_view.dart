@@ -106,8 +106,8 @@ class _LectorViewState extends State<LectorView> {
         color = AppColors.error;
         titulo = 'Es de otro gimnasio';
         detalle = 'Este lector ya fue vinculado por otro gimnasio y no va a '
-            'responder al tuyo. Su dueño tiene que liberarlo, o hay que '
-            'reiniciarlo de fábrica con el botón del aparato.';
+            'responder al tuyo. Si el aparato es tuyo, puedes formatearlo '
+            'para dejarlo libre y vincularlo de nuevo.';
         break;
       case EstadoLector.sinConexion:
         icono = Icons.wifi_off;
@@ -242,6 +242,18 @@ class _LectorViewState extends State<LectorView> {
           ),
         ],
 
+        // Formatear un lector ajeno: es la salida para recuperar un aparato
+        // vinculado a un gimnasio al que ya no se tiene acceso.
+        if (estado == EstadoLector.deOtroGimnasio) ...[
+          const SizedBox(height: 10),
+          _boton(
+            texto: 'Formatear lector',
+            icono: Icons.restart_alt,
+            color: AppColors.error,
+            onTap: _confirmarFormateo,
+          ),
+        ],
+
         if (estado == EstadoLector.mio) ...[
           const SizedBox(height: 10),
           _boton(
@@ -315,6 +327,40 @@ class _LectorViewState extends State<LectorView> {
     );
 
     if (confirmado == true) await controller.desvincularLector();
+  }
+
+  Future<void> _confirmarFormateo() async {
+    final confirmado = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Formatear el lector',
+            style: TextStyle(color: AppColors.textPrimary)),
+        content: const Text(
+          'Este lector pertenece a otro gimnasio. Al formatearlo dejará de '
+          'funcionarle a ese gimnasio de inmediato, y quedará libre para que '
+          'lo vincules al tuyo.\n\n'
+          'El lector pitará mientras se formatea. Hazlo solo si el aparato es '
+          'tuyo.',
+          style: TextStyle(color: AppColors.textSecondary, height: 1.35),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancelar',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Get.back(result: true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Formatear',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmado == true) await controller.formatearLector(_ip);
   }
 
   Future<void> _confirmarCambioIp() async {
@@ -403,11 +449,11 @@ class _LectorViewState extends State<LectorView> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              '¿Perdiste el acceso a un lector? Desconéctalo y vuelve a '
+              '¿El lector no responde en ninguna IP? Desconéctalo y vuelve a '
               'conectarlo, y en los primeros 10 segundos mantén pulsado el '
               'botón BOOT unos 3 segundos: sonará un pitido corto al empezar '
-              'y uno largo al confirmar. Quedará libre para vincularlo de '
-              'nuevo.',
+              'y uno largo al confirmar. Eso lo deja libre y en la IP de '
+              'fábrica (192.168.1.100).',
               style: TextStyle(
                 color: AppColors.textSecondary.withOpacity(0.9),
                 fontSize: 12.5,

@@ -181,8 +181,8 @@ class BackgroundRfidService extends GetxService {
     }
 
     isScanning.value = true;
-    _avisoLectorAjeno = false;
-    RfidReaderService.lectorDeOtroGimnasio.value = false;
+    _avisoRechazo = false;
+    RfidReaderService.rechazo.value = RechazoLector.ninguno;
 
     AppLogger.info('BackgroundRfidService', 'Iniciando servicio de escaneo RFID en segundo plano');
 
@@ -250,14 +250,14 @@ class BackgroundRfidService extends GetxService {
 
       final uid = await RfidReaderService.checkForCard();
 
-      // El lector contestó que pertenece a otro gimnasio (o que todavía no
-      // está vinculado a ninguno). Reintentar no sirve de nada: por muchas
-      // veces que se pregunte, nunca va a contestar. Sin este corte, la app
-      // martillearía el aparato del gimnasio de al lado cada 1,5 s para
-      // siempre, que es justo el problema que la vinculación viene a cerrar.
-      if (RfidReaderService.lectorDeOtroGimnasio.value) {
+      // El lector rechazó la petición. Reintentar no sirve de nada: por
+      // muchas veces que se pregunte, nunca va a contestar. Sin este corte,
+      // la app martillearía el aparato cada 1,5 s para siempre, que es justo
+      // el problema que la vinculación viene a cerrar.
+      final rechazo = RfidReaderService.rechazo.value;
+      if (rechazo != RechazoLector.ninguno) {
         stopScanning();
-        _avisarLectorAjeno();
+        _avisarRechazo(rechazo);
         return;
       }
 
@@ -287,19 +287,30 @@ class BackgroundRfidService extends GetxService {
     }
   }
 
-  /// Si ya se avisó de que el lector es ajeno. Sin esta bandera saldría una
-  /// notificación cada vuelta del sondeo.
-  bool _avisoLectorAjeno = false;
+  /// Si ya se avisó del rechazo. Sin esta bandera saldría una notificación
+  /// cada vuelta del sondeo.
+  bool _avisoRechazo = false;
 
-  void _avisarLectorAjeno() {
-    if (_avisoLectorAjeno) return;
-    _avisoLectorAjeno = true;
+  /// Avisa según el motivo real. Un lector sin vincular se arregla en dos
+  /// toques desde Configuración; uno ajeno no se arregla desde aquí. Dar el
+  /// mismo mensaje para ambos manda al usuario a buscar donde no es.
+  void _avisarRechazo(RechazoLector motivo) {
+    if (_avisoRechazo) return;
+    _avisoRechazo = true;
 
-    AppLogger.warning('BackgroundRfidService',
-        'Sondeo detenido: el lector no pertenece a este gimnasio');
+    final sinVincular = motivo == RechazoLector.sinVincular;
+
+    AppLogger.warning(
+        'BackgroundRfidService',
+        sinVincular
+            ? 'Sondeo detenido: el lector no está vinculado a ningún gimnasio'
+            : 'Sondeo detenido: el lector pertenece a otro gimnasio');
+
     _showSnackbarSafe(
-      'Lector no disponible',
-      'Ese lector es de otro gimnasio. Revísalo en Configuración.',
+      sinVincular ? 'Lector sin vincular' : 'Lector no disponible',
+      sinVincular
+          ? 'Vincúlalo en Configuración → Lector de tarjetas.'
+          : 'Ese lector es de otro gimnasio.',
       isError: true,
     );
   }

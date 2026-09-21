@@ -7,6 +7,7 @@ import '../../../core/permissions/permissions.dart';
 import '../../../core/permissions/staff_role.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/rfid_reader_service.dart';
+import '../../../data/services/background_rfid_service.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../../data/services/image_cache_service.dart';
@@ -92,6 +93,10 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
         case VinculacionResultado.ok:
           estadoLector.value = EstadoLector.mio;
           esp32IpAddress.value = ip;
+          // El sondeo se había detenido al recibir el rechazo del lector, y
+          // no se reanuda solo. Sin esto el dueño vería "Listo" y el lector
+          // seguiría sin responder hasta reiniciar la app.
+          _reanudarSondeo();
           SnackbarHelper.success(
               'Listo', 'El lector quedó vinculado a tu gimnasio');
           break;
@@ -119,6 +124,30 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     }
   }
 
+  /// Formatea un lector que pertenece a otro gimnasio, para poder reclamarlo.
+  ///
+  /// Tras formatearlo se vuelve a consultar: quedará libre, y la pantalla
+  /// mostrará sola el botón de vincular. Así formatear y revincular son dos
+  /// toques seguidos en la misma pantalla, sin pasos sueltos por medio.
+  Future<void> formatearLector(String ip) async {
+    comprobandoLector.value = true;
+    try {
+      if (await RfidConfig.formatear(ip)) {
+        SnackbarHelper.success(
+            'Listo', 'El lector quedó libre. Ya puedes vincularlo.');
+      } else {
+        SnackbarHelper.error('Error',
+            'No se pudo formatear el lector. Revisa que responda en esa IP.');
+      }
+    } finally {
+      comprobandoLector.value = false;
+    }
+
+    // Fuera del finally: comprobarLector maneja su propia bandera y dejarlo
+    // dentro la pisaría a false antes de tiempo.
+    await comprobarLector(ip: ip);
+  }
+
   /// Libera el lector para que otro gimnasio pueda reclamarlo.
   Future<void> desvincularLector() async {
     comprobandoLector.value = true;
@@ -127,6 +156,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
         estadoLector.value = EstadoLector.sinConfigurar;
         esp32IpAddress.value = '';
         esp32Connected.value = false;
+        _detenerSondeo();
         SnackbarHelper.success('Listo', 'El lector quedó libre');
       } else {
         SnackbarHelper.error('Error', 'No se pudo desvincular el lector.');
@@ -134,6 +164,23 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     } finally {
       comprobandoLector.value = false;
     }
+  }
+
+  /// Vuelve a arrancar el sondeo del lector.
+  ///
+  /// `startScanning` ya limpia por dentro el motivo del rechazo anterior, así
+  /// que basta con llamarlo. Si el servicio no está registrado (el lector
+  /// nunca se activó en este dispositivo) no hay nada que reanudar.
+  void _reanudarSondeo() {
+    if (!Get.isRegistered<BackgroundRfidService>()) return;
+    final servicio = Get.find<BackgroundRfidService>();
+    servicio.stopScanning();
+    servicio.startScanning();
+  }
+
+  void _detenerSondeo() {
+    if (!Get.isRegistered<BackgroundRfidService>()) return;
+    Get.find<BackgroundRfidService>().stopScanning();
   }
 
   /// Le da al lector una IP fija propia.

@@ -115,7 +115,8 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
       if (!RfidConfig.isConfigured) {
         isRfidConnected.value = false;
         connectionStatusMessage.value = 'ESP32 no configurado';
-        errorMessage.value = 'Se requiere configurar el ESP32 via Bluetooth primero.';
+        errorMessage.value = 'Vincula el lector en Configuración → '
+            'Lector de tarjetas.';
         return;
       }
       
@@ -130,7 +131,8 @@ class RfidCheckinController extends GetxController with GetSingleTickerProviderS
         errorMessage.value = '';
       } else {
         connectionStatusMessage.value = 'ESP32 no responde';
-        errorMessage.value = 'No se puede conectar al lector RFID. Verifica la configuración via Bluetooth.';
+        errorMessage.value = 'No se puede conectar al lector. Revisa que esté '
+            'encendido y en la misma red, en Configuración → Lector de tarjetas.';
       }
       
     } catch (e) {

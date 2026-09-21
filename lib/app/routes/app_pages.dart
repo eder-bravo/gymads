@@ -14,6 +14,7 @@ import '../modules/configuracion/views/configuracion_view.dart';
 import '../modules/configuracion/views/cuenta_view.dart';
 import '../modules/configuracion/views/abono_prices_view.dart';
 import '../modules/configuracion/views/control_accesos_view.dart';
+import '../modules/configuracion/views/lector_view.dart';
 import '../modules/home/bindings/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/ingresos/bindings/ingresos_binding.dart';
@@ -150,6 +151,11 @@ class AppPages {
     GetPage(
       name: _Paths.CONTROL_ACCESOS,
       page: () => const ControlAccesosView(),
+      binding: ConfiguracionBinding(),
+    ),
+    GetPage(
+      name: _Paths.LECTOR,
+      page: () => const LectorView(),
       binding: ConfiguracionBinding(),
     ),
     GetPage(

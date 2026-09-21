@@ -1,9 +1,36 @@
 import 'dart:convert';
+import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import '../config/rfid_config.dart';
+import 'tenant_context_service.dart';
 
 class RfidReaderService {
+  /// Cierto cuando el lector contestó que pertenece a OTRO gimnasio.
+  ///
+  /// Lo levanta cualquier respuesta 403. Existe porque un 403 no es un fallo
+  /// de red del que valga la pena reintentar: por más veces que se pregunte,
+  /// ese lector nunca va a contestar. Quien sondea lo mira para dejar de
+  /// hacerlo y para poder decírselo al usuario con esas palabras.
+  static final RxBool lectorDeOtroGimnasio = false.obs;
+
+  /// Añade el gym_id a la URL, que es lo que el lector compara para decidir
+  /// si contesta. Sin esto, cualquier app de la red se llevaba los pases.
+  static String _conGymId(String url) {
+    final gymId = TenantContextService.to.currentGymId;
+    if (gymId == null || gymId.isEmpty) return url;
+    final separador = url.contains('?') ? '&' : '?';
+    return '$url$separador' 'gym_id=$gymId';
+  }
+
+  /// Deja constancia de que el lector es ajeno y corta el sondeo.
+  static void _marcarAjeno(String metodo) {
+    if (!lectorDeOtroGimnasio.value) {
+      AppLogger.warning('RfidReaderService',
+          'El lector configurado pertenece a otro gimnasio ($metodo)');
+    }
+    lectorDeOtroGimnasio.value = true;
+  }
   // Método para verificar si hay un UID disponible desde el ESP32
   static Future<String?> checkForCard() async {
     try {
@@ -20,10 +47,16 @@ class RfidReaderService {
       }
 
       final response = await http.get(
-        Uri.parse('$baseUrl/uid'),
+        Uri.parse(_conGymId('$baseUrl/uid')),
       ).timeout(const Duration(seconds: 3));
-      
+
+      if (response.statusCode == 403) {
+        _marcarAjeno('checkForCard');
+        return null;
+      }
+
       if (response.statusCode == 200) {
+        lectorDeOtroGimnasio.value = false;
         final responseText = response.body.trim();
         
         if (responseText.isNotEmpty && responseText != "NO_CARD") {
@@ -59,9 +92,14 @@ class RfidReaderService {
       }
 
       final response = await http.get(
-        Uri.parse('$baseUrl/uid_only'),
+        Uri.parse(_conGymId('$baseUrl/uid_only')),
       ).timeout(const Duration(seconds: 3));
-      
+
+      if (response.statusCode == 403) {
+        _marcarAjeno('checkForCardSilent');
+        return null;
+      }
+
       if (response.statusCode == 200) {
         final responseText = response.body.trim();
         
@@ -96,7 +134,7 @@ class RfidReaderService {
       
       // Verificamos si podemos conectarnos al ESP32
       final response = await http.get(
-        Uri.parse('$baseUrl/status'),
+        Uri.parse(_conGymId('$baseUrl/status')),
       ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200) {
@@ -149,7 +187,7 @@ class RfidReaderService {
       if (accessType != null) body['access_type'] = accessType;
 
       final response = await http.post(
-        Uri.parse('$baseUrl/membership'),
+        Uri.parse(_conGymId('$baseUrl/membership')),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       ).timeout(const Duration(seconds: 10));

@@ -181,6 +181,8 @@ class BackgroundRfidService extends GetxService {
     }
 
     isScanning.value = true;
+    _avisoLectorAjeno = false;
+    RfidReaderService.lectorDeOtroGimnasio.value = false;
 
     AppLogger.info('BackgroundRfidService', 'Iniciando servicio de escaneo RFID en segundo plano');
 
@@ -248,6 +250,17 @@ class BackgroundRfidService extends GetxService {
 
       final uid = await RfidReaderService.checkForCard();
 
+      // El lector contestó que pertenece a otro gimnasio (o que todavía no
+      // está vinculado a ninguno). Reintentar no sirve de nada: por muchas
+      // veces que se pregunte, nunca va a contestar. Sin este corte, la app
+      // martillearía el aparato del gimnasio de al lado cada 1,5 s para
+      // siempre, que es justo el problema que la vinculación viene a cerrar.
+      if (RfidReaderService.lectorDeOtroGimnasio.value) {
+        stopScanning();
+        _avisarLectorAjeno();
+        return;
+      }
+
       if (uid == null || uid.isEmpty || uid == 'NO_CARD') {
         return;
       }
@@ -272,6 +285,23 @@ class BackgroundRfidService extends GetxService {
     } finally {
       _isChecking = false;
     }
+  }
+
+  /// Si ya se avisó de que el lector es ajeno. Sin esta bandera saldría una
+  /// notificación cada vuelta del sondeo.
+  bool _avisoLectorAjeno = false;
+
+  void _avisarLectorAjeno() {
+    if (_avisoLectorAjeno) return;
+    _avisoLectorAjeno = true;
+
+    AppLogger.warning('BackgroundRfidService',
+        'Sondeo detenido: el lector no pertenece a este gimnasio');
+    _showSnackbarSafe(
+      'Lector no disponible',
+      'Ese lector es de otro gimnasio. Revísalo en Configuración.',
+      isError: true,
+    );
   }
 
   /// Verificar si debemos saltar este escaneo

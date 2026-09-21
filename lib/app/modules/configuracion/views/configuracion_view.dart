@@ -81,8 +81,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         TourStep(
           tourKey: controller.keyCuenta,
           title: 'Cuenta',
-          description: 'Tus datos personales, el nombre del gimnasio y el '
-              'lector de tarjetas.',
+          description: 'Tus datos personales y el nombre del gimnasio.',
           borderRadius: 12,
           isFirstStep: true,
           isLastStep: controller.esUltimoPasoDelTour(controller.keyCuenta),
@@ -180,6 +179,28 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
               title: 'Control de accesos',
               subtitle: 'Entradas, salidas y horario del gimnasio',
               onTap: () => controller.openControlAccesos(),
+              trailing: const Icon(Icons.arrow_forward_ios,
+                  size: 16, color: AppColors.textSecondary),
+            ),
+          ),
+        ],
+
+        // El lector de tarjetas: su IP y a qué gimnasio pertenece.
+        if (controller.can(Permission.gestionarControlAccesos)) ...[
+          const SizedBox(height: 12),
+          TourStep(
+            tourKey: controller.keyLector,
+            title: 'Lector de tarjetas',
+            description: 'Vincula el lector a tu gimnasio para que solo '
+                'responda al tuyo, aunque haya otros en la misma red.',
+            borderRadius: 12,
+            isLastStep: controller.esUltimoPasoDelTour(controller.keyLector),
+            child: _buildOptionTile(
+              icon: Icons.nfc,
+              iconColor: AppColors.brand,
+              title: 'Lector de tarjetas',
+              subtitle: 'Vinculación y dirección del lector',
+              onTap: () => controller.openLector(),
               trailing: const Icon(Icons.arrow_forward_ios,
                   size: 16, color: AppColors.textSecondary),
             ),

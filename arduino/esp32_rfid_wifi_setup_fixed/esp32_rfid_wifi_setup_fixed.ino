@@ -2,13 +2,22 @@
  * GYMADS - ESP32 RFID Reader con WiFi
  * LECTOR RFID CON CONEXIÓN WIFI AUTOMÁTICA PARA GYMADS
  * 
- * Versión 5.1.0 - Solo WiFi (Sin Bluetooth) - PN532 RFID Only + Auto-Recovery + Buzzer
+ * Versión 5.2.0 - Solo WiFi - PN532 RFID Only + Auto-Recovery + Buzzer + Vinculación
  * Dispositivo: ESP32
  * 
  * Función: Leer tarjetas RFID físicas y llaveros NFC
  * Sistema simplificado para lectura de tarjetas RFID con conectividad WiFi
- * Versión: 5.1.0 - WiFi robusto con reconexión automática + Watchdog + Keep-alive
+ * Versión: 5.2.0 - WiFi robusto con reconexión automática + Watchdog + Keep-alive
  * 
+ * CAMBIOS v5.2.0:
+ * - El lector se VINCULA a un solo gimnasio (gym_id guardado en NVS)
+ * - /api/uid y /api/uid_only exigen el gym_id correcto (403 si no)
+ * - /api/status deja de filtrar el UID de la tarjeta
+ * - /api/discover dice "claimed" y "mine" SIN revelar nunca el gym_id guardado
+ * - Nuevos: POST /api/claim, /api/unclaim y /api/network
+ * - IP estática configurable por aparato (antes todos salían con la misma)
+ * - Reset de fábrica: mantener BOOT (GPIO0) 5 s con el equipo ENCENDIDO
+ *
  * CAMBIOS v5.1.0:
  * - Buzzer en GPIO25: beep corto al detectar una tarjeta durante el escaneo
  * - Usa tone()/noTone(): no bloquea el loop (corre en su propia tarea)
@@ -37,6 +46,7 @@
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <esp_task_wdt.h>  // Watchdog Timer
+#include <Preferences.h>   // Memoria permanente (NVS): dueño del lector e IP
 
 // =================== CONFIGURACIÓN WIFI ===================
 // TODO: Cambiar estas credenciales por las de tu red WiFi
@@ -99,6 +109,21 @@ IPAddress dns(8, 8, 8, 8);             // Servidor DNS (Google)
 // Pin del buzzer (activo o pasivo: tone() funciona con ambos)
 #define BUZZER_PIN    25   // GPIO 25
 
+// Botón BOOT de la placa, para el reset de fábrica.
+//
+// OJO: GPIO0 es un pin de "strapping". Si está en LOW en el momento del
+// arranque, el ESP32 entra en modo de descarga y el programa ni siquiera
+// corre. Por eso el gesto de reset es mantenerlo pulsado con el equipo YA
+// ENCENDIDO, nunca al encenderlo.
+#define BOTON_RESET_PIN       0      // GPIO 0 (BOOT)
+#define RESET_MANTENER_MS     3000   // 3 s pulsado para borrar la vinculación
+
+// El botón solo hace algo durante los primeros segundos tras encender.
+// Pasada esa ventana se ignora, para que un cable pinzado o un dedo curioso
+// en plena jornada no desvincule el gimnasio sin que nadie se entere: el
+// lector dejaría de funcionar y no habría forma de saber por qué.
+#define RESET_VENTANA_MS      10000  // 10 s desde el arranque
+
 // =================== ESTADOS DE MEMBRESÍA ===================
 #define MEMBERSHIP_ACTIVE      "active"
 #define MEMBERSHIP_EXPIRING    "expiring"
@@ -112,6 +137,26 @@ IPAddress dns(8, 8, 8, 8);             // Servidor DNS (Google)
 PN532_I2C *pn532i2c;
 PN532 *nfc;
 WebServer server(80);
+
+// =================== VINCULACIÓN CON UN GIMNASIO ===================
+// El lector pertenece a UN gimnasio. Sin esto, cualquier app de la red que
+// preguntara por /api/uid se llevaba los pases de tarjeta: dos gimnasios en
+// la misma WiFi recibían la alerta del mismo pase.
+Preferences prefs;
+
+// gym_id del dueño. Vacío = lector sin vincular, listo para que alguien lo
+// reclame. NUNCA se devuelve en ninguna respuesta HTTP: si se filtrara, el
+// gimnasio de al lado podría copiarlo y suplantar al dueño.
+String gymIdVinculado = "";
+
+// Control del botón de reset de fábrica (sin bloquear el loop).
+unsigned long botonPulsadoDesde = 0;
+
+// Reinicio diferido. Nunca se llama a ESP.restart() dentro de un handler
+// HTTP: el servidor no habría terminado de vaciar el socket y el cliente
+// vería la conexión rota en vez de la confirmación, sin poder distinguir
+// "se aplicó" de "se perdió la petición" — y sin saber a qué IP buscarlo.
+unsigned long reinicioPendienteEn = 0;
 
 // Variables de estado
 bool wifiConnected = false;
@@ -148,6 +193,14 @@ void handleDiscover();
 void handleStatusLeds();
 void beepLectura();
 void pruebaVolumenBuzzer();
+void cargarVinculacion();
+bool peticionAutorizada();
+void responderNoAutorizado();
+void handleClaim();
+void handleUnclaim();
+void handleNetwork();
+void revisarBotonReset();
+String gymIdDeLaPeticion();
 String getCardUID(uint8_t* uid, uint8_t uidLength);
 bool isStaticIPConfigured();
 
@@ -155,7 +208,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   
-  Serial.println("=== GYMADS v5.1.0 ===");
+  Serial.println("=== GYMADS v5.2.0 ===");
   Serial.println("PN532 RFID Only + Auto-Recovery");
 
   // Inicializar Watchdog Timer para auto-reinicio si el sistema se congela
@@ -182,6 +235,12 @@ void setup() {
   // Configurar buzzer (apagado al inicio)
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
+
+  // Botón BOOT para el reset de fábrica (lleva pull-up en la placa)
+  pinMode(BOTON_RESET_PIN, INPUT_PULLUP);
+
+  // A qué gimnasio pertenece este lector, y qué IP tiene asignada
+  cargarVinculacion();
 
 #if BUZZER_MODO_PRUEBA
   pruebaVolumenBuzzer();
@@ -293,6 +352,15 @@ void loop() {
   // Manejar LEDs de estado
   handleStatusLeds();
 
+  // Reset de fábrica si se mantiene pulsado el botón BOOT
+  revisarBotonReset();
+
+  // Reinicio programado por un cambio de IP o un reset de fábrica. Se hace
+  // aquí y no dentro del handler para que la respuesta HTTP alcance a salir.
+  if (reinicioPendienteEn != 0 && millis() >= reinicioPendienteEn) {
+    ESP.restart();
+  }
+
   // Solo procesar RFID si estamos conectados a WiFi
   if (wifiConnected && serverRunning) {
     uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };
@@ -397,6 +465,26 @@ void loop() {
 
 // Configuración de IP estática
 bool setupStaticIP() {
+  // Si este aparato tiene una IP propia guardada, se usa esa. Antes todos
+  // los lectores salían con la misma IP compilada, así que dos en la misma
+  // red chocaban. La compilada queda solo como respaldo de fábrica.
+  prefs.begin("gymone", true);
+  String ipGuardada = prefs.getString("ip", "");
+  String gwGuardado = prefs.getString("gw", "");
+  prefs.end();
+
+  if (ipGuardada.length() > 0) {
+    IPAddress ipPropia;
+    if (ipPropia.fromString(ipGuardada)) {
+      staticIP = ipPropia;
+      Serial.println("[RED] Usando la IP guardada en este aparato.");
+    }
+  }
+  if (gwGuardado.length() > 0) {
+    IPAddress gwPropio;
+    if (gwPropio.fromString(gwGuardado)) gateway = gwPropio;
+  }
+
   Serial.println("Configurando IP estática: " + staticIP.toString());
   
   // Primer intento directo
@@ -510,12 +598,23 @@ void setupServerRoutes() {
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/discover", HTTP_GET, handleDiscover);
 
+  // Vinculación del lector con un gimnasio
+  server.on("/api/claim", HTTP_POST, handleClaim);
+  server.on("/api/unclaim", HTTP_POST, handleUnclaim);
+  server.on("/api/network", HTTP_POST, handleNetwork);
+
   // Configurar headers CORS manualmente para mayor compatibilidad
   server.enableCORS(true);
 }
 
 // Manejador para la ruta /api/uid
 void handleGetUid() {
+  // El UID solo sale si quien pregunta es el gimnasio dueño del lector.
+  if (!peticionAutorizada()) {
+    responderNoAutorizado();
+    return;
+  }
+
   // Solo enviar el UID, NO resetearlo
   // El reseteo se maneja en el loop principal
   server.sendHeader("Connection", "close");
@@ -526,6 +625,10 @@ void handleGetUid() {
 // Manejador para la ruta /api/uid_only - Solo devuelve el UID sin activar LEDs
 // Usado para capturar tarjetas al agregar nuevos clientes
 void handleGetUidOnly() {
+  if (!peticionAutorizada()) {
+    responderNoAutorizado();
+    return;
+  }
   server.send(200, "text/plain", lastUid);
 }
 
@@ -538,7 +641,10 @@ void handleStatus() {
   DynamicJsonDocument doc(400);
   doc["status"] = "OK";
   doc["wifi_connected"] = wifiConnected;
-  doc["last_uid"] = lastUid;
+  // `last_uid` ya NO va aquí: este endpoint está abierto (hace falta para
+  // encontrar el lector antes de vincularlo) y devolvía el UID de la última
+  // tarjeta a cualquiera que preguntara, justo lo que /api/uid ya protege.
+  doc["claimed"] = gymIdVinculado.length() > 0;
   doc["ip_address"] = WiFi.localIP().toString();
   doc["network_type"] = networkType;
   doc["static_ip_enabled"] = useStaticIP;
@@ -558,7 +664,17 @@ void handleDiscover() {
   DynamicJsonDocument doc(512);
   doc["device_id"] = "ESP32_RFID_GYMADS";
   doc["device_type"] = "RFID_READER";
-  doc["version"] = "5.1.0";
+  doc["version"] = "5.2.0";
+
+  // Identidad del dueño, en forma de respuesta SÍ/NO.
+  //
+  // `claimed` dice si el lector ya tiene dueño; `mine` responde a "¿soy yo?"
+  // comparando contra el gym_id que manda quien pregunta. El gym_id guardado
+  // NO se incluye a propósito: devolverlo dejaría que el gimnasio de al lado
+  // lo copiara y se hiciera pasar por el dueño, y la vinculación no serviría
+  // de nada.
+  doc["claimed"] = gymIdVinculado.length() > 0;
+  doc["mine"] = peticionAutorizada();
   doc["rfid_reader"] = "PN532";
   doc["manufacturer"] = "GYMADS";
   doc["wifi_connected"] = wifiConnected;
@@ -584,6 +700,204 @@ void handleDiscover() {
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
+}
+
+// =================== VINCULACIÓN CON UN GIMNASIO ===================
+
+// Lee de NVS a qué gimnasio pertenece este lector. Se llama una vez al
+// arrancar; el resto del programa consulta `gymIdVinculado`.
+void cargarVinculacion() {
+  prefs.begin("gymone", true);  // solo lectura
+  gymIdVinculado = prefs.getString("gym_id", "");
+  prefs.end();
+
+  if (gymIdVinculado.length() > 0) {
+    Serial.println("[VINCULACION] Lector vinculado a un gimnasio.");
+  } else {
+    Serial.println("[VINCULACION] Lector SIN vincular: listo para reclamar.");
+  }
+}
+
+// El gym_id que manda quien pregunta, por query (?gym_id=) o en el cuerpo
+// JSON del POST. Devuelve "" si no vino.
+String gymIdDeLaPeticion() {
+  if (server.hasArg("gym_id")) {
+    return server.arg("gym_id");
+  }
+
+  // En un POST el cuerpo crudo llega como el argumento "plain".
+  if (server.hasArg("plain")) {
+    DynamicJsonDocument doc(256);
+    if (deserializeJson(doc, server.arg("plain")) == DeserializationError::Ok) {
+      const char* valor = doc["gym_id"];
+      if (valor != nullptr) return String(valor);
+    }
+  }
+
+  return "";
+}
+
+// ¿Quien pregunta es el dueño de este lector?
+//
+// Un lector sin vincular no autoriza a nadie: primero hay que reclamarlo.
+// Así, un aparato recién sacado de la caja no reparte pases de tarjeta por
+// toda la red mientras nadie lo configura.
+bool peticionAutorizada() {
+  if (gymIdVinculado.length() == 0) return false;
+  return gymIdDeLaPeticion() == gymIdVinculado;
+}
+
+void responderNoAutorizado() {
+  server.sendHeader("Connection", "close");
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+
+  DynamicJsonDocument doc(192);
+  doc["error"] = "forbidden";
+  doc["claimed"] = gymIdVinculado.length() > 0;
+  doc["message"] = gymIdVinculado.length() > 0
+      ? "Este lector pertenece a otro gimnasio"
+      : "Este lector todavia no esta vinculado a ningun gimnasio";
+
+  String respuesta;
+  serializeJson(doc, respuesta);
+  server.send(403, "application/json", respuesta);
+}
+
+// POST /api/claim {"gym_id": "..."} — reclamar un lector libre.
+void handleClaim() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  String gymId = gymIdDeLaPeticion();
+
+  if (gymId.length() == 0) {
+    server.send(400, "application/json", "{\"error\":\"falta gym_id\"}");
+    return;
+  }
+
+  // Ya tiene dueño: no se le puede quitar a otro gimnasio desde la red. La
+  // salida legítima es que el dueño lo libere, o el reset físico de fábrica.
+  if (gymIdVinculado.length() > 0) {
+    if (gymId == gymIdVinculado) {
+      server.send(200, "application/json", "{\"ok\":true,\"already\":true}");
+      return;
+    }
+    server.send(409, "application/json",
+                "{\"error\":\"claimed\",\"message\":\"Ya pertenece a otro gimnasio\"}");
+    return;
+  }
+
+  prefs.begin("gymone", false);
+  prefs.putString("gym_id", gymId);
+  prefs.end();
+  gymIdVinculado = gymId;
+
+  Serial.println("[VINCULACION] Lector vinculado correctamente.");
+  beepLectura();  // confirmación audible de que quedó emparejado
+  server.send(200, "application/json", "{\"ok\":true}");
+}
+
+// POST /api/unclaim {"gym_id": "..."} — liberar el lector. Solo el dueño.
+void handleUnclaim() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+
+  if (!peticionAutorizada()) {
+    responderNoAutorizado();
+    return;
+  }
+
+  prefs.begin("gymone", false);
+  prefs.remove("gym_id");
+  prefs.end();
+  gymIdVinculado = "";
+
+  Serial.println("[VINCULACION] Lector liberado: queda sin dueño.");
+  server.send(200, "application/json", "{\"ok\":true}");
+}
+
+// POST /api/network {"gym_id":"...","ip":"192.168.1.101","gateway":"192.168.1.1"}
+//
+// Le asigna a ESTE aparato su propia IP fija. Antes todos salían con la
+// misma (192.168.1.100), así que dos lectores en una red chocaban y ninguno
+// funcionaba bien. Solo el dueño puede cambiarla.
+void handleNetwork() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+
+  if (!peticionAutorizada()) {
+    responderNoAutorizado();
+    return;
+  }
+
+  DynamicJsonDocument doc(256);
+  if (deserializeJson(doc, server.arg("plain")) != DeserializationError::Ok) {
+    server.send(400, "application/json", "{\"error\":\"json invalido\"}");
+    return;
+  }
+
+  const char* ipTexto = doc["ip"];
+  if (ipTexto == nullptr) {
+    server.send(400, "application/json", "{\"error\":\"falta ip\"}");
+    return;
+  }
+
+  IPAddress nuevaIp;
+  if (!nuevaIp.fromString(ipTexto)) {
+    server.send(400, "application/json", "{\"error\":\"ip invalida\"}");
+    return;
+  }
+
+  prefs.begin("gymone", false);
+  prefs.putString("ip", ipTexto);
+  const char* gwTexto = doc["gateway"];
+  if (gwTexto != nullptr) {
+    IPAddress nuevoGw;
+    if (nuevoGw.fromString(gwTexto)) prefs.putString("gw", gwTexto);
+  }
+  prefs.end();
+
+  // Se responde ANTES de reiniciar y el reinicio se deja programado: cambiar
+  // la IP corta la conexión en curso, y sin este margen la app se quedaría
+  // esperando una respuesta que nunca llega.
+  server.sendHeader("Connection", "close");
+  server.send(200, "application/json",
+              "{\"ok\":true,\"reboot_in_ms\":1500}");
+  reinicioPendienteEn = millis() + 1500;
+}
+
+// Reset de fábrica con el botón BOOT, revisado desde el loop sin bloquear.
+//
+// El gesto es mantenerlo pulsado 5 s con el equipo YA ENCENDIDO. No se puede
+// hacer "pulsar al arrancar" porque GPIO0 es pin de strapping: en LOW durante
+// el arranque, el ESP32 entra en modo de descarga y este programa no corre.
+void revisarBotonReset() {
+  // Fuera de la ventana de arranque el botón no hace nada.
+  if (millis() - systemUptime > RESET_VENTANA_MS) {
+    botonPulsadoDesde = 0;
+    return;
+  }
+
+  // El botón lleva pull-up: pulsado = LOW.
+  bool pulsado = (digitalRead(BOTON_RESET_PIN) == LOW);
+
+  if (!pulsado) {
+    botonPulsadoDesde = 0;  // lo soltó antes de tiempo
+    return;
+  }
+
+  if (botonPulsadoDesde == 0) {
+    botonPulsadoDesde = millis();
+    tone(BUZZER_PIN, BUZZER_BEEP_HZ, 80);  // "te estoy oyendo"
+    return;
+  }
+
+  if (millis() - botonPulsadoDesde >= RESET_MANTENER_MS) {
+    Serial.println("[RESET] Borrando la vinculación y la IP guardada...");
+    prefs.begin("gymone", false);
+    prefs.clear();
+    prefs.end();
+
+    tone(BUZZER_PIN, BUZZER_BEEP_HZ, 600);  // confirmación larga
+    reinicioPendienteEn = millis() + 800;
+    botonPulsadoDesde = 0;
+  }
 }
 
 // =================== CONTROL DE SONIDO ===================

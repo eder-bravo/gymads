@@ -43,6 +43,118 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   final RxBool esp32Connected = false.obs;
   final RxString esp32StatusMessage = 'ESP32 desconectado'.obs;
 
+  // =================== VINCULACIÓN DEL LECTOR ===================
+  /// En qué estado está el lector respecto a ESTE gimnasio.
+  final Rx<EstadoLector> estadoLector = EstadoLector.sinConfigurar.obs;
+  final RxBool comprobandoLector = false.obs;
+
+  /// Pregunta al lector de [ip] (o al ya configurado) de quién es.
+  ///
+  /// El aparato no devuelve nunca el gym_id que tiene guardado —si lo hiciera,
+  /// el gimnasio de al lado podría copiarlo y suplantarlo—, así que contesta
+  /// con dos banderas: `claimed` (¿tiene dueño?) y `mine` (¿eres tú?).
+  Future<void> comprobarLector({String? ip}) async {
+    comprobandoLector.value = true;
+    try {
+      final info = await RfidConfig.getESP32Info(ip: ip);
+
+      if (info == null) {
+        estadoLector.value = EstadoLector.sinConexion;
+        esp32StatusMessage.value = 'El lector no responde';
+        return;
+      }
+
+      final bool vinculado = info['claimed'] == true;
+      final bool esMio = info['mine'] == true;
+
+      if (!vinculado) {
+        estadoLector.value = EstadoLector.libre;
+        esp32StatusMessage.value = 'Lector sin vincular';
+      } else if (esMio) {
+        estadoLector.value = EstadoLector.mio;
+        esp32StatusMessage.value = 'Vinculado a tu gimnasio';
+      } else {
+        estadoLector.value = EstadoLector.deOtroGimnasio;
+        esp32StatusMessage.value = 'Este lector es de otro gimnasio';
+      }
+    } finally {
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// Reclama el lector para este gimnasio.
+  Future<void> vincularLector(String ip) async {
+    comprobandoLector.value = true;
+    try {
+      final resultado = await RfidConfig.vincular(ip);
+
+      switch (resultado) {
+        case VinculacionResultado.ok:
+          estadoLector.value = EstadoLector.mio;
+          esp32IpAddress.value = ip;
+          SnackbarHelper.success(
+              'Listo', 'El lector quedó vinculado a tu gimnasio');
+          break;
+        case VinculacionResultado.deOtroGimnasio:
+          estadoLector.value = EstadoLector.deOtroGimnasio;
+          SnackbarHelper.error(
+              'No se pudo vincular',
+              'Ese lector ya pertenece a otro gimnasio. Su dueño tiene que '
+                  'liberarlo, o hay que reiniciarlo de fábrica con el botón.');
+          break;
+        case VinculacionResultado.sinConexion:
+          estadoLector.value = EstadoLector.sinConexion;
+          SnackbarHelper.error('Sin respuesta',
+              'El lector no contestó. Revisa que esté encendido y en la misma red.');
+          break;
+        case VinculacionResultado.sinSesion:
+          SnackbarHelper.error('Error', 'No hay un gimnasio en esta sesión.');
+          break;
+        case VinculacionResultado.error:
+          SnackbarHelper.error('Error', 'No se pudo vincular el lector.');
+          break;
+      }
+    } finally {
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// Libera el lector para que otro gimnasio pueda reclamarlo.
+  Future<void> desvincularLector() async {
+    comprobandoLector.value = true;
+    try {
+      if (await RfidConfig.desvincular()) {
+        estadoLector.value = EstadoLector.sinConfigurar;
+        esp32IpAddress.value = '';
+        esp32Connected.value = false;
+        SnackbarHelper.success('Listo', 'El lector quedó libre');
+      } else {
+        SnackbarHelper.error('Error', 'No se pudo desvincular el lector.');
+      }
+    } finally {
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// Le da al lector una IP fija propia.
+  ///
+  /// De fábrica todos traen la misma (192.168.1.100), así que dos lectores en
+  /// una red se estorban. El aparato reinicia para aplicarla.
+  Future<void> cambiarIpLector(String nuevaIp) async {
+    comprobandoLector.value = true;
+    try {
+      if (await RfidConfig.cambiarIp(nuevaIp)) {
+        esp32IpAddress.value = nuevaIp;
+        SnackbarHelper.success('Guardado',
+            'El lector se está reiniciando con la IP $nuevaIp. Tarda unos segundos.');
+      } else {
+        SnackbarHelper.error('Error', 'No se pudo cambiar la IP del lector.');
+      }
+    } finally {
+      comprobandoLector.value = false;
+    }
+  }
+
   // Variables para configuración de audio
   final RxBool soundEnabled = true.obs;
   final RxDouble soundVolume = 0.8.obs;
@@ -53,6 +165,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   final keyCategorias = GlobalKey();
   final keyAccesos = GlobalKey();
   final keyControlAccesos = GlobalKey();
+  final keyLector = GlobalKey();
 
   /// Las opciones de administración solo existen para el dueño.
   ///
@@ -76,6 +189,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
         if (can(Permission.gestionarCategorias)) keyCategorias,
         if (can(Permission.gestionarAccesosStaff)) keyAccesos,
         if (can(Permission.gestionarControlAccesos)) keyControlAccesos,
+        if (can(Permission.gestionarControlAccesos)) keyLector,
       ];
 
   @override
@@ -513,6 +627,11 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     Get.toNamed(Routes.CONTROL_ACCESOS);
   }
 
+  /// El lector de tarjetas: a qué IP está y a qué gimnasio pertenece.
+  void openLector() {
+    Get.toNamed(Routes.LECTOR);
+  }
+
   // =================== CONTROL DE ACCESOS ===================
 
   /// Copia editable de la configuración; se guarda al cambiar cada control.
@@ -798,4 +917,22 @@ class _ConfirmDeleteDialog extends StatelessWidget {
           ],
         ));
   }
+}
+
+/// Relación entre el lector configurado y el gimnasio de la sesión actual.
+enum EstadoLector {
+  /// Este gimnasio todavía no eligió ningún lector.
+  sinConfigurar,
+
+  /// Hay un lector y no tiene dueño: se puede reclamar.
+  libre,
+
+  /// Es de este gimnasio. El caso normal.
+  mio,
+
+  /// Existe, pero pertenece a otro gimnasio: no va a contestar los pases.
+  deOtroGimnasio,
+
+  /// No respondió: apagado, otra IP, u otra red.
+  sinConexion,
 }

@@ -23,6 +23,7 @@ abstract class Routes {
   static const CATEGORIAS = _Paths.CATEGORIAS;
   static const STAFF_ACCESOS = _Paths.STAFF_ACCESOS;
   static const CONTROL_ACCESOS = _Paths.CONTROL_ACCESOS;
+  static const LECTOR = _Paths.LECTOR;
   static const STAFF_CODE = _Paths.STAFF_CODE;
 }
 
@@ -48,5 +49,6 @@ abstract class _Paths {
   static const CATEGORIAS = '/inventario/categorias';
   static const STAFF_ACCESOS = '/configuracion/accesos';
   static const CONTROL_ACCESOS = '/configuracion/control-accesos';
+  static const LECTOR = '/configuracion/lector';
   static const STAFF_CODE = '/staff-code';
 }

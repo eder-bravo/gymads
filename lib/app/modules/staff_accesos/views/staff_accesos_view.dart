@@ -9,6 +9,7 @@ import '../../../global_widgets/app_header.dart';
 import '../controllers/staff_accesos_controller.dart';
 import 'codigo_generado_dialog.dart';
 import 'staff_acceso_form_dialog.dart';
+import '../../../core/widgets/centrado_desplazable.dart';
 
 /// Accesos del personal. Solo la ve el dueño del gimnasio.
 class StaffAccesosView extends GetView<StaffAccesosController> {
@@ -178,6 +179,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
   }) async {
     final result = await Get.dialog<bool>(
       AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(titulo,
@@ -217,7 +219,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
   // ============================================
 
   Widget _buildEmpty() {
-    return Center(
+    return CentradoDesplazable(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(

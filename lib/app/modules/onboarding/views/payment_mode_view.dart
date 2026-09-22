@@ -12,7 +12,7 @@ class PaymentModeView extends GetView<OnboardingController> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isTablet = MediaQuery.of(context).size.width > 600;
+    final bool isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
 
     return PopScope(
       canPop: false,

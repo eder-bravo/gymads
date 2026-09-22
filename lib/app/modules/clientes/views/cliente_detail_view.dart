@@ -21,7 +21,9 @@ class ClienteDetailView extends GetView<ClientesController> {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
       appBar: const GymAppBar(title: 'Detalles del Cliente'),
-      body: SingleChildScrollView(
+      // SafeArea: de lado, el notch tapaba el borde izquierdo de la ficha.
+      body: SafeArea(
+        child: SingleChildScrollView(
         child: Column(
           children: [
             // Cabecera con foto y nombre
@@ -45,6 +47,7 @@ class ClienteDetailView extends GetView<ClientesController> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
       ),
     );
   }
@@ -506,6 +509,7 @@ class ClienteDetailView extends GetView<ClientesController> {
   void _deleteCliente() {
     Get.dialog(
       AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(

@@ -20,7 +20,7 @@ class ButtonMenuWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Utilizamos utilidades responsivas
-    final bool isSmallPhone = MediaQuery.of(context).size.width < 360;
+    final bool isSmallPhone = MediaQuery.sizeOf(context).shortestSide < 360;
     final iconSize = ResponsiveValues.getIconSize(context,
       mobile: 34,
       smallPhone: 28,

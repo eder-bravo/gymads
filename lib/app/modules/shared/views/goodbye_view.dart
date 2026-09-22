@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/widgets/centrado_desplazable.dart';
 
 class GoodbyeView extends StatefulWidget {
   const GoodbyeView({super.key});
@@ -68,7 +69,8 @@ class _GoodbyeViewState extends State<GoodbyeView>
             opacity: _fadeAnimation,
             child: ScaleTransition(
               scale: _scaleAnimation,
-              child: Center(
+              // Desplazable: de lado, el icono y los textos no caben a lo alto.
+              child: CentradoDesplazable(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

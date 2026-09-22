@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/main.dart' show rootScaffoldMessengerKey;
 import '../models/user_model.dart';
@@ -48,6 +49,50 @@ class BackgroundRfidService extends GetxService {
   /// su propia fila en `access_logs` por un único pase de tarjeta.
   final atiendeLector = false.obs;
 
+  /// Por qué este dispositivo no atiende el lector, para decírselo a la
+  /// persona en la pantalla del lector. Null si sí lo atiende.
+  final motivoSinAvisos = RxnString();
+
+  /// El dueño o el encargado pidieron recibir los avisos en este teléfono
+  /// aunque haya alguien de mostrador.
+  ///
+  /// Hace falta porque "hay un mostrador activo" no significa "hay un
+  /// mostrador con la app abierta": un perfil de mostrador que no está en el
+  /// gimnasio dejaba a todos sin avisos.
+  ///
+  /// Se guarda en el teléfono y por gimnasio: es una decisión sobre este
+  /// aparato, no un dato del negocio.
+  final recibirAvisosAqui = false.obs;
+
+  static String? _claveAvisosAqui() {
+    final gymId = TenantContextService.to.currentGymId;
+    return gymId == null ? null : 'lector_avisos_aqui_$gymId';
+  }
+
+  Future<void> _cargarPreferenciaAvisos() async {
+    final clave = _claveAvisosAqui();
+    if (clave == null) {
+      recibirAvisosAqui.value = false;
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    recibirAvisosAqui.value = prefs.getBool(clave) ?? false;
+  }
+
+  /// Activa o desactiva los avisos en este teléfono y lo aplica al momento,
+  /// sin reiniciar la app.
+  Future<void> setRecibirAvisosAqui(bool valor) async {
+    final clave = _claveAvisosAqui();
+    if (clave == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(clave, valor);
+    recibirAvisosAqui.value = valor;
+
+    stopScanning();
+    await startScanning();
+  }
+
   /// Decide si este dispositivo atiende el lector.
   ///
   /// Respaldo deliberado: si el gimnasio todavía no tiene a nadie en
@@ -55,15 +100,24 @@ class BackgroundRfidService extends GetxService {
   /// trabaja solo se quedaría sin ningún aviso.
   Future<void> resolverDestinatario() async {
     final tenant = TenantContextService.to;
+    await _cargarPreferenciaAvisos();
 
     if (tenant.can(Permission.recibirAlertasNfc)) {
-      atiendeLector.value = true;
+      _atender();
+      return;
+    }
+
+    // Mismo permiso que abre la pantalla del lector, donde está el
+    // interruptor: dueño y encargado.
+    if (recibirAvisosAqui.value &&
+        tenant.can(Permission.gestionarControlAccesos)) {
+      _atender();
       return;
     }
 
     final gymId = tenant.currentGymId;
     if (tenant.rol != StaffRole.ownerAdmin || gymId == null) {
-      atiendeLector.value = false;
+      _noAtender('Tu rol no recibe los avisos del lector.');
       return;
     }
 
@@ -76,13 +130,27 @@ class BackgroundRfidService extends GetxService {
           .eq('is_active', true)
           .limit(1);
 
-      atiendeLector.value = (filas as List).isEmpty;
+      if ((filas as List).isEmpty) {
+        _atender();
+      } else {
+        _noAtender('Los avisos los recibe el personal de mostrador.');
+      }
     } catch (e) {
       // Sin respuesta se atiende igual: perder un aviso es peor que duplicarlo.
       AppLogger.warning('BackgroundRfidService',
           'No se pudo consultar el mostrador; el dueño atiende el lector');
-      atiendeLector.value = true;
+      _atender();
     }
+  }
+
+  void _atender() {
+    atiendeLector.value = true;
+    motivoSinAvisos.value = null;
+  }
+
+  void _noAtender(String motivo) {
+    atiendeLector.value = false;
+    motivoSinAvisos.value = motivo;
   }
 
   /// Método para mostrar notificación usando el ScaffoldMessenger global

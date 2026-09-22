@@ -51,8 +51,11 @@ class _CodigoGeneradoDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: AppColors.cardBackground,
+      // Ancho de diálogo aunque el teléfono esté de lado, y desplazable si
+      // no cabe a lo alto.
+      constraints: const BoxConstraints(minWidth: 280, maxWidth: 420),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,

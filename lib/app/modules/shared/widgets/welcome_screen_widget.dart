@@ -79,30 +79,38 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
     if (!widget.isVisible) return const SizedBox.shrink();
 
     // Determinar si es una tableta basado en el ancho de la pantalla
-    final bool isTabletSize = MediaQuery.of(context).size.width > 600;
-    final bool isSmallPhone = MediaQuery.of(context).size.width < 360;
+    final bool isTabletSize = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final bool isSmallPhone = MediaQuery.sizeOf(context).shortestSide < 360;
 
     return _buildWelcomeScreen(context, isTabletSize, isSmallPhone);
   }
 
   Widget _buildWelcomeScreen(BuildContext context, bool isTabletSize, bool isSmallPhone) {
     // Tamaños responsivos para pantalla de bienvenida
-    final titleSize = isTabletSize
-        ? 60.0
-        : (isSmallPhone ? 36.0 : 48.0);
+    // Con el teléfono de lado la pantalla es muy baja: la foto y el título,
+    // a tamaño normal, empujaban los días restantes fuera de la vista. Se
+    // reduce todo en proporción para que el aviso se lea sin desplazarse.
+    final escala = MediaQuery.sizeOf(context).height < 500 ? 0.55 : 1.0;
+
+    final titleSize = (isTabletSize
+            ? 60.0
+            : (isSmallPhone ? 36.0 : 48.0)) *
+        escala;
     
-    final nameSize = isTabletSize
-        ? 42.0
-        : (isSmallPhone ? 28.0 : 36.0);
+    final nameSize = (isTabletSize
+            ? 42.0
+            : (isSmallPhone ? 28.0 : 36.0)) *
+        escala;
     
     final infoTextSize = isTabletSize
         ? 24.0
         : (isSmallPhone ? 18.0 : 20.0);
     
     // Tamaño del círculo con foto
-    final photoSize = isTabletSize
-        ? 320.0
-        : (isSmallPhone ? 180.0 : 250.0);
+    final photoSize = (isTabletSize
+            ? 320.0
+            : (isSmallPhone ? 180.0 : 250.0)) *
+        escala;
 
     return Container(
       color: Colors.black.withOpacity(0.95),
@@ -149,7 +157,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                             ? '¡Hasta pronto!'
                                             : '¡Bienvenido!',
                                 style: TextStyle(
-                                  fontSize: widget.isNotFound ? (isTabletSize ? 50.0 : (isSmallPhone ? 30.0 : 40.0)) : titleSize,
+                                  fontSize: widget.isNotFound ? (isTabletSize ? 50.0 : (isSmallPhone ? 30.0 : 40.0)) * escala : titleSize,
                                   fontWeight: FontWeight.bold,
                                   color: widget.isNotFound ? Colors.redAccent : (widget.isExpired ? Colors.redAccent : Colors.white),
                                   shadows: [
@@ -165,7 +173,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                           );
                         }
                       ),
-                      SizedBox(height: isTabletSize ? 40 : 32),
+                      SizedBox(height: (isTabletSize ? 40 : 32) * escala),
                       
                       // Foto del usuario con efecto de aura
                       TweenAnimationBuilder<double>(

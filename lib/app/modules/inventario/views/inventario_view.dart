@@ -7,6 +7,7 @@ import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/core/utils/category_icons.dart';
 import 'package:gymads/app/core/widgets/tour_step.dart';
 import '../../../core/permissions/permissions.dart';
+import '../../../core/widgets/cabecera_con_lista.dart';
 import '../../../core/widgets/refrescable.dart';
 import '../controllers/inventario_controller.dart';
 import 'stock_adjust_dialog.dart';
@@ -77,8 +78,8 @@ class InventarioView extends GetView<InventarioController> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
+        child: CabeceraConLista(
+          cabecera: [
             _buildStatsSection(),
             _buildFaltantesBanner(),
             TourStep(
@@ -89,17 +90,15 @@ class InventarioView extends GetView<InventarioController> {
               child: _buildSearchBar(),
             ),
             _buildCategoryFilter(),
-            Expanded(
-              child: TourStep(
-                tourKey: controller.keyLista,
-                title: 'Tus productos',
-                description: 'Toca un producto para ver su detalle, editarlo '
-                    'o registrar entradas y salidas de stock.',
-                isLastStep: controller.esUltimoPasoDelTour(controller.keyLista),
-                child: _buildProductList(),
-              ),
-            ),
           ],
+          lista: TourStep(
+            tourKey: controller.keyLista,
+            title: 'Tus productos',
+            description: 'Toca un producto para ver su detalle, editarlo '
+                'o registrar entradas y salidas de stock.',
+            isLastStep: controller.esUltimoPasoDelTour(controller.keyLista),
+            child: _buildProductList(),
+          ),
         ),
       ),
     );
@@ -133,6 +132,7 @@ class InventarioView extends GetView<InventarioController> {
 
     final agregar = await Get.dialog<bool>(
       AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Código no registrado',
@@ -636,6 +636,7 @@ class InventarioView extends GetView<InventarioController> {
   void _showProductDetail(Product product) {
     Get.dialog(
       AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.cardBackground,
         title: Text(product.name,
             style: const TextStyle(color: AppColors.textPrimary)),

@@ -125,9 +125,17 @@ class _MyAppState extends State<MyApp> {
         if (connected) {
           AppLogger.info(
               'Main', 'RFID conectado. Iniciando escaneo en segundo plano');
-          Get.find<BackgroundRfidService>().startScanning();
-          AppLogger.info(
-              'Main', 'Servicio de escaneo RFID iniciado correctamente');
+          final servicio = Get.find<BackgroundRfidService>();
+          await servicio.startScanning();
+          // startScanning() no arranca si a este teléfono no le tocan los
+          // avisos; decir "iniciado" en ese caso escondía el motivo real.
+          if (servicio.isScanning.value) {
+            AppLogger.info(
+                'Main', 'Servicio de escaneo RFID iniciado correctamente');
+          } else {
+            AppLogger.info('Main',
+                'Este teléfono no recibe los avisos del lector: ${servicio.motivoSinAvisos.value ?? 'sin motivo'}');
+          }
         } else {
           AppLogger.warning('Main', 'No se pudo conectar al lector RFID');
         }

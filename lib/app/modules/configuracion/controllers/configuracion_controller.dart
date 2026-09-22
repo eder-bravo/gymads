@@ -723,6 +723,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   void logout() {
     Get.dialog(
       AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.cardBackground,
         title: const Text(
           'Cerrar Sesión',
@@ -785,6 +786,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     // First confirmation
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.cardBackground,
         title: Row(
           children: [
@@ -894,6 +896,7 @@ class _ConfirmDeleteDialog extends StatelessWidget {
     final isMatch = false.obs;
 
     return Obx(() => AlertDialog(
+          scrollable: true,
           backgroundColor: AppColors.cardBackground,
           title: const Text(
             'Confirmar eliminación',

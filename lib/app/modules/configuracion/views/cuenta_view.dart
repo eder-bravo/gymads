@@ -384,6 +384,7 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       backgroundColor: AppColors.cardBackground,
       title: Text(
         'Editar ${widget.title}',

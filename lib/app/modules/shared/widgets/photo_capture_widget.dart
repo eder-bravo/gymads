@@ -31,6 +31,7 @@ class PhotoCaptureWidget extends StatelessWidget {
         showDialog(
           context: Get.context!,
           builder: (context) => AlertDialog(
+            scrollable: true,
             title: const Text('Permiso de Cámara Requerido'),
             content: const Text(
               'Para tomar la foto del usuario, necesitamos acceso a la cámara.',

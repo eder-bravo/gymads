@@ -18,7 +18,7 @@ class HomeView extends GetView<HomeController> {
     // `sizeOf` y no `of`: este último crea dependencia con el MediaQueryData
     // entero —`viewInsets` incluido—, así que la animación del teclado
     // reconstruía esta pantalla en cada frame aunque estuviera oculta debajo.
-    final bool isTablet = MediaQuery.sizeOf(context).width > 600;
+    final bool isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
 
     // Asistente inicial / tour de bienvenida. Va aquí además de en onReady
     // porque al volver del asistente GetX puede reutilizar el controlador; la
@@ -238,28 +238,32 @@ class HomeView extends GetView<HomeController> {
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
-      child: GridView.builder(
-        padding: EdgeInsets.zero,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: isTablet ? 4 : 2,
-          crossAxisSpacing: isTablet ? 16 : 12,
-          mainAxisSpacing: isTablet ? 16 : 12,
-          childAspectRatio: isTablet ? 1.1 : 1.05,
-        ),
-        itemCount: modules.length,
-        itemBuilder: (context, index) {
-          final module = modules[index];
-          return TourStep(
-            tourKey: module.showcaseKey,
-            title: module.label,
-            description: module.tourDescription,
-            borderRadius: 20,
-            child: _ModuleCard(module: module),
-          );
-        },
-      ),
+      // Columnas según el ANCHO disponible (un teléfono de lado cabe en 4),
+      // y alto fijo según el contenido de la tarjeta. Con una proporción
+      // ancho/alto, las tarjetas angostas quedaban más bajas que su contenido.
+      child: LayoutBuilder(
+          builder: (context, constraints) => GridView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: constraints.maxWidth >= 600 ? 4 : 2,
+                  crossAxisSpacing: isTablet ? 16 : 12,
+                  mainAxisSpacing: isTablet ? 16 : 12,
+                  mainAxisExtent: isTablet ? 180 : 165,
+                ),
+                itemCount: modules.length,
+                itemBuilder: (context, index) {
+                  final module = modules[index];
+                  return TourStep(
+                    tourKey: module.showcaseKey,
+                    title: module.label,
+                    description: module.tourDescription,
+                    borderRadius: 20,
+                    child: _ModuleCard(module: module),
+                  );
+                },
+              )),
     );
   }
 
@@ -466,7 +470,7 @@ class _ModuleCardState extends State<_ModuleCard>
   @override
   Widget build(BuildContext context) {
     final m = widget.module;
-    final isTablet = MediaQuery.of(context).size.width > 600;
+    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
 
     return AnimatedBuilder(
       animation: _scaleAnim,
@@ -538,6 +542,8 @@ class _ModuleCardState extends State<_ModuleCard>
                 // Text
                 Text(
                   m.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: isTablet ? 17 : 16,
                     fontWeight: FontWeight.w700,
@@ -548,6 +554,8 @@ class _ModuleCardState extends State<_ModuleCard>
                 const SizedBox(height: 3),
                 Text(
                   m.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: isTablet ? 13 : 11,
                     color: AppColors.textSecondary.withOpacity(0.7),

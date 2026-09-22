@@ -375,6 +375,7 @@ class PointOfSaleController extends GetxController with ScreenTourMixin {
 
     final confirmado = await Get.dialog<bool>(
           AlertDialog(
+            scrollable: true,
             backgroundColor: AppColors.cardBackground,
             title: const Text('Sin existencias',
                 style: TextStyle(color: AppColors.textPrimary)),

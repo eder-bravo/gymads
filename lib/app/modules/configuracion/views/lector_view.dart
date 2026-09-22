@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/permissions/permissions.dart';
 import '../../../data/config/rfid_config.dart';
+import '../../../data/services/background_rfid_service.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
 
@@ -65,6 +67,11 @@ class _LectorViewState extends State<LectorView> {
               Obx(() => _acciones()),
               const SizedBox(height: 24),
               _interruptorLector(),
+              if (controller.can(Permission.gestionarControlAccesos) &&
+                  Get.isRegistered<BackgroundRfidService>()) ...[
+                const SizedBox(height: 12),
+                _interruptorAvisosAqui(),
+              ],
               const SizedBox(height: 24),
               _ayuda(),
             ],
@@ -301,6 +308,7 @@ class _LectorViewState extends State<LectorView> {
   Future<void> _confirmarDesvincular() async {
     final confirmado = await Get.dialog<bool>(
       AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Desvincular el lector',
@@ -332,6 +340,7 @@ class _LectorViewState extends State<LectorView> {
   Future<void> _confirmarFormateo() async {
     final confirmado = await Get.dialog<bool>(
       AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Formatear el lector',
@@ -368,6 +377,7 @@ class _LectorViewState extends State<LectorView> {
     // conviene avisar antes: durante unos segundos parecerá que no responde.
     final confirmado = await Get.dialog<bool>(
       AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Cambiar la IP',
@@ -432,6 +442,59 @@ class _LectorViewState extends State<LectorView> {
             },
           ),
         ));
+  }
+
+  /// Recibir los avisos del lector en este teléfono aunque haya alguien de
+  /// mostrador.
+  ///
+  /// Por defecto los avisos le tocan al mostrador. Si ese teléfono no está
+  /// en el gimnasio (o el perfil de mostrador es de prueba), nadie los
+  /// recibía; esto permite que el dueño o el encargado los tomen.
+  Widget _interruptorAvisosAqui() {
+    final servicio = Get.find<BackgroundRfidService>();
+
+    return Obx(() {
+      final activo = servicio.recibirAvisosAqui.value;
+      final atiende = servicio.atiendeLector.value;
+      final motivo = servicio.motivoSinAvisos.value;
+
+      final String detalle;
+      if (atiende && activo) {
+        detalle = 'Este teléfono recibe los avisos del lector. Si el '
+            'mostrador también tiene la app abierta, el aviso sale en los '
+            'dos; la entrada se registra una sola vez.';
+      } else if (atiende) {
+        detalle = 'Este teléfono ya recibe los avisos del lector.';
+      } else {
+        detalle = '${motivo ?? 'Este teléfono no recibe los avisos.'} '
+            'Actívalo para recibirlos aquí también.';
+      }
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: activo,
+          activeColor: AppColors.accent,
+          title: const Text('Recibir avisos en este teléfono',
+              style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600)),
+          subtitle: Text(
+            detalle,
+            style: TextStyle(
+                color: AppColors.textSecondary.withOpacity(0.8),
+                fontSize: 13),
+          ),
+          onChanged: servicio.setRecibirAvisosAqui,
+        ),
+      );
+    });
   }
 
   Widget _ayuda() {

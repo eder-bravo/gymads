@@ -7,6 +7,7 @@ import '../../../core/widgets/periodo_selector.dart';
 import '../controllers/ingresos_controller.dart';
 import '../widgets/transaction_tile.dart';
 import 'todas_transacciones_view.dart';
+import '../../../core/widgets/cabecera_con_lista.dart';
 
 class IngresosView extends GetView<IngresosController> {
   const IngresosView({super.key});
@@ -40,8 +41,8 @@ class IngresosView extends GetView<IngresosController> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
+        child: CabeceraConLista(
+          cabecera: [
             // Periodo: día, semana, mes o rango a medida
             TourStep(
               tourKey: controller.keyPeriodo,
@@ -98,24 +99,21 @@ class IngresosView extends GetView<IngresosController> {
               ),
             ),
             const SizedBox(height: 8),
-
-            // Lista de transacciones a pantalla completa
-            Expanded(
-              child: TourStep(
-                tourKey: controller.keyLista,
-                title: 'Transacciones',
-                description: 'Cada cobro registrado, con su fecha, su monto y '
-                    'de dónde vino.',
-                isLastStep: true,
-                child: _buildTransactionsList(),
-              ),
-            ),
           ],
+
+          // Lista de transacciones a pantalla completa
+          lista: TourStep(
+            tourKey: controller.keyLista,
+            title: 'Transacciones',
+            description: 'Cada cobro registrado, con su fecha, su monto y '
+                'de dónde vino.',
+            isLastStep: true,
+            child: _buildTransactionsList(),
+          ),
         ),
       ),
     );
   }
-
 
   // ─────────────────────────────────────────────────────────
   // TOTAL DEL MES
@@ -235,5 +233,4 @@ class IngresosView extends GetView<IngresosController> {
     controller.fetchTodasLasTransacciones();
     Get.to(() => const TodasTransaccionesView());
   }
-
 }

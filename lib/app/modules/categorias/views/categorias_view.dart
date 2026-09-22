@@ -7,6 +7,7 @@ import '../../../data/models/product_model.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/categorias_controller.dart';
 import 'category_form_dialog.dart';
+import '../../../core/widgets/centrado_desplazable.dart';
 
 /// Pantalla de gestión de categorías de producto.
 class CategoriasView extends GetView<CategoriasController> {
@@ -41,7 +42,7 @@ class CategoriasView extends GetView<CategoriasController> {
   }
 
   Widget _buildEmpty() {
-    return Center(
+    return CentradoDesplazable(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
@@ -250,6 +251,7 @@ class CategoriasView extends GetView<CategoriasController> {
 
     Get.dialog(
       AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(

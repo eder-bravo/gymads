@@ -7,6 +7,8 @@ import '../../../core/utils/hora_formato.dart';
 import '../../../core/widgets/periodo_selector.dart';
 import '../../../core/widgets/tour_step.dart';
 import '../../../global_widgets/app_header.dart';
+import '../../../core/widgets/cabecera_con_lista.dart';
+import '../../../core/widgets/centrado_desplazable.dart';
 
 class AccessLogsView extends GetView<AccessLogsController> {
   const AccessLogsView({super.key});
@@ -40,8 +42,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
+        child: CabeceraConLista(
+          cabecera: [
             // Periodo: día, semana, mes o rango a medida
             TourStep(
               tourKey: controller.keyPeriodo,
@@ -67,19 +69,17 @@ class AccessLogsView extends GetView<AccessLogsController> {
                 ],
               ),
             ),
-
-            // Lista de logs
-            Expanded(
-              child: TourStep(
-                tourKey: controller.keyLista,
-                title: 'Historial de accesos',
-                description: 'Quién entró al gimnasio, a qué hora y quién lo '
-                    'registró. Desliza hacia abajo para actualizar.',
-                isLastStep: true,
-                child: _buildLogsList(),
-              ),
-            ),
           ],
+
+          // Lista de logs
+          lista: TourStep(
+            tourKey: controller.keyLista,
+            title: 'Historial de accesos',
+            description: 'Quién entró al gimnasio, a qué hora y quién lo '
+                'registró. Desliza hacia abajo para actualizar.',
+            isLastStep: true,
+            child: _buildLogsList(),
+          ),
         ),
       ),
     );
@@ -273,7 +273,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Obx(() {
         if (controller.isLoading.value) {
-          return Center(
+          return CentradoDesplazable(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -289,7 +289,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
         }
 
         if (controller.errorMessage.value.isNotEmpty) {
-          return Center(
+          return CentradoDesplazable(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -324,7 +324,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
 
         // Mostrar todos los logs sin filtros
         if (controller.accessLogs.isEmpty) {
-          return Center(
+          return CentradoDesplazable(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

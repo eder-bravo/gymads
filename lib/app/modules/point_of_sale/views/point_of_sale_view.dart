@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../core/utils/category_icons.dart';
 import '../../../core/widgets/tour_step.dart';
+import '../../../core/widgets/cabecera_con_lista.dart';
 import '../../../core/widgets/refrescable.dart';
 import '../../../global_widgets/app_header.dart';
 
@@ -35,97 +36,107 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       body: SafeArea(
         child: Column(
           children: [
-            // Barra de búsqueda
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: TourStep(
-                tourKey: controller.keyBuscar,
-                title: 'Buscador',
-                description: 'Encuentra un producto por su nombre sin tener '
-                    'que recorrer toda la lista.',
-                isFirstStep: true,
-                child: AppSearchField(
-                  hintText: 'Buscar productos...',
-                  onChanged: controller.searchProducts,
-                ),
-              ),
-            ),
-
-            // Filtro de categorías
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: TourStep(
-                tourKey: controller.keyCategorias,
-                title: 'Categorías',
-                description: 'Filtra los productos por categoría para llegar '
-                    'más rápido a lo que vendes a diario.',
-                child: Obx(() => CategoryFilterChips(
-                      categories: controller.activeCategories
-                          .map((c) => CategoryChipData(
-                                id: c.id,
-                                label: c.name,
-                                icon: CategoryIcons.resolve(c.icon),
-                              ))
-                          .toList(),
-                      selectedId: controller.selectedCategoryId,
-                      onSelected: controller.setSelectedCategory,
-                    )),
-              ),
-            ),
-
-            // Grid de productos
             Expanded(
-              child: TourStep(
-                tourKey: controller.keyProductos,
-                title: 'Tus productos',
-                description: 'Toca un producto para agregarlo a la venta. '
-                    'Déjalo presionado para fijarlo arriba y tener a mano lo '
-                    'que más vendes.',
-                child: Obx(() {
-                  if (controller.isLoading) {
-                    return const Center(
-                      child: CircularProgressIndicator(color: AppColors.accent),
-                    );
-                  }
-
-                  final products = controller.filteredProducts;
-
-                  if (products.isEmpty) {
-                    return Refrescable.centrado(
-                      onRefresh: controller.refrescar,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inventory_2_outlined,
-                              size: 64, color: AppColors.textSecondary),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No hay productos disponibles',
-                            style: TextStyle(color: AppColors.textSecondary),
-                          ),
-                        ],
+              child: CabeceraConLista(
+                cabecera: [
+                  // Barra de búsqueda
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                    child: TourStep(
+                      tourKey: controller.keyBuscar,
+                      title: 'Buscador',
+                      description:
+                          'Encuentra un producto por su nombre sin tener '
+                          'que recorrer toda la lista.',
+                      isFirstStep: true,
+                      child: AppSearchField(
+                        hintText: 'Buscar productos...',
+                        onChanged: controller.searchProducts,
                       ),
-                    );
-                  }
-
-                  final isTablet = MediaQuery.of(context).size.width > 600;
-                  return Refrescable(
-                    onRefresh: controller.refrescar,
-                    child: GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: isTablet ? 4 : 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.8,
-                      ),
-                      itemCount: products.length,
-                      itemBuilder: (context, index) {
-                        return _buildProductCard(products[index]);
-                      },
                     ),
-                  );
-                }),
+                  ),
+
+                  // Filtro de categorías
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: TourStep(
+                      tourKey: controller.keyCategorias,
+                      title: 'Categorías',
+                      description:
+                          'Filtra los productos por categoría para llegar '
+                          'más rápido a lo que vendes a diario.',
+                      child: Obx(() => CategoryFilterChips(
+                            categories: controller.activeCategories
+                                .map((c) => CategoryChipData(
+                                      id: c.id,
+                                      label: c.name,
+                                      icon: CategoryIcons.resolve(c.icon),
+                                    ))
+                                .toList(),
+                            selectedId: controller.selectedCategoryId,
+                            onSelected: controller.setSelectedCategory,
+                          )),
+                    ),
+                  ),
+                ],
+                // Grid de productos
+                lista: TourStep(
+                  tourKey: controller.keyProductos,
+                  title: 'Tus productos',
+                  description: 'Toca un producto para agregarlo a la venta. '
+                      'Déjalo presionado para fijarlo arriba y tener a mano lo '
+                      'que más vendes.',
+                  child: Obx(() {
+                    if (controller.isLoading) {
+                      return const Center(
+                        child:
+                            CircularProgressIndicator(color: AppColors.accent),
+                      );
+                    }
+
+                    final products = controller.filteredProducts;
+
+                    if (products.isEmpty) {
+                      return Refrescable.centrado(
+                        onRefresh: controller.refrescar,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.inventory_2_outlined,
+                                size: 64, color: AppColors.textSecondary),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No hay productos disponibles',
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return Refrescable(
+                      onRefresh: controller.refrescar,
+                      child: GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        // Columnas según el ancho disponible (2 en un teléfono
+                        // vertical, más de lado o en tablet) y alto fijo según
+                        // el contenido. Con una proporción ancho/alto, una
+                        // tarjeta ancha y baja no cabía.
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 220,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          mainAxisExtent: 220,
+                        ),
+                        itemCount: products.length,
+                        itemBuilder: (context, index) {
+                          return _buildProductCard(products[index]);
+                        },
+                      ),
+                    );
+                  }),
+                ),
               ),
             ),
 
@@ -443,6 +454,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      // Sin esto, de lado la hoja llega hasta debajo de la barra de estado.
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         padding: EdgeInsets.only(
@@ -452,7 +465,9 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
           color: AppColors.cardBackground,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Padding(
+        // Desplazable: de lado, o con el teclado abierto para la referencia,
+        // el resumen y los métodos de pago no caben.
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -878,12 +893,11 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               ),
             ],
           ),
-
           if (controller.referenciasSugeridas.isNotEmpty) ...[
             const SizedBox(height: 8),
             const Text('Referencias encontradas — toca la correcta:',
-                style: TextStyle(
-                    color: AppColors.textSecondary, fontSize: 12.5)),
+                style:
+                    TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,

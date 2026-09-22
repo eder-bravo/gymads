@@ -372,6 +372,7 @@ class InventarioController extends GetxController with ScreenTourMixin {
       // Mostrar confirmación antes de eliminar permanentemente
       final confirmed = await Get.dialog<bool>(
         AlertDialog(
+          scrollable: true,
           title: Text(
             'Eliminar Producto',
             style: TextStyle(

@@ -9,6 +9,8 @@ import 'package:intl/intl.dart';
 
 import '../../../core/widgets/refrescable.dart';
 import '../controllers/abonar_controller.dart';
+import '../../../core/widgets/centrado_desplazable.dart';
+import '../../../core/widgets/cabecera_con_lista.dart';
 
 class AbonarView extends GetView<AbonarController> {
   const AbonarView({super.key});
@@ -143,8 +145,10 @@ class AbonarView extends GetView<AbonarController> {
   Widget _buildAbonarForm() {
     final client = controller.selectedClient.value!;
 
-    return Column(
-      children: [
+    // La cabecera del cliente deja de estar fija cuando falta altura
+    // (teléfono de lado, o el teclado abierto al escribir el monto).
+    return CabeceraConLista(
+      cabecera: [
         // Cabecera Cliente
         Container(
           padding: const EdgeInsets.all(20),
@@ -198,167 +202,159 @@ class AbonarView extends GetView<AbonarController> {
             ],
           ),
         ),
-
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Detalles del Abono',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.titleColor,
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Selector de precio fijo / libre
-                _buildModoToggle(),
-                const SizedBox(height: 20),
-
-                // Cantidad, periodo y precio unitario
-                _buildCamposAbono(),
-
-                // Total a pagar (solo lectura)
-                Obx(() {
-                  final currency =
-                      NumberFormat.currency(locale: 'es_MX', symbol: '\$');
-                  final total = controller.totalAmount;
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border:
-                          Border.all(color: AppColors.accent.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Total a Pagar',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          currency.format(total),
-                          style: const TextStyle(
-                            color: AppColors.accent,
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                const SizedBox(height: 20),
-
-                // Metodo de pago
-                Obx(() => DropdownButtonFormField<String>(
-                      value: controller.paymentMethod.value,
-                      decoration: InputDecoration(
-                        labelText: 'Método de Pago',
-                        prefixIcon: const Icon(Icons.payments_outlined,
-                            color: AppColors.accent),
-                        filled: true,
-                        fillColor: AppColors.containerBackground,
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16)),
-                      ),
-                      dropdownColor: AppColors.cardBackground,
-                      style: const TextStyle(color: AppColors.textPrimary),
-                      items: controller.paymentMethods.map((method) {
-                        return DropdownMenuItem(
-                            value: method, child: Text(method));
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) controller.paymentMethod.value = val;
-                      },
-                    )),
-                const SizedBox(height: 30),
-
-                // Proyección de Fecha
-                Obx(() {
-                  final newExp = controller.calculateNewExpirationDate();
-                  final formattedDate = DateFormat('dd/MM/yyyy').format(newExp);
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.info.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border:
-                          Border.all(color: AppColors.info.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.event_available,
-                            color: AppColors.info),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Nueva Fecha de Expiración',
-                                style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12),
-                              ),
-                              Text(
-                                formattedDate,
-                                style: const TextStyle(
-                                  color: AppColors.info,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                const SizedBox(height: 40),
-
-                // Botón Enviar
-                Obx(() => ElevatedButton(
-                      onPressed: controller.isLoading.value
-                          ? null
-                          : () => controller.procesarAbono(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: controller.isLoading.value
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Registrar Abono',
-                              style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                            ),
-                    )),
-              ],
-            ),
-          ),
-        ),
       ],
+      lista: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Detalles del Abono',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.titleColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Selector de precio fijo / libre
+            _buildModoToggle(),
+            const SizedBox(height: 20),
+
+            // Cantidad, periodo y precio unitario
+            _buildCamposAbono(),
+
+            // Total a pagar (solo lectura)
+            Obx(() {
+              final currency =
+                  NumberFormat.currency(locale: 'es_MX', symbol: '\$');
+              final total = controller.totalAmount;
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total a Pagar',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      currency.format(total),
+                      style: const TextStyle(
+                        color: AppColors.accent,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 20),
+
+            // Metodo de pago
+            Obx(() => DropdownButtonFormField<String>(
+                  value: controller.paymentMethod.value,
+                  decoration: InputDecoration(
+                    labelText: 'Método de Pago',
+                    prefixIcon: const Icon(Icons.payments_outlined,
+                        color: AppColors.accent),
+                    filled: true,
+                    fillColor: AppColors.containerBackground,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                  dropdownColor: AppColors.cardBackground,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  items: controller.paymentMethods.map((method) {
+                    return DropdownMenuItem(value: method, child: Text(method));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) controller.paymentMethod.value = val;
+                  },
+                )),
+            const SizedBox(height: 30),
+
+            // Proyección de Fecha
+            Obx(() {
+              final newExp = controller.calculateNewExpirationDate();
+              final formattedDate = DateFormat('dd/MM/yyyy').format(newExp);
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_available, color: AppColors.info),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Nueva Fecha de Expiración',
+                            style: TextStyle(
+                                color: AppColors.textSecondary, fontSize: 12),
+                          ),
+                          Text(
+                            formattedDate,
+                            style: const TextStyle(
+                              color: AppColors.info,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 40),
+
+            // Botón Enviar
+            Obx(() => ElevatedButton(
+                  onPressed: controller.isLoading.value
+                      ? null
+                      : () => controller.procesarAbono(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: controller.isLoading.value
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text(
+                          'Registrar Abono',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
+                        ),
+                )),
+          ],
+        ),
+      ),
     );
   }
 
@@ -531,7 +527,7 @@ class AbonarView extends GetView<AbonarController> {
 
   Widget _buildSuccessState() {
     final client = controller.selectedClient.value!;
-    return Center(
+    return CentradoDesplazable(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(

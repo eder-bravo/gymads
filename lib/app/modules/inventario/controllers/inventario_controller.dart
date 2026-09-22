@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:gymads/app/core/permissions/permissions.dart';
+import 'package:gymads/app/core/widgets/escaner_codigo_view.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/auth_utils.dart';
 import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
@@ -181,11 +182,39 @@ class InventarioController extends GetxController with ScreenTourMixin {
     }
   }
 
+  /// Busca un producto por su código de barras, en memoria.
+  ///
+  /// La lista ya viene entera de `getAllProducts()`, así que no hace falta ir
+  /// a la red: escanear y encontrar es instantáneo.
+  Product? productoPorBarcode(String codigo) {
+    final buscado = codigo.trim();
+    if (buscado.isEmpty) return null;
+    for (final producto in products) {
+      if (producto.barcode == buscado) return producto;
+    }
+    return null;
+  }
+
+  /// Abre la cámara y devuelve el código leído, o null si se canceló.
+  Future<String?> escanearCodigo({String? titulo, String? instruccion}) async {
+    return await Get.to<String>(
+      () => EscanerCodigoView(
+        titulo: titulo ?? 'Escanear código',
+        instruccion: instruccion ?? 'Apunta al código de barras del producto',
+      ),
+    );
+  }
+
   void filterProducts() {
     filteredProducts.value = products.where((product) {
+      // El código entra en la búsqueda para poder teclearlo cuando el
+      // escáner no lee (envase arrugado, poca luz) sin cambiar de pantalla.
       bool matchesSearch = searchQuery.isEmpty ||
           product.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          product.description.toLowerCase().contains(searchQuery.toLowerCase());
+          product.description
+              .toLowerCase()
+              .contains(searchQuery.toLowerCase()) ||
+          (product.barcode ?? '').contains(searchQuery.trim());
 
       bool matchesCategory = selectedCategoryId.value == null ||
           product.categoryId == selectedCategoryId.value;
@@ -224,12 +253,18 @@ class InventarioController extends GetxController with ScreenTourMixin {
         // El stock no viaja aquí: se mueve solo por deltas desde "Ajustar
         // stock". `updateProduct` tampoco lo envía, así que una venta hecha
         // mientras esta pantalla estaba abierta no se pierde.
+        // El formulario manda '' cuando se borró el código. `copyWith` con
+        // `??` no puede volver a null, de ahí `limpiarBarcode`.
+        final barcodeEditado = (productData['barcode'] as String?)?.trim();
+
         final updatedProduct = currentProduct.value!.copyWith(
           name: productData['name'],
           description: productData['description'],
           categoryId: productData['category_id'],
           price: double.parse(productData['price']),
           isActive: true,
+          barcode: (barcodeEditado?.isEmpty ?? true) ? null : barcodeEditado,
+          limpiarBarcode: barcodeEditado?.isEmpty ?? false,
           updatedAt: now,
         );
 
@@ -255,6 +290,9 @@ class InventarioController extends GetxController with ScreenTourMixin {
           price: double.parse(productData['price']),
           stock: int.parse(productData['stock']),
           isActive: true,
+          barcode: ((productData['barcode'] as String?)?.trim().isEmpty ?? true)
+              ? null
+              : (productData['barcode'] as String).trim(),
           createdAt: now,
           updatedAt: now,
         );
@@ -272,6 +310,10 @@ class InventarioController extends GetxController with ScreenTourMixin {
 
       filterProducts();
       loadInventoryStats();
+    } on BarcodeDuplicadoException catch (e) {
+      // Se atrapa aparte del error genérico: "ese código ya es de otro
+      // producto" es accionable; "no se pudo guardar" no dice qué arreglar.
+      _showSnackbarSafe('Código repetido', e.mensaje, isError: true);
     } catch (e) {
       AppLogger.error('InventarioController', 'Error al guardar producto', e);
       _showSnackbarSafe('Error', 'No se pudo guardar el producto',

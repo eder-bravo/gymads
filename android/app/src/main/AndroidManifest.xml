@@ -17,6 +17,12 @@
     <!-- Otros permisos -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Cámara: foto del cliente, foto del comprobante de pago y escaneo de
+         códigos de barras. Se declara explícitamente en vez de heredarla del
+         manifiesto del plugin, para que no dependa de qué plugins haya. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     
     <!-- Permisos para audio -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />

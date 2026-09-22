@@ -23,6 +23,11 @@ dependencies:
   camera: ^0.10.5+9
   image_picker: ^1.0.7
   permission_handler: ^11.1.0
+  # Escaneo de códigos de barras en vivo (inventario)
+  mobile_scanner: ^7.4.2
+  # Reconocimiento de texto sobre la foto del comprobante (referencia de pago).
+  # Funciona sin conexión: el modelo corre en el propio teléfono.
+  google_mlkit_text_recognition: ^0.16.0
   flutter_dotenv: ^5.2.1
   supabase_flutter: ^2.8.4
   just_audio: ^0.9.39

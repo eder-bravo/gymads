@@ -87,6 +87,11 @@ class ProductRepository {
 
       return Product.fromJson(response);
     } catch (e) {
+      if (_esBarcodeDuplicado(e)) {
+        AppLogger.warning(
+            'ProductRepository', 'El código de barras ya está en uso');
+        throw const BarcodeDuplicadoException();
+      }
       AppLogger.error('ProductRepository', 'Error al crear producto', e);
       return null;
     }
@@ -109,6 +114,7 @@ class ProductRepository {
             'category_id': product.categoryId,
             'price': product.price,
             'is_active': product.isActive,
+            'barcode': product.barcode,
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', product.id)
@@ -117,9 +123,26 @@ class ProductRepository {
 
       return Product.fromJson(response);
     } catch (e) {
+      if (_esBarcodeDuplicado(e)) {
+        AppLogger.warning(
+            'ProductRepository', 'El código de barras ya está en uso');
+        throw const BarcodeDuplicadoException();
+      }
       AppLogger.error('ProductRepository', 'Error al actualizar producto', e);
       return null;
     }
+  }
+
+  /// Si el fallo viene del índice único del código de barras.
+  ///
+  /// Postgres devuelve 23505 para cualquier violación de unicidad, y esta
+  /// tabla tiene dos: el nombre por sucursal y el código. Se mira el nombre
+  /// del índice para no acusar al código cuando el repetido es el nombre.
+  bool _esBarcodeDuplicado(Object e) {
+    if (e is! PostgrestException) return false;
+    if (e.code != '23505') return false;
+    return (e.message + (e.details?.toString() ?? ''))
+        .contains('idx_products_branch_barcode');
   }
 
   /// Suma [delta] al stock del producto y devuelve el stock resultante.
@@ -445,4 +468,20 @@ class CategoryException implements Exception {
 
   @override
   String toString() => 'CategoryException($kind)';
+}
+
+/// El código de barras que se intentó guardar ya pertenece a otro producto
+/// de esta sucursal.
+///
+/// Tiene su propio tipo para poder decírselo al usuario con esas palabras:
+/// un 23505 de Postgres en crudo no le dice nada a quien está dando de alta
+/// una bebida en el mostrador.
+class BarcodeDuplicadoException implements Exception {
+  const BarcodeDuplicadoException();
+
+  String get mensaje =>
+      'Ese código de barras ya está asignado a otro producto.';
+
+  @override
+  String toString() => 'BarcodeDuplicadoException';
 }

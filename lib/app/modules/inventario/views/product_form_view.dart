@@ -19,6 +19,7 @@ class ProductFormView extends GetView<InventarioController> {
     final descriptionController = TextEditingController();
     final priceController = TextEditingController();
     final stockController = TextEditingController();
+    final barcodeController = TextEditingController();
 
     // Id de la categoría, no el nombre: así renombrarla no desenlaza nada.
     final selectedCategoryId = RxnString(null);
@@ -30,7 +31,11 @@ class ProductFormView extends GetView<InventarioController> {
       descriptionController.text = product.description;
       priceController.text = product.price.toString();
       stockController.text = product.stock.toString();
+      barcodeController.text = product.barcode ?? '';
       selectedCategoryId.value = product.categoryId;
+    } else if (arguments['barcode'] is String) {
+      // Llega desde "Código no registrado" al escanear en el inventario.
+      barcodeController.text = arguments['barcode'] as String;
     }
 
     return Scaffold(
@@ -56,6 +61,7 @@ class ProductFormView extends GetView<InventarioController> {
                           'description': descriptionController.text,
                           'category_id': selectedCategoryId.value,
                           'price': priceController.text,
+                          'barcode': barcodeController.text,
                           // Al editar el stock no se toca aquí.
                           if (!isEditing) 'stock': stockController.text,
                         });
@@ -247,6 +253,60 @@ class ProductFormView extends GetView<InventarioController> {
                         }
                         return null;
                       },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Código de barras: el del fabricante, para poder escanear el
+                // producto y ajustar su stock sin buscarlo en la lista.
+                _buildSectionCard(
+                  title: 'Código de barras',
+                  icon: Icons.qr_code_2,
+                  children: [
+                    TextFormField(
+                      controller: barcodeController,
+                      style: const TextStyle(color: AppColors.textPrimary),
+                      decoration: InputDecoration(
+                        labelText: 'Código (opcional)',
+                        hintText: 'Escanéalo del envase o escríbelo',
+                        labelStyle:
+                            const TextStyle(color: AppColors.textSecondary),
+                        hintStyle: TextStyle(
+                            color: AppColors.textHint.withOpacity(0.5)),
+                        filled: true,
+                        fillColor: AppColors.containerBackground,
+                        prefixIcon: const Icon(Icons.qr_code,
+                            color: AppColors.textSecondary),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.qr_code_scanner,
+                              color: AppColors.accent),
+                          tooltip: 'Escanear',
+                          onPressed: () async {
+                            final codigo = await controller.escanearCodigo(
+                              titulo: 'Código del producto',
+                              instruccion:
+                                  'Apunta al código de barras del envase',
+                            );
+                            if (codigo != null) barcodeController.text = codigo;
+                          },
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Sin código el producto funciona igual; solo hay que '
+                      'buscarlo por nombre para moverle el stock.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary.withOpacity(0.75),
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
                     ),
                   ],
                 ),

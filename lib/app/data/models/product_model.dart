@@ -10,6 +10,14 @@ class Product {
   final double price;
   final int stock;
   final bool isActive;
+
+  /// Código de barras del fabricante (EAN/UPC), si el producto trae uno.
+  ///
+  /// Se guarda como texto y no como número: hay formatos de 8, 12, 13 y 14
+  /// dígitos, los ceros a la izquierda son significativos, y algunos
+  /// productos traen códigos internos alfanuméricos.
+  final String? barcode;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -21,9 +29,13 @@ class Product {
     required this.price,
     required this.stock,
     required this.isActive,
+    this.barcode,
     required this.createdAt,
     required this.updatedAt,
   });
+
+  /// Si tiene un código con el que se pueda escanear.
+  bool get tieneBarcode => (barcode ?? '').isNotEmpty;
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
@@ -34,6 +46,9 @@ class Product {
       price: (json['price'] is num) ? json['price'].toDouble() : 0.0,
       stock: json['stock'] ?? 0,
       isActive: json['is_active'] ?? true,
+      barcode: (json['barcode'] as String?)?.trim().isEmpty == true
+          ? null
+          : json['barcode'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -52,6 +67,7 @@ class Product {
       'price': price,
       'stock': stock,
       'is_active': isActive,
+      'barcode': barcode,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -66,6 +82,7 @@ class Product {
       'price': price,
       'stock': stock,
       'is_active': isActive,
+      'barcode': barcode,
     };
   }
 
@@ -79,8 +96,13 @@ class Product {
     double? price,
     int? stock,
     bool? isActive,
+    String? barcode,
     DateTime? createdAt,
     DateTime? updatedAt,
+    /// Quitarle el código al producto. Hace falta porque `barcode ?? this.barcode`
+    /// nunca puede dejarlo en null, y a diferencia de la categoría, este campo
+    /// sí se puede vaciar desde el formulario.
+    bool limpiarBarcode = false,
   }) {
     return Product(
       id: id ?? this.id,
@@ -90,6 +112,7 @@ class Product {
       price: price ?? this.price,
       stock: stock ?? this.stock,
       isActive: isActive ?? this.isActive,
+      barcode: limpiarBarcode ? null : (barcode ?? this.barcode),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

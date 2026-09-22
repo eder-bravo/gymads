@@ -317,18 +317,29 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
               const SizedBox(width: 6),
-              Text(
-                acceso.estadoTexto,
-                style: TextStyle(color: color, fontSize: 13),
-              ),
-              // El rol es lo que decide qué ve esta persona al entrar, así que
-              // se lee de un vistazo sin abrir el menú.
-              Text(
-                '  ·  ${acceso.rol.label}',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                // Estado y rol comparten el ancho disponible. Al ser un solo
+                // párrafo pueden saltar juntos a otra línea en pantallas
+                // estrechas sin provocar un RenderFlex overflow.
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: acceso.estadoTexto,
+                        style: TextStyle(color: color),
+                      ),
+                      // El rol decide qué ve esta persona al entrar, así que
+                      // se lee de un vistazo sin abrir el menú.
+                      TextSpan(
+                        text: '  ·  ${acceso.rol.label}',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  style: const TextStyle(fontSize: 13),
                 ),
               ),
             ],

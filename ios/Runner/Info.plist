@@ -50,13 +50,13 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Necesitamos acceso a la cámara para tomar la foto de perfil de los miembros.</string>
+	<string>Necesitamos la cámara para tomar la foto de perfil de los miembros, fotografiar comprobantes de pago y escanear códigos de barras de productos.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Necesitamos acceso a la red local para conectar con el lector RFID del gimnasio.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Necesitamos acceso para guardar el código QR en tu galería.</string>
+	<string>Necesitamos acceso para guardar imágenes en tu galería.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Necesitamos acceso a la galería para guardar el código QR.</string>
+	<string>Necesitamos acceso a la galería para elegir comprobantes de pago que hayas recibido por mensajería.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

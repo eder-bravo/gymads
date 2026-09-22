@@ -21,6 +21,15 @@ class InventarioView extends GetView<InventarioController> {
       appBar: GymAppBar(
         title: 'Inventario',
         actions: [
+          // Va bajo `ajustarStock` y no `gestionarProductos`: escanear para
+          // mover existencias es justo lo que hace el personal de almacén,
+          // que no puede editar productos ni tocar precios.
+          if (controller.can(Permission.ajustarStock))
+            IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: 'Escanear código',
+              onPressed: _escanearParaAjustar,
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => controller.refreshAll(),
@@ -94,6 +103,77 @@ class InventarioView extends GetView<InventarioController> {
         ),
       ),
     );
+  }
+
+  /// Escanea un código y abre el ajuste de stock de ese producto.
+  ///
+  /// El diálogo de ajuste ya recibe el producto resuelto, así que escanear
+  /// solo sustituye al paso de buscarlo a mano en la lista.
+  Future<void> _escanearParaAjustar() async {
+    final codigo = await controller.escanearCodigo(
+      instruccion: 'Apunta al código del producto para ajustar su stock',
+    );
+    if (codigo == null) return;  // canceló
+
+    final producto = controller.productoPorBarcode(codigo);
+
+    if (producto != null) {
+      await showStockAdjustDialog(producto);
+      return;
+    }
+
+    // Código no registrado. Es lo normal la primera vez que se escanea cada
+    // producto, así que en vez de un error se ofrece el siguiente paso útil:
+    // darlo de alta con el código ya puesto.
+    //
+    // El botón de escanear va bajo `ajustarStock`, así que quien llega aquí
+    // puede no tener permiso para crear productos. A esa persona solo se le
+    // explica a quién pedírselo.
+    final puedeAgregar = controller.can(Permission.gestionarProductos);
+
+    final agregar = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Código no registrado',
+            style: TextStyle(color: AppColors.textPrimary)),
+        content: Text(
+          puedeAgregar
+              ? 'Ningún producto tiene este código. ¿Quieres agregarlo como '
+                  'producto nuevo?\n\n'
+                  'Si el producto ya existe, edítalo y escanea ahí su código.'
+              : 'Ningún producto tiene este código. Pide a un encargado que '
+                  'lo dé de alta o que se lo asigne al producto.',
+          style: const TextStyle(
+              color: AppColors.textSecondary, height: 1.35),
+        ),
+        actions: puedeAgregar
+            ? [
+                TextButton(
+                  onPressed: () => Get.back(result: false),
+                  child: const Text('Cancelar',
+                      style: TextStyle(color: AppColors.textSecondary)),
+                ),
+                TextButton(
+                  onPressed: () => Get.back(result: true),
+                  child: const Text('Agregar producto',
+                      style: TextStyle(color: AppColors.accent)),
+                ),
+              ]
+            : [
+                TextButton(
+                  onPressed: () => Get.back(result: false),
+                  child: const Text('Entendido',
+                      style: TextStyle(color: AppColors.accent)),
+                ),
+              ],
+      ),
+    );
+
+    if (agregar != true) return;
+
+    controller.resetForm();
+    Get.toNamed(Routes.PRODUCT_FORM, arguments: {'barcode': codigo});
   }
 
   Widget _buildStatsSection() {
@@ -573,6 +653,10 @@ class InventarioView extends GetView<InventarioController> {
                   ? 'Faltan ${-product.stock} unidades'
                   : '${product.stock} unidades',
               valueColor: product.stock < 0 ? AppColors.error : null,
+            ),
+            _buildDetailRow(
+              'Código de barras',
+              product.tieneBarcode ? product.barcode! : 'Sin código',
             ),
             _buildDetailRow('Estado', product.isActive ? 'Activo' : 'Inactivo'),
             _buildDetailRow('Creado',

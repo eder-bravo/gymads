@@ -5,7 +5,7 @@ import '../services/tenant_context_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-/// Configuración simplificada del lector RFID ESP32 con IP manual
+/// Configuración del lector RFID ESP32.
 class RfidConfig {
   // CAMBIAR ESTA IP POR LA DEL ESP32
   static const String DEFAULT_ESP32_IP = '192.168.1.100';
@@ -27,12 +27,7 @@ class RfidConfig {
 
   static String? _currentUrl;
 
-  /// URL del lector de ESTE gimnasio, o null si no tiene ninguno.
-  ///
-  /// Devuelve null a propósito cuando no hay nada configurado. Antes caía a
-  /// `DEFAULT_ESP32_IP`, que es la IP de fábrica de TODOS los lectores: en
-  /// una red compartida eso apuntaba la app al aparato del gimnasio vecino
-  /// sin que nadie lo hubiera pedido. Quien llama ya comprueba el null.
+  /// URL del lector de ESTE gimnasio, o null mientras no se haya encontrado.
   static String? get baseUrl => _currentUrl;
 
   /// Si este gimnasio tiene un lector configurado a propósito.
@@ -50,31 +45,65 @@ class RfidConfig {
       await _migrarClaveAntigua(prefs);
       final savedUrl = prefs.getString(_urlKey);
 
-      if (savedUrl != null && savedUrl.isNotEmpty) {
-        AppLogger.info('RfidConfig', 'URL guardada encontrada');
-        if (await _testConnection(savedUrl)) {
-          _currentUrl = savedUrl;
-          AppLogger.info('RfidConfig', 'IP guardada es válida');
+      const defaultUrl = 'http://$DEFAULT_ESP32_IP/api';
+      final candidatos = <String>[
+        if (savedUrl != null && savedUrl.isNotEmpty) savedUrl,
+        if (savedUrl != defaultUrl) defaultUrl,
+      ];
+
+      // Primero se prueba la IP guardada y, si dejó de responder, la IP de
+      // fábrica. Así se recupera la detección automática que tenía la app sin
+      // perder la configuración particular de cada gimnasio.
+      for (final candidato in candidatos) {
+        if (await _configurarAutomaticamente(candidato)) {
+          _currentUrl = candidato;
+          await saveConfig(candidato);
+          AppLogger.info('RfidConfig', 'Lector encontrado automáticamente');
           return;
         }
-        // Se conserva aunque ahora no responda: el lector puede estar
-        // apagado o el router recién reiniciado. Borrarla obligaría al
-        // dueño a reconfigurarlo cada vez que se va la luz.
-        _currentUrl = savedUrl;
-        AppLogger.warning('RfidConfig', 'La IP guardada no responde ahora mismo');
-        return;
       }
 
-      // Sin nada guardado no se adivina ninguna IP. Antes se caía a
-      // 192.168.1.100, que es la de fábrica de TODOS los lectores: en una red
-      // compartida eso llevaba a la app directa al aparato del gimnasio de al
-      // lado. El lector se elige a mano en Configuración.
-      _currentUrl = null;
-      AppLogger.info(
-          'RfidConfig', 'Este gimnasio todavía no tiene lector configurado');
+      // Si el lector estaba guardado pero está apagado, se conserva la URL
+      // para que vuelva a funcionar cuando reaparezca en la red. Sin una IP
+      // guardada se mantiene la de fábrica como siguiente intento automático.
+      _currentUrl = savedUrl?.isNotEmpty == true ? savedUrl : defaultUrl;
+      AppLogger.warning('RfidConfig', 'El lector no responde por ahora');
     } catch (e) {
-      _currentUrl = null;
+      _currentUrl ??= 'http://$DEFAULT_ESP32_IP/api';
       AppLogger.error('RfidConfig', 'Error al cargar configuración', e);
+    }
+  }
+
+  /// Comprueba un lector, valida que pertenezca al gimnasio actual y reclama
+  /// automáticamente uno nuevo si todavía está libre.
+  static Future<bool> _configurarAutomaticamente(String url) async {
+    if (!await _testConnection(url)) return false;
+
+    final info = await _getESP32InfoForBase(url);
+    // Firmware antiguo: si no existe /discover pero /status sí respondió, se
+    // mantiene la compatibilidad y se usa igual que antes.
+    if (info == null || !info.containsKey('claimed')) return true;
+
+    if (info['claimed'] == true) {
+      return info['mine'] == true;
+    }
+
+    final gymId = TenantContextService.to.currentGymId;
+    if (gymId == null || gymId.isEmpty) return true;
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$url/claim'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'gym_id': gymId}),
+          )
+          .timeout(const Duration(seconds: 10));
+      return response.statusCode == 200;
+    } catch (e) {
+      AppLogger.error(
+          'RfidConfig', 'No se pudo vincular automáticamente el lector', e);
+      return false;
     }
   }
 
@@ -84,14 +113,15 @@ class RfidConfig {
   /// Sin esto, quien ya tenía el lector funcionando se lo encontraría
   /// "sin configurar" después de actualizar, sin entender por qué.
   static Future<void> _migrarClaveAntigua(SharedPreferences prefs) async {
-    if (_urlKey == _urlKeyGlobal) return;            // aún no hay gimnasio
-    if (prefs.getString(_urlKey) != null) return;    // ya migrado
+    if (_urlKey == _urlKeyGlobal) return; // aún no hay gimnasio
+    if (prefs.getString(_urlKey) != null) return; // ya migrado
 
     final antigua = prefs.getString(_urlKeyGlobal);
     if (antigua == null || antigua.isEmpty) return;
 
     await prefs.setString(_urlKey, antigua);
-    AppLogger.info('RfidConfig', 'Configuración del lector migrada a este gimnasio');
+    AppLogger.info(
+        'RfidConfig', 'Configuración del lector migrada a este gimnasio');
   }
 
   // Configurar IP manualmente
@@ -152,8 +182,10 @@ class RfidConfig {
       if (kDebugMode) {
         AppLogger.error('RfidConfig', 'Error al probar conexión', e);
         if (e.toString().contains('TimeoutException')) {
-          AppLogger.info('RfidConfig', 'Timeout: El ESP32 no responde en el tiempo esperado');
-          AppLogger.info('RfidConfig', 'Verificar que el ESP32 esté encendido y en la misma red WiFi');
+          AppLogger.info('RfidConfig',
+              'Timeout: El ESP32 no responde en el tiempo esperado');
+          AppLogger.info('RfidConfig',
+              'Verificar que el ESP32 esté encendido y en la misma red WiFi');
         }
       }
       return false;
@@ -229,22 +261,25 @@ class RfidConfig {
 
   // Obtener información del ESP32
   static Future<Map<String, dynamic>?> getESP32Info({String? ip}) async {
-    try {
-      final base = ip != null ? 'http://$ip/api' : baseUrl;
-      if (base == null) return null;
+    final base = ip != null ? 'http://$ip/api' : baseUrl;
+    if (base == null) return null;
+    return _getESP32InfoForBase(base);
+  }
 
+  static Future<Map<String, dynamic>?> _getESP32InfoForBase(String base) async {
+    try {
       final gymId = TenantContextService.to.currentGymId ?? '';
       final response = await http.get(
         Uri.parse('$base/discover?gym_id=$gymId'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 5));
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      }
-      return null;
+      if (response.statusCode != 200) return null;
+      final data = json.decode(response.body);
+      return data is Map<String, dynamic> ? data : null;
     } catch (e) {
-      AppLogger.error('RfidConfig', 'Error al obtener información del ESP32', e);
+      AppLogger.error(
+          'RfidConfig', 'Error al obtener información del ESP32', e);
       return null;
     }
   }
@@ -276,7 +311,9 @@ class RfidConfig {
         await saveConfig(_currentUrl!);
         return VinculacionResultado.ok;
       }
-      if (response.statusCode == 409) return VinculacionResultado.deOtroGimnasio;
+      if (response.statusCode == 409) {
+        return VinculacionResultado.deOtroGimnasio;
+      }
       return VinculacionResultado.error;
     } catch (e) {
       AppLogger.error('RfidConfig', 'Error al vincular el lector', e);
@@ -294,12 +331,10 @@ class RfidConfig {
   /// El aparato pita mientras lo hace, así que un formateo ajeno se oye.
   static Future<bool> formatear(String ip) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse('http://$ip/api/reset'),
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 10));
+      final response = await http.post(
+        Uri.parse('http://$ip/api/reset'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
 
       return response.statusCode == 200;
     } catch (e) {

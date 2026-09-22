@@ -14,9 +14,10 @@ class AccessLogService {
 
   /// Registra el acceso de un cliente y devuelve qué se registró.
   ///
-  /// Con [registrarSalidas] apagado (lo normal) solo se registran entradas, y
-  /// una segunda pasada el mismo día se ignora. Encendido, el pase alterna:
-  /// si la última marca del día fue una entrada, la siguiente es la salida.
+  /// Con [registrarSalidas] apagado solo se permite una entrada por jornada.
+  /// Encendido se permite, como máximo, una entrada y después una salida.
+  /// Una vez registrada la salida, el resto de pases de esa jornada se
+  /// ignoran: nunca se vuelve a alternar hacia otra entrada.
   ///
   /// Devuelve el tipo registrado ('entrada' o 'salida'), o null si no se
   /// registró nada — porque ya estaba marcado o por un fallo.
@@ -48,20 +49,26 @@ class AccessLogService {
       if (!registrarSalidas) {
         // Modo solo entradas: una por jornada.
         if (ultimo != null) {
-          AppLogger.info('AccessLogService',
-              'Ya existe una entrada registrada para hoy');
+          AppLogger.info(
+              'AccessLogService', 'Ya existe una entrada registrada para hoy');
           return null;
         }
         accessType = 'entrada';
       } else {
+        if (ultimo?.accessType == 'salida') {
+          AppLogger.info('AccessLogService',
+              'La entrada y la salida de hoy ya están registradas');
+          return null;
+        }
+
         if (ultimo != null &&
             now.difference(ultimo.accessTime) < _antirrebote) {
           AppLogger.info('AccessLogService',
               'Pase repetido dentro del margen de rebote, se ignora');
           return null;
         }
-        // Alterna: tras una entrada toca la salida, y viceversa.
-        accessType = ultimo?.accessType == 'entrada' ? 'salida' : 'entrada';
+        // Sin marca toca entrada; tras la única entrada toca la única salida.
+        accessType = ultimo == null ? 'entrada' : 'salida';
       }
 
       AppLogger.info('AccessLogService',
@@ -84,7 +91,8 @@ class AccessLogService {
     } catch (e) {
       AppLogger.error('AccessLogService', 'Fallo al registrar el acceso', e);
       if (e is PostgrestException) {
-        AppLogger.error('AccessLogService', 'Código de error de base de datos: ${e.code}');
+        AppLogger.error(
+            'AccessLogService', 'Código de error de base de datos: ${e.code}');
       }
       return null;
     }
@@ -188,7 +196,8 @@ class AccessLogService {
           .map<AccessLogModel>((json) => AccessLogModel.fromJson(json))
           .toList();
     } catch (e) {
-      AppLogger.error('AccessLogService', 'Error al obtener historial de accesos', e);
+      AppLogger.error(
+          'AccessLogService', 'Error al obtener historial de accesos', e);
       return [];
     }
   }
@@ -221,7 +230,8 @@ class AccessLogService {
 
       return stats;
     } catch (e) {
-      AppLogger.error('AccessLogService', 'Error al obtener estadísticas de accesos', e);
+      AppLogger.error(
+          'AccessLogService', 'Error al obtener estadísticas de accesos', e);
       return {};
     }
   }
@@ -238,7 +248,8 @@ class AccessLogService {
       // El usuario está adentro si su último acceso fue una entrada
       return lastAccess.accessType == 'entrada';
     } catch (e) {
-      AppLogger.error('AccessLogService', 'Error al verificar si el usuario está adentro', e);
+      AppLogger.error('AccessLogService',
+          'Error al verificar si el usuario está adentro', e);
       return false;
     }
   }
@@ -246,7 +257,8 @@ class AccessLogService {
   /// Obtiene todos los logs de acceso ordenados por fecha más reciente
   static Future<List<AccessLogModel>?> getAllAccessLogs({int? limit}) async {
     try {
-      AppLogger.info('AccessLogService', 'Obteniendo todos los logs de acceso desde Supabase');
+      AppLogger.info('AccessLogService',
+          'Obteniendo todos los logs de acceso desde Supabase');
 
       final branchId = TenantQueryHelper.branchIdOrNull;
       var query = _supabase.from('access_logs').select();
@@ -272,21 +284,26 @@ class AccessLogService {
           final log = AccessLogModel.fromJson(logData);
           logs.add(log);
         } catch (e) {
-          AppLogger.error('AccessLogService', 'Error parseando log individual', e);
+          AppLogger.error(
+              'AccessLogService', 'Error parseando log individual', e);
           // Continuar con los otros logs aunque uno falle
         }
       }
 
-      AppLogger.info('AccessLogService', '${logs.length} logs parseados exitosamente');
+      AppLogger.info(
+          'AccessLogService', '${logs.length} logs parseados exitosamente');
 
       return logs;
     } catch (e) {
       if (kDebugMode) {
-        AppLogger.error('AccessLogService', 'Error al obtener logs de acceso', e);
+        AppLogger.error(
+            'AccessLogService', 'Error al obtener logs de acceso', e);
         AppLogger.error('AccessLogService', 'Tipo de error: ${e.runtimeType}');
         if (e is PostgrestException) {
-          AppLogger.error('AccessLogService', 'PostgrestException - Message: ${e.message}');
-          AppLogger.error('AccessLogService', 'PostgrestException - Details: ${e.details}');
+          AppLogger.error(
+              'AccessLogService', 'PostgrestException - Message: ${e.message}');
+          AppLogger.error(
+              'AccessLogService', 'PostgrestException - Details: ${e.details}');
         }
       }
       return null;
@@ -296,14 +313,16 @@ class AccessLogService {
   /// Obtiene los usuarios que están actualmente dentro del gimnasio
   static Future<List<AccessLogModel>?> getUsersCurrentlyInside() async {
     try {
-      AppLogger.info('AccessLogService', 'Obteniendo usuarios actualmente dentro del gimnasio');
+      AppLogger.info('AccessLogService',
+          'Obteniendo usuarios actualmente dentro del gimnasio');
 
       // Primero intentar usar la vista SQL
       try {
         final response =
             await _supabase.from('users_currently_inside').select();
 
-        AppLogger.info('AccessLogService', 'usuarios obtenidos desde vista SQL');
+        AppLogger.info(
+            'AccessLogService', 'usuarios obtenidos desde vista SQL');
 
         // Convertir la respuesta de la vista a AccessLogModel
         final users = <AccessLogModel>[];
@@ -322,19 +341,22 @@ class AccessLogService {
             });
             users.add(user);
           } catch (e) {
-            AppLogger.error('AccessLogService', 'Error parseando usuario dentro', e);
-            }
+            AppLogger.error(
+                'AccessLogService', 'Error parseando usuario dentro', e);
+          }
         }
 
         return users;
       } catch (e) {
-        AppLogger.warning('AccessLogService', 'Vista SQL no disponible, usando método alternativo');
+        AppLogger.warning('AccessLogService',
+            'Vista SQL no disponible, usando método alternativo');
 
         // Método alternativo: usar función SQL directa
         return await _getUsersInsideAlternative();
       }
     } catch (e) {
-      AppLogger.error('AccessLogService', 'Error al obtener usuarios dentro', e);
+      AppLogger.error(
+          'AccessLogService', 'Error al obtener usuarios dentro', e);
       return [];
     }
   }
@@ -342,7 +364,8 @@ class AccessLogService {
   /// Método alternativo para obtener usuarios dentro usando lógica de aplicación
   static Future<List<AccessLogModel>?> _getUsersInsideAlternative() async {
     try {
-      AppLogger.info('AccessLogService', 'Usando método alternativo para usuarios dentro');
+      AppLogger.info(
+          'AccessLogService', 'Usando método alternativo para usuarios dentro');
 
       // Obtener todos los logs y calcular manualmente
       final allLogs = await getAllAccessLogs();
@@ -363,7 +386,8 @@ class AccessLogService {
           .where((log) => log.accessType == 'entrada')
           .toList();
 
-      AppLogger.info('AccessLogService', 'usuarios dentro calculados manualmente');
+      AppLogger.info(
+          'AccessLogService', 'usuarios dentro calculados manualmente');
 
       return usersInside;
     } catch (e) {
@@ -376,7 +400,8 @@ class AccessLogService {
   static Future<List<AccessLogModel>?> getUserAccessLogs(String userId,
       {int? limit}) async {
     try {
-      AppLogger.info('AccessLogService', 'Obteniendo logs de acceso para usuario');
+      AppLogger.info(
+          'AccessLogService', 'Obteniendo logs de acceso para usuario');
 
       var query = _supabase
           .from('access_logs')
@@ -396,7 +421,8 @@ class AccessLogService {
           .map<AccessLogModel>((log) => AccessLogModel.fromJson(log))
           .toList();
     } catch (e) {
-      AppLogger.error('AccessLogService', 'Error al obtener logs del usuario', e);
+      AppLogger.error(
+          'AccessLogService', 'Error al obtener logs del usuario', e);
       return null;
     }
   }
@@ -405,7 +431,8 @@ class AccessLogService {
   static Future<List<AccessLogModel>?> getAccessLogsByDate(
       DateTime startDate, DateTime endDate) async {
     try {
-      AppLogger.info('AccessLogService', 'Obteniendo logs entre ${startDate.toIso8601String()} y ${endDate.toIso8601String()}');
+      AppLogger.info('AccessLogService',
+          'Obteniendo logs entre ${startDate.toIso8601String()} y ${endDate.toIso8601String()}');
 
       final branchId = TenantQueryHelper.branchIdOrNull;
       var query = _supabase.from('access_logs').select();
@@ -419,7 +446,8 @@ class AccessLogService {
           .lte('access_time', endDate.toIso8601String())
           .order('access_time', ascending: false);
 
-      AppLogger.info('AccessLogService', 'logs obtenidos en el rango de fechas');
+      AppLogger.info(
+          'AccessLogService', 'logs obtenidos en el rango de fechas');
 
       return response
           .map<AccessLogModel>((log) => AccessLogModel.fromJson(log))

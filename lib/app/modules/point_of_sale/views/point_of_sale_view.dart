@@ -21,6 +21,11 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         title: 'Punto de Venta',
         actions: [
           IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: controller.escanearAlCarrito,
+            tooltip: 'Escanear productos',
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: controller.refrescar,
             tooltip: 'Actualizar',
@@ -629,10 +634,9 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     ),
                     const SizedBox(height: 8),
                     TextField(
-                      // Fuerza un campo nuevo al cambiar de método de pago,
-                      // para que no arrastre el texto de la operación anterior.
-                      key: ValueKey(
-                          'referencia_${controller.selectedPaymentMethod}'),
+                      // El controlador vive en PointOfSaleController para que
+                      // el OCR pueda escribir aquí la referencia que leyó.
+                      controller: controller.referenciaCtrl,
                       style: const TextStyle(color: AppColors.textPrimary),
                       textCapitalization: TextCapitalization.characters,
                       inputFormatters: [
@@ -657,6 +661,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       ),
                       onChanged: controller.setReferenciaPago,
                     ),
+                    const SizedBox(height: 12),
+                    _buildEscanearReferencia(),
                     const SizedBox(height: 16),
                   ],
                 );
@@ -814,6 +820,100 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       default:
         return method;
     }
+  }
+
+  /// Leer la referencia de la foto del comprobante.
+  ///
+  /// La foto solo se usa para leerla y no se guarda. Lo que se muestra son
+  /// SUGERENCIAS: el campo de arriba sigue mandando, porque el
+  /// reconocimiento falla a veces.
+  Widget _buildEscanearReferencia() {
+    return Obx(() {
+      if (controller.leyendoReferencia.value) {
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppColors.accent),
+              ),
+              SizedBox(width: 12),
+              Text('Leyendo la referencia...',
+                  style: TextStyle(color: AppColors.textSecondary)),
+            ],
+          ),
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      controller.escanearReferencia(desdeCamara: true),
+                  icon: const Icon(Icons.document_scanner_outlined, size: 18),
+                  label: const Text('Escanear referencia'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // La galería no es un extra: muchos comprobantes llegan por
+              // mensajería y nunca pasan por la cámara.
+              IconButton(
+                onPressed: () =>
+                    controller.escanearReferencia(desdeCamara: false),
+                icon: const Icon(Icons.photo_library_outlined),
+                color: AppColors.accent,
+                tooltip: 'Elegir de la galería',
+              ),
+            ],
+          ),
+
+          if (controller.referenciasSugeridas.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('Referencias encontradas — toca la correcta:',
+                style: TextStyle(
+                    color: AppColors.textSecondary, fontSize: 12.5)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: controller.referenciasSugeridas
+                  .map((referencia) => ActionChip(
+                        label: Text(referencia,
+                            style: const TextStyle(
+                                fontFamily: 'monospace', fontSize: 12.5)),
+                        backgroundColor: AppColors.containerBackground,
+                        labelStyle:
+                            const TextStyle(color: AppColors.textPrimary),
+                        onPressed: () =>
+                            controller.usarReferenciaSugerida(referencia),
+                      ))
+                  .toList(),
+            ),
+          ] else if (controller.referenciaEscaneada.value) ...[
+            const SizedBox(height: 8),
+            Text(
+              'No se reconoció ninguna referencia en la foto. '
+              'Escríbela arriba.',
+              style: TextStyle(
+                  color: AppColors.textSecondary.withOpacity(0.8),
+                  fontSize: 12.5),
+            ),
+          ],
+        ],
+      );
+    });
   }
 
   void _processSale(BuildContext context) async {

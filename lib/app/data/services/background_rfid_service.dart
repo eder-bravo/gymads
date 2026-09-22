@@ -90,7 +90,8 @@ class BackgroundRfidService extends GetxService {
     try {
       final messenger = rootScaffoldMessengerKey.currentState;
       if (messenger == null) {
-        AppLogger.error('BackgroundRfidService', 'ScaffoldMessenger no disponible');
+        AppLogger.error(
+            'BackgroundRfidService', 'ScaffoldMessenger no disponible');
         return;
       }
 
@@ -134,7 +135,6 @@ class BackgroundRfidService extends GetxService {
           dismissDirection: DismissDirection.horizontal,
         ),
       );
-
     } catch (e) {
       AppLogger.error('BackgroundRfidService', 'Error mostrando snackbar', e);
     }
@@ -144,11 +144,13 @@ class BackgroundRfidService extends GetxService {
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
   final showWelcomeDialog = false.obs;
   final showNotFoundDialog = false.obs;
+  final lastAccessWasExit = false.obs;
 
   @override
   void onInit() {
     super.onInit();
-    AppLogger.info('BackgroundRfidService', 'BackgroundRfidService inicializado');
+    AppLogger.info(
+        'BackgroundRfidService', 'BackgroundRfidService inicializado');
 
     // El rol decide quién atiende el lector, así que hay que reevaluarlo cada
     // vez que cambia el perfil: al entrar, al salir y si el dueño cambia el
@@ -184,7 +186,8 @@ class BackgroundRfidService extends GetxService {
     _avisoRechazo = false;
     RfidReaderService.rechazo.value = RechazoLector.ninguno;
 
-    AppLogger.info('BackgroundRfidService', 'Iniciando servicio de escaneo RFID en segundo plano');
+    AppLogger.info('BackgroundRfidService',
+        'Iniciando servicio de escaneo RFID en segundo plano');
 
     // Cargar configuración de RFID (IP, etc) si es necesario
     await RfidConfig.loadConfig();
@@ -195,7 +198,8 @@ class BackgroundRfidService extends GetxService {
       await _checkForCard();
     });
 
-    AppLogger.info('BackgroundRfidService', 'Escaneo RFID en segundo plano iniciado (polling cada 1.5s)');
+    AppLogger.info('BackgroundRfidService',
+        'Escaneo RFID en segundo plano iniciado (polling cada 1.5s)');
   }
 
   /// Detener el escaneo en segundo plano
@@ -204,25 +208,29 @@ class BackgroundRfidService extends GetxService {
     _pollingTimer = null;
     isScanning.value = false;
 
-    AppLogger.info('BackgroundRfidService', 'Escaneo RFID en segundo plano detenido');
+    AppLogger.info(
+        'BackgroundRfidService', 'Escaneo RFID en segundo plano detenido');
   }
 
   /// Pausar temporalmente el escaneo (sin detener el timer)
   /// Usado cuando se está registrando una nueva tarjeta
   void pauseScanning() {
     if (!isScanning.value) {
-      AppLogger.warning('BackgroundRfidService', 'No se puede pausar: el escaneo no está activo');
+      AppLogger.warning('BackgroundRfidService',
+          'No se puede pausar: el escaneo no está activo');
       return;
     }
 
     isPaused.value = true;
-    AppLogger.info('BackgroundRfidService', 'Escaneo RFID pausado temporalmente');
+    AppLogger.info(
+        'BackgroundRfidService', 'Escaneo RFID pausado temporalmente');
   }
 
   /// Reanudar el escaneo después de una pausa
   void resumeScanning() {
     if (!isScanning.value) {
-      AppLogger.warning('BackgroundRfidService', 'No se puede reanudar: el escaneo no está activo');
+      AppLogger.warning('BackgroundRfidService',
+          'No se puede reanudar: el escaneo no está activo');
       return;
     }
 
@@ -382,7 +390,7 @@ class BackgroundRfidService extends GetxService {
       await Future.delayed(const Duration(seconds: 6));
       showNotFoundDialog.value = false;
     } else {
-      // Si no estamos en home, podríamos usar la notificación o un diálogo, 
+      // Si no estamos en home, podríamos usar la notificación o un diálogo,
       // pero el usuario especificó "pantalla completa".
       // Vamos a habilitar la pantalla completa también asumiendo que el widget está en el home
       showNotFoundDialog.value = true;
@@ -441,7 +449,11 @@ class BackgroundRfidService extends GetxService {
       membershipStatus = 'active';
     }
 
-    // Reproducir sonido
+    // El registro puede ignorarse porque el acceso de hoy ya existe. Eso no
+    // impide mostrar la bienvenida: solo evita crear otra fila en Supabase.
+    final accessType = await _registerAccess(user) ?? 'entrada';
+    lastAccessWasExit.value = accessType == 'salida';
+
     AudioService.playWelcomeSound();
 
     // Enviar estado al ESP32
@@ -449,18 +461,16 @@ class BackgroundRfidService extends GetxService {
       uid,
       membershipStatus,
       userName: user.name,
-      accessType: 'entrada',
+      accessType: accessType,
       verificationType: 'rfid',
     );
-
-    // Registrar acceso en segundo plano
-    _registerAccess(user);
 
     // Mostrar interfaz según la vista actual
     final currentRoute = Get.currentRoute;
 
     AppLogger.info('BackgroundRfidService', 'Evaluando ruta actual');
-    AppLogger.info('BackgroundRfidService', 'Es home: ${currentRoute == Routes.HOME || currentRoute == "/"}');
+    AppLogger.info('BackgroundRfidService',
+        'Es home: ${currentRoute == Routes.HOME || currentRoute == "/"}');
 
     if (currentRoute == Routes.HOME || currentRoute == '/') {
       // Estamos en home, mostrar diálogo completo
@@ -487,39 +497,40 @@ class BackgroundRfidService extends GetxService {
     _showSnackbarSafe('Acceso denegado', message, isError: true);
   }
 
-  /// Registrar acceso en background
-  void _registerAccess(UserModel user) {
-    Future(() async {
-      try {
-        if (user.id == null) return;
+  /// Registra el acceso y devuelve el tipo realmente insertado.
+  Future<String?> _registerAccess(UserModel user) async {
+    try {
+      if (user.id == null) return null;
 
-        // Salvaguarda: nunca registrar entrada de una membresía inactiva o vencida
-        if (!user.isActive || user.daysRemaining <= 0) {
-          AppLogger.error('BackgroundRfidService', 'Registro de acceso bloqueado (membresía no válida)');
-          return;
-        }
-
-        final staffUser = AuthUtils.getStaffIdentifier();
-
-        // El servicio decide si toca entrada o salida según lo que tenga
-        // configurado el gimnasio.
-        final ajustes = await GymSettingsService.current();
-
-        final tipo = await AccessLogService.registerAccess(
-          userId: user.id!,
-          userName: user.name,
-          userNumber: user.userNumber,
-          method: 'rfid_background',
-          staffUser: staffUser,
-          registrarSalidas: ajustes.registrarSalidas,
-        );
-
-        AppLogger.info('BackgroundRfidService',
-            tipo == null ? 'Acceso no registrado' : 'Acceso registrado: $tipo');
-      } catch (e) {
-        AppLogger.error('BackgroundRfidService', 'Error registrando acceso', e);
+      // Salvaguarda: nunca registrar entrada de una membresía inactiva o vencida
+      if (!user.isActive || user.daysRemaining <= 0) {
+        AppLogger.error('BackgroundRfidService',
+            'Registro de acceso bloqueado (membresía no válida)');
+        return null;
       }
-    });
+
+      final staffUser = AuthUtils.getStaffIdentifier();
+
+      // El servicio decide si toca entrada o salida según lo que tenga
+      // configurado el gimnasio.
+      final ajustes = await GymSettingsService.current();
+
+      final tipo = await AccessLogService.registerAccess(
+        userId: user.id!,
+        userName: user.name,
+        userNumber: user.userNumber,
+        method: 'rfid_background',
+        staffUser: staffUser,
+        registrarSalidas: ajustes.registrarSalidas,
+      );
+
+      AppLogger.info('BackgroundRfidService',
+          tipo == null ? 'Acceso no registrado' : 'Acceso registrado: $tipo');
+      return tipo;
+    } catch (e) {
+      AppLogger.error('BackgroundRfidService', 'Error registrando acceso', e);
+      return null;
+    }
   }
 
   @override

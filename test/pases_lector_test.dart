@@ -83,16 +83,24 @@ void main() {
   });
 
   group('Aviso al pasar la tarjeta', () {
-    Future<int Function()> mostrar(WidgetTester tester) async {
+    Future<int Function()> mostrar(WidgetTester tester,
+        {double barraDeEstado = 0}) async {
       var cerrado = 0;
       await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: WelcomeScreenWidget(
-            userName: 'María',
-            userPhotoUrl: '',
-            daysLeft: 20,
-            isVisible: true,
-            onClose: () => cerrado++,
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: const Size(400, 860),
+            padding: EdgeInsets.only(top: barraDeEstado),
+            viewPadding: EdgeInsets.only(top: barraDeEstado),
+          ),
+          child: Scaffold(
+            body: WelcomeScreenWidget(
+              userName: 'María',
+              userPhotoUrl: '',
+              daysLeft: 20,
+              isVisible: true,
+              onClose: () => cerrado++,
+            ),
           ),
         ),
       ));
@@ -109,10 +117,19 @@ void main() {
       expect(cerrado(), 1);
     });
 
-    testWidgets('también se cierra tocando en cualquier parte', (tester) async {
+    testWidgets('NO se cierra tocando fuera de la X', (tester) async {
       final cerrado = await mostrar(tester);
       await tester.tapAt(const Offset(40, 400));
-      expect(cerrado(), 1);
+      await tester.tapAt(const Offset(200, 800));
+      expect(cerrado(), 0);
+    });
+
+    testWidgets('la X queda debajo de la barra de estado, a la vista',
+        (tester) async {
+      await mostrar(tester, barraDeEstado: 59);
+      final x = tester.getRect(find.byTooltip('Cerrar'));
+      expect(x.top, greaterThanOrEqualTo(59));
+      expect(x.right, lessThanOrEqualTo(tester.view.physicalSize.width));
     });
   });
 }

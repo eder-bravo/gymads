@@ -450,37 +450,34 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
     final cerrar = widget.onClose;
     if (cerrar == null) return contenido;
 
-    // Se puede quitar al momento: con un toque en cualquier parte o con la
-    // X. Los botones de adentro (Abonar, Editar, Registrar) siguen
-    // funcionando: ganan el toque.
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: cerrar,
-      child: Stack(
-        children: [
-          contenido,
-          Positioned(
-            top: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: IconButton(
-                  onPressed: cerrar,
-                  tooltip: 'Cerrar',
-                  icon: const Icon(Icons.close, size: 26),
-                  color: Colors.white,
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.15),
-                    minimumSize: const Size(48, 48),
-                    shape: const CircleBorder(),
-                  ),
+    // Se quita al momento, pero solo con la X: un toque en otro lado (al
+    // acomodar el teléfono, o el cliente que se asoma) no debe cerrarlo. Se
+    // cierra solo pasados unos segundos.
+    return Stack(
+      children: [
+        contenido,
+        Positioned(
+          top: 0,
+          right: 0,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: IconButton(
+                onPressed: cerrar,
+                tooltip: 'Cerrar',
+                icon: const Icon(Icons.close, size: 28),
+                color: Colors.white,
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withOpacity(0.2),
+                  side: BorderSide(color: Colors.white.withOpacity(0.35)),
+                  minimumSize: const Size(52, 52),
+                  shape: const CircleBorder(),
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

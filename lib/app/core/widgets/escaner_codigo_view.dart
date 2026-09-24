@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../utils/confirmador_codigo.dart';
 
 /// Lector de códigos de barras.
 ///
@@ -64,12 +65,28 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
       BarcodeFormat.code39,
       BarcodeFormat.itf,
     ],
-    // `noDuplicates` ignora un código hasta leer otro distinto, lo que en
-    // modo continuo impediría sumar dos unidades seguidas del mismo producto.
-    // Ahí el filtro lo hace `_enfriamiento`.
-    detectionSpeed:
-        _continuo ? DetectionSpeed.normal : DetectionSpeed.noDuplicates,
+    // Todas las lecturas, cada 100 ms: el código se acepta hasta que se lee
+    // igual varias veces (`_confirmador`). `noDuplicates` entregaba solo la
+    // primera, y era la que a veces salía con los números cambiados.
+    detectionSpeed: DetectionSpeed.normal,
+    detectionTimeoutMs: 100,
+    // Más resolución que la de fábrica: las barras delgadas de un envase
+    // chico se distinguen mejor (en iPhone la elige el sistema).
+    cameraResolution: const Size(1920, 1080),
   );
+
+  final _confirmador = ConfirmadorCodigo();
+
+  /// Formatos cuyo último dígito verifica a los demás.
+  static const _conVerificador = {
+    BarcodeFormat.ean13,
+    BarcodeFormat.ean8,
+    BarcodeFormat.upcA,
+  };
+
+  /// Formatos sin dígito verificador obligatorio: un error de lectura no se
+  /// nota en el número, así que se piden más lecturas iguales.
+  static const _sinVerificador = {BarcodeFormat.code39, BarcodeFormat.itf};
 
   /// La cámara sigue entregando fotogramas mientras se cierra la pantalla, así
   /// que sin esta bandera el mismo código dispararía `Get.back` varias veces y
@@ -97,11 +114,23 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
       final valor = codigo.rawValue?.trim();
       if (valor == null || valor.isEmpty) continue;
 
+      // Un EAN o UPC con el verificador mal es una lectura a medias.
+      if (_conVerificador.contains(codigo.format) &&
+          !digitoVerificadorValido(valor)) {
+        continue;
+      }
+
+      final confirmado = _confirmador.registrar(
+        valor,
+        necesarias: _sinVerificador.contains(codigo.format) ? 4 : 3,
+      );
+      if (confirmado == null) continue;
+
       if (_continuo) {
-        _entregar(valor);
+        _entregar(confirmado);
       } else {
         _yaDevuelto = true;
-        Get.back(result: valor);
+        Get.back(result: confirmado);
       }
       return;
     }
@@ -173,10 +202,20 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          MobileScanner(
-            controller: _controlador,
-            onDetect: _alDetectar,
-            errorBuilder: (context, error) => _error(error),
+          LayoutBuilder(
+            builder: (context, limites) => MobileScanner(
+              controller: _controlador,
+              onDetect: _alDetectar,
+              // Solo se lee lo que está dentro del recuadro (con un poco de
+              // margen): un código a medio salir, o el de al lado, ya no se
+              // cuela.
+              scanWindow: Rect.fromCenter(
+                center: limites.biggest.center(Offset.zero),
+                width: _anchoMarco + 40,
+                height: _altoMarco + 40,
+              ),
+              errorBuilder: (context, error) => _error(error),
+            ),
           ),
           _marco(),
           if (_aviso != null) _avisoLectura(_aviso!),
@@ -186,13 +225,16 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
     );
   }
 
-  /// Un recuadro para que la persona sepa dónde poner el código. El lector
-  /// analiza toda la imagen, así que es una guía visual, no un recorte.
+  static const double _anchoMarco = 280;
+  static const double _altoMarco = 160;
+
+  /// El recuadro donde hay que poner el código: solo se lee lo que queda
+  /// dentro (ver `scanWindow`).
   Widget _marco() {
     return Center(
       child: Container(
-        width: 280,
-        height: 160,
+        width: _anchoMarco,
+        height: _altoMarco,
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.accent, width: 3),
           borderRadius: BorderRadius.circular(16),

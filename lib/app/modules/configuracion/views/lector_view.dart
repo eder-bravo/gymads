@@ -12,8 +12,8 @@ import 'agregar_lector_view.dart';
 /// El lector de tarjetas de este gimnasio.
 ///
 /// Nadie tiene que saber de IPs: "Agregar lector" lo configura por
-/// Bluetooth y la app lo encuentra sola en la red. La IP solo aparece en
-/// "Opciones avanzadas".
+/// Bluetooth y la app lo encuentra sola en la red. La IP no aparece en
+/// ninguna parte.
 ///
 /// Un lector solo atiende al gimnasio que lo reclamó. Sin eso, dos gimnasios
 /// en la misma red WiFi recibían la alerta del mismo pase de tarjeta, porque
@@ -28,16 +28,9 @@ class LectorView extends StatefulWidget {
 class _LectorViewState extends State<LectorView> {
   ConfiguracionController get controller => Get.find<ConfiguracionController>();
 
-  late final TextEditingController _ipCtrl;
-
   @override
   void initState() {
     super.initState();
-    _ipCtrl = TextEditingController(
-      text: controller.esp32IpAddress.value.isNotEmpty
-          ? controller.esp32IpAddress.value
-          : RfidConfig.getCurrentIP() ?? '',
-    );
 
     // Se pregunta al entrar, no en build: build se repite y volvería a
     // consultar al lector en cada frame.
@@ -55,7 +48,6 @@ class _LectorViewState extends State<LectorView> {
 
     controller.lectorEncontrado.value = null;
     if (RfidConfig.isConfigured) {
-      _ipCtrl.text = RfidConfig.getCurrentIP() ?? '';
       await controller.comprobarLector();
     } else {
       // El gimnasio puede tener lector registrado aunque ahora no conteste
@@ -65,14 +57,6 @@ class _LectorViewState extends State<LectorView> {
           : EstadoLector.sinConfigurar;
     }
   }
-
-  @override
-  void dispose() {
-    _ipCtrl.dispose();
-    super.dispose();
-  }
-
-  String get _ip => _ipCtrl.text.trim();
 
   @override
   Widget build(BuildContext context) {
@@ -95,8 +79,6 @@ class _LectorViewState extends State<LectorView> {
                 const SizedBox(height: 12),
                 _interruptorAvisosAqui(),
               ],
-              const SizedBox(height: 16),
-              _opcionesAvanzadas(),
               const SizedBox(height: 16),
               _ayuda(),
             ],
@@ -207,71 +189,6 @@ class _LectorViewState extends State<LectorView> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // Opciones avanzadas: IP a mano
-  // ─────────────────────────────────────────────────────────
-
-  /// Para quien sabe lo que hace (o para soporte): buscar el lector en una
-  /// IP concreta, y formatear uno ajeno.
-  Widget _opcionesAvanzadas() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          iconColor: AppColors.textSecondary,
-          collapsedIconColor: AppColors.textSecondary,
-          title: const Text(
-            'Opciones avanzadas',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          children: [
-            TextField(
-              controller: _ipCtrl,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontFamily: 'monospace',
-              ),
-              decoration: InputDecoration(
-                labelText: 'Dirección IP del lector',
-                labelStyle: const TextStyle(color: AppColors.textSecondary),
-                hintText: '192.168.1.50',
-                hintStyle:
-                    TextStyle(color: AppColors.textHint.withOpacity(0.5)),
-                filled: true,
-                fillColor: AppColors.containerBackground,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            _boton(
-              texto: 'Buscar lector en esa IP',
-              icono: Icons.search,
-              color: AppColors.info,
-              onTap: () {
-                controller.lectorEncontrado.value = null;
-                controller.comprobarLector(ip: _ip);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────
   // Acciones, según el estado
   // ─────────────────────────────────────────────────────────
 
@@ -362,17 +279,14 @@ class _LectorViewState extends State<LectorView> {
   }
 
   /// La IP del lector sobre el que se actúa en "Vincular" y "Formatear": el
-  /// que encontró la búsqueda en la red, el de "Buscar en esa IP", o el ya
-  /// guardado.
+  /// que encontró la búsqueda en la red, o el ya guardado.
   String get _ipObjetivo =>
-      controller.lectorEncontrado.value?.ip ??
-      (_ip.isNotEmpty ? _ip : (RfidConfig.getCurrentIP() ?? ''));
+      controller.lectorEncontrado.value?.ip ?? RfidConfig.getCurrentIP() ?? '';
 
   Future<void> _abrirAsistente({required bool cambiarWifi}) async {
     await abrirAgregarLector(cambiarWifi: cambiarWifi);
     if (!mounted) return;
     if (RfidConfig.isConfigured) {
-      _ipCtrl.text = RfidConfig.getCurrentIP() ?? '';
       await controller.comprobarLector();
     }
   }

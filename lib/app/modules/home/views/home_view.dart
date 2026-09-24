@@ -43,7 +43,7 @@ class HomeView extends GetView<HomeController> {
       });
     }
 
-    return Scaffold(
+    final pantalla = Scaffold(
       backgroundColor: AppColors.backgroundColor,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -109,8 +109,17 @@ class HomeView extends GetView<HomeController> {
         ),
       ),
       // Diálogo de bienvenida RFID en segundo plano
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: const BackgroundWelcomeDialog(),
+    );
+
+    // El aviso del lector (bienvenida, salida, tarjeta no registrada) va
+    // ENCIMA de toda la pantalla. Antes iba en el hueco del botón flotante:
+    // el Scaffold lo acomodaba como un botón, con margen abajo, y la pantalla
+    // negra quedaba subida, con la X escondida bajo la barra de estado.
+    return Stack(
+      children: [
+        pantalla,
+        const Positioned.fill(child: BackgroundWelcomeDialog()),
+      ],
     );
   }
 

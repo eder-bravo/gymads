@@ -130,6 +130,23 @@ void main() {
       expect(acceso.lecturas, 2);
     });
 
+    test(
+        'un tour visto justo cuando cambió el rol cuenta para el rol con '
+        'el que se vio', () async {
+      acceso = _AccesoFalso({});
+      sesion = empleado('mostrador');
+      final tours = servicio();
+      expect(await tours.isPending(AppTours.home), isTrue);
+
+      // Le cambian el rol mientras terminaba el tour de Inicio de Mostrador.
+      sesion = empleado('almacen');
+      await tours.marcarVistosParaPruebas([AppTours.home], rol: 'mostrador');
+
+      expect(acceso.guardados, {'mostrador:home'});
+      // El de Almacén sigue pendiente: es otro menú.
+      expect(await tours.isPending(AppTours.home), isTrue);
+    });
+
     test('lo que ya vio se lee una sola vez de la base', () async {
       acceso = _AccesoFalso({});
       sesion = empleado('mostrador');

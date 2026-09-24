@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../core/permissions/permissions.dart';
 import '../../../core/widgets/tour_step.dart';
 
+import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/background_welcome_dialog.dart';
@@ -13,8 +14,18 @@ import '../widgets/background_welcome_dialog.dart';
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
 
+  /// Se redibuja cuando cambia el perfil: si el dueño le cambia el rol a
+  /// quien usa la app, el menú (y el tour de Inicio) pasan a ser los del rol
+  /// nuevo sin cerrar sesión.
   @override
   Widget build(BuildContext context) {
+    return Obx(() {
+      TenantContextService.to.staffProfileRx.value;
+      return _pantalla(context);
+    });
+  }
+
+  Widget _pantalla(BuildContext context) {
     // `sizeOf` y no `of`: este último crea dependencia con el MediaQueryData
     // entero —`viewInsets` incluido—, así que la animación del teclado
     // reconstruía esta pantalla en cada frame aunque estuviera oculta debajo.

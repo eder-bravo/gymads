@@ -141,6 +141,11 @@ class WelcomeTourService extends GetxService {
   /// callbacks de `ShowcaseView` se registran una sola vez para todos.
   String? _activeTour;
 
+  /// Con qué rol se inició [_activeTour]. Al darlo por visto cuenta ese rol,
+  /// no el actual: si el rol cambia justo cuando termina, el recorrido se vio
+  /// con el anterior.
+  String? _rolDelTour;
+
   /// Si el recorrido en curso llegó a pintar algún paso. Distingue "el usuario
   /// lo vio" de "se cerró solo sin enseñar nada", que son cosas muy distintas
   /// a la hora de darlo por visto.
@@ -257,6 +262,7 @@ class WelcomeTourService extends GetxService {
 
       _startedTours.add(tourId);
       _activeTour = tourId;
+      _rolDelTour = _sesion().rol;
       _activeTourShown = false;
       // Un respiro para que la transición de ruta termine de asentarse antes
       // de pintar el resaltado.
@@ -298,8 +304,10 @@ class WelcomeTourService extends GetxService {
   /// viejas dejan de existir. Ese caso no cuenta como visto.
   Future<void> _onFinish() async {
     final finished = _activeTour;
+    final rol = _rolDelTour;
     final wasShown = _activeTourShown;
     _activeTour = null;
+    _rolDelTour = null;
     _activeTourShown = false;
     if (finished == null) return;
 
@@ -308,7 +316,7 @@ class WelcomeTourService extends GetxService {
       _attempts[finished] = (_attempts[finished] ?? 0) + 1;
       return;
     }
-    await _markSeen([finished]);
+    await _markSeen([finished], rol: rol);
   }
 
   /// El usuario tocó "Saltar". Cuenta como visto igual que llegar al final, y
@@ -316,22 +324,48 @@ class WelcomeTourService extends GetxService {
   /// sobre la de Abonar, que el usuario todavía no ha visto.
   Future<void> _onDismiss() async {
     final dismissed = _activeTour;
+    final rol = _rolDelTour;
     _activeTour = null;
+    _rolDelTour = null;
     _activeTourShown = false;
     if (dismissed == null) return;
-    await _markSeen([dismissed]);
+    await _markSeen([dismissed], rol: rol);
   }
 
-  Future<void> _markSeen(List<String> tourIds) async {
+  /// Cierra el recorrido que esté en pantalla SIN darlo por visto.
+  ///
+  /// Para cuando la app tiene que irse de la pantalla por su cuenta (le
+  /// cambiaron el rol a quien la usa, o le retiraron el acceso): el recorrido
+  /// no se terminó de ver y debe poder salir otra vez. Se suelta
+  /// [_activeTour] ANTES de cerrarlo, para que `_onDismiss`/`_onFinish` no lo
+  /// marquen.
+  void cancelarRecorridoEnCurso() {
+    final activo = _activeTour;
+    if (activo == null) return;
+    _activeTour = null;
+    _rolDelTour = null;
+    _activeTourShown = false;
+    _startedTours.remove(activo);
+
+    final showcaseView = _showcaseView;
+    if (showcaseView != null && showcaseView.isShowcaseRunning) {
+      showcaseView.dismiss();
+    }
+  }
+
+  /// [rol]: con el que se vio (por defecto, el actual).
+  Future<void> _markSeen(List<String> tourIds, {String? rol}) async {
     final sesion = _sesion();
     final gymId = sesion.gymId;
     if (gymId == null) return;
 
     if (sesion.esEmpleado) {
-      _vistosEmpleado?.addAll(tourIds);
+      final rolVisto = rol ?? sesion.rol;
+      // Lo que se recuerda en memoria es del rol actual.
+      if (rolVisto == sesion.rol) _vistosEmpleado?.addAll(tourIds);
       for (final tourId in tourIds) {
         try {
-          await _toursDelEmpleado.marcarVisto(sesion.rol, tourId);
+          await _toursDelEmpleado.marcarVisto(rolVisto, tourId);
         } catch (e) {
           // En esta sesión ya no se repite (queda en memoria); si no llegó a
           // la base, se volverá a ver una vez más en otra sesión.
@@ -349,6 +383,6 @@ class WelcomeTourService extends GetxService {
   }
 
   @visibleForTesting
-  Future<void> marcarVistosParaPruebas(List<String> tourIds) =>
-      _markSeen(tourIds);
+  Future<void> marcarVistosParaPruebas(List<String> tourIds, {String? rol}) =>
+      _markSeen(tourIds, rol: rol);
 }

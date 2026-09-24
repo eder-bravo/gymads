@@ -31,6 +31,22 @@ class StaffProfileProvider {
     }
   }
 
+  /// El perfil de [userId] tal como está ahora en la base, para notar un
+  /// cambio de rol o una revocación con la app abierta.
+  ///
+  /// A diferencia de [getByUserId], no filtra `is_active` (un perfil revocado
+  /// vuelve con `isActive` false) y NO atrapa los errores: sin red lanza, para
+  /// no confundir "no hay conexión" con "ya no tiene acceso". Null solo si la
+  /// fila ya no existe.
+  Future<StaffProfileModel?> obtenerPerfil(String userId) async {
+    final response = await _supabase
+        .from('staff_profiles')
+        .select('*, gyms(name, created_at, payment_mode)')
+        .eq('user_id', userId)
+        .maybeSingle();
+    return response == null ? null : StaffProfileModel.fromJson(response);
+  }
+
   /// Get staff profile by ID
   Future<StaffProfileModel?> getById(String id) async {
     try {

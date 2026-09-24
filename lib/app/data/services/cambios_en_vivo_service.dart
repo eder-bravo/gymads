@@ -13,7 +13,12 @@ enum TablaEnVivo {
   productos('products'),
   categorias('product_categories'),
   ingresos('ingresos'),
-  accesos('access_logs');
+  accesos('access_logs'),
+
+  /// El perfil de quien usa la app (su rol, si sigue activo). A diferencia de
+  /// las demás, no se filtra por gimnasio sino por su `user_id`: solo importa
+  /// la fila propia.
+  miPerfil('staff_profiles');
 
   const TablaEnVivo(this.nombre);
 
@@ -48,7 +53,10 @@ class CambiosEnVivoService extends GetxService with WidgetsBindingObserver {
   final _pendientes = <TablaEnVivo>{};
   Timer? _agrupar;
   RealtimeChannel? _canal;
-  String? _gymDelCanal;
+
+  /// De qué gimnasio y persona es el canal abierto: otra persona en el mismo
+  /// gimnasio necesita su propio filtro de [TablaEnVivo.miPerfil].
+  String? _claveDelCanal;
   bool _suscritoAntes = false;
   DateTime? _enSegundoPlanDesde;
   Worker? _alCambiarSesion;
@@ -99,29 +107,34 @@ class CambiosEnVivoService extends GetxService with WidgetsBindingObserver {
   /// Abre el canal del gimnasio de la sesión; sin sesión, lo cierra. Al
   /// cambiar de cuenta se cierra el del gimnasio anterior.
   void _abrirCanal() {
-    final gymId = TenantContextService.to.currentGymId;
-    if (gymId == _gymDelCanal && _canal != null) return;
+    final tenant = TenantContextService.to;
+    final gymId = tenant.currentGymId;
+    final userId = tenant.userId;
+    final clave = '$gymId|$userId';
+    if (clave == _claveDelCanal && _canal != null) return;
 
     _cerrarCanal();
     if (gymId == null || gymId.isEmpty) return;
 
     final supabase = Supabase.instance.client;
-    var canal = supabase.channel('cambios-en-vivo:$gymId');
+    var canal = supabase.channel('cambios-en-vivo:$gymId:$userId');
     for (final tabla in TablaEnVivo.values) {
+      final esMiPerfil = tabla == TablaEnVivo.miPerfil;
+      if (esMiPerfil && (userId == null || userId.isEmpty)) continue;
       canal = canal.onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: tabla.nombre,
         filter: PostgresChangeFilter(
           type: PostgresChangeFilterType.eq,
-          column: 'gym_id',
-          value: gymId,
+          column: esMiPerfil ? 'user_id' : 'gym_id',
+          value: esMiPerfil ? userId! : gymId,
         ),
         callback: (_) => anotar([tabla]),
       );
     }
 
-    _gymDelCanal = gymId;
+    _claveDelCanal = clave;
     _suscritoAntes = false;
     _canal = canal.subscribe((estado, error) {
       switch (estado) {
@@ -145,7 +158,7 @@ class CambiosEnVivoService extends GetxService with WidgetsBindingObserver {
   void _cerrarCanal() {
     final canal = _canal;
     _canal = null;
-    _gymDelCanal = null;
+    _claveDelCanal = null;
     if (canal != null) {
       unawaited(Supabase.instance.client.removeChannel(canal));
     }

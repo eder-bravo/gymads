@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
@@ -6,7 +8,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../data/models/staff_profile_model.dart';
 import '../../../data/providers/staff_profile_provider.dart';
+import '../../../core/permissions/staff_role.dart';
+import '../../../core/utils/snackbar_helper.dart';
+import '../../../data/services/cambio_de_perfil.dart';
+import '../../../data/services/cambios_en_vivo_service.dart';
 import '../../../data/services/tenant_context_service.dart';
+import '../../../data/services/welcome_tour_service.dart';
 import '../../../routes/app_pages.dart';
 import 'register_controller.dart';
 
@@ -27,11 +34,87 @@ class AuthController extends GetxController {
   final RxnString errorMessage = RxnString();
   final RxBool obscurePassword = true.obs;
 
+  StreamSubscription<void>? _perfilEnVivo;
+
+  /// Revisiones del perfil encadenadas: dos avisos seguidos no se enciman.
+  Future<void> _revisandoPerfil = Future.value();
+
+  @override
+  void onInit() {
+    super.onInit();
+    // Si el dueño le cambia el rol o le retira el acceso a quien usa la app,
+    // se refleja al momento, sin cerrar sesión. También se revisa al
+    // reconectarse o al volver de un rato en segundo plano (CambiosEnVivo
+    // avisa entonces de todas las tablas).
+    _perfilEnVivo =
+        CambiosEnVivoService.cambiosEn({TablaEnVivo.miPerfil}).listen((_) {
+      _revisandoPerfil = _revisandoPerfil.then((_) => refrescarPerfil());
+    });
+  }
+
   @override
   void onClose() {
+    _perfilEnVivo?.cancel();
     emailController.dispose();
     passwordController.dispose();
     super.onClose();
+  }
+
+  /// Vuelve a leer el perfil de quien usa la app y aplica lo que cambió.
+  Future<void> refrescarPerfil() async {
+    final tenant = TenantContextService.to;
+    final actual = tenant.staffProfile;
+    final userId = _supabase.auth.currentUser?.id;
+    if (actual == null || userId == null) return;
+
+    final StaffProfileModel? nuevo;
+    try {
+      nuevo = await _staffProfileProvider.obtenerPerfil(userId);
+    } catch (e) {
+      // Sin red no se sabe nada: se revisa otra vez al reconectarse.
+      AppLogger.warning('AuthController', 'No se pudo revisar el perfil: $e');
+      return;
+    }
+    // La sesión pudo cambiar mientras se consultaba.
+    if (tenant.staffProfile?.id != actual.id) return;
+
+    switch (cambioDePerfil(actual, nuevo)) {
+      case CambioDePerfil.sinCambios:
+        return;
+      case CambioDePerfil.datos:
+        await tenant.setProfile(nuevo!);
+      case CambioDePerfil.rol:
+        await _aplicarRolNuevo(nuevo!);
+      case CambioDePerfil.sinAcceso:
+        AppLogger.warning('AuthController', 'El acceso fue retirado');
+        WelcomeTourService.to.cancelarRecorridoEnCurso();
+        await logout();
+        SnackbarHelper.info(
+            'Sin acceso', 'Tu acceso fue retirado. Pide un código nuevo.');
+    }
+  }
+
+  /// El rol cambió: de vuelta a Inicio con el menú (y el tour) del rol nuevo.
+  Future<void> _aplicarRolNuevo(StaffProfileModel nuevo) async {
+    // Un tour a medias apunta a pantallas que se van a cerrar; se corta sin
+    // darlo por visto.
+    WelcomeTourService.to.cancelarRecorridoEnCurso();
+
+    // Se regresa al Inicio que ya está debajo, en vez de abrir otro: con
+    // offAllNamed habría dos Inicios montados a la vez con las mismas claves
+    // de los pasos del tour.
+    Get.until((ruta) => ruta.settings.name == Routes.HOME || ruta.isFirst);
+    final ruta = Get.currentRoute;
+    if (ruta != Routes.HOME && ruta != Routes.PERMISOS) {
+      Get.offAllNamed(Routes.HOME);
+    }
+
+    // Después de regresar: con Inicio al frente, su redibujo (Obx sobre el
+    // perfil) arranca el tour de Inicio si este rol no lo ha visto.
+    await TenantContextService.to.setProfile(nuevo);
+
+    final rol = StaffRole.fromString(nuevo.role).label;
+    SnackbarHelper.info('Rol actualizado', 'Ahora tu rol es $rol');
   }
 
   /// Toggle password visibility

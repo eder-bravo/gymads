@@ -13,9 +13,10 @@ import '../../../data/services/gym_settings_service.dart';
 import '../../../data/services/pdf_report_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../services/entradas_pdf_builder.dart';
+import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 
 class AccessLogsController extends GetxController
-    with ScreenTourMixin, PeriodoFiltroMixin {
+    with ScreenTourMixin, PeriodoFiltroMixin, RecargaEnVivoMixin {
   // Estados reactivos
   final isLoading = false.obs;
   final accessLogs = <AccessLogModel>[].obs;
@@ -59,6 +60,9 @@ class AccessLogsController extends GetxController
     _cargarPreferenciaFranjas();
     // Abre en el día de hoy; `iniciarEnHoy` dispara la carga.
     iniciarEnHoy();
+    // Las entradas del lector (y las de otros teléfonos) aparecen solas.
+    recargarAlCambiar(
+        {TablaEnVivo.accesos}, () => loadAccessLogs(silencioso: true));
   }
 
   Future<void> _cargarPreferenciaFranjas() async {
@@ -80,11 +84,15 @@ class AccessLogsController extends GetxController
     ajustes.value = await GymSettingsService.current();
   }
 
-  /// Cargar los accesos del periodo seleccionado
-  Future<void> loadAccessLogs() async {
+  /// Cargar los accesos del periodo seleccionado. [silencioso]: sin spinner
+  /// ni mensajes de error, y si falla se conserva lo que ya se veía
+  /// (recarga automática).
+  Future<void> loadAccessLogs({bool silencioso = false}) async {
     try {
-      isLoading.value = true;
-      errorMessage.value = '';
+      if (!silencioso) {
+        isLoading.value = true;
+        errorMessage.value = '';
+      }
 
       final desde = fechaInicio.value;
       final hasta = fechaFin.value;
@@ -93,6 +101,7 @@ class AccessLogsController extends GetxController
       final logs = await AccessLogService.getAccessLogsByDate(desde, hasta);
 
       if (logs == null) {
+        if (silencioso) return;
         errorMessage.value = 'No se pudieron cargar los registros';
         accessLogs.clear();
         AppLogger.error('AccessLogsController', 'Error: no se pudieron cargar los logs');
@@ -104,13 +113,14 @@ class AccessLogsController extends GetxController
       AppLogger.info(
           'AccessLogsController', '${logs.length} accesos cargados');
     } catch (e) {
+      AppLogger.error('AccessLogsController', 'Excepción al cargar logs', e);
+      if (silencioso) return;
       errorMessage.value = 'Error al cargar registros: ${e.toString()}';
       accessLogs.clear();
-      AppLogger.error('AccessLogsController', 'Excepción al cargar logs', e);
       SnackbarHelper.error(
           'Error', 'No se pudieron cargar los registros de acceso');
     } finally {
-      isLoading.value = false;
+      if (!silencioso) isLoading.value = false;
     }
   }
 

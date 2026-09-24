@@ -1,8 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:showcaseview/showcaseview.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/permissions/staff_role.dart';
 import 'tenant_context_service.dart';
 
 /// Identificadores de los recorridos guiados: uno por pantalla principal.
@@ -36,6 +39,59 @@ class AppTours {
   ];
 }
 
+/// Dónde se guardan los recorridos que ya vio un empleado: en su acceso
+/// (`staff_accesos.tours_vistos`), no en el teléfono, y por ROL.
+///
+/// Su acceso es lo único estable del empleado: regenerarle el código borra su
+/// perfil y su usuario, y un cambio de rol solo cambia el rol. Y se cuentan
+/// por rol, no solo por pantalla: quien fue Encargado (que ve todas las
+/// pantallas) y pasa a Almacén debe ver los recorridos de Almacén. Así:
+/// - un código nuevo no le vuelve a mostrar nada;
+/// - un rol que nunca usó le enseña los recorridos de ese rol;
+/// - al regresar a un rol que ya tuvo, ya estaban vistos.
+abstract class ToursDelEmpleado {
+  /// Los recorridos ya vistos con el rol [rol]. Null si quien usa la app no
+  /// es un empleado con acceso.
+  Future<Set<String>?> vistos(String rol);
+
+  Future<void> marcarVisto(String rol, String tourId);
+}
+
+class ToursDelEmpleadoSupabase implements ToursDelEmpleado {
+  @override
+  Future<Set<String>?> vistos(String rol) async {
+    final respuesta = await Supabase.instance.client
+        .rpc('mis_tours_vistos', params: {'p_rol': rol});
+    if (respuesta == null) return null;
+    return {for (final tour in respuesta as List) tour as String};
+  }
+
+  /// Con el rol con el que se mostró: si el dueño se lo cambió justo en ese
+  /// momento, cuenta el que vio.
+  @override
+  Future<void> marcarVisto(String rol, String tourId) =>
+      Supabase.instance.client
+          .rpc('marcar_tour_visto', params: {'p_tour': tourId, 'p_rol': rol});
+}
+
+/// Quién usa la app y con qué rol, para saber de dónde salen sus recorridos.
+typedef SesionTour = ({
+  String? gymId,
+  String? perfilId,
+  String rol,
+  bool esEmpleado,
+});
+
+SesionTour _sesionActual() {
+  final tenant = TenantContextService.to;
+  return (
+    gymId: tenant.currentGymId,
+    perfilId: tenant.staffProfileRx.value?.id,
+    rol: tenant.rol.value,
+    esEmpleado: tenant.rol != StaffRole.ownerAdmin,
+  );
+}
+
 /// Dueño de los tours de bienvenida de toda la app.
 ///
 /// Vive como servicio permanente y no dentro de cada controlador de pantalla a
@@ -45,7 +101,24 @@ class AppTours {
 /// (sale en silencio por su guarda interna `_mounted`). Registrándolo una sola
 /// vez para toda la vida de la app, ese problema desaparece.
 class WelcomeTourService extends GetxService {
+  WelcomeTourService({
+    ToursDelEmpleado? toursDelEmpleado,
+    SesionTour Function()? sesion,
+  })  : _toursDelEmpleado = toursDelEmpleado ?? ToursDelEmpleadoSupabase(),
+        _sesion = sesion ?? _sesionActual;
+
   static WelcomeTourService get to => Get.find<WelcomeTourService>();
+
+  final ToursDelEmpleado _toursDelEmpleado;
+  final SesionTour Function() _sesion;
+
+  /// Recorridos ya vistos por el empleado en sesión con su rol actual, leídos
+  /// una vez de la base. Null mientras no se han leído.
+  Set<String>? _vistosEmpleado;
+
+  /// De quién, y con qué rol, es lo que se recuerda en memoria (recorridos
+  /// iniciados, intentos y [_vistosEmpleado]).
+  String? _sesionEnMemoria;
 
   ShowcaseView? _showcaseView;
 
@@ -73,16 +146,15 @@ class WelcomeTourService extends GetxService {
   /// a la hora de darlo por visto.
   bool _activeTourShown = false;
 
-  /// Clave (por gimnasio y recorrido) que lo marca como pendiente.
+  /// Clave (por gimnasio y recorrido) que marca un recorrido del DUEÑO como
+  /// pendiente.
   ///
-  /// Las escriben los dos puntos de entrada a un gimnasio: el asistente de
-  /// configuración inicial, para el dueño recién registrado, y el canje del
-  /// código, para cada empleado nuevo. Los gimnasios que ya existían antes de
-  /// esta función nunca las tienen y por eso nunca ven los recorridos.
+  /// La escribe el asistente de configuración inicial, al registrar el
+  /// gimnasio. Los gimnasios que ya existían antes de esta función nunca la
+  /// tienen y por eso su dueño nunca ve los recorridos.
   ///
-  /// Ojo: vive en el disco del dispositivo, no en la base. Marcarlas en el
-  /// teléfono del dueño no hace nada por el del empleado; de ahí que cada
-  /// entrada tenga que marcarlas por su cuenta.
+  /// Vive en el disco del dispositivo. Los de los empleados no: van en su
+  /// acceso, en la base ([ToursDelEmpleado]).
   static String _pendingKey(String gymId, String tourId) =>
       'onboarding_tour_pending_${gymId}_$tourId';
 
@@ -100,14 +172,14 @@ class WelcomeTourService extends GetxService {
     return this;
   }
 
-  /// Marca todos los recorridos como pendientes para el gimnasio actual.
+  /// Marca todos los recorridos del dueño como pendientes para el gimnasio
+  /// actual.
   ///
-  /// La llaman el asistente de configuración inicial (dueño) y el canje del
-  /// código (empleado). Necesita que [TenantContextService] ya tenga el
-  /// perfil cargado: sin `gym_id` no hay clave que escribir y sale en
-  /// silencio.
+  /// La llama el asistente de configuración inicial. Necesita que
+  /// [TenantContextService] ya tenga el perfil cargado: sin `gym_id` no hay
+  /// clave que escribir y sale en silencio.
   Future<void> markPending() async {
-    final gymId = TenantContextService.to.currentGymId;
+    final gymId = _sesion().gymId;
     if (gymId == null) return;
     final prefs = await SharedPreferences.getInstance();
     for (final tourId in AppTours.all) {
@@ -116,10 +188,44 @@ class WelcomeTourService extends GetxService {
   }
 
   Future<bool> isPending(String tourId) async {
-    final gymId = TenantContextService.to.currentGymId;
+    final sesion = _sesion();
+    final gymId = sesion.gymId;
     if (gymId == null) return false;
+    _recordarSesion(sesion);
+
+    if (sesion.esEmpleado) {
+      final vistos = await _vistosDelEmpleado(sesion.rol);
+      // Sin acceso (null) o sin red no se muestra: mejor no enseñar un
+      // recorrido que repetirlo. Sin red se reintenta en la siguiente visita.
+      return vistos != null && !vistos.contains(tourId);
+    }
+
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_pendingKey(gymId, tourId)) ?? false;
+  }
+
+  Future<Set<String>?> _vistosDelEmpleado(String rol) async {
+    final enMemoria = _vistosEmpleado;
+    if (enMemoria != null) return enMemoria;
+    try {
+      return _vistosEmpleado = await _toursDelEmpleado.vistos(rol);
+    } catch (e) {
+      AppLogger.warning('WelcomeTourService',
+          'No se pudieron leer los recorridos vistos: $e');
+      return null;
+    }
+  }
+
+  /// Si ahora usa la app otra persona (cerró sesión y entró otra en el mismo
+  /// teléfono) o la misma con otro rol, se olvida lo que se recordaba: los
+  /// recorridos iniciados con el rol anterior no dicen nada de los del nuevo.
+  void _recordarSesion(SesionTour sesion) {
+    final clave = '${sesion.perfilId}|${sesion.rol}';
+    if (clave == _sesionEnMemoria) return;
+    _sesionEnMemoria = clave;
+    _vistosEmpleado = null;
+    _startedTours.clear();
+    _attempts.clear();
   }
 
   /// Arranca el recorrido de una pantalla si sigue pendiente. Idempotente: se
@@ -128,6 +234,7 @@ class WelcomeTourService extends GetxService {
   /// * [tourId] - Uno de [AppTours].
   /// * [steps] - Las claves de los pasos, en el orden en que deben mostrarse.
   Future<void> startIfPending(String tourId, List<GlobalKey> steps) async {
+    _recordarSesion(_sesion());
     if (steps.isEmpty || _startedTours.contains(tourId)) return;
     if ((_attempts[tourId] ?? 0) >= _maxAttempts) return;
     // `add` devuelve false si ya estaba: un comprobar-y-marcar sin `await` de
@@ -216,11 +323,32 @@ class WelcomeTourService extends GetxService {
   }
 
   Future<void> _markSeen(List<String> tourIds) async {
-    final gymId = TenantContextService.to.currentGymId;
+    final sesion = _sesion();
+    final gymId = sesion.gymId;
     if (gymId == null) return;
+
+    if (sesion.esEmpleado) {
+      _vistosEmpleado?.addAll(tourIds);
+      for (final tourId in tourIds) {
+        try {
+          await _toursDelEmpleado.marcarVisto(sesion.rol, tourId);
+        } catch (e) {
+          // En esta sesión ya no se repite (queda en memoria); si no llegó a
+          // la base, se volverá a ver una vez más en otra sesión.
+          AppLogger.warning('WelcomeTourService',
+              'No se pudo guardar el recorrido visto: $e');
+        }
+      }
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     for (final tourId in tourIds) {
       await prefs.remove(_pendingKey(gymId, tourId));
     }
   }
+
+  @visibleForTesting
+  Future<void> marcarVistosParaPruebas(List<String> tourIds) =>
+      _markSeen(tourIds);
 }

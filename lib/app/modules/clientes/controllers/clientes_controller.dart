@@ -11,8 +11,10 @@ import 'package:gymads/app/data/services/background_rfid_service.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
+import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 
-class ClientesController extends GetxController with ScreenTourMixin {
+class ClientesController extends GetxController
+    with ScreenTourMixin, RecargaEnVivoMixin {
   final UserRepository userRepository;
   final IngresoService? ingresoService; // Opcional
 
@@ -61,6 +63,9 @@ class ClientesController extends GetxController with ScreenTourMixin {
   void onInit() {
     super.onInit();
     fetchClientes();
+    // Un cliente dado de alta (o un abono) en otro teléfono aparece solo.
+    recargarAlCambiar(
+        {TablaEnVivo.clientes}, () => fetchClientes(silencioso: true));
     _initializeImageCache();
     
     // Si venimos de un redirect para editar un cliente
@@ -120,9 +125,10 @@ class ClientesController extends GetxController with ScreenTourMixin {
     );
   }
 
-  // Método para obtener todos los clientes
-  Future<void> fetchClientes() async {
-    isLoading.value = true;
+  // Método para obtener todos los clientes. [silencioso]: sin spinner ni
+  // mensajes de error (recarga automática).
+  Future<void> fetchClientes({bool silencioso = false}) async {
+    if (!silencioso) isLoading.value = true;
     try {
       final users = await userRepository.getAllUsers();
       clientes.assignAll(users);
@@ -132,13 +138,17 @@ class ClientesController extends GetxController with ScreenTourMixin {
         _preloadClientImages(users);
       });
     } catch (e) {
+      if (silencioso) {
+        AppLogger.error('ClientesController', 'Error al recargar clientes', e);
+        return;
+      }
       _showSnackbarSafe(
         'Error',
         'No se pudieron cargar los clientes: $e',
         isError: true,
       );
     } finally {
-      isLoading.value = false;
+      if (!silencioso) isLoading.value = false;
     }
   }
 

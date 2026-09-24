@@ -68,10 +68,18 @@ class Refrescable extends StatelessWidget {
   /// Se parte de la física del contexto con `copyWith` y no de un
   /// `ScrollBehavior` nuevo: así se conservan el efecto de rebote de cada
   /// plataforma, la barra de desplazamiento y los dispositivos de arrastre.
+  ///
+  /// OJO: la física nueva debe llevar como padre la de la plataforma. Sin
+  /// padre, `AlwaysScrollableScrollPhysics` no tiene límites ni rebote: la
+  /// lista se podía arrastrar fuera de la pantalla y se quedaba ahí.
   Widget _imponerScroll(BuildContext context) {
+    final comportamiento = ScrollConfiguration.of(context);
     return ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context)
-          .copyWith(physics: const AlwaysScrollableScrollPhysics()),
+      behavior: comportamiento.copyWith(
+        physics: AlwaysScrollableScrollPhysics(
+          parent: comportamiento.getScrollPhysics(context),
+        ),
+      ),
       child: child,
     );
   }

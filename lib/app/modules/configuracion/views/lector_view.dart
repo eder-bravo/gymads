@@ -7,8 +7,13 @@ import '../../../data/config/rfid_config.dart';
 import '../../../data/services/background_rfid_service.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
+import 'agregar_lector_view.dart';
 
-/// El lector de tarjetas de este gimnasio: a qué IP está y a quién pertenece.
+/// El lector de tarjetas de este gimnasio.
+///
+/// Nadie tiene que saber de IPs: "Agregar lector" lo configura por
+/// Bluetooth y la app lo encuentra sola en la red. La IP solo aparece en
+/// "Opciones avanzadas".
 ///
 /// Un lector solo atiende al gimnasio que lo reclamó. Sin eso, dos gimnasios
 /// en la misma red WiFi recibían la alerta del mismo pase de tarjeta, porque
@@ -36,8 +41,28 @@ class _LectorViewState extends State<LectorView> {
 
     // Se pregunta al entrar, no en build: build se repite y volvería a
     // consultar al lector en cada frame.
+    _cargar();
+  }
+
+  /// Con "Usar el lector" apagado la configuración guardada no se había
+  /// leído, y la pantalla decía "Sin lector" aunque hubiera uno.
+  Future<void> _cargar() async {
+    controller.comprobandoLector.value = true;
+    // Carga el lector de ESTE gimnasio y su interruptor "Usar el lector".
+    await controller.cargarEstadoLector();
+    if (!mounted) return;
+    controller.comprobandoLector.value = false;
+
+    controller.lectorEncontrado.value = null;
     if (RfidConfig.isConfigured) {
-      controller.comprobarLector();
+      _ipCtrl.text = RfidConfig.getCurrentIP() ?? '';
+      await controller.comprobarLector();
+    } else {
+      // El gimnasio puede tener lector registrado aunque ahora no conteste
+      // (apagado, sin WiFi, recién formateado): no es lo mismo que no tener.
+      controller.estadoLector.value = RfidConfig.tieneLector
+          ? EstadoLector.sinConexion
+          : EstadoLector.sinConfigurar;
     }
   }
 
@@ -62,8 +87,6 @@ class _LectorViewState extends State<LectorView> {
             children: [
               Obx(() => _tarjetaEstado()),
               const SizedBox(height: 20),
-              _campoIp(),
-              const SizedBox(height: 16),
               Obx(() => _acciones()),
               const SizedBox(height: 24),
               _interruptorLector(),
@@ -72,7 +95,9 @@ class _LectorViewState extends State<LectorView> {
                 const SizedBox(height: 12),
                 _interruptorAvisosAqui(),
               ],
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              _opcionesAvanzadas(),
+              const SizedBox(height: 16),
               _ayuda(),
             ],
           ),
@@ -97,16 +122,20 @@ class _LectorViewState extends State<LectorView> {
       case EstadoLector.mio:
         icono = Icons.verified_user;
         color = AppColors.success;
-        titulo = 'Vinculado a tu gimnasio';
+        titulo = RfidConfig.nombreLector == null
+            ? 'Vinculado a tu gimnasio'
+            : '${RfidConfig.nombreLector} · vinculado a tu gimnasio';
         detalle = 'Este lector solo atiende a tu gimnasio. '
             'Ningún otro puede leer tus tarjetas.';
         break;
       case EstadoLector.libre:
         icono = Icons.lock_open;
         color = AppColors.warning;
-        titulo = 'Lector sin vincular';
-        detalle = 'Todavía no pertenece a ningún gimnasio. '
-            'Vincúlalo para que solo responda al tuyo.';
+        titulo = controller.lectorEncontrado.value == null
+            ? 'Lector sin vincular'
+            : '${controller.lectorEncontrado.value!.nombre} · sin vincular';
+        detalle = 'Encontré este lector en tu red y todavía no pertenece a '
+            'ningún gimnasio. Vincúlalo para que solo responda al tuyo.';
         break;
       case EstadoLector.deOtroGimnasio:
         icono = Icons.block;
@@ -119,15 +148,20 @@ class _LectorViewState extends State<LectorView> {
       case EstadoLector.sinConexion:
         icono = Icons.wifi_off;
         color = AppColors.error;
-        titulo = 'No responde';
-        detalle = 'Revisa que el lector esté encendido y conectado a la misma '
-            'red WiFi que este teléfono.';
+        titulo = RfidConfig.nombreLector == null
+            ? 'Tu lector no aparece'
+            : '${RfidConfig.nombreLector} no aparece';
+        detalle = 'Tu gimnasio tiene un lector, pero no está en la red de este '
+            'teléfono. Si está apagado, enciéndelo. Si su luz parpadea '
+            'rápido, perdió su WiFi o lo reiniciaron: toca "Configurar el '
+            'lector".';
         break;
       case EstadoLector.sinConfigurar:
         icono = Icons.nfc;
         color = AppColors.textSecondary;
-        titulo = 'Sin lector configurado';
-        detalle = 'Escribe la dirección IP del lector para empezar.';
+        titulo = 'Sin lector';
+        detalle = 'Agrega tu lector: la app lo configura por Bluetooth, sin '
+            'escribir direcciones.';
         break;
     }
 
@@ -173,41 +207,67 @@ class _LectorViewState extends State<LectorView> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // IP del lector
+  // Opciones avanzadas: IP a mano
   // ─────────────────────────────────────────────────────────
 
-  Widget _campoIp() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Dirección IP del lector',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _ipCtrl,
-          keyboardType: TextInputType.number,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontFamily: 'monospace',
-          ),
-          decoration: InputDecoration(
-            hintText: '192.168.1.100',
-            hintStyle: TextStyle(color: AppColors.textHint.withOpacity(0.5)),
-            filled: true,
-            fillColor: AppColors.containerBackground,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+  /// Para quien sabe lo que hace (o para soporte): buscar el lector en una
+  /// IP concreta, y formatear uno ajeno.
+  Widget _opcionesAvanzadas() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          iconColor: AppColors.textSecondary,
+          collapsedIconColor: AppColors.textSecondary,
+          title: const Text(
+            'Opciones avanzadas',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
             ),
           ),
+          children: [
+            TextField(
+              controller: _ipCtrl,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontFamily: 'monospace',
+              ),
+              decoration: InputDecoration(
+                labelText: 'Dirección IP del lector',
+                labelStyle: const TextStyle(color: AppColors.textSecondary),
+                hintText: '192.168.1.50',
+                hintStyle:
+                    TextStyle(color: AppColors.textHint.withOpacity(0.5)),
+                filled: true,
+                fillColor: AppColors.containerBackground,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            _boton(
+              texto: 'Buscar lector en esa IP',
+              icono: Icons.search,
+              color: AppColors.info,
+              onTap: () {
+                controller.lectorEncontrado.value = null;
+                controller.comprobarLector(ip: _ip);
+              },
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -230,44 +290,64 @@ class _LectorViewState extends State<LectorView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _boton(
-          texto: 'Buscar lector en esa IP',
-          icono: Icons.search,
-          color: AppColors.info,
-          onTap: () => controller.comprobarLector(ip: _ip),
-        ),
+        if (estado == EstadoLector.sinConfigurar) ...[
+          _boton(
+            texto: 'Agregar lector',
+            icono: Icons.add,
+            color: AppColors.accent,
+            onTap: () => _abrirAsistente(cambiarWifi: false),
+          ),
+          const SizedBox(height: 10),
+          _botonSecundario(
+            texto: 'Ya tengo uno funcionando: buscarlo',
+            icono: Icons.wifi_find,
+            onTap: controller.buscarLectorEnRed,
+          ),
+        ],
+
+        if (estado == EstadoLector.sinConexion) ...[
+          // Si perdió el WiFi o lo reiniciaron, se está ofreciendo por
+          // Bluetooth: configurarlo lo vuelve a dejar funcionando (y lo
+          // vuelve a vincular si quedó libre).
+          _boton(
+            texto: 'Configurar el lector',
+            icono: Icons.bluetooth_searching,
+            color: AppColors.accent,
+            onTap: _cambiarWifi,
+          ),
+          const SizedBox(height: 10),
+          _botonSecundario(
+            texto: 'Buscar de nuevo en la red',
+            icono: Icons.wifi_find,
+            onTap: controller.buscarLectorEnRed,
+          ),
+        ],
 
         // Solo se ofrece vincular cuando el lector dijo que está libre:
         // intentarlo sobre uno ajeno devuelve 409 y no lleva a ningún lado.
-        if (estado == EstadoLector.libre) ...[
-          const SizedBox(height: 10),
+        if (estado == EstadoLector.libre)
           _boton(
             texto: 'Vincular a mi gimnasio',
             icono: Icons.link,
             color: AppColors.success,
-            onTap: () => controller.vincularLector(_ip),
+            onTap: () => controller.vincularLector(_ipObjetivo),
           ),
-        ],
 
         // Formatear un lector ajeno: es la salida para recuperar un aparato
         // vinculado a un gimnasio al que ya no se tiene acceso.
-        if (estado == EstadoLector.deOtroGimnasio) ...[
-          const SizedBox(height: 10),
+        if (estado == EstadoLector.deOtroGimnasio)
           _boton(
             texto: 'Formatear lector',
             icono: Icons.restart_alt,
             color: AppColors.error,
             onTap: _confirmarFormateo,
           ),
-        ],
 
         if (estado == EstadoLector.mio) ...[
-          const SizedBox(height: 10),
-          _boton(
-            texto: 'Cambiar la IP del lector',
-            icono: Icons.settings_ethernet,
-            color: AppColors.info,
-            onTap: _confirmarCambioIp,
+          _botonSecundario(
+            texto: 'Cambiar WiFi del lector',
+            icono: Icons.wifi,
+            onTap: _cambiarWifi,
           ),
           const SizedBox(height: 10),
           _boton(
@@ -278,6 +358,53 @@ class _LectorViewState extends State<LectorView> {
           ),
         ],
       ],
+    );
+  }
+
+  /// La IP del lector sobre el que se actúa en "Vincular" y "Formatear": el
+  /// que encontró la búsqueda en la red, el de "Buscar en esa IP", o el ya
+  /// guardado.
+  String get _ipObjetivo =>
+      controller.lectorEncontrado.value?.ip ??
+      (_ip.isNotEmpty ? _ip : (RfidConfig.getCurrentIP() ?? ''));
+
+  Future<void> _abrirAsistente({required bool cambiarWifi}) async {
+    await abrirAgregarLector(cambiarWifi: cambiarWifi);
+    if (!mounted) return;
+    if (RfidConfig.isConfigured) {
+      _ipCtrl.text = RfidConfig.getCurrentIP() ?? '';
+      await controller.comprobarLector();
+    }
+  }
+
+  /// Si el lector contesta, se le pide que se ofrezca por Bluetooth unos
+  /// minutos. Si no contesta (perdió el WiFi, lo reiniciaron), ya se está
+  /// ofreciendo solo: se abre el asistente directamente.
+  Future<void> _cambiarWifi() async {
+    final conectado = controller.estadoLector.value == EstadoLector.mio;
+    if (conectado) await RfidConfig.abrirModoConfiguracion();
+    await _abrirAsistente(cambiarWifi: conectado);
+  }
+
+  Widget _botonSecundario({
+    required String texto,
+    required IconData icono,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icono, size: 18),
+        label: Text(texto),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.accent,
+          side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
     );
   }
 
@@ -314,8 +441,9 @@ class _LectorViewState extends State<LectorView> {
         title: const Text('Desvincular el lector',
             style: TextStyle(color: AppColors.textPrimary)),
         content: const Text(
-          'El lector dejará de responder a tu gimnasio y cualquier otro podrá '
-          'reclamarlo. Podrás volver a vincularlo cuando quieras.',
+          'El lector olvidará tu gimnasio y tu WiFi, y se reiniciará. Quedará '
+          'listo para agregarse en cualquier lugar (su luz parpadea rápido).\n\n'
+          'Para volver a usarlo aquí, agrégalo de nuevo con "Agregar lector".',
           style: TextStyle(color: AppColors.textSecondary, height: 1.35),
         ),
         actions: [
@@ -362,49 +490,14 @@ class _LectorViewState extends State<LectorView> {
           ElevatedButton(
             onPressed: () => Get.back(result: true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Formatear',
-                style: TextStyle(color: Colors.white)),
+            child:
+                const Text('Formatear', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
 
-    if (confirmado == true) await controller.formatearLector(_ip);
-  }
-
-  Future<void> _confirmarCambioIp() async {
-    // Cambiar la IP reinicia el aparato y corta la conexión en curso, así que
-    // conviene avisar antes: durante unos segundos parecerá que no responde.
-    final confirmado = await Get.dialog<bool>(
-      AlertDialog(
-        scrollable: true,
-        backgroundColor: AppColors.cardBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Cambiar la IP',
-            style: TextStyle(color: AppColors.textPrimary)),
-        content: Text(
-          'El lector se reiniciará para quedarse en $_ip y tardará unos '
-          'segundos en volver. Úsalo si tienes más de un lector en la misma '
-          'red, para que no se estorben entre ellos.',
-          style: const TextStyle(
-              color: AppColors.textSecondary, height: 1.35),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Get.back(result: true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
-            child: const Text('Cambiar', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmado == true) await controller.cambiarIpLector(_ip);
+    if (confirmado == true) await controller.formatearLector(_ipObjetivo);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -488,8 +581,7 @@ class _LectorViewState extends State<LectorView> {
           subtitle: Text(
             detalle,
             style: TextStyle(
-                color: AppColors.textSecondary.withOpacity(0.8),
-                fontSize: 13),
+                color: AppColors.textSecondary.withOpacity(0.8), fontSize: 13),
           ),
           onChanged: servicio.setRecibirAvisosAqui,
         ),
@@ -512,11 +604,11 @@ class _LectorViewState extends State<LectorView> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              '¿El lector no responde en ninguna IP? Desconéctalo y vuelve a '
-              'conectarlo, y en los primeros 10 segundos mantén pulsado el '
-              'botón BOOT unos 3 segundos: sonará un pitido corto al empezar '
-              'y uno largo al confirmar. Eso lo deja libre y en la IP de '
-              'fábrica (192.168.1.100).',
+              'Para dejar el lector como nuevo: desconéctalo, vuelve a '
+              'conectarlo y, en los primeros 10 segundos, mantén pulsado el '
+              'botón BOOT unos 3 segundos. Suena un pitido corto al empezar '
+              'y uno largo al confirmar. Olvida el WiFi y el gimnasio, y su '
+              'luz parpadea rápido: ya se puede agregar de nuevo.',
               style: TextStyle(
                 color: AppColors.textSecondary.withOpacity(0.9),
                 fontSize: 12.5,

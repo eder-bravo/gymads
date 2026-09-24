@@ -3,9 +3,11 @@ import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
 import '../controllers/ingresos_controller.dart';
+import 'detalle_ingreso_sheet.dart';
 
 /// Tarjeta de una transacción de ingreso, reutilizable en la vista de
-/// ingresos del mes y en la vista de todas las transacciones.
+/// ingresos del mes y en la vista de todas las transacciones. Al tocarla se
+/// ve su detalle (en una venta, los productos que llevó).
 class TransactionTile extends StatelessWidget {
   final IngresoModel ingreso;
 
@@ -15,123 +17,132 @@ class TransactionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.find<IngresosController>();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.disabled.withOpacity(0.4)),
-      ),
-      child: Row(
-        children: [
-          // Icono del concepto
-          Container(
-            padding: const EdgeInsets.all(8),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => mostrarDetalleIngreso(context, ingreso),
+          child: Ink(
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: controller
-                  .getColorForConcepto(ingreso.concepto)
-                  .withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
+              color: AppColors.cardBackground,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.disabled.withOpacity(0.4)),
             ),
-            child: Icon(
-              _getIconForConcepto(ingreso.concepto),
-              color: controller.getColorForConcepto(ingreso.concepto),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Información de la transacción
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  ingreso.clienteNombre,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                // Icono del concepto
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: controller
+                        .getColorForConcepto(ingreso.concepto)
+                        .withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  child: Icon(
+                    _getIconForConcepto(ingreso.concepto),
+                    color: controller.getColorForConcepto(ingreso.concepto),
+                    size: 24,
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        ingreso.conceptoDescripcion,
+                const SizedBox(width: 12),
+
+                // Información de la transacción
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ingreso.clienteNombre,
                         style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: controller
-                            .getColorForMetodoPago(ingreso.metodoPago)
-                            .withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(10),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              ingreso.conceptoDescripcion,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: controller
+                                  .getColorForMetodoPago(ingreso.metodoPago)
+                                  .withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              ingreso.metodoPagoDescripcion,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: controller
+                                    .getColorForMetodoPago(ingreso.metodoPago),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        ingreso.metodoPagoDescripcion,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: controller
-                              .getColorForMetodoPago(ingreso.metodoPago),
-                          fontWeight: FontWeight.w500,
+                      if ((ingreso.referenciaPago ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Ref. ${ingreso.referenciaPago}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Monto y fecha
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      controller.formatCurrency(ingreso.montoFinal),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.success,
+                        fontSize: 17,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      controller.formatFechaCorta(ingreso.fecha),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
-                if ((ingreso.referenciaPago ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Ref. ${ingreso.referenciaPago}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
               ],
             ),
           ),
-          const SizedBox(width: 8),
-
-          // Monto y fecha
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                controller.formatCurrency(ingreso.montoFinal),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.success,
-                  fontSize: 17,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                controller.formatFechaCorta(ingreso.fecha),
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }

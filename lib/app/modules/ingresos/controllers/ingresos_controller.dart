@@ -9,9 +9,10 @@ import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/pdf_report_service.dart';
 import 'package:gymads/app/modules/ingresos/services/ingresos_pdf_builder.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
+import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 
 class IngresosController extends GetxController
-    with ScreenTourMixin, PeriodoFiltroMixin {
+    with ScreenTourMixin, PeriodoFiltroMixin, RecargaEnVivoMixin {
   final IngresoService ingresoService;
 
   IngresosController({required this.ingresoService});
@@ -29,6 +30,10 @@ class IngresosController extends GetxController
   // Todas las transacciones (sin filtro de mes) para la vista completa
   final RxList<IngresoModel> todasTransacciones = <IngresoModel>[].obs;
   final RxBool isLoadingTodas = false.obs;
+
+  // Qué productos se vendieron en el periodo (hoja "Productos vendidos").
+  final RxList<ProductoVendido> productosVendidos = <ProductoVendido>[].obs;
+  final RxBool isLoadingProductos = false.obs;
 
   // Filtros. El periodo y su rango los aporta PeriodoFiltroMixin.
   final selectedConcepto = Rx<String?>(null);
@@ -63,16 +68,32 @@ class IngresosController extends GetxController
     // `iniciarEnHoy` fija el rango completo (00:00 a 23:59:59) y dispara la
     // carga por `onPeriodoChanged`.
     iniciarEnHoy();
+    // Un abono o una venta hechos en otro teléfono aparecen solos.
+    recargarAlCambiar({TablaEnVivo.ingresos}, _recargarEnSilencio);
   }
 
   @override
   Future<void> onPeriodoChanged() => refreshData();
 
-  /// Obtiene las estadísticas de ingresos
-  Future<void> fetchEstadisticas() async {
+  /// Si la hoja "Productos vendidos" está abierta (se recarga con lo demás).
+  bool hojaProductosAbierta = false;
+
+  /// Como [refreshData], sin spinner ni mensajes de error.
+  Future<void> _recargarEnSilencio() => Future.wait([
+        fetchEstadisticas(silencioso: true),
+        fetchIngresos(),
+        fetchDatosGrafica(),
+        if (hojaProductosAbierta) fetchProductosVendidos(),
+      ]);
+
+  /// Obtiene las estadísticas de ingresos. [silencioso]: sin spinner ni
+  /// mensajes de error (recarga automática).
+  Future<void> fetchEstadisticas({bool silencioso = false}) async {
     try {
-      isLoading.value = true;
-      errorMessage.value = '';
+      if (!silencioso) {
+        isLoading.value = true;
+        errorMessage.value = '';
+      }
 
       AppLogger.info('IngresosController', 'Obteniendo estadísticas de ingresos');
 
@@ -84,11 +105,12 @@ class IngresosController extends GetxController
       estadisticas.value = stats;
     } catch (e) {
       AppLogger.error('IngresosController', 'Error al obtener estadísticas', e);
+      if (silencioso) return;
       errorMessage.value = 'Error al cargar estadísticas: $e';
 
       SnackbarHelper.error('Error', 'Error al cargar estadísticas: $e');
     } finally {
-      isLoading.value = false;
+      if (!silencioso) isLoading.value = false;
     }
   }
 
@@ -129,6 +151,23 @@ class IngresosController extends GetxController
           'Error', 'No se pudieron cargar todas las transacciones');
     } finally {
       isLoadingTodas.value = false;
+    }
+  }
+
+  /// Cuánto se vendió de cada producto en el periodo. Consulta aparte: la
+  /// lista de transacciones trae como máximo 50 y aquí cuentan todas.
+  Future<void> fetchProductosVendidos() async {
+    try {
+      isLoadingProductos.value = true;
+      final ventas = await ingresoService.getVentasDeProductos(
+        fechaInicio: fechaInicio.value,
+        fechaFin: fechaFin.value,
+      );
+      productosVendidos.assignAll(resumirProductosVendidos(ventas));
+    } catch (e) {
+      AppLogger.error('IngresosController', 'Error al obtener productos vendidos', e);
+    } finally {
+      isLoadingProductos.value = false;
     }
   }
 

@@ -19,8 +19,10 @@ import '../../../data/services/ocr_referencia_service.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../ingresos/controllers/ingresos_controller.dart';
+import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 
-class PointOfSaleController extends GetxController with ScreenTourMixin {
+class PointOfSaleController extends GetxController
+    with ScreenTourMixin, RecargaEnVivoMixin {
   final ProductRepository _productRepository = ProductRepository();
   final SaleRepository _saleRepository = SaleRepository();
 
@@ -204,6 +206,10 @@ class PointOfSaleController extends GetxController with ScreenTourMixin {
     loadProducts();
     loadCategories();
     _loadPinnedProducts();
+    // El stock cambia con las ventas de otro teléfono; un producto o una
+    // categoría nuevos aparecen solos.
+    recargarAlCambiar({TablaEnVivo.productos, TablaEnVivo.categorias},
+        () => Future.wait([loadProducts(silencioso: true), loadCategories()]));
   }
 
   /// Recarga todo lo que se ve en el mostrador.
@@ -225,16 +231,20 @@ class PointOfSaleController extends GetxController with ScreenTourMixin {
   /// existencias se sigue pudiendo cobrar, y el stock queda como faltante.
   /// Filtra por activos porque, al dejar de esconder los de stock 0, un
   /// producto desactivado aparecería en el mostrador.
-  Future<void> loadProducts() async {
+  ///
+  /// [silencioso]: sin spinner ni mensajes de error (recarga automática).
+  Future<void> loadProducts({bool silencioso = false}) async {
     try {
-      _isLoading.value = true;
+      if (!silencioso) _isLoading.value = true;
       final products = await _productRepository.getActiveProducts();
       _availableProducts.assignAll(products);
     } catch (e) {
       AppLogger.error('PointOfSaleController', 'Error al cargar productos', e);
-      SnackbarHelper.error('Error', 'No se pudieron cargar los productos');
+      if (!silencioso) {
+        SnackbarHelper.error('Error', 'No se pudieron cargar los productos');
+      }
     } finally {
-      _isLoading.value = false;
+      if (!silencioso) _isLoading.value = false;
     }
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -18,6 +20,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../routes/app_pages.dart';
+import '../../../data/services/lector_red_service.dart';
 
 class ConfiguracionController extends GetxController with ScreenTourMixin {
   // Variables observables para la configuración
@@ -48,6 +51,11 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   /// En qué estado está el lector respecto a ESTE gimnasio.
   final Rx<EstadoLector> estadoLector = EstadoLector.sinConfigurar.obs;
   final RxBool comprobandoLector = false.obs;
+
+  /// El lector que encontró la última búsqueda en la red cuando no es el de
+  /// este gimnasio (libre, o de otro): sobre él actúan "Vincular" y
+  /// "Formatear".
+  final Rxn<LectorEnRed> lectorEncontrado = Rxn<LectorEnRed>();
 
   /// Pregunta al lector de [ip] (o al ya configurado) de quién es.
   ///
@@ -92,6 +100,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
       switch (resultado) {
         case VinculacionResultado.ok:
           estadoLector.value = EstadoLector.mio;
+          lectorEncontrado.value = null;
           esp32IpAddress.value = ip;
           // El sondeo se había detenido al recibir el rechazo del lector, y
           // no se reanuda solo. Sin esto el dueño vería "Listo" y el lector
@@ -157,7 +166,8 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
         esp32IpAddress.value = '';
         esp32Connected.value = false;
         _detenerSondeo();
-        SnackbarHelper.success('Listo', 'El lector quedó libre');
+        SnackbarHelper.success('Listo',
+            'El lector quedó libre y olvidó el WiFi. Ya puedes llevarlo a otro lugar.');
       } else {
         SnackbarHelper.error('Error', 'No se pudo desvincular el lector.');
       }
@@ -183,23 +193,71 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     Get.find<BackgroundRfidService>().stopScanning();
   }
 
-  /// Le da al lector una IP fija propia.
+  /// Busca lectores en la red de este teléfono, sin saber su IP.
   ///
-  /// De fábrica todos traen la misma (192.168.1.100), así que dos lectores en
-  /// una red se estorban. El aparato reinicia para aplicarla.
-  Future<void> cambiarIpLector(String nuevaIp) async {
+  /// - El de este gimnasio: se deja configurado y listo.
+  /// - Uno libre (recién reseteado, o nunca vinculado): se ofrece vincularlo.
+  /// - Solo de otros gimnasios: se ofrece formatearlo.
+  Future<void> buscarLectorEnRed() async {
     comprobandoLector.value = true;
     try {
-      if (await RfidConfig.cambiarIp(nuevaIp)) {
-        esp32IpAddress.value = nuevaIp;
-        SnackbarHelper.success('Guardado',
-            'El lector se está reiniciando con la IP $nuevaIp. Tarda unos segundos.');
-      } else {
-        SnackbarHelper.error('Error', 'No se pudo cambiar la IP del lector.');
+      final encontrados = await RfidConfig.buscarTodosEnRed();
+      final mio = encontrados.firstWhereOrNull((l) => l.mine);
+
+      if (mio != null) {
+        await RfidConfig.guardarLector(mio);
+        lectorEncontrado.value = null;
+        esp32IpAddress.value = mio.ip;
+        estadoLector.value = EstadoLector.mio;
+        _reanudarSondeo();
+        SnackbarHelper.success(
+            'Listo', 'El lector de tu gimnasio está conectado');
+        return;
       }
+
+      final libre = encontrados.firstWhereOrNull((l) => !l.claimed);
+      if (libre != null) {
+        lectorEncontrado.value = libre;
+        estadoLector.value = EstadoLector.libre;
+        return;
+      }
+
+      if (encontrados.isNotEmpty) {
+        lectorEncontrado.value = encontrados.first;
+        estadoLector.value = EstadoLector.deOtroGimnasio;
+        return;
+      }
+
+      lectorEncontrado.value = null;
+      estadoLector.value = RfidConfig.tieneLector
+          ? EstadoLector.sinConexion
+          : EstadoLector.sinConfigurar;
+      SnackbarHelper.error(
+          'No se encontró',
+          RfidConfig.tieneLector
+              ? 'Tu lector no aparece en esta red WiFi. Si su luz parpadea '
+                  'rápido, está esperando que lo configures.'
+              : 'No hay lectores en esta red WiFi. Si es nuevo, agrégalo con '
+                  '"Agregar lector".');
     } finally {
       comprobandoLector.value = false;
     }
+  }
+
+  /// Tras configurar un lector por Bluetooth: lo deja como el de este
+  /// gimnasio y arranca el escaneo.
+  Future<void> lectorAgregado(LectorEnRed lector) async {
+    await RfidConfig.guardarLector(lector);
+    lectorEncontrado.value = null;
+    esp32IpAddress.value = lector.ip;
+    estadoLector.value = EstadoLector.mio;
+
+    // "Usar el lector" se enciende solo: acabas de agregar uno.
+    await RfidConfig.activarLector(true);
+    rfidEnabled.value = true;
+    rfidConnectionStatus.value = true;
+    connectionStatusMessage.value = 'Conectado y funcionando';
+    _reanudarSondeo();
   }
 
   // Variables para configuración de audio
@@ -425,24 +483,41 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
       soundEnabled.value = prefs.getBool('sound_enabled') ?? true;
       soundVolume.value = prefs.getDouble('sound_volume') ?? 0.8;
 
-      // RFID — only scan if enabled
-      rfidEnabled.value = prefs.getBool('rfid_enabled') ?? false;
-      if (rfidEnabled.value && !_rfidScanCancelled) {
-        isRfidScanning.value = true;
-        connectionStatusMessage.value = 'Buscando lector RFID...';
-        await RfidConfig.loadConfig();
-        isRfidScanning.value = false;
-        if (!_rfidScanCancelled) {
-          await _checkRfidConnection();
-        }
-      } else if (!rfidEnabled.value) {
-        connectionStatusMessage.value = 'Desactivado';
-      }
+      // El estado del lector va aparte y sin esperarlo: si no contesta,
+      // buscarlo en la red tarda unos segundos, y no hay por qué frenar la
+      // pantalla de Configuración por eso.
+      unawaited(cargarEstadoLector());
     } catch (e) {
       AppLogger.error(
           'ConfiguracionController', 'Error al cargar configuración', e);
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// "Usar el lector de tarjetas" y su estado, para el gimnasio de la sesión.
+  ///
+  /// Ambas cosas son de ESTE gimnasio: antes el interruptor era uno solo
+  /// para el teléfono, y una cuenta recién creada lo encontraba encendido.
+  /// Si nunca se tocó, sigue a si el gimnasio tiene lector; por eso primero
+  /// se carga la configuración.
+  Future<void> cargarEstadoLector() async {
+    try {
+      isRfidScanning.value = true;
+      await RfidConfig.loadConfig();
+      rfidEnabled.value = await RfidConfig.lectorActivado();
+      isRfidScanning.value = false;
+
+      if (!rfidEnabled.value) {
+        connectionStatusMessage.value = 'Desactivado';
+      } else if (!_rfidScanCancelled) {
+        await _checkRfidConnection();
+      }
+    } catch (e) {
+      AppLogger.error(
+          'ConfiguracionController', 'Error al cargar el lector', e);
+    } finally {
+      isRfidScanning.value = false;
     }
   }
 
@@ -476,9 +551,6 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
           SnackbarHelper.success(
               'Conectado', 'ESP32 conectado exitosamente a $ipAddress');
         }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('esp32_ip_manual', ipAddress);
       } else {
         esp32Connected.value = false;
         esp32StatusMessage.value = 'No se pudo conectar a $ipAddress';
@@ -507,8 +579,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
 
       if (available) {
         esp32Connected.value = true;
-        esp32IpAddress.value =
-            RfidConfig.getCurrentIP() ?? RfidConfig.DEFAULT_ESP32_IP;
+        esp32IpAddress.value = RfidConfig.getCurrentIP() ?? '';
         esp32StatusMessage.value = 'ESP32 conectado: ${esp32IpAddress.value}';
       } else {
         esp32Connected.value = false;
@@ -554,9 +625,8 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
       isLoading.value = true;
       connectionStatusMessage.value = 'Buscando lector RFID...';
 
-      // Persist enabled state
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('rfid_enabled', true);
+      // Persist enabled state (de este gimnasio)
+      await RfidConfig.activarLector(true);
 
       await RfidConfig.loadConfig();
       if (_rfidScanCancelled) return;
@@ -628,9 +698,8 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     isLoading.value = false;
     connectionStatusMessage.value = 'Desactivado';
 
-    // Persist disabled state
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('rfid_enabled', false);
+    // Persist disabled state (de este gimnasio)
+    await RfidConfig.activarLector(false);
   }
 
   // =================== MÉTODOS DE CONFIGURACIÓN ===================
@@ -703,8 +772,8 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     final ok = await GymSettingsService.to.save(nuevos);
     if (!ok) {
       accesosSettings.value = anterior;
-      SnackbarHelper.error(
-          'Error', 'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.');
+      SnackbarHelper.error('Error',
+          'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.');
     }
   }
 

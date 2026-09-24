@@ -16,7 +16,8 @@ import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/modules/auth/controllers/auth_controller.dart';
 import 'package:gymads/app/routes/app_pages.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/app/data/services/avisos_sistema_service.dart';
 
 /// GlobalKey para acceder al ScaffoldMessenger desde cualquier parte de la app
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
@@ -48,6 +49,14 @@ void main() async {
   await TenantContextService.to.init();
   AppLogger.info('Main', 'TenantContextService inicializado');
 
+  // Actualización automática: lo que cambia otro teléfono del gimnasio se ve
+  // sin refrescar. Sigue a la sesión (abre y cierra el canal solo).
+  Get.put(CambiosEnVivoService(), permanent: true);
+
+  // Notificaciones de los pases del lector con la app en segundo plano. El
+  // permiso se pide después, solo en el teléfono que atiende el lector.
+  await AvisosSistema.init();
+
   // Configuración de accesos (salidas y horario). Se registra sin cargar:
   // hace falta el gimnasio, que llega con la sesión.
   Get.put(GymSettingsService(), permanent: true);
@@ -74,15 +83,9 @@ void main() async {
   Get.put(imageCacheService, permanent: true);
   AppLogger.info('Main', 'Servicio de caché de imágenes inicializado');
 
-  // Inicializa la configuración del lector RFID SOLO si está activado
-  final prefs = await SharedPreferences.getInstance();
-  final rfidEnabled = prefs.getBool('rfid_enabled') ?? false;
-  if (rfidEnabled) {
-    await RfidConfig.loadConfig();
-    AppLogger.info('Main', 'Configuración RFID cargada');
-  } else {
-    AppLogger.info('Main', 'RFID desactivado, omitiendo configuración');
-  }
+  // El lector NO se carga aquí: si no contesta, buscarlo en la red tarda
+  // unos segundos y retrasaría la apertura de la app. Lo carga el servicio
+  // de escaneo (y _initRfidServiceIfEnabled) ya con la app abierta.
 
   // Registra el servicio de RFID de forma perezosa
   Get.lazyPut<BackgroundRfidService>(() => BackgroundRfidService());
@@ -110,9 +113,10 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initRfidServiceIfEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rfidEnabled = prefs.getBool('rfid_enabled') ?? false;
-    if (!rfidEnabled) {
+    // "Usar el lector" es de cada gimnasio. Si nunca se tocó, sigue a si el
+    // gimnasio tiene lector: por eso primero se carga la configuración.
+    await RfidConfig.loadConfig();
+    if (!await RfidConfig.lectorActivado()) {
       AppLogger.info('Main', 'RFID desactivado, omitiendo servicio de escaneo');
       return;
     }

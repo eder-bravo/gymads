@@ -7,6 +7,7 @@
 #include "generated_plugin_registrant.h"
 
 #include <app_links/app_links_plugin_c_api.h>
+#include <bonsoir_windows/bonsoir_windows_plugin_c_api.h>
 #include <file_selector_windows/file_selector_windows.h>
 #include <permission_handler_windows/permission_handler_windows_plugin.h>
 #include <printing/printing_plugin.h>
@@ -16,6 +17,8 @@
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   AppLinksPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("AppLinksPluginCApi"));
+  BonsoirWindowsPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("BonsoirWindowsPluginCApi"));
   FileSelectorWindowsRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FileSelectorWindows"));
   PermissionHandlerWindowsPluginRegisterWithRegistrar(

@@ -114,6 +114,16 @@ class IngresoService {
     );
   }
 
+  /// Las ventas de productos del periodo (para "Productos vendidos").
+  Future<List<IngresoModel>> getVentasDeProductos({
+    DateTime? fechaInicio,
+    DateTime? fechaFin,
+  }) =>
+      _ingresoProvider.getVentasDeProductos(
+        fechaInicio: fechaInicio,
+        fechaFin: fechaFin,
+      );
+
   /// Obtiene datos para gráficas por período
   Future<Map<String, double>> getIngresosPorPeriodo({
     required DateTime fechaInicio,

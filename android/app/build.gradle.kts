@@ -11,6 +11,9 @@ android {
     ndkVersion = "27.0.12077973"
 
     compileOptions {
+        // flutter_local_notifications usa APIs de Java 8+ también en
+        // versiones viejas de Android.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -45,4 +48,8 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

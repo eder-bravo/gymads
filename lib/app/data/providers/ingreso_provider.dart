@@ -7,6 +7,38 @@ class IngresoProvider {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   /// Obtiene todos los ingresos
+  /// Las ventas de productos del periodo, solo con lo necesario para saber
+  /// qué se vendió. Consulta aparte porque la lista del periodo trae como
+  /// máximo 50 transacciones, y el resumen tiene que contar todas.
+  Future<List<IngresoModel>> getVentasDeProductos({
+    DateTime? fechaInicio,
+    DateTime? fechaFin,
+  }) async {
+    try {
+      var query = _supabase
+          .from('ingresos')
+          .select('id, concepto, fecha, monto_final, metodo_pago, items_detalle')
+          .eq('branch_id', TenantQueryHelper.branchIdOrNull ?? '')
+          .eq('concepto', 'producto');
+      if (fechaInicio != null) {
+        query = query.gte('fecha', fechaInicio.toIso8601String());
+      }
+      if (fechaFin != null) {
+        query = query.lte('fecha', fechaFin.toIso8601String());
+      }
+
+      final response =
+          await query.order('fecha', ascending: false).limit(5000);
+
+      return (response as List)
+          .map((json) => IngresoModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      AppLogger.error('IngresoProvider', 'Error al obtener ventas de productos', e);
+      return [];
+    }
+  }
+
   Future<List<IngresoModel>> getIngresos({
     DateTime? fechaInicio,
     DateTime? fechaFin,

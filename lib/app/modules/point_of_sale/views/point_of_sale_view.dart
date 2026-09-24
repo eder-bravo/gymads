@@ -450,6 +450,26 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     });
   }
 
+  /// Campos de la hoja de cobro: más claros que el fondo y con borde, para
+  /// que se vean aunque la pantalla tenga poco brillo. El relleno de antes
+  /// (14,14,14) era casi igual al de la hoja (18,18,18).
+  InputDecoration _decoracionCampoCobro({String? hintText}) {
+    OutlineInputBorder borde(Color color, double ancho) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: color, width: ancho),
+        );
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: TextStyle(color: AppColors.textHint.withOpacity(0.6)),
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.06),
+      border: borde(Colors.white.withOpacity(0.25), 1),
+      enabledBorder: borde(Colors.white.withOpacity(0.25), 1),
+      focusedBorder: borde(AppColors.accent, 2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
   void _showPaymentDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -590,24 +610,20 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       ),
                       const SizedBox(height: 8),
                       TextField(
-                        style: const TextStyle(color: AppColors.textPrimary),
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
                               RegExp(r'^\d+\.?\d{0,2}')),
                         ],
-                        decoration: InputDecoration(
+                        style: const TextStyle(
+                            color: AppColors.textPrimary, fontSize: 18),
+                        decoration: _decoracionCampoCobro(
+                          hintText: 'Cuánto te entregó',
+                        ).copyWith(
                           prefixText: '\$ ',
-                          prefixStyle: const TextStyle(color: AppColors.accent),
-                          filled: true,
-                          fillColor: AppColors.containerBackground,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
+                          prefixStyle: const TextStyle(
+                              color: AppColors.accent, fontSize: 18),
                         ),
                         onChanged: (value) {
                           final amount = double.tryParse(value) ?? 0.0;
@@ -657,22 +673,13 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       inputFormatters: [
                         LengthLimitingTextInputFormatter(50),
                       ],
-                      decoration: InputDecoration(
-                        hintText: 'Ej: 004521',
-                        hintStyle: const TextStyle(color: AppColors.textHint),
+                      decoration: _decoracionCampoCobro(hintText: 'Ej: 004521')
+                          .copyWith(
                         prefixIcon: const Icon(
                           Icons.receipt_long,
                           color: AppColors.accent,
                           size: 20,
                         ),
-                        filled: true,
-                        fillColor: AppColors.containerBackground,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
                       ),
                       onChanged: controller.setReferenciaPago,
                     ),
@@ -692,6 +699,11 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
+                      // Deshabilitado (falta el monto): se ve, pero apagado.
+                      // Con los colores por defecto casi desaparecía.
+                      disabledBackgroundColor:
+                          AppColors.success.withOpacity(0.25),
+                      disabledForegroundColor: Colors.white.withOpacity(0.6),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),

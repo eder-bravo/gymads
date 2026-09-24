@@ -11,11 +11,14 @@ import 'supabase_service.dart';
 import 'tenant_context_service.dart';
 import 'audio_service.dart';
 import 'access_log_service.dart';
+import 'avisos_sistema_service.dart';
+import 'escucha_segundo_plano.dart';
 import 'gym_settings_service.dart';
 import '../../core/permissions/permissions.dart';
 import '../../core/permissions/staff_role.dart';
 import '../../core/utils/auth_utils.dart';
 import '../../routes/app_pages.dart';
+import '../../modules/clientes/controllers/clientes_controller.dart';
 import '../config/rfid_config.dart';
 
 /// Servicio global para escaneo RFID en segundo plano
@@ -40,6 +43,47 @@ class BackgroundRfidService extends GetxService {
 
   // Guard para evitar peticiones concurrentes
   bool _isChecking = false;
+
+  /// Cada cuánto se le pregunta al lector. Con los pases numerados del
+  /// firmware 6.3 ya no se pierde ninguno aunque se pregunte "tarde"; esto
+  /// solo decide qué tan rápido aparece el aviso.
+  static const _intervaloSondeo = Duration(milliseconds: 600);
+
+  /// Qué pases del lector ya se vieron (firmware 6.3+, `/api/lecturas`).
+  final SeguimientoPases _seguimiento = SeguimientoPases();
+
+  /// Si el lector sabe contar sus pases. Con firmware anterior (404) se usa
+  /// `/api/uid`, que solo dice cuál fue la última tarjeta.
+  bool _usarLecturas = true;
+
+  /// Pases por procesar, en orden, con la hora en que ocurrieron. El sondeo
+  /// solo los encola: así nunca espera a que termine el pase anterior (antes
+  /// esperaba hasta que se cerraba el aviso, 8 s, y en ese tiempo no se
+  /// preguntaba al lector).
+  final List<({String uid, DateTime cuando})> _cola = [];
+  bool _procesandoCola = false;
+
+  /// Accesos registrados de pases atrasados (ocurridos con la app congelada)
+  /// en esta vuelta de la cola, para avisarlos juntos al terminar.
+  int _atrasadosRegistrados = 0;
+
+  /// Con la app en segundo plano los avisos van como notificación del
+  /// sistema. `inactive` también cuenta (iOS al bajar el centro de
+  /// notificaciones o al cambiar de app): la pantalla de la app no se ve.
+  bool get _appEnSegundoPlano {
+    final estado = WidgetsBinding.instance.lifecycleState;
+    return estado != null && estado != AppLifecycleState.resumed;
+  }
+
+  /// Cierra el aviso en pantalla. Una tarjeta nueva lo reinicia.
+  Timer? _ocultarAviso;
+
+  /// Cambia con cada aviso, para que el de una tarjeta nueva se vea como
+  /// nuevo (con su animación) aunque reemplace a otro.
+  final avisoId = 0.obs;
+
+  static const _duracionBienvenida = Duration(seconds: 4);
+  static const _duracionRechazo = Duration(seconds: 6);
 
   /// Si a este dispositivo le tocan los avisos del lector.
   ///
@@ -154,7 +198,13 @@ class BackgroundRfidService extends GetxService {
   }
 
   /// Método para mostrar notificación usando el ScaffoldMessenger global
-  void _showSnackbarSafe(String title, String message, {bool isError = false}) {
+  void _showSnackbarSafe(
+    String title,
+    String message, {
+    bool isError = false,
+    Duration duracion = const Duration(seconds: 2),
+    SnackBarAction? accion,
+  }) {
     try {
       final messenger = rootScaffoldMessengerKey.currentState;
       if (messenger == null) {
@@ -199,7 +249,11 @@ class BackgroundRfidService extends GetxService {
           margin:
               const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 16),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          duration: const Duration(seconds: 2),
+          duration: duracion,
+          action: accion,
+          // X para quitarlo al momento, como la pantalla completa de Inicio.
+          showCloseIcon: true,
+          closeIconColor: Colors.white,
           dismissDirection: DismissDirection.horizontal,
         ),
       );
@@ -260,14 +314,23 @@ class BackgroundRfidService extends GetxService {
     // Cargar configuración de RFID (IP, etc) si es necesario
     await RfidConfig.loadConfig();
 
-    // Iniciar polling cada 1.5 segundos
-    _pollingTimer =
-        Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
+    // Lo que el lector tenga guardado es de antes de empezar a escuchar.
+    _seguimiento.reiniciar();
+    _usarLecturas = true;
+
+    _pollingTimer = Timer.periodic(_intervaloSondeo, (timer) async {
       await _checkForCard();
     });
 
+    // Con la app en segundo plano cada pase llega como notificación, y en
+    // Android el lector se sigue escuchando (servicio en primer plano).
+    unawaited(() async {
+      await AvisosSistema.pedirPermiso();
+      if (isScanning.value) await EscuchaSegundoPlano.iniciar();
+    }());
+
     AppLogger.info('BackgroundRfidService',
-        'Escaneo RFID en segundo plano iniciado (polling cada 1.5s)');
+        'Escaneo RFID en segundo plano iniciado');
   }
 
   /// Detener el escaneo en segundo plano
@@ -275,6 +338,7 @@ class BackgroundRfidService extends GetxService {
     _pollingTimer?.cancel();
     _pollingTimer = null;
     isScanning.value = false;
+    unawaited(EscuchaSegundoPlano.detener());
 
     AppLogger.info(
         'BackgroundRfidService', 'Escaneo RFID en segundo plano detenido');
@@ -302,11 +366,19 @@ class BackgroundRfidService extends GetxService {
       return;
     }
 
+    // Lo que pasó durante la pausa (p. ej. la tarjeta que se le estaba
+    // asignando a un cliente) no es una entrada: se ignora.
+    _seguimiento.reiniciar();
     isPaused.value = false;
     AppLogger.info('BackgroundRfidService', 'Escaneo RFID reanudado');
   }
 
-  /// Verificar si hay una tarjeta disponible
+  /// Pregunta al lector qué tarjetas pasaron y las encola.
+  ///
+  /// Nunca espera a que se procese un pase: eso lo hace [_procesarCola] por
+  /// su lado. Si esperara (como antes, hasta que se cerraba el aviso), una
+  /// segunda tarjeta tendría que esperar su turno y, con firmware anterior,
+  /// podía perderse.
   Future<void> _checkForCard() async {
     // Evitar peticiones concurrentes si la anterior no ha terminado
     if (_isChecking) return;
@@ -324,43 +396,118 @@ class BackgroundRfidService extends GetxService {
         return;
       }
 
-      final uid = await RfidReaderService.checkForCard();
-
-      // El lector rechazó la petición. Reintentar no sirve de nada: por
-      // muchas veces que se pregunte, nunca va a contestar. Sin este corte,
-      // la app martillearía el aparato cada 1,5 s para siempre, que es justo
-      // el problema que la vinculación viene a cerrar.
-      final rechazo = RfidReaderService.rechazo.value;
-      if (rechazo != RechazoLector.ninguno) {
-        stopScanning();
-        _avisarRechazo(rechazo);
-        return;
+      final ahora = DateTime.now();
+      final List<({String uid, DateTime cuando})> pases;
+      if (_usarLecturas) {
+        final r = await RfidReaderService.leerLecturas(_seguimiento.desde);
+        if (r.sinSoporte) {
+          AppLogger.info('BackgroundRfidService',
+              'El lector no cuenta sus pases (firmware anterior): se usa /api/uid');
+          _usarLecturas = false;
+          return;
+        }
+        if (_revisarRechazo() || r.respuesta == null) return;
+        // `hace_ms` es relativo a la respuesta: da la hora real del pase, que
+        // importa si ocurrió con la app congelada.
+        DateTime horaDe(PaseLector p) =>
+            ahora.subtract(Duration(milliseconds: p.haceMs));
+        pases = [
+          for (final p in _seguimiento.nuevos(r.respuesta!))
+            (uid: p.uid, cuando: horaDe(p)),
+        ];
+      } else {
+        final uid = await RfidReaderService.checkForCard();
+        if (_revisarRechazo()) return;
+        if (uid == null || uid.isEmpty || uid == 'NO_CARD') return;
+        pases = [(uid: uid, cuando: ahora)];
       }
 
-      if (uid == null || uid.isEmpty || uid == 'NO_CARD') {
-        return;
+      for (final pase in pases) {
+        _encolar(pase.uid, pase.cuando);
       }
-
-      AppLogger.info('BackgroundRfidService', 'Tarjeta detectada');
-
-      // Verificar cooldown para evitar escaneos duplicados
-      if (_shouldSkipScan(uid)) {
-        AppLogger.info('BackgroundRfidService', 'Escaneo omitido (cooldown)');
-        return;
-      }
-
-      // Actualizar control de tiempo
-      _lastScanTime = DateTime.now();
-      _lastScannedCard = uid;
-      lastScannedUid.value = uid;
-
-      // Procesar la tarjeta
-      await _processCard(uid);
     } catch (e) {
       AppLogger.error('BackgroundRfidService', 'Error en escaneo de fondo', e);
     } finally {
       _isChecking = false;
     }
+  }
+
+  /// El lector rechazó la petición. Reintentar no sirve de nada: por muchas
+  /// veces que se pregunte, nunca va a contestar. Sin este corte, la app
+  /// martillearía el aparato para siempre, que es justo el problema que la
+  /// vinculación viene a cerrar.
+  bool _revisarRechazo() {
+    final rechazo = RfidReaderService.rechazo.value;
+    if (rechazo == RechazoLector.ninguno) return false;
+    stopScanning();
+    _avisarRechazo(rechazo);
+    return true;
+  }
+
+  void _encolar(String uid, DateTime cuando) {
+    // La misma tarjeta dos veces en 3 s es el mismo pase (con firmware
+    // anterior se ve en varias consultas seguidas).
+    if (_shouldSkipScan(uid, cuando)) {
+      AppLogger.info('BackgroundRfidService', 'Escaneo omitido (cooldown)');
+      return;
+    }
+    AppLogger.info('BackgroundRfidService', 'Tarjeta detectada');
+
+    _lastScanTime = cuando;
+    _lastScannedCard = uid;
+    lastScannedUid.value = uid;
+
+    _cola.add((uid: uid, cuando: cuando));
+    unawaited(_procesarCola());
+  }
+
+  Future<void> _procesarCola() async {
+    if (_procesandoCola) return;
+    _procesandoCola = true;
+    try {
+      while (_cola.isNotEmpty) {
+        final pase = _cola.removeAt(0);
+        await _processCard(pase.uid, pase.cuando);
+      }
+      _avisarAtrasados();
+    } finally {
+      _procesandoCola = false;
+    }
+  }
+
+  /// Un solo aviso por los pases que ocurrieron con la app congelada, en vez
+  /// de una bienvenida atrasada por cada uno.
+  void _avisarAtrasados() {
+    final n = _atrasadosRegistrados;
+    if (n == 0) return;
+    _atrasadosRegistrados = 0;
+    _showSnackbarSafe(
+      'Accesos registrados',
+      n == 1
+          ? 'Mientras la app estaba en segundo plano se registró 1 acceso'
+          : 'Mientras la app estaba en segundo plano se registraron $n accesos',
+      duracion: const Duration(seconds: 5),
+    );
+  }
+
+  /// Muestra el aviso a pantalla completa y programa que se cierre solo. Si
+  /// ya había uno, lo reemplaza: la persona que acaba de pasar no tiene que
+  /// esperar a que se quite el de la anterior.
+  void _mostrarAviso({required bool noRegistrada, required Duration duracion}) {
+    _ocultarAviso?.cancel();
+    avisoId.value++;
+    showNotFoundDialog.value = noRegistrada;
+    showWelcomeDialog.value = !noRegistrada;
+    _ocultarAviso = Timer(duracion, cerrarAviso);
+  }
+
+  /// Quita el aviso ya (botón "Cerrar" o un toque en la pantalla).
+  void cerrarAviso() {
+    _ocultarAviso?.cancel();
+    _ocultarAviso = null;
+    showWelcomeDialog.value = false;
+    showNotFoundDialog.value = false;
+    currentUser.value = null;
   }
 
   /// Si ya se avisó del rechazo. Sin esta bandera saldría una notificación
@@ -392,7 +539,7 @@ class BackgroundRfidService extends GetxService {
   }
 
   /// Verificar si debemos saltar este escaneo
-  bool _shouldSkipScan(String uid) {
+  bool _shouldSkipScan(String uid, DateTime cuando) {
     if (_lastScannedCard != uid) {
       return false; // Tarjeta diferente, siempre procesar
     }
@@ -401,18 +548,29 @@ class BackgroundRfidService extends GetxService {
       return false; // Primera vez, procesar
     }
 
-    final timeSinceLastScan = DateTime.now().difference(_lastScanTime!);
+    final timeSinceLastScan = cuando.difference(_lastScanTime!).abs();
     return timeSinceLastScan <
         _scanCooldown; // Saltar si no ha pasado el cooldown
   }
 
   /// Procesar la tarjeta detectada
-  Future<void> _processCard(String uid) async {
+  Future<void> _processCard(String uid, DateTime cuando) async {
     try {
       AppLogger.info('BackgroundRfidService', 'Procesando tarjeta');
 
       // Buscar usuario por RFID
       final user = await _userRepository.getUserByRfid(uid);
+
+      // Un pase de hace rato (la app estaba congelada en segundo plano) ya no
+      // tiene a nadie en la puerta: se registra el acceso con su hora real,
+      // sin aviso ni sonido. Los rechazados no dejan registro.
+      if (esPaseAtrasado(cuando)) {
+        if (user != null && user.isActive && user.daysRemaining > 0) {
+          final tipo = await _registerAccess(user, cuando);
+          if (tipo != null) _atrasadosRegistrados++;
+        }
+        return;
+      }
 
       if (user == null) {
         await _handleUserNotFound(uid);
@@ -426,7 +584,7 @@ class BackgroundRfidService extends GetxService {
       }
 
       // Usuario activo, procesar acceso
-      await _handleActiveUser(user, uid);
+      await _handleActiveUser(user, uid, cuando);
     } catch (e) {
       AppLogger.error('BackgroundRfidService', 'Error procesando tarjeta', e);
     }
@@ -436,35 +594,56 @@ class BackgroundRfidService extends GetxService {
   Future<void> _handleUserNotFound(String uid) async {
     AppLogger.error('BackgroundRfidService', 'Usuario no encontrado');
 
-    AudioService.playDeniedSound();
+    final segundoPlano = _appEnSegundoPlano;
+    if (segundoPlano) {
+      // Como un mensaje: la notificación trae su propio sonido.
+      unawaited(AvisosSistema.mostrarPase(ResultadoPase.noRegistrada));
+    } else {
+      AudioService.playDeniedSound();
+    }
 
-    // Enviar estado al ESP32
-    await RfidReaderService.sendMembershipStatus(
+    // El firmware actual ya no usa este aviso; no se espera su respuesta.
+    unawaited(RfidReaderService.sendMembershipStatus(
       uid,
       'not_found',
       userName: 'Usuario Desconocido',
       accessType: 'denied',
       verificationType: 'rfid',
-    );
+    ));
 
-    // Ya no mostramos la notificación inferior (tarjetita roja) por petición del usuario
+    currentUser.value = null;
+    if (segundoPlano) return;
 
-    // Mostrar pantalla completa de tarjeta no registrada
     final currentRoute = Get.currentRoute;
     if (currentRoute == Routes.HOME || currentRoute == '/') {
-      showNotFoundDialog.value = true;
-
-      // Cerrar después de 6 segundos
-      await Future.delayed(const Duration(seconds: 6));
-      showNotFoundDialog.value = false;
+      // En Inicio, aviso a pantalla completa (con "Registrar").
+      _mostrarAviso(noRegistrada: true, duracion: _duracionRechazo);
     } else {
-      // Si no estamos en home, podríamos usar la notificación o un diálogo,
-      // pero el usuario especificó "pantalla completa".
-      // Vamos a habilitar la pantalla completa también asumiendo que el widget está en el home
-      showNotFoundDialog.value = true;
-      await Future.delayed(const Duration(seconds: 6));
-      showNotFoundDialog.value = false;
+      // Fuera de Inicio la pantalla completa no existe: antes no se veía
+      // nada, solo sonaba.
+      _showSnackbarSafe(
+        'Tarjeta no registrada',
+        'Tarjeta no registrada',
+        isError: true,
+        duracion: const Duration(seconds: 4),
+        accion: SnackBarAction(
+          label: 'Registrar',
+          textColor: Colors.white,
+          onPressed: () => _registrarTarjeta(uid),
+        ),
+      );
     }
+  }
+
+  /// Lleva a dar de alta un cliente con la tarjeta [uid] ya puesta.
+  void _registrarTarjeta(String uid) {
+    // Ya en Clientes, navegar a la misma pantalla no haría nada.
+    if (Get.currentRoute == Routes.CLIENTES &&
+        Get.isRegistered<ClientesController>()) {
+      Get.find<ClientesController>().showAddDialog(initialRfid: uid);
+      return;
+    }
+    Get.toNamed(Routes.CLIENTES, arguments: {'new_rfid': uid});
   }
 
   /// Manejar usuario inactivo o con membresía vencida
@@ -475,28 +654,32 @@ class BackgroundRfidService extends GetxService {
 
     AppLogger.warning('BackgroundRfidService', 'Acceso denegado ($motivo)');
 
-    AudioService.playDeniedSound();
+    final segundoPlano = _appEnSegundoPlano;
+    if (segundoPlano) {
+      unawaited(AvisosSistema.mostrarPase(
+        estaVencida ? ResultadoPase.vencida : ResultadoPase.inactiva,
+        nombre: user.name,
+      ));
+    } else {
+      AudioService.playDeniedSound();
+    }
 
-    // Enviar estado al ESP32
-    await RfidReaderService.sendMembershipStatus(
+    // El firmware actual ya no usa este aviso; no se espera su respuesta.
+    unawaited(RfidReaderService.sendMembershipStatus(
       user.userNumber,
       'expired',
       userName: user.name,
       accessType: 'denied',
       verificationType: 'rfid',
-    );
+    ));
 
     currentUser.value = user;
+    if (segundoPlano) return;
 
     final currentRoute = Get.currentRoute;
     if (currentRoute == Routes.HOME || currentRoute == '/') {
-      // Estamos en home, mostrar diálogo completo
-      showWelcomeDialog.value = true;
-
-      // Cerrar después de 8 segundos para dar tiempo a interactuar
-      await Future.delayed(const Duration(seconds: 8));
-      showWelcomeDialog.value = false;
-      currentUser.value = null;
+      // En Inicio, aviso a pantalla completa (con "Abonar" y "Editar").
+      _mostrarAviso(noRegistrada: false, duracion: _duracionRechazo);
     } else {
       // Mostrar notificación de denegado
       _showDeniedNotification(motivo);
@@ -504,7 +687,8 @@ class BackgroundRfidService extends GetxService {
   }
 
   /// Manejar usuario activo
-  Future<void> _handleActiveUser(UserModel user, String uid) async {
+  Future<void> _handleActiveUser(
+      UserModel user, String uid, DateTime cuando) async {
     AppLogger.info('BackgroundRfidService', 'Acceso autorizado');
 
     currentUser.value = user;
@@ -519,19 +703,30 @@ class BackgroundRfidService extends GetxService {
 
     // El registro puede ignorarse porque el acceso de hoy ya existe. Eso no
     // impide mostrar la bienvenida: solo evita crear otra fila en Supabase.
-    final accessType = await _registerAccess(user) ?? 'entrada';
+    final accessType = await _registerAccess(user, cuando) ?? 'entrada';
     lastAccessWasExit.value = accessType == 'salida';
 
-    AudioService.playWelcomeSound();
+    final segundoPlano = _appEnSegundoPlano;
+    if (segundoPlano) {
+      unawaited(AvisosSistema.mostrarPase(
+        accessType == 'salida' ? ResultadoPase.salida : ResultadoPase.entrada,
+        nombre: user.name,
+        diasRestantes: user.daysRemaining,
+      ));
+    } else {
+      AudioService.playWelcomeSound();
+    }
 
-    // Enviar estado al ESP32
-    await RfidReaderService.sendMembershipStatus(
+    // El firmware actual ya no usa este aviso; no se espera su respuesta.
+    unawaited(RfidReaderService.sendMembershipStatus(
       uid,
       membershipStatus,
       userName: user.name,
       accessType: accessType,
       verificationType: 'rfid',
-    );
+    ));
+
+    if (segundoPlano) return;
 
     // Mostrar interfaz según la vista actual
     final currentRoute = Get.currentRoute;
@@ -541,13 +736,8 @@ class BackgroundRfidService extends GetxService {
         'Es home: ${currentRoute == Routes.HOME || currentRoute == "/"}');
 
     if (currentRoute == Routes.HOME || currentRoute == '/') {
-      // Estamos en home, mostrar diálogo completo
-      showWelcomeDialog.value = true;
-
-      // Cerrar después de 8 segundos para dar tiempo a interactuar
-      await Future.delayed(const Duration(seconds: 8));
-      showWelcomeDialog.value = false;
-      currentUser.value = null;
+      // En Inicio, aviso a pantalla completa.
+      _mostrarAviso(noRegistrada: false, duracion: _duracionBienvenida);
     } else {
       // Estamos en otra vista, mostrar notificación pequeña
       AppLogger.info('BackgroundRfidService', 'Mostrando notificación');
@@ -565,8 +755,9 @@ class BackgroundRfidService extends GetxService {
     _showSnackbarSafe('Acceso denegado', message, isError: true);
   }
 
-  /// Registra el acceso y devuelve el tipo realmente insertado.
-  Future<String?> _registerAccess(UserModel user) async {
+  /// Registra el acceso (a la hora del pase, [cuando]) y devuelve el tipo
+  /// realmente insertado.
+  Future<String?> _registerAccess(UserModel user, DateTime cuando) async {
     try {
       if (user.id == null) return null;
 
@@ -590,6 +781,7 @@ class BackgroundRfidService extends GetxService {
         method: 'rfid_background',
         staffUser: staffUser,
         registrarSalidas: ajustes.registrarSalidas,
+        cuando: cuando,
       );
 
       AppLogger.info('BackgroundRfidService',
@@ -604,6 +796,7 @@ class BackgroundRfidService extends GetxService {
   @override
   void onClose() {
     stopScanning();
+    _ocultarAviso?.cancel();
     super.onClose();
   }
 }

@@ -592,7 +592,8 @@ class InventarioView extends GetView<InventarioController> {
               ),
           ],
         ),
-        onTap: () => _showProductDetail(product),
+        // Sin onTap: la ficha con todos los datos se quitó. Lo que se hace
+        // con un producto está en el menú y en los botones de +/-.
       ),
     );
   }
@@ -630,93 +631,6 @@ class InventarioView extends GetView<InventarioController> {
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-    );
-  }
-
-  void _showProductDetail(Product product) {
-    Get.dialog(
-      AlertDialog(
-        scrollable: true,
-        backgroundColor: AppColors.cardBackground,
-        title: Text(product.name,
-            style: const TextStyle(color: AppColors.textPrimary)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailRow('Descripción', product.description),
-            _buildDetailRow('Categoría', controller.categoryNameFor(product)),
-            _buildDetailRow(
-                'Precio de venta', '\$${product.price.toStringAsFixed(2)}'),
-            _buildDetailRow(
-              'Stock actual',
-              product.stock < 0
-                  ? 'Faltan ${-product.stock} unidades'
-                  : '${product.stock} unidades',
-              valueColor: product.stock < 0 ? AppColors.error : null,
-            ),
-            _buildDetailRow(
-              'Código de barras',
-              product.tieneBarcode ? product.barcode! : 'Sin código',
-            ),
-            _buildDetailRow('Estado', product.isActive ? 'Activo' : 'Inactivo'),
-            _buildDetailRow('Creado',
-                '${product.createdAt.day}/${product.createdAt.month}/${product.createdAt.year}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cerrar',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          if (controller.can(Permission.gestionarProductos))
-            ElevatedButton(
-              onPressed: () {
-                Get.back();
-                controller.editProduct(product);
-                Get.toNamed(Routes.PRODUCT_FORM,
-                    arguments: {'isEditing': true});
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: AppColors.textPrimary,
-              ),
-              child: const Text('Editar'),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: valueColor ?? AppColors.textPrimary,
-                fontWeight:
-                    valueColor == null ? FontWeight.normal : FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

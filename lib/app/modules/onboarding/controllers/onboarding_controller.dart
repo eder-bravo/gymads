@@ -19,9 +19,9 @@ class PaymentModes {
 /// punto donde se le marca el tour de bienvenida al DUEÑO: los gimnasios que
 /// ya existían nunca pasan por aquí y por eso nunca lo ven.
 ///
-/// Al personal se le marca en otro sitio —`StaffCodeController.entrar()`, al
-/// canjear su código—, porque no pasa por este asistente y porque las
-/// banderas viven en el disco de cada dispositivo.
+/// Los del personal no se marcan: se recuerdan en su acceso, en la base
+/// (`staff_accesos.tours_vistos`). Un empleado nuevo empieza sin ninguno
+/// visto, y un código nuevo no le vuelve a mostrar nada.
 class OnboardingController extends GetxController {
   final isSaving = false.obs;
 

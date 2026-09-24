@@ -10,8 +10,10 @@ import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/repositories/product_repository.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
+import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 
-class InventarioController extends GetxController with ScreenTourMixin {
+class InventarioController extends GetxController
+    with ScreenTourMixin, RecargaEnVivoMixin {
   // `late` a propósito: el repositorio abre el cliente de Supabase al
   // construirse, y como campo directo obligaba a tener Supabase inicializado
   // solo por crear el controller.
@@ -108,6 +110,16 @@ class InventarioController extends GetxController with ScreenTourMixin {
     loadProducts();
     loadCategories();
     loadInventoryStats();
+    // Existencias que bajan con una venta en otro teléfono, productos y
+    // categorías nuevos: aparecen solos.
+    recargarAlCambiar(
+      {TablaEnVivo.productos, TablaEnVivo.categorias},
+      () => Future.wait([
+        loadCategories(),
+        loadProducts(silencioso: true),
+        loadInventoryStats(),
+      ]),
+    );
   }
 
   @override
@@ -126,17 +138,20 @@ class InventarioController extends GetxController with ScreenTourMixin {
     priceController.clear();
   }
 
-  Future<void> loadProducts() async {
-    isLoading.value = true;
+  /// [silencioso]: sin spinner ni mensajes de error (recarga automática).
+  Future<void> loadProducts({bool silencioso = false}) async {
+    if (!silencioso) isLoading.value = true;
     try {
       products.value = await productRepository.getAllProducts();
       filterProducts();
     } catch (e) {
       AppLogger.error('InventarioController', 'Error al cargar productos', e);
-      _showSnackbarSafe('Error', 'No se pudieron cargar los productos',
-          isError: true);
+      if (!silencioso) {
+        _showSnackbarSafe('Error', 'No se pudieron cargar los productos',
+            isError: true);
+      }
     } finally {
-      isLoading.value = false;
+      if (!silencioso) isLoading.value = false;
     }
   }
 

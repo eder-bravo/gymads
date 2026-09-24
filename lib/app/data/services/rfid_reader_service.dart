@@ -50,6 +50,44 @@ class RfidReaderService {
     }
     rechazo.value = motivo;
   }
+  /// Los pases posteriores a [desde] (firmware 6.3+).
+  ///
+  /// `sinSoporte` es true si el lector no conoce `/api/lecturas` (firmware
+  /// anterior): entonces hay que usar [checkForCard]. `respuesta` es null si
+  /// no se pudo preguntar (sin red, lector apagado, o lo rechazó: ver
+  /// [rechazo]).
+  static Future<({RespuestaLecturas? respuesta, bool sinSoporte})>
+      leerLecturas(int desde) async {
+    const nada = (respuesta: null, sinSoporte: false);
+    final baseUrl = RfidConfig.baseUrl;
+    if (baseUrl == null) return nada;
+
+    try {
+      final response = await http
+          .get(Uri.parse(_conGymId('$baseUrl/lecturas?desde=$desde')))
+          .timeout(const Duration(seconds: 3));
+
+      if (response.statusCode == 404) {
+        return (respuesta: null, sinSoporte: true);
+      }
+      if (response.statusCode == 403) {
+        _marcarRechazo('leerLecturas', response.body);
+        return nada;
+      }
+      if (response.statusCode != 200) return nada;
+
+      rechazo.value = RechazoLector.ninguno;
+      final datos = jsonDecode(response.body);
+      if (datos is! Map<String, dynamic>) return nada;
+      return (respuesta: RespuestaLecturas.fromJson(datos), sinSoporte: false);
+    } catch (e) {
+      // No contestó: puede que el router le haya dado otra IP. Se busca en
+      // segundo plano (como mucho una vez por minuto) sin frenar el sondeo.
+      RfidConfig.redescubrir();
+      return nada;
+    }
+  }
+
   // Método para verificar si hay un UID disponible desde el ESP32
   static Future<String?> checkForCard() async {
     try {
@@ -89,7 +127,9 @@ class RfidReaderService {
       }
     } catch (e) {
       AppLogger.error('RfidReaderService', 'Error al verificar tarjeta', e);
-      AppLogger.info('RfidReaderService', 'Verifique que el ESP32 esté encendido en la IP');
+      // No contestó: puede que el router le haya dado otra IP. Se busca en
+      // segundo plano (como mucho una vez por minuto) sin frenar el sondeo.
+      RfidConfig.redescubrir();
       return null;
     }
   }
@@ -243,3 +283,98 @@ enum RechazoLector {
   /// hacerle el reset de fábrica con el botón.
   deOtroGimnasio,
 }
+
+/// Un pase de tarjeta registrado por el lector.
+class PaseLector {
+  const PaseLector({required this.seq, required this.uid, required this.haceMs});
+
+  final int seq;
+  final String uid;
+
+  /// Hace cuánto pasó, según el reloj del lector.
+  final int haceMs;
+
+  factory PaseLector.fromJson(Map<String, dynamic> json) => PaseLector(
+        seq: (json['seq'] as num).toInt(),
+        uid: json['uid'] as String,
+        haceMs: (json['hace_ms'] as num?)?.toInt() ?? 0,
+      );
+}
+
+/// Lo que contesta `GET /api/lecturas`.
+class RespuestaLecturas {
+  const RespuestaLecturas({required this.seq, required this.lecturas});
+
+  /// El último número de pase que dio el lector.
+  final int seq;
+  final List<PaseLector> lecturas;
+
+  factory RespuestaLecturas.fromJson(Map<String, dynamic> json) =>
+      RespuestaLecturas(
+        seq: (json['seq'] as num?)?.toInt() ?? 0,
+        lecturas: [
+          for (final l in (json['lecturas'] as List? ?? const []))
+            PaseLector.fromJson(l as Map<String, dynamic>),
+        ],
+      );
+}
+
+/// Decide qué pases son nuevos, recordando el último número visto.
+///
+/// Así ningún pase se procesa dos veces ni se pierde: aunque la tarjeta se
+/// retire antes de la siguiente consulta, o pasen dos seguidas.
+class SeguimientoPases {
+  int? _ultima;
+  bool _trasReinicio = false;
+
+  /// Desde qué número preguntar.
+  int get desde => _ultima ?? 0;
+
+  /// Olvida lo visto (al empezar a escanear, o al cambiar de lector).
+  void reiniciar() {
+    _ultima = null;
+    _trasReinicio = false;
+  }
+
+  /// Los pases a procesar de [r], en el orden en que ocurrieron.
+  List<PaseLector> nuevos(RespuestaLecturas r) {
+    final ultima = _ultima;
+
+    // Primera consulta: lo que ya estaba en el lector es de antes de que la
+    // app empezara a escuchar. No se procesa.
+    if (ultima == null) {
+      _ultima = r.seq;
+      return const [];
+    }
+
+    // El número bajó: el lector se reinició y empezó a contar de nuevo. Se
+    // pregunta desde cero en la siguiente vuelta.
+    if (r.seq < ultima) {
+      _ultima = 0;
+      _trasReinicio = true;
+      return const [];
+    }
+
+    final pases = r.lecturas
+        .where((l) => l.seq > ultima)
+        // Tras un reinicio solo lo reciente: lo viejo ya no tiene a nadie
+        // esperando en la puerta.
+        .where((l) => !_trasReinicio || l.haceMs <= 10000)
+        .toList()
+      ..sort((a, b) => a.seq.compareTo(b.seq));
+
+    _trasReinicio = false;
+    _ultima = r.seq;
+    return pases;
+  }
+}
+
+/// Un pase de hace más de esto ya no tiene a nadie esperando en la puerta:
+/// ocurrió mientras la app estaba congelada en segundo plano (iOS la
+/// suspende a los pocos segundos). Se registra con su hora real, sin aviso.
+const paseAtrasadoDespuesDe = Duration(seconds: 15);
+
+/// Si el pase de [cuando] ya es viejo para avisarlo (ver
+/// [paseAtrasadoDespuesDe]).
+bool esPaseAtrasado(DateTime cuando, {DateTime? ahora}) =>
+    (ahora ?? DateTime.now()).difference(cuando) > paseAtrasadoDespuesDe;

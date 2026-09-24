@@ -21,6 +21,10 @@ class BackgroundWelcomeDialog extends StatelessWidget {
         // Primero verificamos si debemos mostrar la pantalla de tarjeta no registrada
         if (service.showNotFoundDialog.value) {
           return WelcomeScreenWidget(
+            // Una tarjeta nueva es un aviso nuevo (con su animación), aunque
+            // reemplace al anterior.
+            key: ValueKey(service.avisoId.value),
+            onClose: service.cerrarAviso,
             userName:
                 service.lastScannedUid.value, // Mostrar el UID de la tarjeta
             userPhotoUrl: '',
@@ -45,6 +49,8 @@ class BackgroundWelcomeDialog extends StatelessWidget {
         final user = service.currentUser.value!;
 
         return WelcomeScreenWidget(
+          key: ValueKey(service.avisoId.value),
+          onClose: service.cerrarAviso,
           userName: user.name,
           userPhotoUrl: user.photoUrl ?? '',
           daysLeft: user.daysRemaining,

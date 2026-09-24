@@ -27,21 +27,35 @@
     <!-- Permisos para audio -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Avisos del lector con la app en segundo plano: notificaciones de cada
+         pase y un servicio en primer plano que mantiene viva la escucha del
+         lector. El servicio es de tipo connectedDevice (habla con el lector
+         por la red local); Android 14 exige para ese tipo tener uno de varios
+         permisos, y CHANGE_WIFI_STATE se concede sin preguntar. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     
     <!-- Permisos para Bluetooth (Flutter Blue Plus) -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <!-- neverForLocation: la app solo busca lectores GymOne, no ubica al
+         usuario. Sin esta marca, en Android 12+ el escaneo exige permiso de
+         ubicación y, sin él, no devuelve ningún resultado. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     
     <!-- Declarar que la app usa Bluetooth -->
     <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
     
     <application
-        android:label="gymads"
+        android:label="GymOne"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
@@ -67,6 +81,17 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Servicio de flutter_foreground_task (no cambiar el nombre). Con
+             stopWithTask, cerrar la app desde recientes lo detiene: sin la app
+             ya no hay quien escuche al lector. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="connectedDevice"
+            android:stopWithTask="true"
+            android:exported="false" />
+        <meta-data
+            android:name="com.gymone.ic_notificacion"
+            android:resource="@drawable/ic_notificacion" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

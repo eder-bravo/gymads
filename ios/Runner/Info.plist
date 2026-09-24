@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Gymads</string>
+	<string>GymOne</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>gymads</string>
+	<string>GymOne</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -49,6 +49,13 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Usamos Bluetooth para configurar el WiFi del lector de tarjetas del gimnasio.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_gymone._tcp</string>
+		<string>_gymads._tcp</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Necesitamos la cámara para tomar la foto de perfil de los miembros, fotografiar comprobantes de pago y escanear códigos de barras de productos.</string>
 	<key>NSLocalNetworkUsageDescription</key>

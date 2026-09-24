@@ -28,11 +28,14 @@ class AccessLogService {
     required String method, // 'qr' o 'rfid'
     required String staffUser,
     bool registrarSalidas = false,
+    // Hora del pase. Por defecto, ahora; un pase ocurrido con la app
+    // congelada en segundo plano se registra con su hora real.
+    DateTime? cuando,
   }) async {
     try {
       // La jornada empieza a la 1:00 AM: alguien que entrena de noche sigue
       // contando como el mismo día de gimnasio.
-      final now = DateTime.now();
+      final now = cuando ?? DateTime.now();
       final DateTime startOfDay;
       if (now.hour < 1) {
         final yesterday = now.subtract(const Duration(days: 1));

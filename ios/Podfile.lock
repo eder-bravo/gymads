@@ -13,12 +13,19 @@ PODS:
     - PromisesObjC (~> 2.4)
   - audio_session (0.0.1):
     - Flutter
+  - bonsoir_darwin (0.0.1):
+    - Flutter
+    - FlutterMacOS
   - camera_avfoundation (0.0.1):
     - Flutter
   - Flutter (1.0.0)
   - flutter_blue_plus_darwin (0.0.2):
     - Flutter
     - FlutterMacOS
+  - flutter_foreground_task (0.0.1):
+    - Flutter
+  - flutter_local_notifications (0.0.1):
+    - Flutter
   - fluttertoast (0.0.2):
     - Flutter
   - google_mlkit_commons (0.12.0):
@@ -136,9 +143,12 @@ PODS:
 DEPENDENCIES:
   - app_links (from `.symlinks/plugins/app_links/ios`)
   - audio_session (from `.symlinks/plugins/audio_session/ios`)
+  - bonsoir_darwin (from `.symlinks/plugins/bonsoir_darwin/darwin`)
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
   - Flutter (from `Flutter`)
   - flutter_blue_plus_darwin (from `.symlinks/plugins/flutter_blue_plus_darwin/darwin`)
+  - flutter_foreground_task (from `.symlinks/plugins/flutter_foreground_task/ios`)
+  - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
   - fluttertoast (from `.symlinks/plugins/fluttertoast/ios`)
   - google_mlkit_commons (from `.symlinks/plugins/google_mlkit_commons/ios`)
   - google_mlkit_text_recognition (from `.symlinks/plugins/google_mlkit_text_recognition/ios`)
@@ -181,12 +191,18 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/app_links/ios"
   audio_session:
     :path: ".symlinks/plugins/audio_session/ios"
+  bonsoir_darwin:
+    :path: ".symlinks/plugins/bonsoir_darwin/darwin"
   camera_avfoundation:
     :path: ".symlinks/plugins/camera_avfoundation/ios"
   Flutter:
     :path: Flutter
   flutter_blue_plus_darwin:
     :path: ".symlinks/plugins/flutter_blue_plus_darwin/darwin"
+  flutter_foreground_task:
+    :path: ".symlinks/plugins/flutter_foreground_task/ios"
+  flutter_local_notifications:
+    :path: ".symlinks/plugins/flutter_local_notifications/ios"
   fluttertoast:
     :path: ".symlinks/plugins/fluttertoast/ios"
   google_mlkit_commons:
@@ -225,9 +241,12 @@ SPEC CHECKSUMS:
   AppAuth: d4f13a8fe0baf391b2108511793e4b479691fb73
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
   audio_session: 9bb7f6c970f21241b19f5a3658097ae459681ba0
+  bonsoir_darwin: 14bd7429acb51db6a8e51f6574ac3b1ea0037a87
   camera_avfoundation: 04b44aeb14070126c6529e5ab82cc7c9fca107cf
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_blue_plus_darwin: 20a08bfeaa0f7804d524858d3d8744bcc1b6dbc3
+  flutter_foreground_task: a159d2c2173b33699ddb3e6c2a067045d7cebb89
+  flutter_local_notifications: 643a3eda1ce1c0599413ca31672536d423dee214
   fluttertoast: 2c67e14dce98bbdb200df9e1acf610d7a6264ea1
   google_mlkit_commons: b4dfe2f6ae4cbf24010dc6640a28984d01343c86
   google_mlkit_text_recognition: 9b164471713e3afdb4c129cabe6d1d64fef7e817

@@ -47,6 +47,9 @@ dependencies:
   google_sign_in: ^6.1.6
   pdf: ^3.11.1
   printing: ^5.13.4
+  bonsoir: ^7.1.4
+  flutter_local_notifications: ^22.3.1
+  flutter_foreground_task: ^10.0.0
 
 dev_dependencies:
   flutter_test:

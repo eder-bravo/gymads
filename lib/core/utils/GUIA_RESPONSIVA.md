@@ -1,4 +1,4 @@
-# Guía de Diseño Responsivo en GymAds
+# Guía de Diseño Responsivo en GymOne
 
 Esta guía explica cómo utilizar las herramientas de diseño responsivo incluidas en el proyecto.
 

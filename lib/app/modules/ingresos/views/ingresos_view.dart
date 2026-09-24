@@ -5,6 +5,7 @@ import 'package:gymads/app/core/widgets/tour_step.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import '../../../core/widgets/periodo_selector.dart';
 import '../controllers/ingresos_controller.dart';
+import '../widgets/detalle_ingreso_sheet.dart';
 import '../widgets/transaction_tile.dart';
 import 'todas_transacciones_view.dart';
 import '../../../core/widgets/cabecera_con_lista.dart';
@@ -61,7 +62,7 @@ class IngresosView extends GetView<IngresosController> {
               description: 'La suma de todo lo cobrado en el periodo que '
                   'tengas seleccionado: abonos y ventas.',
               borderRadius: 20,
-              child: _buildMonthTotal(),
+              child: _buildMonthTotal(context),
             ),
 
             const SizedBox(height: 12),
@@ -118,7 +119,7 @@ class IngresosView extends GetView<IngresosController> {
   // ─────────────────────────────────────────────────────────
   // TOTAL DEL MES
   // ─────────────────────────────────────────────────────────
-  Widget _buildMonthTotal() {
+  Widget _buildMonthTotal(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -173,6 +174,19 @@ class IngresosView extends GetView<IngresosController> {
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              // Qué productos se vendieron en el periodo.
+              TextButton.icon(
+                onPressed: () => mostrarProductosVendidos(context, controller),
+                icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                label: const Text('Productos vendidos'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
             ],

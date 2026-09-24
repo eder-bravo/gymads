@@ -13,8 +13,10 @@ import 'package:gymads/app/modules/ingresos/controllers/ingresos_controller.dart
 import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/app/modules/shared/widgets/rfid_reader_animation.dart';
 import 'dart:async';
+import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 
-class AbonarController extends GetxController with ScreenTourMixin {
+class AbonarController extends GetxController
+    with ScreenTourMixin, RecargaEnVivoMixin {
   final UserRepository userRepository;
   final IngresoService ingresoService;
   final AbonoPricesRepository pricesRepository;
@@ -113,6 +115,9 @@ class AbonarController extends GetxController with ScreenTourMixin {
     searchController.addListener(_applyFilter);
 
     loadClients();
+    // Los días restantes cambian con un abono hecho en otro teléfono.
+    recargarAlCambiar(
+        {TablaEnVivo.clientes}, () => loadClients(silencioso: true));
 
     // Mantener el estado reactivo en sincronía con los campos de texto
     unitPriceController.addListener(_onUnitPriceChanged);
@@ -149,8 +154,16 @@ class AbonarController extends GetxController with ScreenTourMixin {
 
   /// Cambia entre precio fijo (tomado de la configuración) y precio libre.
   void setPrecioFijo(bool fijo) {
+    if (fijo == isPrecioFijo.value) return;
     isPrecioFijo.value = fijo;
-    if (fijo) applyFixedPrice();
+    if (fijo) {
+      applyFixedPrice();
+    } else {
+      // Al pasar a libre se deja vacío para escribir el precio. Si se quedaba
+      // el fijo ("350.00"), el campo ya tenía sus dos decimales y rechazaba
+      // cualquier dígito tecleado al final: parecía que no dejaba escribir.
+      unitPriceController.clear();
+    }
   }
 
   /// Cambia el periodo y, en modo fijo, recarga el precio configurado.
@@ -212,8 +225,9 @@ class AbonarController extends GetxController with ScreenTourMixin {
   ///
   /// Se llama al entrar y al volver del formulario de cobro, para que los días
   /// restantes que se ven en la lista sean los de después del abono.
-  Future<void> loadClients() async {
-    isLoadingClients.value = true;
+  /// [silencioso]: sin spinner ni mensajes de error (recarga automática).
+  Future<void> loadClients({bool silencioso = false}) async {
+    if (!silencioso) isLoadingClients.value = true;
     try {
       final all = await userRepository.getAllUsers();
       all.sort((a, b) => _sortKey(a.name).compareTo(_sortKey(b.name)));
@@ -223,10 +237,12 @@ class AbonarController extends GetxController with ScreenTourMixin {
       _applyFilter();
     } catch (e) {
       AppLogger.error('AbonarController', 'Error cargando clientes', e);
-      _showSnackbar('Error', 'No se pudo cargar la lista de clientes',
-          isError: true);
+      if (!silencioso) {
+        _showSnackbar('Error', 'No se pudo cargar la lista de clientes',
+            isError: true);
+      }
     } finally {
-      isLoadingClients.value = false;
+      if (!silencioso) isLoadingClients.value = false;
     }
   }
 

@@ -15,6 +15,38 @@ import 'package:gymads/app/modules/shared/widgets/rfid_reader_animation.dart';
 import 'dart:async';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 
+/// Qué ofrece la pantalla de éxito, según desde dónde se llegó a Abonar.
+enum AlTerminarAbono {
+  /// Desde el módulo Abonar o el aviso de membresía vencida del lector.
+  abonarOtro,
+
+  /// Tras registrar un cliente desde el aviso del lector.
+  volverAInicio,
+
+  /// Tras registrar un cliente en Clientes, o desde su ficha.
+  volverAClientes,
+}
+
+/// El periodo con el que abre el cobro: [actual] (Meses) si tiene precio; si
+/// no, el primero que lo tenga (Meses, Semanas, Días, Años). Así el precio
+/// fijo no abre vacío en un gimnasio que solo cobra, por ejemplo, por día.
+String periodoConPrecio(AbonoPricesModel precios, String actual) {
+  if (precios.priceFor(actual) != null) return actual;
+  for (final periodo in const ['Meses', 'Semanas', 'Días', 'Años']) {
+    if (precios.priceFor(periodo) != null) return periodo;
+  }
+  return actual;
+}
+
+/// Lo que indican los argumentos de la ruta (`'alTerminar'`). Sin él,
+/// [AlTerminarAbono.abonarOtro].
+AlTerminarAbono alTerminarDesde(Object? argumentos) {
+  if (argumentos is Map && argumentos['alTerminar'] is AlTerminarAbono) {
+    return argumentos['alTerminar'] as AlTerminarAbono;
+  }
+  return AlTerminarAbono.abonarOtro;
+}
+
 class AbonarController extends GetxController
     with ScreenTourMixin, RecargaEnVivoMixin {
   final UserRepository userRepository;
@@ -108,6 +140,7 @@ class AbonarController extends GetxController
     if (Get.arguments != null && Get.arguments['cliente'] != null) {
       selectedClient.value = Get.arguments['cliente'];
     }
+    alTerminar = alTerminarDesde(Get.arguments);
 
     _setupRfidListener();
 
@@ -141,14 +174,22 @@ class AbonarController extends GetxController
   Future<void> _loadPrices() async {
     final result = await pricesRepository.getPrices();
     prices.value = result;
-    // Punto de partida del toggle: el modo que configuró el gimnasio. Sin modo
-    // configurado se conserva la heurística anterior. En ambos casos el modo
-    // fijo necesita al menos un precio para tener algo que ofrecer, y el staff
-    // puede cambiarlo libremente en cada cobro.
-    final mode = result.paymentMode;
-    isPrecioFijo.value = mode == null
-        ? result.hasAnyPrice
-        : mode == 'fijo' && result.hasAnyPrice;
+    _modoInicial();
+  }
+
+  /// Cómo abre el cobro: con precio fijo si hay al menos un precio
+  /// configurado, y en un periodo que lo tenga. El staff puede pasar a libre
+  /// en cada cobro.
+  ///
+  /// No se sigue `payment_mode`: un gimnasio que eligió "libre" en el
+  /// asistente inicial y después configuró sus precios abría siempre en
+  /// libre, teniendo precios que ofrecer.
+  void _modoInicial() {
+    final precios = prices.value;
+    isPrecioFijo.value = precios?.hasAnyPrice ?? false;
+    if (precios != null) {
+      durationType.value = periodoConPrecio(precios, durationType.value);
+    }
     applyFixedPrice();
   }
 
@@ -348,12 +389,21 @@ class AbonarController extends GetxController
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
+  /// Qué pasa después del abono. Con [AlTerminarAbono.abonarOtro] se muestra
+  /// la pantalla de éxito con "Abonar a otro cliente"; con los otros dos se
+  /// regresa solo ([procesarAbono]). Para regresar basta con atrás: quien
+  /// abrió Abonar ya dejó debajo la pantalla a la que hay que volver (Inicio
+  /// o Clientes).
+  AlTerminarAbono alTerminar = AlTerminarAbono.abonarOtro;
+
   void clearSelection() {
     selectedClient.value = null;
     unitPriceController.clear();
     durationController.text = '1';
     durationType.value = 'Meses';
-    applyFixedPrice();
+    // El siguiente cliente vuelve a empezar con precio fijo, aunque al
+    // anterior se le haya cobrado libre.
+    _modoInicial();
     isSuccess.value = false;
     loadClients();
   }
@@ -460,6 +510,16 @@ class AbonarController extends GetxController
         }
 
         selectedClient.value = updatedClient;
+
+        // Tras registrar a un cliente (desde el aviso del lector o desde
+        // Clientes) se regresa solo a donde se empezó, sin pantalla de éxito:
+        // el aviso basta.
+        if (alTerminar != AlTerminarAbono.abonarOtro) {
+          Get.back();
+          _showSnackbar('Listo', 'Abono registrado para ${client.name}');
+          return;
+        }
+
         isSuccess.value = true;
         _showSnackbar('Éxito', 'Abono registrado correctamente');
       } else {

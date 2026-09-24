@@ -20,6 +20,7 @@ import '../../core/utils/auth_utils.dart';
 import '../../routes/app_pages.dart';
 import '../../modules/clientes/controllers/clientes_controller.dart';
 import '../config/rfid_config.dart';
+import 'permisos_app.dart';
 
 /// Servicio global para escaneo RFID en segundo plano
 /// Se ejecuta continuamente y maneja las detecciones de tarjetas
@@ -292,6 +293,10 @@ class BackgroundRfidService extends GetxService {
 
   /// Iniciar el escaneo en segundo plano
   Future<void> startScanning() async {
+    // Escuchar al lector dispara avisos del sistema (red local en iPhone,
+    // notificaciones): primero se piden todos juntos en su pantalla.
+    await PermisosApp.listos;
+
     if (isScanning.value) {
       AppLogger.warning('BackgroundRfidService', 'El escaneo ya está activo');
       return;

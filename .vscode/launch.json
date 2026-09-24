@@ -1,0 +1,39 @@
+{
+  // Cómo arrancar GymOne desde VS Code (Run and Debug, o F5).
+  //
+  // En iPhone, el modo de pruebas de Flutter se anuncia en la red local para
+  // conectarse con VS Code, y eso hace que iOS pida el permiso de "red local"
+  // al abrir la app, antes de la pantalla "Permisos de la app". La versión
+  // para usuarios no lo hace. Por eso hay tres formas de arrancar:
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Lo de siempre: hot reload, por cable o por WiFi. En iPhone sale el
+      // aviso de red local al abrir la app.
+      "name": "GymOne",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart"
+    },
+    {
+      // Con hot reload y sin el aviso de red local al abrir. Solo con el
+      // iPhone conectado por CABLE: por WiFi, VS Code necesita ese anuncio
+      // para encontrar la app.
+      "name": "GymOne (iPhone por cable, sin aviso de red)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--no-publish-port"]
+    },
+    {
+      // Igual que la versión para usuarios: sin hot reload ni depuración.
+      // Funciona por cable o por WiFi. Para probar permisos y el lector tal
+      // como los verá el gimnasio.
+      "name": "GymOne (como usuario, release)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "release"
+    }
+  ]
+}

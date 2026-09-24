@@ -508,6 +508,10 @@ class PointOfSaleController extends GetxController
         // una imagen agresivamente reducida deja al OCR sin nada que leer.
         maxWidth: 1600,
         imageQuality: 90,
+        // Solo se lee la referencia: sin pedir los metadatos, iPhone no
+        // pregunta por el acceso a Fotos (los permisos se piden todos juntos
+        // al entrar, y este no hace falta).
+        requestFullMetadata: false,
       );
       if (elegida == null) return;
 

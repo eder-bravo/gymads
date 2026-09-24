@@ -38,6 +38,9 @@ import '../modules/staff_accesos/bindings/staff_accesos_binding.dart';
 import '../modules/staff_accesos/views/staff_accesos_view.dart';
 import '../modules/auth/views/staff_code_view.dart';
 import '../modules/auth/controllers/staff_code_controller.dart';
+import '../modules/permisos/bindings/permisos_binding.dart';
+import '../modules/permisos/permisos_middleware.dart';
+import '../modules/permisos/views/permisos_view.dart';
 
 part 'app_routes.dart';
 
@@ -77,6 +80,13 @@ class AppPages {
       name: _Paths.HOME,
       page: () => const HomeView(),
       binding: HomeBinding(),
+      // La primera vez en el teléfono, antes de Inicio se piden los permisos.
+      middlewares: [PermisosMiddleware()],
+    ),
+    GetPage(
+      name: _Paths.PERMISOS,
+      page: () => const PermisosView(),
+      binding: PermisosBinding(),
     ),
     GetPage(
       name: _Paths.CLIENTES,

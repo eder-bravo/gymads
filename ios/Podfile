@@ -51,6 +51,16 @@ post_install do |installer|
 
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = $iOSVersion
+
+      # permission_handler solo compila los permisos que se enciendan aquí:
+      # sin estas macros, en iOS devuelve "denegado" sin preguntar nunca. Son
+      # los que pide la pantalla "Permisos de la app" (PermisosApp).
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] += [
+        'PERMISSION_CAMERA=1',
+        'PERMISSION_NOTIFICATIONS=1',
+        'PERMISSION_BLUETOOTH=1',
+      ]
     end
   end
   

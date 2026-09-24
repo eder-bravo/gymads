@@ -748,6 +748,10 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     Get.toNamed(Routes.LECTOR);
   }
 
+  void openPermisos() {
+    Get.toNamed(Routes.PERMISOS, arguments: {'desdeConfiguracion': true});
+  }
+
   // =================== CONTROL DE ACCESOS ===================
 
   /// Copia editable de la configuración; se guarda al cambiar cada control.

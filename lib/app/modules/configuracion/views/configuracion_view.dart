@@ -207,6 +207,19 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           ),
         ],
 
+        // Los permisos se piden todos al entrar la primera vez; aquí se ve
+        // cómo quedaron y se corrigen.
+        const SizedBox(height: 12),
+        _buildOptionTile(
+          icon: Icons.verified_user_outlined,
+          iconColor: AppColors.info,
+          title: 'Permisos de la app',
+          subtitle: 'Cámara, notificaciones y lector de tarjetas',
+          onTap: () => controller.openPermisos(),
+          trailing: const Icon(Icons.arrow_forward_ios,
+              size: 16, color: AppColors.textSecondary),
+        ),
+
         const SizedBox(height: 24),
 
         // Sección de acciones peligrosas

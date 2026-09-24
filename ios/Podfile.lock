@@ -18,6 +18,8 @@ PODS:
     - FlutterMacOS
   - camera_avfoundation (0.0.1):
     - Flutter
+  - device_info_plus (0.0.1):
+    - Flutter
   - Flutter (1.0.0)
   - flutter_blue_plus_darwin (0.0.2):
     - Flutter
@@ -145,6 +147,7 @@ DEPENDENCIES:
   - audio_session (from `.symlinks/plugins/audio_session/ios`)
   - bonsoir_darwin (from `.symlinks/plugins/bonsoir_darwin/darwin`)
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
+  - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - Flutter (from `Flutter`)
   - flutter_blue_plus_darwin (from `.symlinks/plugins/flutter_blue_plus_darwin/darwin`)
   - flutter_foreground_task (from `.symlinks/plugins/flutter_foreground_task/ios`)
@@ -195,6 +198,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/bonsoir_darwin/darwin"
   camera_avfoundation:
     :path: ".symlinks/plugins/camera_avfoundation/ios"
+  device_info_plus:
+    :path: ".symlinks/plugins/device_info_plus/ios"
   Flutter:
     :path: Flutter
   flutter_blue_plus_darwin:
@@ -243,6 +248,7 @@ SPEC CHECKSUMS:
   audio_session: 9bb7f6c970f21241b19f5a3658097ae459681ba0
   bonsoir_darwin: 14bd7429acb51db6a8e51f6574ac3b1ea0037a87
   camera_avfoundation: 04b44aeb14070126c6529e5ab82cc7c9fca107cf
+  device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_blue_plus_darwin: 20a08bfeaa0f7804d524858d3d8744bcc1b6dbc3
   flutter_foreground_task: a159d2c2173b33699ddb3e6c2a067045d7cebb89
@@ -279,6 +285,6 @@ SPEC CHECKSUMS:
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
   url_launcher_ios: 694010445543906933d732453a59da0a173ae33d
 
-PODFILE CHECKSUM: 2946c317e7abb7ed9f5ceef72bcba81e6a4e9053
+PODFILE CHECKSUM: 942653b115821bfb00ee1cf670fa5e9a63a07588
 
 COCOAPODS: 1.16.2

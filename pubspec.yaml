@@ -50,6 +50,7 @@ dependencies:
   bonsoir: ^7.1.4
   flutter_local_notifications: ^22.3.1
   flutter_foreground_task: ^10.0.0
+  device_info_plus: ^12.4.0
 
 dev_dependencies:
   flutter_test:

@@ -9,7 +9,8 @@ class AbonoPricesModel {
   final double? priceYear;
 
   /// Modo de cobro del gimnasio: 'fijo' | 'libre'. Null significa que el
-  /// asistente de configuración inicial aún está pendiente.
+  /// asistente de configuración inicial aún está pendiente. Abonar no lo usa
+  /// para decidir cómo abre: con precios configurados siempre abre en fijo.
   final String? paymentMode;
 
   const AbonoPricesModel({

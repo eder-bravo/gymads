@@ -7,6 +7,7 @@ import 'package:gymads/app/core/utils/phone_utils.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import '../controllers/clientes_controller.dart';
+import 'package:gymads/app/modules/abonar/controllers/abonar_controller.dart';
 
 class ClienteDetailView extends GetView<ClientesController> {
   final UserModel cliente;
@@ -503,7 +504,10 @@ class ClienteDetailView extends GetView<ClientesController> {
   void _abonarCliente() {
     Get.back(); // Volver a la lista de clientes
     // Navegar al módulo de abonar pre-seleccionando al cliente, asumiendo ruta /abonar
-    Get.toNamed('/abonar', arguments: {'cliente': cliente});
+    Get.toNamed('/abonar', arguments: {
+      'cliente': cliente,
+      'alTerminar': AlTerminarAbono.volverAClientes,
+    });
   }
 
   void _deleteCliente() {

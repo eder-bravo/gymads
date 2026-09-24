@@ -55,6 +55,7 @@
 	<array>
 		<string>_gymone._tcp</string>
 		<string>_gymads._tcp</string>
+		<string>_gymonelan._tcp</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Necesitamos la cámara para tomar la foto de perfil de los miembros, fotografiar comprobantes de pago y escanear códigos de barras de productos.</string>

@@ -18,6 +18,7 @@ import 'package:gymads/app/routes/app_pages.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 import 'package:gymads/app/data/services/avisos_sistema_service.dart';
+import 'package:gymads/app/data/services/permisos_app.dart';
 
 /// GlobalKey para acceder al ScaffoldMessenger desde cualquier parte de la app
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
@@ -35,6 +36,9 @@ void main() async {
 
   // Initialize GetStorage for local caching
   await GetStorage.init();
+
+  // Si en este teléfono ya se pidieron los permisos (pantalla antes de Inicio).
+  await PermisosApp.cargar();
 
   // Inicializa Supabase (cliente principal) - SOLO UNA VEZ
   await Supabase.initialize(
@@ -113,6 +117,10 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initRfidServiceIfEnabled() async {
+    // Hablarle al lector dispara avisos del sistema (red local en iPhone,
+    // notificaciones): se espera a que se pidan todos juntos en su pantalla.
+    await PermisosApp.listos;
+
     // "Usar el lector" es de cada gimnasio. Si nunca se tocó, sigue a si el
     // gimnasio tiene lector: por eso primero se carga la configuración.
     await RfidConfig.loadConfig();

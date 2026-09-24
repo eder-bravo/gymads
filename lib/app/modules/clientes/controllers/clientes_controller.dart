@@ -12,6 +12,8 @@ import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/app/modules/abonar/controllers/abonar_controller.dart';
+import 'package:gymads/app/routes/app_pages.dart';
 
 class ClientesController extends GetxController
     with ScreenTourMixin, RecargaEnVivoMixin {
@@ -102,8 +104,15 @@ class ClientesController extends GetxController
     super.onClose();
   }
 
+  /// Si el cliente que se está registrando viene del aviso del lector
+  /// (tarjeta no registrada): tras cobrarle se regresa a Inicio, no aquí.
+  bool _registroDesdeLector = false;
+
   void showAddDialog({String? initialRfid}) {
     clearForm();
+    // La tarjeta ya puesta solo llega desde el aviso del lector (por Inicio
+    // o por el aviso pequeño "Registrar" de otras pantallas).
+    _registroDesdeLector = initialRfid != null;
     if (initialRfid != null) {
       rfidController.text = initialRfid;
     }
@@ -274,7 +283,23 @@ class ClientesController extends GetxController
         final clienteConId = newClient.copyWith(id: userId);
         // Navegar a la pantalla de Abono con el nuevo cliente seleccionado
         await Future.delayed(const Duration(milliseconds: 200));
-        Get.toNamed('/abonar', arguments: {'cliente': clienteConId});
+        if (_registroDesdeLector) {
+          // Desde el aviso del lector se termina en Inicio: debajo de Abonar
+          // queda solo Inicio, aunque el aviso saliera en otra pantalla.
+          Get.offNamedUntil(
+            Routes.ABONAR,
+            (ruta) => ruta.settings.name == Routes.HOME,
+            arguments: {
+              'cliente': clienteConId,
+              'alTerminar': AlTerminarAbono.volverAInicio,
+            },
+          );
+        } else {
+          Get.toNamed(Routes.ABONAR, arguments: {
+            'cliente': clienteConId,
+            'alTerminar': AlTerminarAbono.volverAClientes,
+          });
+        }
 
         _showSnackbarSafe('Éxito', 'Cliente agregado correctamente');
         return true;

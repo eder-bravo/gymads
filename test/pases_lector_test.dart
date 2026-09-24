@@ -124,6 +124,39 @@ void main() {
       expect(cerrado(), 0);
     });
 
+    testWidgets('sin Scaffold (como en Inicio) los textos no salen subrayados',
+        (tester) async {
+      // En Inicio el aviso va encima de todo, fuera del Scaffold: sin estilo
+      // propio, Flutter subraya los textos en amarillo.
+      await tester.pumpWidget(MaterialApp(
+        home: WelcomeScreenWidget(
+          userName: 'María',
+          userPhotoUrl: '',
+          daysLeft: 0,
+          isVisible: true,
+          isNotFound: true,
+          onClose: () {},
+        ),
+      ));
+      await tester.pump(const Duration(seconds: 2));
+
+      final titulo = find.text('Tarjeta No Registrada');
+      expect(DefaultTextStyle.of(tester.element(titulo)).style.decoration,
+          isNot(TextDecoration.underline));
+      expect(tester.widget<Text>(titulo).textAlign, TextAlign.center);
+    });
+
+    testWidgets('el fondo es opaco: no se transparenta la pantalla de atrás',
+        (tester) async {
+      await mostrar(tester);
+      final fondo = tester.widget<Container>(find
+          .descendant(
+              of: find.byType(WelcomeScreenWidget),
+              matching: find.byType(Container))
+          .first);
+      expect(fondo.color?.a, 1.0);
+    });
+
     testWidgets('la X queda debajo de la barra de estado, a la vista',
         (tester) async {
       await mostrar(tester, barraDeEstado: 59);

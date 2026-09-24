@@ -82,7 +82,12 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
     final bool isTabletSize = MediaQuery.sizeOf(context).shortestSide >= 600;
     final bool isSmallPhone = MediaQuery.sizeOf(context).shortestSide < 360;
 
-    return _buildWelcomeScreen(context, isTabletSize, isSmallPhone);
+    // Con estilo de texto propio: en Inicio el aviso va encima de todo,
+    // fuera del Scaffold, y sin esto Flutter subraya cada texto en amarillo.
+    return Material(
+      type: MaterialType.transparency,
+      child: _buildWelcomeScreen(context, isTabletSize, isSmallPhone),
+    );
   }
 
   Widget _buildWelcomeScreen(BuildContext context, bool isTabletSize, bool isSmallPhone) {
@@ -113,7 +118,9 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
         escala;
 
     final contenido = Container(
-      color: Colors.black.withOpacity(0.95),
+      // Negro sólido: al 95 % se transparentaba Inicio por detrás (sus
+      // títulos y el borde de las tarjetas se veían como rayas).
+      color: Colors.black,
       child: Center(
         child: AnimatedBuilder(
           animation: _animationController,
@@ -148,7 +155,12 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                             opacity: safeOpacity,
                             child: Transform.translate(
                               offset: Offset(0, 20 * (1 - value)),
-                              child: Text(
+                              // Centrado y con margen: "Tarjeta No
+                              // Registrada" se parte en dos líneas.
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16),
+                                child: Text(
                                 widget.isNotFound
                                     ? 'Tarjeta No Registrada'
                                     : widget.isExpired
@@ -156,6 +168,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                         : widget.isSalida
                                             ? '¡Hasta pronto!'
                                             : '¡Bienvenido!',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: widget.isNotFound ? (isTabletSize ? 50.0 : (isSmallPhone ? 30.0 : 40.0)) * escala : titleSize,
                                   fontWeight: FontWeight.bold,
@@ -168,6 +181,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                     ),
                                   ],
                                 ),
+                              ),
                               ),
                             ),
                           );

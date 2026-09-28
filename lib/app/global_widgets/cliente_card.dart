@@ -149,6 +149,10 @@ class ClienteCard extends StatelessWidget {
                       // Avatar del cliente con caché optimizado
                       Hero(
                         tag: 'avatar_${cliente.id}',
+                        // Con estilo de texto propio: al volar entre la lista
+                        // y la ficha, las iniciales (cliente sin foto) salían
+                        // subrayadas en amarillo.
+                        flightShuttleBuilder: _vueloConEstilo,
                         child: Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
@@ -232,4 +236,19 @@ class ClienteCard extends StatelessWidget {
     );
   }
 
+}
+
+/// El avatar mientras vuela entre la lista y la ficha, dentro de un
+/// `Material`: fuera de la pantalla no hay estilo de texto y Flutter subraya
+/// en amarillo las iniciales de un cliente sin foto.
+Widget _vueloConEstilo(
+  BuildContext flightContext,
+  Animation<double> animation,
+  HeroFlightDirection direction,
+  BuildContext fromContext,
+  BuildContext toContext,
+) {
+  // Como hace Flutter por defecto: vuela la versión del destino.
+  final hero = toContext.widget as Hero;
+  return Material(type: MaterialType.transparency, child: hero.child);
 }

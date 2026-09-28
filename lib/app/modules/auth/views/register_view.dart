@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/register_controller.dart';
 import '../widgets/horario_selector.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 
 /// Registration view — single-form with email/password + Google option
 class RegisterView extends GetView<RegisterController> {
@@ -208,11 +209,11 @@ class RegisterView extends GetView<RegisterController> {
               child: const Text(
                 'Iniciar sesión',
                 style: TextStyle(
-                  color: Colors.blueAccent,
+                  color: AppColors.accent,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   decoration: TextDecoration.underline,
-                  decorationColor: Colors.blueAccent,
+                  decorationColor: AppColors.accent,
                 ),
               ),
             ),
@@ -316,7 +317,7 @@ class RegisterView extends GetView<RegisterController> {
         children: [
           Row(
             children: [
-              Icon(icon, color: Colors.blueAccent, size: 22),
+              Icon(icon, color: AppColors.accent, size: 22),
               const SizedBox(width: 10),
               Text(
                 title,
@@ -355,19 +356,8 @@ class RegisterView extends GetView<RegisterController> {
         labelText: label,
         hintText: hint,
         hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
         prefixIcon: Icon(icon, color: Colors.white54, size: 20),
         suffixIcon: suffixIcon,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.blueAccent),
-        ),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
@@ -405,7 +395,7 @@ class RegisterView extends GetView<RegisterController> {
           child: ElevatedButton(
             onPressed: controller.isLoading.value ? null : _onRegister,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
+              backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),

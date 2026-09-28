@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../data/services/welcome_tour_service.dart';
 
 /// Un paso del tour de bienvenida.
 ///
@@ -102,16 +103,48 @@ class TourStep extends StatelessWidget {
       tooltipBorderRadius: BorderRadius.circular(16),
       targetBorderRadius: BorderRadius.circular(borderRadius),
       targetPadding: const EdgeInsets.all(6),
-      // Sin esto, tocar el elemento resaltado dispararía su acción real (abrir
-      // un módulo, agregar un cliente…) en vez de avanzar el tour.
-      disableDefaultTargetGestures: true,
+      // La zona resaltada atrapa los toques y los arrastres, y tocarla no
+      // hace nada: el tour se maneja solo con sus botones.
+      //
+      // Antes estaba `disableDefaultTargetGestures: true`, que NO bloquea: deja
+      // pasar los gestos por el hueco del resaltado a la pantalla de abajo.
+      // Arrastrando sobre una lista o una tarjeta resaltada, la pantalla se
+      // desplazaba a mitad del tour (y un toque podía abrir el módulo).
+      disposeOnTap: false,
+      onTargetClick: () {},
       tooltipActionConfig: const TooltipActionConfig(
         alignment: MainAxisAlignment.spaceBetween,
         position: TooltipActionPosition.inside,
         gapBetweenContentAndAction: 14,
       ),
       tooltipActions: actions,
+      child: _bloqueoDuranteElTour(),
+    );
+  }
+
+  /// Mientras hay un recorrido en pantalla, el elemento resaltado no recibe
+  /// gestos y sus arrastres no llegan a la pantalla: queda fija hasta que el
+  /// tour termina o se salta.
+  ///
+  /// Hace falta porque showcaseview deja un hueco sobre lo resaltado (y lo
+  /// envuelve en una región "transparente"): los toques y arrastres pasaban a
+  /// la pantalla de abajo, y se podía desplazar a mitad del tour.
+  /// - `AbsorbPointer`: el elemento (una lista, una tarjeta) no reacciona.
+  /// - El `GestureDetector` de fuera se queda con los arrastres antes que la
+  ///   pantalla que lo contiene (el detector más interno gana).
+  /// Siempre están en el árbol (solo se activan): así el elemento no se
+  /// reconstruye ni pierde su estado al empezar o terminar el tour.
+  Widget _bloqueoDuranteElTour() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: WelcomeTourService.recorridoEnCurso,
       child: child,
+      builder: (context, enCurso, hijo) => GestureDetector(
+        behavior:
+            enCurso ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
+        onVerticalDragStart: enCurso ? (_) {} : null,
+        onHorizontalDragStart: enCurso ? (_) {} : null,
+        child: AbsorbPointer(absorbing: enCurso, child: hijo),
+      ),
     );
   }
 }

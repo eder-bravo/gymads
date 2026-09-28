@@ -10,6 +10,7 @@ import '../../../core/widgets/tour_step.dart';
 import '../../../core/widgets/cabecera_con_lista.dart';
 import '../../../core/widgets/refrescable.dart';
 import '../../../global_widgets/app_header.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
 
 class PointOfSaleView extends GetView<PointOfSaleController> {
   const PointOfSaleView({super.key});
@@ -453,19 +454,11 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   /// Campos de la hoja de cobro: más claros que el fondo y con borde, para
   /// que se vean aunque la pantalla tenga poco brillo. El relleno de antes
   /// (14,14,14) era casi igual al de la hoja (18,18,18).
+  /// El relleno, el borde y el foco naranja vienen del tema, como en todos
+  /// los formularios.
   InputDecoration _decoracionCampoCobro({String? hintText}) {
-    OutlineInputBorder borde(Color color, double ancho) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: color, width: ancho),
-        );
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(color: AppColors.textHint.withOpacity(0.6)),
-      filled: true,
-      fillColor: Colors.white.withOpacity(0.06),
-      border: borde(Colors.white.withOpacity(0.25), 1),
-      enabledBorder: borde(Colors.white.withOpacity(0.25), 1),
-      focusedBorder: borde(AppColors.accent, 2),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
@@ -691,52 +684,17 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               }),
 
               // Botón procesar
-              Obx(() => ElevatedButton(
-                    onPressed: controller.canProcessSale() &&
-                            !controller.isProcessingPayment
+              Obx(() => BotonGuardar(
+                    texto: 'Cobrar venta',
+                    guardando: controller.isProcessingPayment,
+                    onPressed: controller.canProcessSale()
                         ? () => _processSale(context)
                         : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.success,
-                      foregroundColor: Colors.white,
-                      // Deshabilitado (falta el monto): se ve, pero apagado.
-                      // Con los colores por defecto casi desaparecía.
-                      disabledBackgroundColor:
-                          AppColors.success.withOpacity(0.25),
-                      disabledForegroundColor: Colors.white.withOpacity(0.6),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: controller.isProcessingPayment
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            'Procesar Venta',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
                   )),
               const SizedBox(height: 12),
 
               // Botón cancelar
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'Cancelar',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              ),
+              BotonCancelar(onPressed: () => Navigator.pop(context)),
             ],
           ),
         ),

@@ -8,6 +8,8 @@ import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import '../controllers/clientes_controller.dart';
 import 'package:gymads/app/modules/abonar/controllers/abonar_controller.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
+import 'package:gymads/app/global_widgets/foto_ampliada.dart';
 
 class ClienteDetailView extends GetView<ClientesController> {
   final UserModel cliente;
@@ -70,7 +72,19 @@ class ClienteDetailView extends GetView<ClientesController> {
           // Foto de perfil con animación Hero
           Hero(
             tag: 'avatar_${cliente.id}',
-            child: Container(
+            // Ver la nota en ClienteCard: sin esto las iniciales volaban
+            // subrayadas en amarillo.
+            flightShuttleBuilder: (context, animation, direction, desde, hacia) =>
+                Material(
+                    type: MaterialType.transparency,
+                    child: (hacia.widget as Hero).child),
+            child: GestureDetector(
+              // Tocar la foto la abre en grande.
+              onTap: (cliente.photoUrl?.isNotEmpty ?? false)
+                  ? () => mostrarFotoAmpliada(cliente.photoUrl!,
+                      nombre: cliente.name)
+                  : null,
+              child: Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
@@ -90,6 +104,7 @@ class ClienteDetailView extends GetView<ClientesController> {
                 userName: cliente.name,
                 size: 130,
               ),
+            ),
             ),
           ),
           const SizedBox(width: 16),
@@ -477,7 +492,7 @@ class ClienteDetailView extends GetView<ClientesController> {
         userNumberController: controller.userNumberController,
         rfidController: controller.rfidController,
         currentPhotoUrl: cliente.photoUrl,
-        onSave: (updatedUser, photoFile) {
+        onSave: (updatedUser, photoFile) async {
           final user = updatedUser.copyWith(
             id: cliente.id,
             joinDate: cliente.joinDate,
@@ -490,10 +505,15 @@ class ClienteDetailView extends GetView<ClientesController> {
             isActive: cliente.isActive,
           );
 
-          controller.updateCliente(cliente.id!, user, photoFile: photoFile);
+          // Se cierra solo si se guardó: si falla (sin conexión, tarjeta de
+          // otro cliente) el formulario sigue abierto con lo escrito.
+          final guardado = await controller.updateCliente(cliente.id!, user,
+              photoFile: photoFile);
+          if (!guardado) return;
           Get.back(); // Cerrar el formulario
           Get.back(); // Volver a la lista de clientes
         },
+        guardando: controller.guardandoCliente,
         isEditing: true,
         fullScreen: true,
       ),
@@ -517,9 +537,9 @@ class ClienteDetailView extends GetView<ClientesController> {
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
-          'Eliminar Cliente',
+          'Eliminar cliente',
           style: TextStyle(
-            color: AppColors.titleColor,
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -528,33 +548,16 @@ class ClienteDetailView extends GetView<ClientesController> {
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          ElevatedButton(
+          BotonCancelar(onPressed: () => Get.back()),
+          BotonGuardar(
+            texto: 'Eliminar',
+            compacto: true,
+            color: AppColors.error,
             onPressed: () {
               Get.back(); // Cerrar dialog
               Get.back(); // Volver a lista
               controller.deleteCliente(cliente.id!);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
           ),
         ],
       ),

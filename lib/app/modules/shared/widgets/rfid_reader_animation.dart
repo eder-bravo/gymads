@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gymads/core/theme/app_colors.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
 
 class RfidReaderAnimation extends StatefulWidget {
   final bool isReading;
@@ -193,38 +194,12 @@ class _RfidReaderAnimationState extends State<RfidReaderAnimation>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (widget.detectedUid == null)
-                  ElevatedButton.icon(
-                    onPressed: widget.onCancel,
-                    icon: const Icon(Icons.close),
-                    label: const Text('Cancelar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  )
+                  BotonCancelar(onPressed: widget.onCancel)
                 else
-                  ElevatedButton.icon(
+                  BotonGuardar(
+                    texto: 'Aceptar',
+                    compacto: true,
                     onPressed: widget.onCancel,
-                    icon: const Icon(Icons.check),
-                    label: const Text('Aceptar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
                   ),
               ],
             ),

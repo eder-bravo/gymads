@@ -69,13 +69,16 @@ class AppSearchField extends StatelessWidget {
       style: const TextStyle(color: AppColors.textPrimary),
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: const TextStyle(color: AppColors.textHint),
-        prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-        filled: true,
-        fillColor: AppColors.containerBackground,
-        border: OutlineInputBorder(
+        prefixIcon: const Icon(Icons.search),
+        // Relleno, borde y foco como todos los campos (tema); solo más
+        // redondeado, porque es un buscador.
+        enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.accent, width: 2),
         ),
         contentPadding: EdgeInsets.zero,
       ),

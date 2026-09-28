@@ -5,6 +5,7 @@ import '../../../core/permissions/permissions.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
+import '../../../core/widgets/formulario.dart';
 
 /// Account settings view — shows and allows editing of user profile data
 class CuentaView extends GetView<ConfiguracionController> {
@@ -394,31 +395,17 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
         controller: _textController,
         autofocus: true,
         style: const TextStyle(color: AppColors.textPrimary),
-        decoration: InputDecoration(
-          labelText: widget.title,
-          labelStyle: TextStyle(color: AppColors.textSecondary),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.titleColor),
-          ),
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.05),
-        ),
+        decoration: InputDecoration(labelText: widget.title),
       ),
       actions: [
-        TextButton(
-          onPressed: _isSaving ? null : () => Get.back(),
-          child: const Text('Cancelar'),
-        ),
+        BotonCancelar(onPressed: _isSaving ? null : () => Get.back()),
         // Se espera a que termine la escritura antes de cerrar, para que
         // el error (si lo hay) aparezca con el diálogo todavía abierto.
-        TextButton(
-          onPressed: _isSaving ? null : _handleSave,
-          child: Text(_isSaving ? 'Guardando...' : 'Guardar'),
+        BotonGuardar(
+          texto: 'Guardar',
+          compacto: true,
+          guardando: _isSaving,
+          onPressed: _handleSave,
         ),
       ],
     );

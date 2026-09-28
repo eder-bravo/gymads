@@ -10,6 +10,7 @@ import '../controllers/staff_accesos_controller.dart';
 import 'codigo_generado_dialog.dart';
 import 'staff_acceso_form_dialog.dart';
 import '../../../core/widgets/centrado_desplazable.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
 
 /// Accesos del personal. Solo la ve el dueño del gimnasio.
 class StaffAccesosView extends GetView<StaffAccesosController> {
@@ -196,17 +197,12 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
+          BotonCancelar(onPressed: () => Get.back(result: false)),
+          BotonGuardar(
+            texto: textoConfirmar,
+            compacto: true,
+            color: color,
             onPressed: () => Get.back(result: true),
-            style: ElevatedButton.styleFrom(backgroundColor: color),
-            child: Text(textoConfirmar,
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

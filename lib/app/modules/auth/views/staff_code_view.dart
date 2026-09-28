@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../core/utils/access_code_generator.dart';
 import '../controllers/staff_code_controller.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 
 /// Entrada del personal con su código de acceso.
 ///
@@ -163,21 +164,7 @@ class StaffCodeView extends GetView<StaffCodeController> {
           letterSpacing: 6,
           fontWeight: FontWeight.bold,
         ),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
         contentPadding: const EdgeInsets.symmetric(vertical: 20),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
-        ),
       ),
     );
   }
@@ -212,7 +199,7 @@ class StaffCodeView extends GetView<StaffCodeController> {
           child: ElevatedButton(
             onPressed: controller.isLoading.value ? null : controller.entrar,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
+              backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

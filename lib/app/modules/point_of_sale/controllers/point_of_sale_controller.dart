@@ -20,6 +20,7 @@ import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../ingresos/controllers/ingresos_controller.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
 
 class PointOfSaleController extends GetxController
     with ScreenTourMixin, RecargaEnVivoMixin {
@@ -400,18 +401,11 @@ class PointOfSaleController extends GetxController
               style: const TextStyle(color: AppColors.textSecondary),
             ),
             actions: [
-              TextButton(
-                onPressed: () => Get.back(result: false),
-                child: const Text('Cancelar',
-                    style: TextStyle(color: AppColors.textSecondary)),
-              ),
-              ElevatedButton(
+              BotonCancelar(onPressed: () => Get.back(result: false)),
+              BotonGuardar(
+                texto: 'Vender igual',
+                compacto: true,
                 onPressed: () => Get.back(result: true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Vender igual'),
               ),
             ],
           ),

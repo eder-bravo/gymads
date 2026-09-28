@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/core/utils/category_icons.dart';
 import '../controllers/inventario_controller.dart';
@@ -41,51 +42,37 @@ class ProductFormView extends GetView<InventarioController> {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
       appBar: GymAppBar(
-        title: isEditing ? 'Editar Producto' : 'Nuevo Producto',
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.textPrimary),
-          onPressed: () {
-            controller.resetForm();
-            Get.back();
-          },
-        ),
-        actions: [
-          Obx(() {
-            return TextButton(
-              onPressed: controller.isLoading.value
+        title: isEditing ? 'Editar producto' : 'Nuevo producto',
+        leading: Obx(() => IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Cerrar',
+              onPressed: controller.guardandoProducto.value
                   ? null
                   : () {
-                      if (formKey.currentState!.validate()) {
-                        controller.saveProduct({
-                          'name': nameController.text,
-                          'description': descriptionController.text,
-                          'category_id': selectedCategoryId.value,
-                          'price': priceController.text,
-                          'barcode': barcodeController.text,
-                          // Al editar el stock no se toca aquí.
-                          if (!isEditing) 'stock': stockController.text,
-                        });
-                      }
+                      controller.resetForm();
+                      Get.back();
                     },
-              child: controller.isLoading.value
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: AppColors.accent,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : Text(
-                      isEditing ? 'Actualizar' : 'Guardar',
-                      style: const TextStyle(
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            );
-          }),
-        ],
+            )),
+      ),
+      // Como en los demás formularios: el botón para guardar, fijo abajo.
+      bottomNavigationBar: PieDeFormulario(
+        child: Obx(() => BotonGuardar(
+              texto: isEditing ? 'Guardar cambios' : 'Guardar producto',
+              guardando: controller.guardandoProducto.value,
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  controller.saveProduct({
+                    'name': nameController.text,
+                    'description': descriptionController.text,
+                    'category_id': selectedCategoryId.value,
+                    'price': priceController.text,
+                    'barcode': barcodeController.text,
+                    // Al editar el stock no se toca aquí.
+                    if (!isEditing) 'stock': stockController.text,
+                  });
+                }
+              },
+            )),
       ),
       body: SafeArea(
         child: Form(
@@ -96,9 +83,8 @@ class ProductFormView extends GetView<InventarioController> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Sección de información básica
-                _buildSectionCard(
-                  title: 'Información Básica',
-                  icon: Icons.info_outline,
+                _seccion(
+                  title: 'Datos del producto',
                   children: [
                     TextFormField(
                       controller: nameController,
@@ -107,7 +93,7 @@ class ProductFormView extends GetView<InventarioController> {
                         labelText: 'Nombre del producto *',
                         hintText: 'Ej: Proteína Whey 1kg',
                         prefixIcon:
-                            Icon(Icons.shopping_bag, color: AppColors.accent),
+                            Icon(Icons.shopping_bag),
                       ),
                       textCapitalization: TextCapitalization.words,
                       inputFormatters: [
@@ -134,7 +120,7 @@ class ProductFormView extends GetView<InventarioController> {
                         hintText:
                             'Describe las características del producto...',
                         prefixIcon:
-                            Icon(Icons.description, color: AppColors.accent),
+                            Icon(Icons.description),
                         helperText: 'Opcional - Máximo 500 caracteres',
                         helperStyle: TextStyle(
                             fontSize: 11, color: AppColors.textSecondary),
@@ -164,8 +150,7 @@ class ProductFormView extends GetView<InventarioController> {
                         style: const TextStyle(color: AppColors.textPrimary),
                         decoration: InputDecoration(
                           labelText: 'Categoría *',
-                          prefixIcon: const Icon(Icons.category,
-                              color: AppColors.accent),
+                          prefixIcon: const Icon(Icons.category),
                         ),
                         dropdownColor: AppColors.cardBackground,
                         items: cats.map((category) {
@@ -209,9 +194,8 @@ class ProductFormView extends GetView<InventarioController> {
                 const SizedBox(height: 24),
 
                 // Sección de precio
-                _buildSectionCard(
+                _seccion(
                   title: 'Precio',
-                  icon: Icons.attach_money,
                   children: [
                     TextFormField(
                       controller: priceController,
@@ -222,8 +206,7 @@ class ProductFormView extends GetView<InventarioController> {
                       decoration: InputDecoration(
                         labelText: 'Precio de venta *',
                         hintText: '0.00',
-                        prefixIcon: const Icon(Icons.monetization_on,
-                            color: AppColors.accent),
+                        prefixIcon: const Icon(Icons.monetization_on),
                         prefixText: '\$ ',
                         prefixStyle: TextStyle(
                             color: AppColors.accent,
@@ -261,9 +244,8 @@ class ProductFormView extends GetView<InventarioController> {
 
                 // Código de barras: el del fabricante, para poder escanear el
                 // producto y ajustar su stock sin buscarlo en la lista.
-                _buildSectionCard(
+                _seccion(
                   title: 'Código de barras',
-                  icon: Icons.qr_code_2,
                   children: [
                     TextFormField(
                       controller: barcodeController,
@@ -271,17 +253,9 @@ class ProductFormView extends GetView<InventarioController> {
                       decoration: InputDecoration(
                         labelText: 'Código (opcional)',
                         hintText: 'Escanéalo del envase o escríbelo',
-                        labelStyle:
-                            const TextStyle(color: AppColors.textSecondary),
-                        hintStyle: TextStyle(
-                            color: AppColors.textHint.withOpacity(0.5)),
-                        filled: true,
-                        fillColor: AppColors.containerBackground,
-                        prefixIcon: const Icon(Icons.qr_code,
-                            color: AppColors.textSecondary),
+                        prefixIcon: const Icon(Icons.qr_code),
                         suffixIcon: IconButton(
-                          icon: const Icon(Icons.qr_code_scanner,
-                              color: AppColors.accent),
+                          icon: const Icon(Icons.qr_code_scanner),
                           tooltip: 'Escanear',
                           onPressed: () async {
                             final codigo = await controller.escanearCodigo(
@@ -291,10 +265,6 @@ class ProductFormView extends GetView<InventarioController> {
                             );
                             if (codigo != null) barcodeController.text = codigo;
                           },
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
                         ),
                       ),
                     ),
@@ -323,9 +293,8 @@ class ProductFormView extends GetView<InventarioController> {
                 if (isEditing)
                   _buildStockSoloLectura()
                 else
-                  _buildSectionCard(
-                    title: 'Stock Inicial',
-                    icon: Icons.inventory_2_outlined,
+                  _seccion(
+                    title: 'Stock inicial',
                     children: [
                       TextFormField(
                         controller: stockController,
@@ -336,8 +305,7 @@ class ProductFormView extends GetView<InventarioController> {
                         decoration: InputDecoration(
                           labelText: 'Cantidad disponible *',
                           hintText: '0',
-                          prefixIcon: const Icon(Icons.inventory,
-                              color: AppColors.accent),
+                          prefixIcon: const Icon(Icons.inventory),
                           suffixText: 'unidades',
                           suffixStyle: TextStyle(
                               color: AppColors.textSecondary, fontSize: 14),
@@ -385,9 +353,8 @@ class ProductFormView extends GetView<InventarioController> {
 
       final faltante = product.stock < 0;
 
-      return _buildSectionCard(
+      return _seccion(
         title: 'Stock',
-        icon: Icons.inventory_2_outlined,
         children: [
           Row(
             children: [
@@ -434,53 +401,17 @@ class ProductFormView extends GetView<InventarioController> {
     });
   }
 
-  Widget _buildSectionCard({
+  /// Un grupo de campos, con su título: igual que en los demás formularios.
+  Widget _seccion({
     required String title,
-    required IconData icon,
     required List<Widget> children,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.accent.withOpacity(0.15)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: AppColors.accent, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          ...children,
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TituloSeccion(title),
+        ...children,
+      ],
     );
   }
 }

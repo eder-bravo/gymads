@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import '../controllers/abono_prices_controller.dart';
@@ -13,7 +14,17 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
-      appBar: const GymAppBar(title: 'Precios de Abonos'),
+      appBar: const GymAppBar(title: 'Precios de abonos'),
+      // Como en los demás formularios: el botón para guardar, fijo abajo.
+      bottomNavigationBar: Obx(() => controller.isLoading.value
+          ? const SizedBox.shrink()
+          : PieDeFormulario(
+              child: BotonGuardar(
+                texto: controller.isOnboarding ? 'Continuar' : 'Guardar precios',
+                guardando: controller.isSaving.value,
+                onPressed: () => controller.savePrices(),
+              ),
+            )),
       body: SafeArea(
         child: Obx(() {
           if (controller.isLoading.value) {
@@ -23,7 +34,7 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
           }
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -41,8 +52,7 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                       Expanded(
                         child: Text(
                           'Al registrar un abono el precio se llena solo según '
-                          'el periodo elegido y el total se calcula automáticamente. '
-                          'Deja vacío el periodo que no ofrezcas.',
+                          'el periodo elegido y el total se calcula automáticamente.',
                           style: TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 13,
@@ -53,6 +63,8 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                   ),
                 ),
                 const SizedBox(height: 24),
+                const TituloSeccion('Precio por periodo',
+                    detalle: 'Deja vacío el periodo que no ofrezcas.'),
                 _priceField(
                   controller: controller.dayController,
                   label: 'Precio por día',
@@ -76,38 +88,6 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                   label: 'Precio por año',
                   icon: Icons.event_repeat,
                 ),
-                const SizedBox(height: 32),
-                Obx(() => ElevatedButton(
-                      onPressed: controller.isSaving.value
-                          ? null
-                          : () => controller.savePrices(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        disabledBackgroundColor:
-                            AppColors.accent.withOpacity(0.4),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: controller.isSaving.value
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              controller.isOnboarding ? 'Continuar' : 'Guardar',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    )),
               ],
             ),
           );
@@ -134,18 +114,12 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
       ),
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: AppColors.accent),
+        prefixIcon: Icon(icon),
         prefixText: '\$ ',
         prefixStyle: const TextStyle(
           color: AppColors.accent,
           fontSize: 20,
           fontWeight: FontWeight.bold,
-        ),
-        filled: true,
-        fillColor: AppColors.containerBackground,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
         ),
       ),
     );

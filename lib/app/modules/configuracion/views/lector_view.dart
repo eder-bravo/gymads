@@ -8,6 +8,7 @@ import '../../../data/services/background_rfid_service.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
 import 'agregar_lector_view.dart';
+import '../../../core/widgets/formulario.dart';
 
 /// El lector de tarjetas de este gimnasio.
 ///
@@ -361,16 +362,12 @@ class _LectorViewState extends State<LectorView> {
           style: TextStyle(color: AppColors.textSecondary, height: 1.35),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
+          BotonCancelar(onPressed: () => Get.back(result: false)),
+          BotonGuardar(
+            texto: 'Desvincular',
+            compacto: true,
+            color: AppColors.error,
             onPressed: () => Get.back(result: true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Desvincular',
-                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -396,16 +393,12 @@ class _LectorViewState extends State<LectorView> {
           style: TextStyle(color: AppColors.textSecondary, height: 1.35),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
+          BotonCancelar(onPressed: () => Get.back(result: false)),
+          BotonGuardar(
+            texto: 'Formatear',
+            compacto: true,
+            color: AppColors.error,
             onPressed: () => Get.back(result: true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child:
-                const Text('Formatear', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

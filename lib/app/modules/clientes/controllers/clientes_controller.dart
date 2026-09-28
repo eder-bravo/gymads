@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/fallo_al_guardar.dart';
 import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
@@ -128,6 +130,7 @@ class ClientesController extends GetxController
         onSave: (user, photoFile) {
           addCliente(user, photoFile: photoFile);
         },
+        guardando: guardandoCliente,
         fullScreen: true,
       ),
       fullscreenDialog: true,
@@ -243,7 +246,12 @@ class ClientesController extends GetxController
     emailController.clear();
     addressController.clear();
 
-    // Generar un código alfanumérico único (ej. A1B2C3)
+    userNumberController.text = _nuevoNumeroDeCliente();
+  }
+
+  /// Un código alfanumérico (ej. A1B2C3) que no tenga ningún cliente de la
+  /// lista cargada.
+  String _nuevoNumeroDeCliente() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final rnd = Random();
     String result = '';
@@ -253,8 +261,7 @@ class ClientesController extends GetxController
         result += chars[rnd.nextInt(chars.length)];
       }
     } while (clientes.any((c) => c.userNumber == result));
-    
-    userNumberController.text = result;
+    return result;
   }
 
   // Preparar formulario para editar
@@ -267,60 +274,95 @@ class ClientesController extends GetxController
     addressController.text = client.address ?? '';
   }
 
+  /// Si hay un alta o una edición de cliente en curso. El formulario
+  /// desactiva su botón y muestra "Guardando…"; además, un segundo toque no
+  /// manda otro guardado: antes el segundo chocaba con el número del primero
+  /// y salía "error" aunque el cliente sí se había guardado.
+  final guardandoCliente = false.obs;
+
   // Método para añadir un nuevo cliente (registro simple, sin cobro aquí)
   Future<bool> addCliente(UserModel newClient, {File? photoFile}) async {
-    isLoading.value = true;
+    if (guardandoCliente.value) return false;
+    // La foto es obligatoria (el formulario ya lo pide; esto es la última
+    // barrera para que no entre un cliente sin foto).
+    if (photoFile == null) {
+      _showSnackbarSafe('No se guardó', 'Toma la foto del cliente.',
+          isError: true);
+      return false;
+    }
+    guardandoCliente.value = true;
     try {
-      final userId = await userRepository.addUser(
-        newClient,
-        photoFile: photoFile,
-      );
-
-      if (userId != null) {
-        await fetchClientes();
-        Get.back(); // Cerrar el diálogo
-
-        final clienteConId = newClient.copyWith(id: userId);
-        // Navegar a la pantalla de Abono con el nuevo cliente seleccionado
-        await Future.delayed(const Duration(milliseconds: 200));
-        if (_registroDesdeLector) {
-          // Desde el aviso del lector se termina en Inicio: debajo de Abonar
-          // queda solo Inicio, aunque el aviso saliera en otra pantalla.
-          Get.offNamedUntil(
-            Routes.ABONAR,
-            (ruta) => ruta.settings.name == Routes.HOME,
-            arguments: {
-              'cliente': clienteConId,
-              'alTerminar': AlTerminarAbono.volverAInicio,
-            },
-          );
-        } else {
-          Get.toNamed(Routes.ABONAR, arguments: {
-            'cliente': clienteConId,
-            'alTerminar': AlTerminarAbono.volverAClientes,
-          });
-        }
-
-        _showSnackbarSafe('Éxito', 'Cliente agregado correctamente');
-        return true;
-      } else {
-        _showSnackbarSafe('Error', 'No se pudo agregar el cliente', isError: true);
-        return false;
+      String userId;
+      try {
+        userId = await userRepository.crearCliente(
+          newClient,
+          photoFile: photoFile,
+        );
+      } on NumeroDeClienteEnUso {
+        // Otro cliente ya tiene ese número (lo registraron en otro teléfono
+        // después de cargar la lista): se le asigna otro y se intenta una vez
+        // más.
+        final numero = _nuevoNumeroDeCliente();
+        userNumberController.text = numero;
+        newClient = newClient.copyWith(userNumber: numero);
+        userId = await userRepository.crearCliente(
+          newClient,
+          photoFile: photoFile,
+        );
       }
+
+      Get.back(); // Cerrar el formulario
+      // La lista se actualiza por detrás: esperar a recargarla entera dejaba
+      // el formulario abierto sin que pasara nada en pantalla.
+      unawaited(fetchClientes(silencioso: true));
+
+      final clienteConId = newClient.copyWith(id: userId);
+      // Navegar a la pantalla de Abono con el nuevo cliente seleccionado
+      await Future.delayed(const Duration(milliseconds: 200));
+      if (_registroDesdeLector) {
+        // Desde el aviso del lector se termina en Inicio: debajo de Abonar
+        // queda solo Inicio, aunque el aviso saliera en otra pantalla.
+        Get.offNamedUntil(
+          Routes.ABONAR,
+          (ruta) => ruta.settings.name == Routes.HOME,
+          arguments: {
+            'cliente': clienteConId,
+            'alTerminar': AlTerminarAbono.volverAInicio,
+          },
+        );
+      } else {
+        Get.toNamed(Routes.ABONAR, arguments: {
+          'cliente': clienteConId,
+          'alTerminar': AlTerminarAbono.volverAClientes,
+        });
+      }
+
+      _showSnackbarSafe('Éxito', 'Cliente agregado correctamente');
+      return true;
     } catch (e) {
-      _showSnackbarSafe('Error', 'Error al agregar cliente: $e', isError: true);
+      AppLogger.error('ClientesController', 'No se pudo agregar el cliente', e);
+      _showSnackbarSafe(
+        'No se guardó',
+        mensajeDeFallo(e,
+            generico: 'No se pudo agregar el cliente. Intenta de nuevo.'),
+        isError: true,
+      );
       return false;
     } finally {
-      isLoading.value = false;
+      guardandoCliente.value = false;
     }
   }
 
-  // Método para actualizar un cliente existente
+  // Método para actualizar un cliente existente. Devuelve si se guardó: el
+  // formulario solo se cierra en ese caso, para no perder lo escrito.
   Future<bool> updateCliente(
     String id,
     UserModel updatedClient, {
     File? photoFile,
   }) async {
+    if (guardandoCliente.value) return false;
+    guardandoCliente.value = true;
+
     BackgroundRfidService? rfidService;
     try {
       if (Get.isRegistered<BackgroundRfidService>()) {
@@ -331,26 +373,26 @@ class ClientesController extends GetxController
       AppLogger.warning('ClientesController', 'No se pudo pausar servicio RFID');
     }
 
-    isLoading.value = true;
     try {
-      final success = await userRepository.updateUser(
+      await userRepository.actualizarCliente(
         id,
         updatedClient,
         photoFile: photoFile,
       );
-      if (success) {
-        await fetchClientes();
-        _showSnackbarSafe('Éxito', 'Cliente actualizado correctamente');
-        return true;
-      } else {
-        _showSnackbarSafe('Error', 'No se pudo actualizar el cliente', isError: true);
-        return false;
-      }
+      unawaited(fetchClientes(silencioso: true));
+      _showSnackbarSafe('Éxito', 'Cliente actualizado correctamente');
+      return true;
     } catch (e) {
-      _showSnackbarSafe('Error', 'Error al actualizar cliente: $e', isError: true);
+      AppLogger.error('ClientesController', 'No se pudo actualizar el cliente', e);
+      _showSnackbarSafe(
+        'No se guardó',
+        mensajeDeFallo(e,
+            generico: 'No se pudo guardar el cliente. Intenta de nuevo.'),
+        isError: true,
+      );
       return false;
     } finally {
-      isLoading.value = false;
+      guardandoCliente.value = false;
       await Future.delayed(const Duration(milliseconds: 300));
       rfidService?.resumeScanning();
     }

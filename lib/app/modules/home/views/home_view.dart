@@ -100,10 +100,7 @@ class HomeView extends GetView<HomeController> {
               const SizedBox(height: 12),
               _buildQuickActions(context, isTablet),
 
-              const SizedBox(height: 16),
-              _buildSettingsTile(context, isTablet),
-
-              const SizedBox(height: 24),
+              const SizedBox(height: 14),
             ],
           ),
         ),
@@ -311,7 +308,20 @@ class HomeView extends GetView<HomeController> {
         showcaseKey: controller.keyEntradas,
         tourDescription: 'Revisa quién entró al gimnasio y a qué hora.',
       ),
-    ].where(_permitido).toList();
+    ].where(_permitido).toList()
+      // Configuración va con las demás opciones, con la misma tarjeta y el
+      // mismo espacio (antes iba aparte, más abajo y con otro diseño). Todos
+      // los roles la ven.
+      ..add(_QuickAction(
+        icon: Icons.settings_outlined,
+        label: 'Configuración',
+        subtitle: 'Cuenta, precios y lector',
+        color: const Color(0xFFB0BEC5),
+        onTap: () => Get.toNamed(Routes.CONFIGURACION),
+        showcaseKey: controller.keyConfiguracion,
+        tourDescription: 'Ajusta tu cuenta, los precios de abonos, las '
+            'categorías de productos y el lector de tarjetas.',
+      ));
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
@@ -324,77 +334,11 @@ class HomeView extends GetView<HomeController> {
               title: action.label,
               description: action.tourDescription,
               borderRadius: 16,
+              isLastStep: action.showcaseKey == controller.keyConfiguracion,
               child: _QuickActionTile(action: action),
             ),
           );
         }).toList(),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // SETTINGS (acceso a configuración en la zona inferior)
-  // ─────────────────────────────────────────────────────────
-  Widget _buildSettingsTile(BuildContext context, bool isTablet) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
-      child: TourStep(
-        tourKey: controller.keyConfiguracion,
-        title: 'Configuración',
-        description: 'Ajusta tu cuenta, los precios de abonos, las '
-            'categorías de productos y el lector de tarjetas.',
-        borderRadius: 16,
-        isLastStep: true,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => Get.toNamed(Routes.CONFIGURACION),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-              decoration: BoxDecoration(
-                color: AppColors.cardBackground,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.06),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.settings_outlined,
-                      color: Colors.white70,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Text(
-                      'Configuración',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: Colors.white.withOpacity(0.2),
-                    size: 16,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

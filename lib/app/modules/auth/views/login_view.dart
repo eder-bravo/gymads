@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../routes/app_pages.dart';
 import '../controllers/auth_controller.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 
 /// Login view with email/password form
 class LoginView extends GetView<AuthController> {
@@ -53,11 +54,11 @@ class LoginView extends GetView<AuthController> {
                         child: const Text(
                           'Crear cuenta',
                           style: TextStyle(
-                            color: Colors.blueAccent,
+                            color: AppColors.accent,
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             decoration: TextDecoration.underline,
-                            decorationColor: Colors.blueAccent,
+                            decorationColor: AppColors.accent,
                           ),
                         ),
                       ),
@@ -246,25 +247,10 @@ class LoginView extends GetView<AuthController> {
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: 'Correo electrónico',
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
         prefixIcon: Icon(
           Icons.email_outlined,
           color: Colors.white.withOpacity(0.7),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.blueAccent),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent),
-        ),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
       ),
       onChanged: (_) => controller.clearError(),
     );
@@ -278,7 +264,6 @@ class LoginView extends GetView<AuthController> {
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             labelText: 'Contraseña',
-            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
             prefixIcon: Icon(
               Icons.lock_outline,
               color: Colors.white.withOpacity(0.7),
@@ -292,20 +277,6 @@ class LoginView extends GetView<AuthController> {
               ),
               onPressed: controller.togglePasswordVisibility,
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.blueAccent),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.redAccent),
-            ),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
           ),
           onChanged: (_) => controller.clearError(),
           onSubmitted: (_) => controller.login(),
@@ -349,7 +320,7 @@ class LoginView extends GetView<AuthController> {
           child: ElevatedButton(
             onPressed: controller.isLoading.value ? null : controller.login,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
+              backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

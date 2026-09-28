@@ -6,6 +6,7 @@ import '../../../core/utils/category_icons.dart';
 import '../../../data/models/product_model.dart';
 import '../controllers/categorias_controller.dart';
 import 'widgets/category_icon_picker.dart';
+import '../../../core/widgets/formulario.dart';
 
 /// Diálogo de alta y edición de categoría, compartido por la pantalla de
 /// Categorías y por el atajo `+` del formulario de producto.
@@ -121,12 +122,6 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                 labelText: 'Nombre *',
                 hintText: 'Ej: Suplementos',
                 errorText: _nameError,
-                filled: true,
-                fillColor: AppColors.containerBackground,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
               ),
               onSubmitted: (_) => _submit(),
             ),
@@ -137,12 +132,6 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
               style: const TextStyle(color: AppColors.textPrimary),
               decoration: InputDecoration(
                 labelText: 'Descripción (opcional)',
-                filled: true,
-                fillColor: AppColors.containerBackground,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
               ),
             ),
             const SizedBox(height: 18),
@@ -162,38 +151,14 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Get.back(),
-          child: const Text(
-            'Cancelar',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ),
-        Obx(() => ElevatedButton(
-              onPressed: controller.isSaving.value ? null : _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                disabledBackgroundColor: AppColors.accent.withOpacity(0.4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: controller.isSaving.value
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(
-                      _isEditing ? 'Guardar' : 'Crear',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+        Obx(() => BotonCancelar(
+              onPressed: controller.isSaving.value ? null : () => Get.back(),
+            )),
+        Obx(() => BotonGuardar(
+              texto: _isEditing ? 'Guardar' : 'Crear',
+              compacto: true,
+              guardando: controller.isSaving.value,
+              onPressed: _submit,
             )),
       ],
     );

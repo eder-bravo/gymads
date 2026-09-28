@@ -3,6 +3,67 @@ import 'app_colors.dart';
 
 /// Clase para gestionar el tema de la aplicación
 class AppTheme {
+  /// El tema que usa la app (`GetMaterialApp` en main.dart): el de Flutter
+  /// con el estilo común de los campos. Las pruebas usan este mismo, para
+  /// que prueben lo que se ve.
+  static ThemeData get app => ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+        inputDecorationTheme: campos,
+        textSelectionTheme: seleccion,
+      );
+
+  /// Un solo estilo de campo para toda la app. Con el tema de Flutter por
+  /// defecto la etiqueta salía gris oscuro (casi invisible sobre el fondo
+  /// negro) y el foco morado.
+  static InputDecorationTheme get campos => InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.06),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.accent, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.error, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        hintStyle: TextStyle(color: AppColors.textHint.withOpacity(0.6)),
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        floatingLabelStyle: const TextStyle(
+          color: AppColors.accent,
+          fontWeight: FontWeight.w600,
+        ),
+        prefixIconColor: AppColors.textSecondary,
+        suffixIconColor: AppColors.textSecondary,
+        errorStyle: const TextStyle(color: AppColors.error),
+      );
+
+  static TextSelectionThemeData get seleccion => TextSelectionThemeData(
+        cursorColor: AppColors.accent,
+        selectionColor: AppColors.accent.withOpacity(0.35),
+        selectionHandleColor: AppColors.accent,
+      );
+
   /// Obtiene el tema principal de la aplicación
   static ThemeData get theme {
     return ThemeData(
@@ -47,32 +108,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.containerBackground.withOpacity(0.7),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.error),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-        hintStyle: const TextStyle(color: AppColors.textHint),
-        labelStyle: const TextStyle(color: AppColors.textSecondary),
-      ),
+      inputDecorationTheme: campos,
+      textSelectionTheme: seleccion,
       brightness: Brightness.dark,
       textTheme: const TextTheme(
         displayLarge: TextStyle(

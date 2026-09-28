@@ -11,6 +11,7 @@ import '../../../core/widgets/refrescable.dart';
 import '../controllers/abonar_controller.dart';
 import '../../../core/widgets/centrado_desplazable.dart';
 import '../../../core/widgets/cabecera_con_lista.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
 
 class AbonarView extends GetView<AbonarController> {
   const AbonarView({super.key});
@@ -266,13 +267,8 @@ class AbonarView extends GetView<AbonarController> {
             Obx(() => DropdownButtonFormField<String>(
                   value: controller.paymentMethod.value,
                   decoration: InputDecoration(
-                    labelText: 'Método de Pago',
-                    prefixIcon: const Icon(Icons.payments_outlined,
-                        color: AppColors.accent),
-                    filled: true,
-                    fillColor: AppColors.containerBackground,
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16)),
+                    labelText: 'Método de pago',
+                    prefixIcon: const Icon(Icons.payments_outlined),
                   ),
                   dropdownColor: AppColors.cardBackground,
                   style: const TextStyle(color: AppColors.textPrimary),
@@ -327,30 +323,10 @@ class AbonarView extends GetView<AbonarController> {
             const SizedBox(height: 40),
 
             // Botón Enviar
-            Obx(() => ElevatedButton(
-                  onPressed: controller.isLoading.value
-                      ? null
-                      : () => controller.procesarAbono(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: controller.isLoading.value
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Registrar Abono',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
-                        ),
+            Obx(() => BotonGuardar(
+                  texto: 'Registrar abono',
+                  guardando: controller.isLoading.value,
+                  onPressed: () => controller.procesarAbono(),
                 )),
           ],
         ),
@@ -362,8 +338,9 @@ class AbonarView extends GetView<AbonarController> {
   Widget _buildModoToggle() {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.containerBackground,
+        color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
       ),
       padding: const EdgeInsets.all(4),
       child: Obx(() {
@@ -421,10 +398,6 @@ class AbonarView extends GetView<AbonarController> {
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Cantidad',
-                  filled: true,
-                  fillColor: AppColors.containerBackground,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16)),
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
                   prefixIconConstraints:
@@ -460,10 +433,6 @@ class AbonarView extends GetView<AbonarController> {
               child: Obx(() => DropdownButtonFormField<String>(
                     value: controller.durationType.value,
                     decoration: InputDecoration(
-                      filled: true,
-                      fillColor: AppColors.containerBackground,
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16)),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 18),
                     ),
@@ -511,12 +480,8 @@ class AbonarView extends GetView<AbonarController> {
                   color: AppColors.accent,
                   fontSize: 24,
                   fontWeight: FontWeight.bold),
-              filled: true,
-              fillColor: fijo
-                  ? AppColors.containerBackground.withOpacity(0.5)
-                  : AppColors.containerBackground,
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              // Bloqueado (precio fijo): más apagado que un campo normal.
+              fillColor: fijo ? Colors.white.withOpacity(0.02) : null,
             ),
           );
         }),
@@ -559,22 +524,9 @@ class AbonarView extends GetView<AbonarController> {
                   const TextStyle(fontSize: 16, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 40),
-            ElevatedButton(
+            BotonGuardar(
+              texto: 'Abonar a otro cliente',
               onPressed: controller.clearSelection,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                padding:
-                    const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-              ),
-              child: const Text(
-                'Abonar a otro cliente',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white),
-              ),
             ),
           ],
         ),

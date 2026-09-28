@@ -8,6 +8,7 @@ import '../../../global_widgets/app_header.dart';
 import '../controllers/categorias_controller.dart';
 import 'category_form_dialog.dart';
 import '../../../core/widgets/centrado_desplazable.dart';
+import '../../../core/widgets/formulario.dart';
 
 /// Pantalla de gestión de categorías de producto.
 class CategoriasView extends GetView<CategoriasController> {
@@ -271,40 +272,25 @@ class CategoriasView extends GetView<CategoriasController> {
           style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
+          BotonCancelar(onPressed: () => Get.back()),
           if (hasProducts)
-            ElevatedButton(
+            BotonGuardar(
+              texto: 'Desactivar',
+              compacto: true,
               onPressed: () {
                 Get.back();
                 controller.toggleActive(category);
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Desactivar',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
             )
           else
-            ElevatedButton(
+            BotonGuardar(
+              texto: 'Eliminar',
+              compacto: true,
+              color: AppColors.error,
               onPressed: () {
                 Get.back();
                 controller.delete(category);
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Eliminar',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
             ),
         ],
       ),

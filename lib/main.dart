@@ -19,6 +19,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 import 'package:gymads/app/data/services/avisos_sistema_service.dart';
 import 'package:gymads/app/data/services/permisos_app.dart';
+import 'package:gymads/core/theme/app_theme.dart';
 
 /// GlobalKey para acceder al ScaffoldMessenger desde cualquier parte de la app
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
@@ -179,10 +180,7 @@ class _MyAppState extends State<MyApp> {
         Locale('es'),
         Locale('en'),
       ],
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
+      theme: AppTheme.app,
     );
   }
 }

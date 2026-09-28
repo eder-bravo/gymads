@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/fallo_al_guardar.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/services/supabase_service.dart';
 import 'package:gymads/app/data/services/tenant_query_helper.dart';
@@ -76,24 +79,35 @@ class ProductRepository {
     }
   }
 
-  // Crear un nuevo producto
-  Future<Product?> createProduct(Product product) async {
+  /// Crea el producto. Si no se puede, lanza el motivo:
+  /// [BarcodeDuplicadoException], [GuardadoFallido] (nombre repetido) o el
+  /// error de conexión / [TimeoutException]. Antes devolvía null y la pantalla
+  /// no decía nada: parecía que el botón no funcionaba.
+  ///
+  /// Idempotente: el id lo pone la app, una vez por formulario. Si un intento
+  /// anterior sí se guardó pero la respuesta no llegó (mala señal), el
+  /// reintento choca con su propio id y se devuelve ese producto.
+  Future<Product> createProduct(Product product) async {
     try {
       final response = await _supabase
           .from('products')
           .insert(TenantQueryHelper.withTenant(product.toJsonForInsert()))
           .select()
-          .single();
+          .single()
+          .timeout(limiteAlGuardar);
 
       return Product.fromJson(response);
     } catch (e) {
-      if (_esBarcodeDuplicado(e)) {
-        AppLogger.warning(
-            'ProductRepository', 'El código de barras ya está en uso');
-        throw const BarcodeDuplicadoException();
+      final indice = restriccionUnicaViolada(e);
+      if (indice != null) {
+        // Cualquier repetido puede ser el propio producto de un intento
+        // anterior (Postgres puede acusar al nombre antes que al id).
+        final yaGuardado = await _productoPorId(product.id);
+        if (yaGuardado != null) return yaGuardado;
+        _lanzarRepetido(indice);
       }
       AppLogger.error('ProductRepository', 'Error al crear producto', e);
-      return null;
+      rethrow;
     }
   }
 
@@ -104,7 +118,9 @@ class ProductRepository {
   // cual, así que editar el precio pisaba el stock con un valor viejo y
   // borraba las ventas hechas mientras la pantalla estaba abierta. El stock
   // solo se mueve por deltas, en `ajustarStock`.
-  Future<Product?> updateProduct(Product product) async {
+  //
+  // Si no se puede, lanza el motivo, igual que [createProduct].
+  Future<Product> updateProduct(Product product) async {
     try {
       final response = await _supabase
           .from('products')
@@ -119,30 +135,45 @@ class ProductRepository {
           })
           .eq('id', product.id)
           .select()
-          .single();
+          .single()
+          .timeout(limiteAlGuardar);
 
       return Product.fromJson(response);
     } catch (e) {
-      if (_esBarcodeDuplicado(e)) {
-        AppLogger.warning(
-            'ProductRepository', 'El código de barras ya está en uso');
-        throw const BarcodeDuplicadoException();
-      }
+      final indice = restriccionUnicaViolada(e);
+      if (indice != null) _lanzarRepetido(indice);
       AppLogger.error('ProductRepository', 'Error al actualizar producto', e);
-      return null;
+      rethrow;
     }
   }
 
-  /// Si el fallo viene del índice único del código de barras.
-  ///
-  /// Postgres devuelve 23505 para cualquier violación de unicidad, y esta
-  /// tabla tiene dos: el nombre por sucursal y el código. Se mira el nombre
-  /// del índice para no acusar al código cuando el repetido es el nombre.
-  bool _esBarcodeDuplicado(Object e) {
-    if (e is! PostgrestException) return false;
-    if (e.code != '23505') return false;
-    return (e.message + (e.details?.toString() ?? ''))
-        .contains('idx_products_branch_barcode');
+  /// El motivo, según el índice único que se violó.
+  Never _lanzarRepetido(String indice) {
+    if (indice == 'idx_products_branch_barcode') {
+      AppLogger.warning(
+          'ProductRepository', 'El código de barras ya está en uso');
+      throw const BarcodeDuplicadoException();
+    }
+    if (indice == 'idx_products_branch_name') {
+      throw const GuardadoFallido(
+          'Ya hay un producto con ese nombre. Revisa también los productos '
+          'desactivados.');
+    }
+    throw const GuardadoFallido('Ese producto ya existe.');
+  }
+
+  Future<Product?> _productoPorId(String id) async {
+    try {
+      final fila = await _supabase
+          .from('products')
+          .select()
+          .eq('id', id)
+          .maybeSingle()
+          .timeout(limiteAlGuardar);
+      return fila == null ? null : Product.fromJson(fila);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Suma [delta] al stock del producto y devuelve el stock resultante.

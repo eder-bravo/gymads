@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/fallo_al_guardar.dart';
+import 'package:gymads/app/data/services/supabase_service.dart';
+import 'package:gymads/app/data/services/tenant_query_helper.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/providers/api_provider.dart';
 import 'package:gymads/app/data/providers/storage_provider.dart';
@@ -178,46 +182,108 @@ class UserRepository {
     }
   }
 
-  /// Agrega un nuevo usuario con foto
-  /// Añade un nuevo usuario y devuelve su ID si es exitoso
+  /// Crea un cliente y devuelve su id. Si no se puede, lanza una excepción
+  /// con el motivo ([GuardadoFallido], [NumeroDeClienteEnUso], o el error de
+  /// conexión / [TimeoutException]).
+  ///
+  /// - La foto es obligatoria si se tomó: si no se puede subir, el cliente NO
+  ///   se crea (antes se creaba sin foto, en silencio).
+  /// - Idempotente: si un intento anterior sí se guardó pero la respuesta no
+  ///   llegó (mala señal) y se vuelve a intentar, el número de cliente ya
+  ///   existe con ese mismo cliente: se devuelve su id en vez de fallar.
+  Future<String> crearCliente(UserModel user, {File? photoFile}) async {
+    String? fotoSubida;
+    if (photoFile != null) {
+      fotoSubida = await _subirFoto(
+        photoFile,
+        // Nombre provisional: el id real aún no existe.
+        DateTime.now().millisecondsSinceEpoch.toString(),
+      );
+      user = user.copyWith(photoUrl: fotoSubida);
+    }
+
+    try {
+      final fila = await SupabaseService.client
+          .from('users')
+          .insert(TenantQueryHelper.withTenant(user.toJson()))
+          .select('id')
+          .single()
+          .timeout(limiteAlGuardar);
+      return fila['id'] as String;
+    } catch (e) {
+      final indice = restriccionUnicaViolada(e);
+      if (indice == 'idx_users_branch_rfid_card') {
+        await _borrarFotoSuelta(fotoSubida);
+        throw const GuardadoFallido('Esa tarjeta ya es de otro cliente.');
+      }
+      if (indice == 'idx_users_branch_user_number') {
+        final existente = await _clientePorNumero(user.userNumber);
+        if (existente != null && esElMismoAlta(existente, user)) {
+          // Ya se había guardado; la foto de este reintento sobra.
+          await _borrarFotoSuelta(fotoSubida);
+          return existente.id!;
+        }
+        await _borrarFotoSuelta(fotoSubida);
+        throw const NumeroDeClienteEnUso();
+      }
+      await _borrarFotoSuelta(fotoSubida);
+      rethrow;
+    }
+  }
+
+  /// Compatibilidad: como [crearCliente], pero null si falla.
   Future<String?> addUser(UserModel user, {File? photoFile}) async {
     try {
-      // Si se proporciona una foto, primero la subimos a Supabase
-      if (photoFile != null) {
-        // Verificar que el archivo existe ANTES de leer sus metadatos
-        // (photoFile.length() lanza PathNotFoundException si ya no existe)
-        if (!await photoFile.exists()) {
-          AppLogger.warning('UserRepository', 'La foto seleccionada ya no existe, se continúa sin foto');
-          // Continuamos sin foto
-        } else {
-          // ID temporal para la foto (se usará el ID real cuando esté disponible)
-          final tempId = DateTime.now().millisecondsSinceEpoch.toString();
-
-          final photoUrl = await _storageProvider.uploadUserPhoto(
-            photoFile,
-            tempId,
-          );
-
-          if (photoUrl != null) {
-            // Actualizar el modelo de usuario con la URL de la foto
-            user = user.copyWith(photoUrl: photoUrl);
-          } else {
-            AppLogger.error('UserRepository', 'Fallo al subir la foto del usuario');
-            // Continuamos con la creación del usuario aunque no se pudo subir la foto
-          }
-        }
-      }
-
-      final response = await _apiProvider.add(user.toJson());
-
-      if (!response['error'] && response['data'] != null) {
-        return response['data']['id'] as String;
-      } else {
-        AppLogger.error('UserRepository', 'Fallo al crear el usuario');
-        return null;
-      }
+      return await crearCliente(user, photoFile: photoFile);
     } catch (e) {
       AppLogger.error('UserRepository', 'Fallo al crear el usuario', e);
+      return null;
+    }
+  }
+
+  /// Sube la foto de un cliente. Si no se puede, lanza [GuardadoFallido]: sin
+  /// foto no se guarda nada.
+  Future<String> _subirFoto(File foto, String nombre) async {
+    if (!await foto.exists()) {
+      throw const GuardadoFallido(
+          'La foto ya no está disponible. Vuelve a tomarla.');
+    }
+    String? url;
+    try {
+      url = await _storageProvider
+          .uploadUserPhoto(foto, nombre)
+          .timeout(limiteAlGuardar);
+    } on TimeoutException {
+      url = null;
+    }
+    if (url == null) {
+      throw const GuardadoFallido(
+          'No se pudo guardar la foto. Revisa tu conexión e intenta de nuevo.');
+    }
+    return url;
+  }
+
+  /// Una foto que se subió para un guardado que al final no se hizo.
+  Future<void> _borrarFotoSuelta(String? url) async {
+    if (url == null) return;
+    try {
+      await _storageProvider.deleteUserPhoto(url);
+    } catch (_) {
+      // Una foto huérfana no afecta a nadie.
+    }
+  }
+
+  Future<UserModel?> _clientePorNumero(String numero) async {
+    try {
+      var consulta = SupabaseService.client
+          .from('users')
+          .select()
+          .eq('user_number', numero);
+      final branchId = TenantQueryHelper.branchIdOrNull;
+      if (branchId != null) consulta = consulta.eq('branch_id', branchId);
+      final fila = await consulta.maybeSingle().timeout(limiteAlGuardar);
+      return fila == null ? null : UserModel.fromJson(fila);
+    } catch (_) {
       return null;
     }
   }
@@ -239,72 +305,78 @@ class UserRepository {
     }
   }
 
-  /// Actualiza un usuario existente
+  /// Actualiza un cliente. Si no se puede, lanza una excepción con el motivo
+  /// ([GuardadoFallido], o el error de conexión / [TimeoutException]).
   ///
-  /// La foto solo se toca si se manda una nueva. `UserModel.toJson()` incluye
-  /// siempre `photo_url`, y varios formularios arman el modelo sin ella, así
-  /// que enviarla vacía borraba la que ya estaba guardada. Como ninguna
-  /// pantalla ofrece "quitar la foto", aquí un `photo_url` vacío significa
-  /// *no la cambies*, nunca *bórrala*.
+  /// La foto solo se toca si se manda una nueva, y es obligatoria: si no se
+  /// puede subir, no se guarda nada (antes se guardaba el resto con la foto
+  /// vieja). `UserModel.toJson()` incluye siempre `photo_url`, y varios
+  /// formularios arman el modelo sin ella, así que enviarla vacía borraba la
+  /// que ya estaba guardada. Como ninguna pantalla ofrece "quitar la foto",
+  /// aquí un `photo_url` vacío significa *no la cambies*, nunca *bórrala*.
+  Future<void> actualizarCliente(String id, UserModel user,
+      {File? photoFile}) async {
+    String? fotoAnterior;
+    String? fotoNueva;
+
+    if (photoFile != null) {
+      // La foto vigente se lee de la BD y no del modelo: quien llama pone
+      // `photoUrl` en null al mandar una foto nueva, de modo que el modelo
+      // ya no la trae.
+      fotoAnterior = (await getUserById(id))?.photoUrl ?? user.photoUrl;
+      // Con el id real del cliente como nombre.
+      fotoNueva = await _subirFoto(photoFile, id);
+      user = user.copyWith(photoUrl: fotoNueva);
+    }
+
+    final payload = user.toJson();
+    final photoUrl = payload['photo_url'] as String?;
+    if (photoUrl == null || photoUrl.isEmpty) {
+      payload.remove('photo_url');
+    }
+
+    final List<dynamic> filas;
+    try {
+      filas = await SupabaseService.client
+          .from('users')
+          .update(payload)
+          .eq('id', id)
+          .select('id')
+          .timeout(limiteAlGuardar);
+    } catch (e) {
+      await _borrarFotoSuelta(fotoNueva);
+      if (restriccionUnicaViolada(e) == 'idx_users_branch_rfid_card') {
+        throw const GuardadoFallido('Esa tarjeta ya es de otro cliente.');
+      }
+      rethrow;
+    }
+    if (filas.isEmpty) {
+      await _borrarFotoSuelta(fotoNueva);
+      throw const GuardadoFallido('No se pudo guardar el cliente.');
+    }
+
+    // La anterior se borra al final, con la nueva ya confirmada en la BD.
+    // Borrándola antes, un fallo en el update dejaba al cliente sin foto y
+    // apuntando a un objeto que ya no existe.
+    if (fotoNueva != null &&
+        fotoAnterior != null &&
+        fotoAnterior.isNotEmpty &&
+        fotoAnterior != fotoNueva) {
+      try {
+        await _storageProvider.deleteUserPhoto(fotoAnterior);
+      } catch (e) {
+        AppLogger.warning(
+            'UserRepository', 'No se pudo eliminar la foto anterior');
+        // Un objeto huérfano es preferible a fallar una actualización válida
+      }
+    }
+  }
+
+  /// Compatibilidad (Abonar, check-in): como [actualizarCliente], pero
+  /// devuelve false si falla.
   Future<bool> updateUser(String id, UserModel user, {File? photoFile}) async {
     try {
-      String? fotoAnterior;
-      String? fotoNueva;
-
-      if (photoFile != null) {
-        // La foto vigente se lee de la BD y no del modelo: quien llama pone
-        // `photoUrl` en null al mandar una foto nueva, de modo que el modelo
-        // ya no la trae.
-        fotoAnterior = (await getUserById(id))?.photoUrl ?? user.photoUrl;
-
-        // Verificar que el archivo existe ANTES de leer sus metadatos
-        // (photoFile.length() lanza PathNotFoundException si ya no existe)
-        if (!await photoFile.exists()) {
-          AppLogger.warning('UserRepository', 'La foto seleccionada ya no existe, no se actualiza la foto');
-        } else {
-          fotoNueva = await _storageProvider.uploadUserPhoto(
-            photoFile,
-            id, // Usar el ID real del usuario para la foto
-          );
-
-          if (fotoNueva != null) {
-            user = user.copyWith(photoUrl: fotoNueva);
-          } else {
-            // El resto de la edición (nombre, teléfono…) sí se guarda; la foto
-            // anterior se queda como estaba.
-            AppLogger.error('UserRepository', 'Fallo al subir la nueva foto del usuario');
-          }
-        }
-      }
-
-      final payload = user.toJson();
-      final photoUrl = payload['photo_url'] as String?;
-      if (photoUrl == null || photoUrl.isEmpty) {
-        payload.remove('photo_url');
-      }
-
-      final response = await _apiProvider.update(id, payload);
-
-      if (response['error']) {
-        AppLogger.error('UserRepository', 'Fallo al actualizar el usuario');
-        return false;
-      }
-
-      // La anterior se borra al final, con la nueva ya confirmada en la BD.
-      // Borrándola antes, un fallo en el update dejaba al cliente sin foto y
-      // apuntando a un objeto que ya no existe.
-      if (fotoNueva != null &&
-          fotoAnterior != null &&
-          fotoAnterior.isNotEmpty &&
-          fotoAnterior != fotoNueva) {
-        try {
-          await _storageProvider.deleteUserPhoto(fotoAnterior);
-        } catch (e) {
-          AppLogger.warning('UserRepository', 'No se pudo eliminar la foto anterior');
-          // Un objeto huérfano es preferible a fallar una actualización válida
-        }
-      }
-
+      await actualizarCliente(id, user, photoFile: photoFile);
       return true;
     } catch (e) {
       AppLogger.error('UserRepository', 'Fallo al actualizar el usuario', e);
@@ -346,4 +418,18 @@ class UserRepository {
       return false;
     }
   }
+}
+
+/// El número de cliente ya lo tiene OTRO cliente (no es un reintento del
+/// mismo alta). Quien llama genera otro número y vuelve a intentar.
+class NumeroDeClienteEnUso implements Exception {
+  const NumeroDeClienteEnUso();
+}
+
+/// Si [existente] (el que ya tiene ese número) es el mismo alta que [nuevo]:
+/// un intento anterior que sí se guardó aunque la respuesta no llegó.
+bool esElMismoAlta(UserModel existente, UserModel nuevo) {
+  String limpio(String? t) => (t ?? '').trim().toLowerCase();
+  return limpio(existente.name) == limpio(nuevo.name) &&
+      limpio(existente.phone) == limpio(nuevo.phone);
 }

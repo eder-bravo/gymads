@@ -101,6 +101,12 @@ SesionTour _sesionActual() {
 /// (sale en silencio por su guarda interna `_mounted`). Registrándolo una sola
 /// vez para toda la vida de la app, ese problema desaparece.
 class WelcomeTourService extends GetxService {
+  /// Si hay un recorrido en pantalla. Mientras tanto la pantalla queda fija:
+  /// `TourStep` bloquea los gestos del elemento resaltado (por su hueco se
+  /// colaban a la pantalla y se podía desplazar a mitad del tour). Se suelta
+  /// al terminar, saltar o cancelar.
+  static final recorridoEnCurso = ValueNotifier<bool>(false);
+
   WelcomeTourService({
     ToursDelEmpleado? toursDelEmpleado,
     SesionTour Function()? sesion,
@@ -264,6 +270,7 @@ class WelcomeTourService extends GetxService {
       _activeTour = tourId;
       _rolDelTour = _sesion().rol;
       _activeTourShown = false;
+      recorridoEnCurso.value = true;
       // Un respiro para que la transición de ruta termine de asentarse antes
       // de pintar el resaltado.
       showcaseView.startShowCase(
@@ -309,6 +316,7 @@ class WelcomeTourService extends GetxService {
     _activeTour = null;
     _rolDelTour = null;
     _activeTourShown = false;
+    recorridoEnCurso.value = false;
     if (finished == null) return;
 
     if (!wasShown) {
@@ -328,6 +336,7 @@ class WelcomeTourService extends GetxService {
     _activeTour = null;
     _rolDelTour = null;
     _activeTourShown = false;
+    recorridoEnCurso.value = false;
     if (dismissed == null) return;
     await _markSeen([dismissed], rol: rol);
   }
@@ -342,6 +351,7 @@ class WelcomeTourService extends GetxService {
   void cancelarRecorridoEnCurso() {
     final activo = _activeTour;
     if (activo == null) return;
+    recorridoEnCurso.value = false;
     _activeTour = null;
     _rolDelTour = null;
     _activeTourShown = false;

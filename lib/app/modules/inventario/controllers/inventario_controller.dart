@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:gymads/app/core/permissions/permissions.dart';
 import 'package:gymads/app/core/widgets/escaner_codigo_view.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/fallo_al_guardar.dart';
 import 'package:gymads/app/core/utils/auth_utils.dart';
 import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/data/models/product_model.dart';
@@ -11,6 +12,8 @@ import 'package:gymads/app/data/repositories/product_repository.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 
 class InventarioController extends GetxController
     with ScreenTourMixin, RecargaEnVivoMixin {
@@ -132,6 +135,7 @@ class InventarioController extends GetxController
 
   void resetForm() {
     currentProduct.value = null;
+    _idProductoNuevo = null;
     isEditing.value = false;
     quantityController.clear();
     notesController.clear();
@@ -257,8 +261,19 @@ class InventarioController extends GetxController
     filterProducts();
   }
 
+  /// Si hay un producto guardándose. Aparte de [isLoading] (que es de la
+  /// lista): el botón "Guardar" se desactiva y un segundo toque no manda
+  /// otro guardado.
+  final guardandoProducto = false.obs;
+
+  /// El id del producto nuevo, uno por formulario: si un intento se guardó
+  /// pero la respuesta no llegó (mala señal), el reintento lleva el mismo id
+  /// y se reconoce como el mismo producto en vez de fallar.
+  String? _idProductoNuevo;
+
   Future<void> saveProduct(Map<String, dynamic> productData) async {
-    isLoading.value = true;
+    if (guardandoProducto.value) return;
+    guardandoProducto.value = true;
 
     try {
       final now = DateTime.now();
@@ -285,20 +300,18 @@ class InventarioController extends GetxController
 
         final result = await productRepository.updateProduct(updatedProduct);
 
-        if (result != null) {
-          int index = products.indexWhere((p) => p.id == result.id);
-          if (index >= 0) {
-            products[index] = result;
-            products.refresh();
-          }
-
-          Get.back();
-          _showSnackbarSafe('Éxito', 'Producto actualizado correctamente');
+        int index = products.indexWhere((p) => p.id == result.id);
+        if (index >= 0) {
+          products[index] = result;
+          products.refresh();
         }
+
+        Get.back();
+        _showSnackbarSafe('Éxito', 'Producto actualizado correctamente');
       } else {
         // Crear nuevo producto
         final newProduct = Product(
-          id: const Uuid().v4(),
+          id: _idProductoNuevo ??= const Uuid().v4(),
           name: productData['name'],
           description: productData['description'],
           categoryId: productData['category_id'],
@@ -313,14 +326,13 @@ class InventarioController extends GetxController
         );
 
         final result = await productRepository.createProduct(newProduct);
+        _idProductoNuevo = null;
 
-        if (result != null) {
-          products.add(result);
-          products.refresh();
+        if (!products.any((p) => p.id == result.id)) products.add(result);
+        products.refresh();
 
-          Get.back();
-          _showSnackbarSafe('Éxito', 'Producto creado correctamente');
-        }
+        Get.back();
+        _showSnackbarSafe('Éxito', 'Producto creado correctamente');
       }
 
       filterProducts();
@@ -331,10 +343,14 @@ class InventarioController extends GetxController
       _showSnackbarSafe('Código repetido', e.mensaje, isError: true);
     } catch (e) {
       AppLogger.error('InventarioController', 'Error al guardar producto', e);
-      _showSnackbarSafe('Error', 'No se pudo guardar el producto',
-          isError: true);
+      _showSnackbarSafe(
+        'No se guardó',
+        mensajeDeFallo(e,
+            generico: 'No se pudo guardar el producto. Intenta de nuevo.'),
+        isError: true,
+      );
     } finally {
-      isLoading.value = false;
+      guardandoProducto.value = false;
     }
   }
 
@@ -388,32 +404,29 @@ class InventarioController extends GetxController
       final confirmed = await Get.dialog<bool>(
         AlertDialog(
           scrollable: true,
-          title: Text(
-            'Eliminar Producto',
+          // Oscuro, como los demás diálogos (con el tema de la app salía
+          // blanco).
+          backgroundColor: AppColors.cardBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Eliminar producto',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Colors.red[700],
+              color: AppColors.textPrimary,
             ),
           ),
-          content: Text(
-            '¿Estás seguro de que deseas eliminar este producto permanentemente?\n\nEsta acción no se puede deshacer.',
-            style: TextStyle(fontSize: 16),
+          content: const Text(
+            '¿Seguro que quieres eliminar este producto? Esta acción no se '
+            'puede deshacer.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Get.back(result: false),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            ),
-            ElevatedButton(
+            BotonCancelar(onPressed: () => Get.back(result: false)),
+            BotonGuardar(
+              texto: 'Eliminar',
+              compacto: true,
+              color: AppColors.error,
               onPressed: () => Get.back(result: true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Eliminar'),
             ),
           ],
         ),

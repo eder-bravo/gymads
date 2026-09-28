@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../data/models/product_model.dart';
 import '../controllers/inventario_controller.dart';
+import '../../../core/widgets/formulario.dart';
 
 /// Diálogo para mover el stock de un producto **por diferencia**, nunca
 /// fijando un valor absoluto: se elige Agregar o Quitar y se escribe cuánto.
@@ -101,13 +102,6 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: 'Cantidad',
-                labelStyle: const TextStyle(color: AppColors.textSecondary),
-                filled: true,
-                fillColor: AppColors.containerBackground,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -120,40 +114,18 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
               decoration: InputDecoration(
                 labelText: 'Nota (opcional)',
                 hintText: 'Compra a proveedor, merma, conteo…',
-                labelStyle: const TextStyle(color: AppColors.textSecondary),
-                hintStyle: const TextStyle(color: AppColors.textHint),
-                filled: true,
-                fillColor: AppColors.containerBackground,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
               ),
             ),
           ],
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: _guardando ? null : () => Get.back(),
-          child: const Text('Cancelar',
-              style: TextStyle(color: AppColors.textSecondary)),
-        ),
-        ElevatedButton(
-          onPressed: (_cantidad > 0 && !_guardando) ? _guardar : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: AppColors.disabled,
-          ),
-          child: _guardando
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : const Text('Guardar'),
+        BotonCancelar(onPressed: _guardando ? null : () => Get.back()),
+        BotonGuardar(
+          texto: 'Guardar',
+          compacto: true,
+          guardando: _guardando,
+          onPressed: _cantidad > 0 ? _guardar : null,
         ),
       ],
     );
@@ -201,8 +173,9 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
   Widget _buildSelectorDireccion() {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.containerBackground,
+        color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
       ),
       padding: const EdgeInsets.all(4),
       child: Row(
@@ -277,8 +250,9 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.containerBackground,
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

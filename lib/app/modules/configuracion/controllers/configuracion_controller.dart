@@ -21,6 +21,7 @@ import '../../../core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../routes/app_pages.dart';
 import '../../../data/services/lector_red_service.dart';
+import '../../../core/widgets/formulario.dart';
 
 class ConfiguracionController extends GetxController with ScreenTourMixin {
   // Variables observables para la configuración
@@ -807,19 +808,15 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
           style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
+          BotonCancelar(onPressed: () => Get.back()),
+          BotonGuardar(
+            texto: 'Cerrar sesión',
+            compacto: true,
+            color: AppColors.error,
             onPressed: () async {
               Get.back(); // close dialog
               await _performLogout();
             },
-            child: const Text(
-              'Cerrar Sesión',
-              style: TextStyle(color: AppColors.error),
-            ),
           ),
         ],
       ),
@@ -885,17 +882,12 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
           style: TextStyle(color: AppColors.textSecondary, height: 1.5),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
+          BotonCancelar(onPressed: () => Get.back(result: false)),
+          BotonGuardar(
+            texto: 'Sí, borrar todo',
+            compacto: true,
+            color: AppColors.error,
             onPressed: () => Get.back(result: true),
-            child: Text(
-              'Sí, borrar todo',
-              style: TextStyle(
-                  color: Colors.red[400], fontWeight: FontWeight.bold),
-            ),
           ),
         ],
       ),
@@ -1024,18 +1016,12 @@ class _ConfirmDeleteDialog extends StatelessWidget {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Get.back(result: false),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
+            BotonCancelar(onPressed: () => Get.back(result: false)),
+            BotonGuardar(
+              texto: 'Borrar permanentemente',
+              compacto: true,
+              color: AppColors.error,
               onPressed: isMatch.value ? () => Get.back(result: true) : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red[700],
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey[800],
-              ),
-              child: const Text('Borrar permanentemente'),
             ),
           ],
         ));

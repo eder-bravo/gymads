@@ -503,13 +503,6 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
   InputDecoration _decoracion(String etiqueta) {
     return InputDecoration(
       labelText: etiqueta,
-      labelStyle: const TextStyle(color: AppColors.textSecondary),
-      filled: true,
-      fillColor: AppColors.containerBackground,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
     );
   }
 }

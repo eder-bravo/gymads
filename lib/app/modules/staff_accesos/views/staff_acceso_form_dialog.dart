@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/permissions/staff_role.dart';
 import '../../../data/models/staff_acceso_model.dart';
+import '../../../core/widgets/formulario.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/staff_accesos_controller.dart';
 
@@ -104,12 +105,14 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.containerBackground,
+            color: seleccionado
+                ? AppColors.accent.withOpacity(0.08)
+                : Colors.white.withOpacity(0.04),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: seleccionado
                   ? AppColors.accent
-                  : Colors.white.withOpacity(0.06),
+                  : Colors.white.withOpacity(0.10),
               width: seleccionado ? 1.5 : 1,
             ),
           ),
@@ -174,25 +177,12 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
             const SizedBox(height: 20),
             _campoNombre(),
             const SizedBox(height: 24),
-            const Text(
-              'Qué podrá hacer',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
+            const TituloSeccion('Qué podrá hacer'),
             ..._controller.rolesAsignables.map(_buildOpcionRol),
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: _botonGuardar('Generar código'),
-        ),
-      ),
+      bottomNavigationBar: PieDeFormulario(child: _botonGuardar('Generar código')),
     );
   }
 
@@ -224,18 +214,14 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
             _campoNombre(),
             const SizedBox(height: 20),
             Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Expanded(
-                  child: Obx(() => TextButton(
-                        onPressed: _controller.isSaving.value
-                            ? null
-                            : () => Get.back(),
-                        child: const Text('Cancelar',
-                            style: TextStyle(color: AppColors.textSecondary)),
-                      )),
-                ),
-                const SizedBox(width: 10),
-                Expanded(child: _botonGuardar('Guardar')),
+                Obx(() => BotonCancelar(
+                      onPressed:
+                          _controller.isSaving.value ? null : () => Get.back(),
+                    )),
+                const SizedBox(width: 8),
+                _botonGuardar('Guardar', compacto: true),
               ],
             ),
           ],
@@ -263,40 +249,15 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
           labelText: 'Nombre del empleado',
           hintText: 'Ej: María López',
           errorText: _error,
-          labelStyle: const TextStyle(color: AppColors.textSecondary),
-          hintStyle: TextStyle(color: AppColors.textHint.withOpacity(0.5)),
-          filled: true,
-          fillColor: AppColors.containerBackground,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
+          prefixIcon: const Icon(Icons.person_outline),
         ),
       );
 
-  Widget _botonGuardar(String texto) => Obx(() {
-        final saving = _controller.isSaving.value;
-        return ElevatedButton(
-          onPressed: saving ? null : _guardar,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: saving
-              ? const SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : Text(
-                  texto,
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-        );
-      });
+  Widget _botonGuardar(String texto, {bool compacto = false}) =>
+      Obx(() => BotonGuardar(
+            texto: texto,
+            compacto: compacto,
+            guardando: _controller.isSaving.value,
+            onPressed: _guardar,
+          ));
 }

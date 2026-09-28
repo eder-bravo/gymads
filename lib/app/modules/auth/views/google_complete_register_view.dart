@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/register_controller.dart';
 import '../widgets/horario_selector.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 
 /// Screen shown to Google Sign-In users who don't have a gym yet.
 /// They only need to provide gym name + location.
@@ -35,17 +36,17 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                     width: 100,
                     height: 100,
                     decoration: BoxDecoration(
-                      color: Colors.blueAccent.withOpacity(0.15),
+                      color: AppColors.accent.withOpacity(0.15),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.blueAccent.withOpacity(0.3),
+                        color: AppColors.accent.withOpacity(0.3),
                         width: 2,
                       ),
                     ),
                     child: const Icon(
                       Icons.fitness_center,
                       size: 48,
-                      color: Colors.blueAccent,
+                      color: AppColors.accent,
                     ),
                   ),
                   const SizedBox(height: 28),
@@ -125,7 +126,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                       children: [
                         Row(
                           children: const [
-                            Icon(Icons.store, color: Colors.blueAccent, size: 22),
+                            Icon(Icons.store, color: AppColors.accent, size: 22),
                             SizedBox(width: 10),
                             Text(
                               'Tu Gimnasio',
@@ -208,7 +209,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                                       ? null
                                       : controller.completeGoogleRegistration,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blueAccent,
+                                    backgroundColor: AppColors.accent,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
@@ -272,18 +273,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
         hintText: hint,
         hintStyle:
             TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
         prefixIcon: Icon(icon, color: Colors.white54, size: 20),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.blueAccent),
-        ),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),

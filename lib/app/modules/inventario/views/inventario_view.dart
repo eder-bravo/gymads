@@ -11,6 +11,7 @@ import '../../../core/widgets/cabecera_con_lista.dart';
 import '../../../core/widgets/refrescable.dart';
 import '../controllers/inventario_controller.dart';
 import 'stock_adjust_dialog.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
 
 class InventarioView extends GetView<InventarioController> {
   const InventarioView({super.key});
@@ -149,22 +150,18 @@ class InventarioView extends GetView<InventarioController> {
         ),
         actions: puedeAgregar
             ? [
-                TextButton(
-                  onPressed: () => Get.back(result: false),
-                  child: const Text('Cancelar',
-                      style: TextStyle(color: AppColors.textSecondary)),
-                ),
-                TextButton(
+                BotonCancelar(onPressed: () => Get.back(result: false)),
+                BotonGuardar(
+                  texto: 'Agregar producto',
+                  compacto: true,
                   onPressed: () => Get.back(result: true),
-                  child: const Text('Agregar producto',
-                      style: TextStyle(color: AppColors.accent)),
                 ),
               ]
             : [
-                TextButton(
+                BotonGuardar(
+                  texto: 'Entendido',
+                  compacto: true,
                   onPressed: () => Get.back(result: false),
-                  child: const Text('Entendido',
-                      style: TextStyle(color: AppColors.accent)),
                 ),
               ],
       ),

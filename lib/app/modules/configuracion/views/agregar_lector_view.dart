@@ -26,6 +26,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     // En el paso de la contraseña, "atrás" (la flecha, el botón de Android o
     // el gesto de iOS) regresa a la lista de redes en vez de cerrar todo: lo
     // normal es que la persona se haya equivocado de red.
@@ -35,7 +36,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
             if (!didPop) controller.volverARedes();
           },
           child: Scaffold(
-            backgroundColor: AppColors.backgroundColor,
+            backgroundColor: c.backgroundColor,
             appBar: GymAppBar(
                 title: cambiarWifi
                     ? 'Cambiar WiFi del lector'
@@ -58,19 +59,19 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
   Widget _paso(BuildContext context) {
     switch (controller.paso.value) {
       case PasoAgregar.buscando:
-        return _buscando();
+        return _buscando(context);
       case PasoAgregar.preparando:
-        return _esperando(
+        return _esperando(context,
           icono: Icons.bluetooth_connected,
           titulo: 'Lector encontrado',
           texto: 'Preguntándole qué redes WiFi ve...',
         );
       case PasoAgregar.elegirRed:
-        return _elegirRed();
+        return _elegirRed(context);
       case PasoAgregar.escribirClave:
         return _escribirClave(context);
       case PasoAgregar.conectando:
-        return _esperando(
+        return _esperando(context,
           icono: Icons.wifi,
           titulo: 'Conectando al WiFi...',
           texto: 'El lector está probando la red. Mientras tanto se '
@@ -78,27 +79,28 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
               'minuto; no cierres esta pantalla.',
         );
       case PasoAgregar.comprobando:
-        return _esperando(
+        return _esperando(context,
           icono: Icons.wifi_find,
           titulo: 'Casi listo',
           texto: 'El lector se está reiniciando para empezar a trabajar. '
               'Buscándolo en la red...',
         );
       case PasoAgregar.listo:
-        return _listo();
+        return _listo(context);
       case PasoAgregar.fallo:
-        return _fallo();
+        return _fallo(context);
     }
   }
 
   // ─────────────────────────────────────────────────────────
 
-  Widget _buscando() {
+  Widget _buscando(BuildContext context) {
+    final c = context.colores;
     final varios = controller.lectores.length > 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(
+        _encabezado(context,
           icono: Icons.bluetooth_searching,
           titulo: varios ? '¿Cuál es tu lector?' : 'Buscando el lector...',
           texto: varios
@@ -117,21 +119,21 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
         for (final lector in controller.lectores)
           if (varios)
             Card(
-              color: AppColors.cardBackground,
+              color: c.cardBackground,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
               child: ListTile(
                 leading: const Icon(Icons.nfc, color: AppColors.accent),
                 title: Text(lector.nombre,
-                    style: const TextStyle(color: AppColors.textPrimary)),
+                    style: TextStyle(color: c.textPrimary)),
                 subtitle: Text(
                   _esDeEsteGimnasio(lector.nombre)
                       ? 'Es el lector de tu gimnasio'
                       : (lector.rssi > -60 ? 'Muy cerca' : 'Cerca'),
-                  style: const TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: c.textSecondary),
                 ),
-                trailing: const Icon(Icons.chevron_right,
-                    color: AppColors.textSecondary),
+                trailing: Icon(Icons.chevron_right,
+                    color: c.textSecondary),
                 onTap: () => controller.elegirLector(lector),
               ),
             ),
@@ -140,12 +142,13 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
   }
 
   /// Paso 1 del WiFi: solo la lista. Tocar una red lleva a su contraseña.
-  Widget _elegirRed() {
+  Widget _elegirRed(BuildContext context) {
+    final c = context.colores;
     final redes = controller.redes;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(
+        _encabezado(context,
           icono: Icons.wifi,
           titulo: '¿A qué WiFi se conecta?',
           texto: redes.isEmpty
@@ -155,7 +158,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
         ),
         const SizedBox(height: 20),
         if (controller.mensaje.value != null) ...[
-          _aviso(controller.mensaje.value!),
+          _aviso(context, controller.mensaje.value!),
           const SizedBox(height: 16),
         ],
         if (controller.buscandoRedes.value)
@@ -165,7 +168,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                 child: CircularProgressIndicator(color: AppColors.accent)),
           )
         else
-          for (final red in redes) _filaRed(red),
+          for (final red in redes) _filaRed(context, red),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -176,7 +179,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Buscar de nuevo'),
               style: TextButton.styleFrom(
-                  foregroundColor: AppColors.textSecondary),
+                  foregroundColor: c.textSecondary),
             ),
             const Spacer(),
             TextButton(
@@ -193,6 +196,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
   /// Paso 2 del WiFi: la contraseña de la red elegida (o el nombre, con
   /// "Otra red"). Siempre con la salida "Cambiar de red".
   Widget _escribirClave(BuildContext context) {
+    final c = context.colores;
     final red = controller.redSeleccionada;
     final otraRed = controller.usarOtraRed.value;
 
@@ -204,7 +208,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(
+        _encabezado(context,
           icono: Icons.wifi_password,
           titulo: otraRed ? 'Otra red' : (red?.ssid ?? 'Red elegida'),
           texto: otraRed
@@ -216,11 +220,11 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
         ),
         const SizedBox(height: 20),
         if (controller.mensaje.value != null) ...[
-          _aviso(controller.mensaje.value!),
+          _aviso(context, controller.mensaje.value!),
           const SizedBox(height: 16),
         ],
         if (red?.senalDebil == true) ...[
-          _aviso('La señal de esta red es débil donde está el lector. Si no '
+          _aviso(context, 'La señal de esta red es débil donde está el lector. Si no '
               'conecta, acércalo al módem.'),
           const SizedBox(height: 16),
         ],
@@ -233,7 +237,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
             smartDashesType: SmartDashesType.disabled,
             smartQuotesType: SmartQuotesType.disabled,
             textInputAction: TextInputAction.next,
-            style: const TextStyle(color: AppColors.textPrimary),
+            style: TextStyle(color: c.textPrimary),
             decoration: _decoracion('Nombre de la red'),
           ),
           const SizedBox(height: 12),
@@ -254,14 +258,14 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
             smartQuotesType: SmartQuotesType.disabled,
             keyboardType: TextInputType.visiblePassword,
             textInputAction: TextInputAction.go,
-            style: const TextStyle(color: AppColors.textPrimary),
+            style: TextStyle(color: c.textPrimary),
             decoration: _decoracion('Contraseña del WiFi').copyWith(
               suffixIcon: IconButton(
                 icon: Icon(
                   controller.mostrarClave.value
                       ? Icons.visibility_off
                       : Icons.visibility,
-                  color: AppColors.textSecondary,
+                  color: c.textSecondary,
                 ),
                 tooltip: controller.mostrarClave.value
                     ? 'Ocultar contraseña'
@@ -277,7 +281,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
             child: Text(
               'Distingue mayúsculas y minúsculas.',
               style: TextStyle(
-                  color: AppColors.textSecondary.withOpacity(0.8),
+                  color: c.textSecondary.withOpacity(0.8),
                   fontSize: 12),
             ),
           ),
@@ -289,17 +293,17 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           onPressed: controller.volverARedes,
           icon: const Icon(Icons.arrow_back, size: 18),
           label: const Text('Cambiar de red'),
-          style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+          style: TextButton.styleFrom(foregroundColor: c.textSecondary),
         ),
       ],
     );
   }
 
-  Widget _listo() {
+  Widget _listo(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(
+        _encabezado(context,
           icono: Icons.check_circle,
           color: AppColors.success,
           titulo: '¡Listo!',
@@ -314,11 +318,11 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     );
   }
 
-  Widget _fallo() {
+  Widget _fallo(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(
+        _encabezado(context,
           icono: Icons.error_outline,
           color: AppColors.error,
           titulo: 'No se pudo',
@@ -326,7 +330,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
         ),
         if (cambiarWifi || RfidConfig.tieneLector) ...[
           const SizedBox(height: 16),
-          _aviso('Si acabas de conectar el lector en otro lugar, tarda unos '
+          _aviso(context, 'Si acabas de conectar el lector en otro lugar, tarda unos '
               '30 segundos en empezar a parpadear rápido. Si ya estaba '
               'funcionando y perdió el WiFi, tarda 2 minutos. También puedes '
               'desconectarlo, volver a conectarlo y, en los primeros 10 '
@@ -340,7 +344,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
 
   // ─────────────────────────────────────────────────────────
 
-  Widget _esperando({
+  Widget _esperando(BuildContext context, {
     required IconData icono,
     required String titulo,
     required String texto,
@@ -348,19 +352,20 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(icono: icono, titulo: titulo, texto: texto),
+        _encabezado(context, icono: icono, titulo: titulo, texto: texto),
         const SizedBox(height: 24),
         const Center(child: CircularProgressIndicator(color: AppColors.accent)),
       ],
     );
   }
 
-  Widget _encabezado({
+  Widget _encabezado(BuildContext context, {
     required IconData icono,
     required String titulo,
     required String texto,
     Color color = AppColors.accent,
   }) {
+    final c = context.colores;
     return Column(
       children: [
         const SizedBox(height: 12),
@@ -376,8 +381,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
         Text(
           titulo,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: c.textPrimary,
             fontSize: 20,
             fontWeight: FontWeight.w700,
           ),
@@ -387,7 +392,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           texto,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: AppColors.textSecondary.withOpacity(0.9),
+            color: c.textSecondary.withOpacity(0.9),
             fontSize: 14,
             height: 1.4,
           ),
@@ -396,7 +401,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     );
   }
 
-  Widget _aviso(String texto) {
+  Widget _aviso(BuildContext context, String texto) {
+    final c = context.colores;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -412,8 +418,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           Expanded(
             child: Text(
               texto,
-              style: const TextStyle(
-                  color: AppColors.textPrimary, fontSize: 13, height: 1.35),
+              style: TextStyle(
+                  color: c.textPrimary, fontSize: 13, height: 1.35),
             ),
           ),
         ],
@@ -423,7 +429,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
 
   /// Una red de la lista: señal, nombre y si pide contraseña. Tocarla lleva
   /// a su contraseña.
-  Widget _filaRed(RedWifi red) {
+  Widget _filaRed(BuildContext context, RedWifi red) {
+    final c = context.colores;
     const iconosSenal = [
       Icons.signal_wifi_0_bar,
       Icons.network_wifi_1_bar,
@@ -431,7 +438,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
       Icons.signal_wifi_4_bar,
     ];
     final color =
-        red.compatible ? AppColors.textPrimary : AppColors.textSecondary;
+        red.compatible ? c.textPrimary : c.textSecondary;
 
     return Material(
       color: Colors.transparent,
@@ -454,21 +461,21 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                 ),
               ),
               if (!red.compatible)
-                const Padding(
-                  padding: EdgeInsets.only(left: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
                   child: Text('No compatible',
                       style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 11)),
+                          color: c.textSecondary, fontSize: 11)),
                 ),
               if (red.pideClave)
-                const Padding(
-                  padding: EdgeInsets.only(left: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
                   child: Icon(Icons.lock_outline,
-                      size: 16, color: AppColors.textSecondary),
+                      size: 16, color: c.textSecondary),
                 ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right,
-                  size: 20, color: AppColors.textSecondary),
+              Icon(Icons.chevron_right,
+                  size: 20, color: c.textSecondary),
             ],
           ),
         ),

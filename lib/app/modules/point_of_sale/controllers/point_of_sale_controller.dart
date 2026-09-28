@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/screen_tour_mixin.dart';
 import '../../../core/widgets/escaner_codigo_view.dart';
 import '../../../core/utils/snackbar_helper.dart';
@@ -387,9 +386,7 @@ class PointOfSaleController extends GetxController
     final confirmado = await Get.dialog<bool>(
           AlertDialog(
             scrollable: true,
-            backgroundColor: AppColors.cardBackground,
-            title: const Text('Sin existencias',
-                style: TextStyle(color: AppColors.textPrimary)),
+            title: const Text('Sin existencias'),
             content: Text(
               product.stock > 0
                   ? 'Solo quedan ${product.stock} de ${product.name}.\n\n'
@@ -398,7 +395,6 @@ class PointOfSaleController extends GetxController
                   : 'No hay existencias de ${product.name}.\n\n'
                       'Puedes venderlo igual: el stock quedará en ${-restante} '
                       'unidades faltantes y se descontarán solas cuando repongas.',
-              style: const TextStyle(color: AppColors.textSecondary),
             ),
             actions: [
               BotonCancelar(onPressed: () => Get.back(result: false)),

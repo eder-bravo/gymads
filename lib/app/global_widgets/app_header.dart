@@ -4,8 +4,8 @@ import 'package:gymads/core/theme/app_colors.dart';
 /// AppBar estándar de la aplicación.
 ///
 /// Único lugar donde se define el estilo del header: título alineado a la
-/// izquierda, fondo [AppColors.primary] y sin sombra. Al ir en el `appBar`
-/// del Scaffold queda fijo: el contenido hace scroll debajo sin moverlo.
+/// izquierda, fondo y colores del tema (`appBarTheme`, en claro u oscuro) y
+/// sin sombra. Al ir en el `appBar` del Scaffold queda fijo: el contenido hace scroll debajo sin moverlo.
 class GymAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;
@@ -33,9 +33,6 @@ class GymAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       centerTitle: false,
       titleSpacing: 16,
-      backgroundColor: AppColors.primary,
-      foregroundColor: AppColors.textPrimary,
-      elevation: 0,
       leading: leading,
       actions: actions,
       bottom: bottom,
@@ -62,11 +59,12 @@ class AppSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return TextField(
       controller: controller,
       onChanged: onChanged,
       keyboardType: keyboardType,
-      style: const TextStyle(color: AppColors.textPrimary),
+      style: TextStyle(color: c.textPrimary),
       decoration: InputDecoration(
         hintText: hintText,
         prefixIcon: const Icon(Icons.search),
@@ -74,7 +72,7 @@ class AppSearchField extends StatelessWidget {
         // redondeado, porque es un buscador.
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
+          borderSide: BorderSide(color: c.borde),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -126,6 +124,7 @@ class CategoryFilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final items = <CategoryChipData>[
       CategoryChipData(id: '', label: allLabel, icon: allIcon),
       ...categories,
@@ -146,14 +145,14 @@ class CategoryFilterChips extends StatelessWidget {
                 item.icon,
                 size: 18,
                 color:
-                    isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                    isSelected ? c.textPrimary : c.textSecondary,
               ),
               label: Text(
                 item.label,
                 style: TextStyle(
                   color: isSelected
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
+                      ? c.textPrimary
+                      : c.textSecondary,
                   fontWeight:
                       isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
@@ -163,7 +162,7 @@ class CategoryFilterChips extends StatelessWidget {
               // seleccionar, y el icono desaparece justo al mirarlo.
               showCheckmark: false,
               onSelected: (_) => onSelected(isAll ? null : item.id),
-              backgroundColor: AppColors.cardBackground,
+              backgroundColor: c.cardBackground,
               selectedColor: AppColors.accent,
               side: BorderSide(
                 color: isSelected

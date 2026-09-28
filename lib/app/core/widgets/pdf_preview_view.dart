@@ -26,8 +26,9 @@ class PdfPreviewView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: GymAppBar(title: titulo),
       body: PdfPreview(
         build: construir,
@@ -40,12 +41,12 @@ class PdfPreviewView extends StatelessWidget {
         allowPrinting: true,
         allowSharing: true,
         initialPageFormat: PdfPageFormat.a4,
-        scrollViewDecoration: const BoxDecoration(
-          color: AppColors.backgroundColor,
+        scrollViewDecoration: BoxDecoration(
+          color: c.backgroundColor,
         ),
         pdfPreviewPageDecoration: const BoxDecoration(color: Colors.white),
-        actionBarTheme: const PdfActionBarTheme(
-          backgroundColor: AppColors.cardBackground,
+        actionBarTheme: PdfActionBarTheme(
+          backgroundColor: c.cardBackground,
           iconColor: AppColors.accent,
         ),
         loadingWidget: const Center(

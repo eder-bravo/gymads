@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 
 import '../../../data/models/gym_settings_model.dart';
 
@@ -27,27 +28,28 @@ class HorarioSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(Icons.schedule, color: Colors.white54, size: 20),
+            Icon(Icons.schedule, color: c.contraste.withOpacity(0.54), size: 20),
             const SizedBox(width: 8),
             Text(
               'Horario',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: c.contraste.withOpacity(0.7),
                 fontSize: 14,
               ),
             ),
             const Spacer(),
-            _buildVeinticuatroHoras(),
+            _buildVeinticuatroHoras(context),
           ],
         ),
         const SizedBox(height: 10),
         if (_esVeinticuatroHoras)
-          _buildAbiertoSiempre()
+          _buildAbiertoSiempre(context)
         else
           Row(
             children: [
@@ -74,7 +76,7 @@ class HorarioSelector extends StatelessWidget {
         Text(
           'Lo usamos para el reporte de entradas. Puedes cambiarlo después.',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.35),
+            color: c.contraste.withOpacity(0.35),
             fontSize: 11,
           ),
         ),
@@ -82,7 +84,8 @@ class HorarioSelector extends StatelessWidget {
     );
   }
 
-  Widget _buildVeinticuatroHoras() {
+  Widget _buildVeinticuatroHoras(BuildContext context) {
+    final c = context.colores;
     return GestureDetector(
       onTap: () => _esVeinticuatroHoras
           // Al desmarcar se vuelve al horario habitual, no a un estado raro.
@@ -93,18 +96,18 @@ class HorarioSelector extends StatelessWidget {
         decoration: BoxDecoration(
           color: _esVeinticuatroHoras
               ? Colors.blueAccent.withOpacity(0.25)
-              : Colors.white.withOpacity(0.05),
+              : c.contraste.withOpacity(0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: _esVeinticuatroHoras
                 ? Colors.blueAccent
-                : Colors.white.withOpacity(0.15),
+                : c.contraste.withOpacity(0.15),
           ),
         ),
         child: Text(
           '24 horas',
           style: TextStyle(
-            color: _esVeinticuatroHoras ? Colors.white : Colors.white60,
+            color: _esVeinticuatroHoras ? c.contraste : c.contraste.withOpacity(0.60),
             fontSize: 12,
             fontWeight:
                 _esVeinticuatroHoras ? FontWeight.w700 : FontWeight.w500,
@@ -114,19 +117,20 @@ class HorarioSelector extends StatelessWidget {
     );
   }
 
-  Widget _buildAbiertoSiempre() {
+  Widget _buildAbiertoSiempre(BuildContext context) {
+    final c = context.colores;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: c.contraste.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
+        border: Border.all(color: c.contraste.withOpacity(0.15)),
       ),
-      child: const Text(
+      child: Text(
         'Abierto todo el día',
         style: TextStyle(
-          color: Colors.white,
+          color: c.contraste,
           fontSize: 15,
           fontWeight: FontWeight.w600,
         ),
@@ -140,14 +144,15 @@ class HorarioSelector extends StatelessWidget {
     required HoraDelDia hora,
     required void Function(HoraDelDia) onPick,
   }) {
+    final c = context.colores;
     return GestureDetector(
       onTap: () => _elegirHora(context, hora, onPick),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: c.contraste.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.15)),
+          border: Border.all(color: c.contraste.withOpacity(0.15)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,15 +160,15 @@ class HorarioSelector extends StatelessWidget {
             Text(
               etiqueta,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: c.contraste.withOpacity(0.5),
                 fontSize: 11,
               ),
             ),
             const SizedBox(height: 2),
             Text(
               hora.etiqueta,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: c.contraste,
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
@@ -185,19 +190,6 @@ class HorarioSelector extends StatelessWidget {
       helpText: 'Selecciona la hora',
       // El reloj sale en 12 h por MaterialLocalizations12h (ver main.dart);
       // el idioma por sí solo lo daría en 24 h.
-      builder: (context, child) => Theme(
-        data: ThemeData(
-          useMaterial3: true,
-          brightness: Brightness.dark,
-          colorScheme: const ColorScheme.dark(
-            primary: Colors.blueAccent,
-            onPrimary: Colors.white,
-            surface: Color(0xFF1E1E24),
-            onSurface: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
     );
 
     if (elegida != null) {

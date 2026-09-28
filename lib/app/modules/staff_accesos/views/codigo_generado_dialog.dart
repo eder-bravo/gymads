@@ -49,8 +49,9 @@ class _CodigoGeneradoDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Dialog(
-      backgroundColor: AppColors.cardBackground,
+      backgroundColor: c.cardBackground,
       // Ancho de diálogo aunque el teléfono esté de lado, y desplazable si
       // no cabe a lo alto.
       constraints: const BoxConstraints(minWidth: 280, maxWidth: 420),
@@ -76,8 +77,8 @@ class _CodigoGeneradoDialog extends StatelessWidget {
                 Expanded(
                   child: Text(
                     esRegenerado ? 'Código nuevo' : 'Acceso creado',
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: c.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                     ),
@@ -91,7 +92,7 @@ class _CodigoGeneradoDialog extends StatelessWidget {
                   ? 'El código anterior de $nombre dejó de servir.'
                   : 'Comparte este código con $nombre.',
               style: TextStyle(
-                color: AppColors.textSecondary.withOpacity(0.85),
+                color: c.textSecondary.withOpacity(0.85),
                 fontSize: 14,
               ),
             ),
@@ -101,7 +102,7 @@ class _CodigoGeneradoDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 20),
               decoration: BoxDecoration(
-                color: AppColors.containerBackground,
+                color: c.containerBackground,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AppColors.accent.withOpacity(0.5)),
               ),
@@ -139,7 +140,7 @@ class _CodigoGeneradoDialog extends StatelessWidget {
                       'Guárdalo ahora: por seguridad no se puede volver a ver. '
                       'Si se pierde, genera uno nuevo desde la lista.',
                       style: TextStyle(
-                        color: AppColors.textSecondary.withOpacity(0.9),
+                        color: c.textSecondary.withOpacity(0.9),
                         fontSize: 12.5,
                         height: 1.35,
                       ),
@@ -157,16 +158,16 @@ class _CodigoGeneradoDialog extends StatelessWidget {
                     onPressed: _copiar,
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(
-                          color: AppColors.textSecondary.withOpacity(0.4)),
+                          color: c.textSecondary.withOpacity(0.4)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: const Icon(Icons.copy,
-                        size: 18, color: AppColors.textPrimary),
-                    label: const Text('Copiar',
-                        style: TextStyle(color: AppColors.textPrimary)),
+                    icon: Icon(Icons.copy,
+                        size: 18, color: c.textPrimary),
+                    label: Text('Copiar',
+                        style: TextStyle(color: c.textPrimary)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -197,9 +198,9 @@ class _CodigoGeneradoDialog extends StatelessWidget {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Get.back(),
-              child: const Text(
+              child: Text(
                 'Ya lo guardé',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: c.textSecondary),
               ),
             ),
           ],

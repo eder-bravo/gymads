@@ -13,6 +13,7 @@ class ProductFormView extends GetView<InventarioController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final arguments = Get.arguments as Map<String, dynamic>? ?? {};
     final bool isEditing = arguments['isEditing'] ?? false;
     final formKey = GlobalKey<FormState>();
@@ -40,7 +41,7 @@ class ProductFormView extends GetView<InventarioController> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: isEditing ? 'Editar producto' : 'Nuevo producto',
         leading: Obx(() => IconButton(
@@ -88,7 +89,7 @@ class ProductFormView extends GetView<InventarioController> {
                   children: [
                     TextFormField(
                       controller: nameController,
-                      style: const TextStyle(color: AppColors.textPrimary),
+                      style: TextStyle(color: c.textPrimary),
                       decoration: const InputDecoration(
                         labelText: 'Nombre del producto *',
                         hintText: 'Ej: Proteína Whey 1kg',
@@ -114,16 +115,16 @@ class ProductFormView extends GetView<InventarioController> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: descriptionController,
-                      style: const TextStyle(color: AppColors.textPrimary),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: c.textPrimary),
+                      decoration: InputDecoration(
                         labelText: 'Descripción',
                         hintText:
                             'Describe las características del producto...',
                         prefixIcon:
-                            Icon(Icons.description),
+                            const Icon(Icons.description),
                         helperText: 'Opcional - Máximo 500 caracteres',
                         helperStyle: TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
+                            fontSize: 11, color: c.textSecondary),
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
@@ -147,12 +148,12 @@ class ProductFormView extends GetView<InventarioController> {
 
                       return DropdownButtonFormField<String>(
                         value: validValue,
-                        style: const TextStyle(color: AppColors.textPrimary),
-                        decoration: InputDecoration(
+                        style: TextStyle(color: c.textPrimary),
+                        decoration: const InputDecoration(
                           labelText: 'Categoría *',
-                          prefixIcon: const Icon(Icons.category),
+                          prefixIcon: Icon(Icons.category),
                         ),
-                        dropdownColor: AppColors.cardBackground,
+                        dropdownColor: c.cardBackground,
                         items: cats.map((category) {
                           return DropdownMenuItem<String>(
                             value: category.id,
@@ -163,8 +164,8 @@ class ProductFormView extends GetView<InventarioController> {
                                 const SizedBox(width: 10),
                                 Text(
                                   category.name,
-                                  style: const TextStyle(
-                                      color: AppColors.textPrimary),
+                                  style: TextStyle(
+                                      color: c.textPrimary),
                                 ),
                               ],
                             ),
@@ -184,7 +185,7 @@ class ProductFormView extends GetView<InventarioController> {
                               ? 'Crea categorías desde Configuración'
                               : 'Selecciona una categoría',
                           style: TextStyle(
-                              color: AppColors.textSecondary.withOpacity(0.6)),
+                              color: c.textSecondary.withOpacity(0.6)),
                         ),
                       );
                     }),
@@ -199,8 +200,8 @@ class ProductFormView extends GetView<InventarioController> {
                   children: [
                     TextFormField(
                       controller: priceController,
-                      style: const TextStyle(
-                          color: AppColors.textPrimary,
+                      style: TextStyle(
+                          color: c.textPrimary,
                           fontSize: 22,
                           fontWeight: FontWeight.bold),
                       decoration: InputDecoration(
@@ -208,13 +209,13 @@ class ProductFormView extends GetView<InventarioController> {
                         hintText: '0.00',
                         prefixIcon: const Icon(Icons.monetization_on),
                         prefixText: '\$ ',
-                        prefixStyle: TextStyle(
+                        prefixStyle: const TextStyle(
                             color: AppColors.accent,
                             fontSize: 22,
                             fontWeight: FontWeight.bold),
                         helperText: 'Precio unitario en MXN',
-                        helperStyle: const TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
+                        helperStyle: TextStyle(
+                            fontSize: 11, color: c.textSecondary),
                       ),
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
@@ -249,7 +250,7 @@ class ProductFormView extends GetView<InventarioController> {
                   children: [
                     TextFormField(
                       controller: barcodeController,
-                      style: const TextStyle(color: AppColors.textPrimary),
+                      style: TextStyle(color: c.textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Código (opcional)',
                         hintText: 'Escanéalo del envase o escríbelo',
@@ -273,7 +274,7 @@ class ProductFormView extends GetView<InventarioController> {
                       'Sin código el producto funciona igual; solo hay que '
                       'buscarlo por nombre para moverle el stock.',
                       style: TextStyle(
-                        color: AppColors.textSecondary.withOpacity(0.75),
+                        color: c.textSecondary.withOpacity(0.75),
                         fontSize: 12,
                         height: 1.35,
                       ),
@@ -291,15 +292,15 @@ class ProductFormView extends GetView<InventarioController> {
                 // hechas mientras tanto. El stock solo se mueve por diferencia,
                 // desde "Ajustar stock".
                 if (isEditing)
-                  _buildStockSoloLectura()
+                  _buildStockSoloLectura(context)
                 else
                   _seccion(
                     title: 'Stock inicial',
                     children: [
                       TextFormField(
                         controller: stockController,
-                        style: const TextStyle(
-                            color: AppColors.textPrimary,
+                        style: TextStyle(
+                            color: c.textPrimary,
                             fontSize: 22,
                             fontWeight: FontWeight.bold),
                         decoration: InputDecoration(
@@ -308,10 +309,10 @@ class ProductFormView extends GetView<InventarioController> {
                           prefixIcon: const Icon(Icons.inventory),
                           suffixText: 'unidades',
                           suffixStyle: TextStyle(
-                              color: AppColors.textSecondary, fontSize: 14),
+                              color: c.textSecondary, fontSize: 14),
                           helperText: 'Unidades en existencia',
-                          helperStyle: const TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary),
+                          helperStyle: TextStyle(
+                              fontSize: 11, color: c.textSecondary),
                         ),
                         keyboardType: TextInputType.number,
                         inputFormatters: [
@@ -346,7 +347,8 @@ class ProductFormView extends GetView<InventarioController> {
 
   /// Stock del producto en edición: se muestra, no se escribe. Para moverlo
   /// está "Ajustar", que trabaja por diferencia.
-  Widget _buildStockSoloLectura() {
+  Widget _buildStockSoloLectura(BuildContext context) {
+    final c = context.colores;
     return Obx(() {
       final product = controller.currentProduct.value;
       if (product == null) return const SizedBox.shrink();
@@ -368,7 +370,7 @@ class ProductFormView extends GetView<InventarioController> {
                           : '${product.stock}',
                       style: TextStyle(
                         color:
-                            faltante ? AppColors.error : AppColors.textPrimary,
+                            faltante ? AppColors.error : c.textPrimary,
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
                       ),
@@ -377,9 +379,9 @@ class ProductFormView extends GetView<InventarioController> {
                       faltante
                           ? 'unidades vendidas sin existencias'
                           : 'unidades en existencia',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: c.textSecondary,
                       ),
                     ),
                   ],

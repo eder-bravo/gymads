@@ -12,8 +12,9 @@ class TodasTransaccionesView extends GetView<IngresosController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Todas las transacciones',
         actions: [
@@ -37,10 +38,10 @@ class TodasTransaccionesView extends GetView<IngresosController> {
                   const SizedBox(width: 8),
                   Obx(() => Text(
                         '${controller.todasTransacciones.length} transacciones',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: c.textPrimary,
                         ),
                       )),
                 ],
@@ -48,14 +49,15 @@ class TodasTransaccionesView extends GetView<IngresosController> {
             ),
 
             // Lista
-            Expanded(child: _buildList()),
+            Expanded(child: _buildList(context)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(BuildContext context) {
+    final c = context.colores;
     return Obx(() {
       if (controller.isLoadingTodas.value) {
         return const Center(
@@ -68,14 +70,14 @@ class TodasTransaccionesView extends GetView<IngresosController> {
           onRefresh: controller.fetchTodasLasTransacciones,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            children: const [
-              SizedBox(height: 80),
-              Icon(Icons.receipt_long, size: 64, color: AppColors.textSecondary),
-              SizedBox(height: 16),
+            children: [
+              const SizedBox(height: 80),
+              Icon(Icons.receipt_long, size: 64, color: c.textSecondary),
+              const SizedBox(height: 16),
               Center(
                 child: Text(
                   'No hay transacciones registradas',
-                  style: TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: c.textSecondary),
                 ),
               ),
             ],

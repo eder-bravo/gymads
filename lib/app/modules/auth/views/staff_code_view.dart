@@ -15,19 +15,10 @@ class StaffCodeView extends GetView<StaffCodeController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1a1a2e),
-              Color(0xFF16213e),
-              Color(0xFF0f3460),
-            ],
-          ),
-        ),
+        decoration: BoxDecoration(gradient: c.fondoAcceso),
         child: SafeArea(
           child: Column(
             children: [
@@ -35,7 +26,7 @@ class StaffCodeView extends GetView<StaffCodeController> {
                 alignment: Alignment.centerLeft,
                 child: IconButton(
                   onPressed: () => Get.back(),
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  icon: Icon(Icons.arrow_back, color: c.contraste),
                 ),
               ),
               Expanded(
@@ -45,9 +36,9 @@ class StaffCodeView extends GetView<StaffCodeController> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildHeader(),
+                        _buildHeader(context),
                         const SizedBox(height: 40),
-                        _buildCard(),
+                        _buildCard(context),
                       ],
                     ),
                   ),
@@ -60,26 +51,27 @@ class StaffCodeView extends GetView<StaffCodeController> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    final c = context.colores;
     return Column(
       children: [
         Container(
           width: 90,
           height: 90,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: c.contraste.withOpacity(0.1),
             borderRadius: BorderRadius.circular(25),
-            border: Border.all(color: Colors.white.withOpacity(0.2), width: 2),
+            border: Border.all(color: c.contraste.withOpacity(0.2), width: 2),
           ),
-          child: const Icon(Icons.badge, size: 44, color: Colors.white),
+          child: Icon(Icons.badge, size: 44, color: c.contraste),
         ),
         const SizedBox(height: 20),
-        const Text(
+        Text(
           'Entrar como staff',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: c.contraste,
           ),
         ),
         const SizedBox(height: 8),
@@ -88,21 +80,22 @@ class StaffCodeView extends GetView<StaffCodeController> {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.white.withOpacity(0.7),
+            color: c.contraste.withOpacity(0.7),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildCard() {
+  Widget _buildCard(BuildContext context) {
+    final c = context.colores;
     return Container(
       constraints: const BoxConstraints(maxWidth: 400),
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: c.contraste.withOpacity(0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: c.contraste.withOpacity(0.1)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.2),
@@ -114,7 +107,7 @@ class StaffCodeView extends GetView<StaffCodeController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildCodeField(),
+          _buildCodeField(context),
           const SizedBox(height: 24),
           Obx(() => controller.errorMessage.value != null
               ? _buildErrorMessage()
@@ -126,7 +119,7 @@ class StaffCodeView extends GetView<StaffCodeController> {
             'recordará tu sesión.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
+              color: c.contraste.withOpacity(0.5),
               fontSize: 12,
               height: 1.4,
             ),
@@ -136,7 +129,8 @@ class StaffCodeView extends GetView<StaffCodeController> {
     );
   }
 
-  Widget _buildCodeField() {
+  Widget _buildCodeField(BuildContext context) {
+    final c = context.colores;
     return TextField(
       controller: controller.codigoController,
       autofocus: true,
@@ -149,8 +143,8 @@ class StaffCodeView extends GetView<StaffCodeController> {
       // caracteres, y pegar el código completo también funciona. El largo lo
       // acota el propio formateador, así que no hace falta limitarlo aquí.
       inputFormatters: [CodigoAccesoFormatter()],
-      style: const TextStyle(
-        color: Colors.white,
+      style: TextStyle(
+        color: c.contraste,
         fontSize: 26,
         fontWeight: FontWeight.bold,
         letterSpacing: 6,
@@ -159,7 +153,7 @@ class StaffCodeView extends GetView<StaffCodeController> {
       decoration: InputDecoration(
         hintText: 'XXXX-XXXX',
         hintStyle: TextStyle(
-          color: Colors.white.withOpacity(0.25),
+          color: c.contraste.withOpacity(0.25),
           fontSize: 24,
           letterSpacing: 6,
           fontWeight: FontWeight.bold,

@@ -8,11 +8,12 @@ class SalesStatsWidget extends GetView<PointOfSaleController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: c.cardBackground,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -25,12 +26,12 @@ class SalesStatsWidget extends GetView<PointOfSaleController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Estadísticas de Hoy',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: c.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -55,7 +56,7 @@ class SalesStatsWidget extends GetView<PointOfSaleController> {
               return Row(
                 children: [
                   Expanded(
-                    child: _buildStatCard(
+                    child: _buildStatCard(context,
                       'Ventas',
                       '${stats['today_count'] ?? 0}',
                       Icons.receipt,
@@ -64,7 +65,7 @@ class SalesStatsWidget extends GetView<PointOfSaleController> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: _buildStatCard(
+                    child: _buildStatCard(context,
                       'Total',
                       '\$${(stats['today_total'] ?? 0.0).toStringAsFixed(2)}',
                       Icons.attach_money,
@@ -73,7 +74,7 @@ class SalesStatsWidget extends GetView<PointOfSaleController> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: _buildStatCard(
+                    child: _buildStatCard(context,
                       'Promedio',
                       '\$${(stats['average_sale'] ?? 0.0).toStringAsFixed(2)}',
                       Icons.trending_up,
@@ -89,11 +90,12 @@ class SalesStatsWidget extends GetView<PointOfSaleController> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color) {
+    final c = context.colores;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.containerBackground,
+        color: c.containerBackground,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
@@ -103,9 +105,9 @@ class SalesStatsWidget extends GetView<PointOfSaleController> {
           const SizedBox(height: 4),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: AppColors.textSecondary,
+              color: c.textSecondary,
             ),
           ),
           const SizedBox(height: 2),

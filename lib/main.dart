@@ -19,6 +19,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 import 'package:gymads/app/data/services/avisos_sistema_service.dart';
 import 'package:gymads/app/data/services/permisos_app.dart';
+import 'package:gymads/app/data/services/tema_service.dart';
 import 'package:gymads/core/theme/app_theme.dart';
 
 /// GlobalKey para acceder al ScaffoldMessenger desde cualquier parte de la app
@@ -37,6 +38,10 @@ void main() async {
 
   // Initialize GetStorage for local caching
   await GetStorage.init();
+
+  // Modo claro u oscuro elegido en este teléfono (por defecto, el del
+  // teléfono). Antes del primer cuadro, para que no parpadee.
+  Get.put(TemaService(), permanent: true);
 
   // Si en este teléfono ya se pidieron los permisos (pantalla antes de Inicio).
   await PermisosApp.cargar();
@@ -180,7 +185,9 @@ class _MyAppState extends State<MyApp> {
         Locale('es'),
         Locale('en'),
       ],
-      theme: AppTheme.app,
+      theme: AppTheme.claro,
+      darkTheme: AppTheme.oscuro,
+      themeMode: TemaService.to.modo.value,
     );
   }
 }

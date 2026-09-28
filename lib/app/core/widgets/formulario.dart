@@ -34,6 +34,7 @@ class BotonGuardar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // El botón es naranja (o rojo) en los dos modos: lo de adentro, blanco.
     final etiqueta = guardando
         ? const Row(
             mainAxisSize: MainAxisSize.min,
@@ -88,11 +89,12 @@ class PieDeFormulario extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.backgroundColor,
+        color: c.backgroundColor,
         border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.08)),
+          top: BorderSide(color: c.divisor),
         ),
       ),
       child: SafeArea(
@@ -114,10 +116,11 @@ class BotonCancelar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return TextButton(
       onPressed: onPressed,
       style: TextButton.styleFrom(
-        foregroundColor: AppColors.textSecondary,
+        foregroundColor: c.textSecondary,
         minimumSize: const Size(0, 44),
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
       ),
@@ -137,6 +140,7 @@ class TituloSeccion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -144,8 +148,8 @@ class TituloSeccion extends StatelessWidget {
         children: [
           Text(
             texto,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
+            style: TextStyle(
+              color: c.textPrimary,
               fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
@@ -155,7 +159,7 @@ class TituloSeccion extends StatelessWidget {
             Text(
               detalle!,
               style: TextStyle(
-                color: AppColors.textSecondary.withOpacity(0.85),
+                color: c.textSecondary.withOpacity(0.85),
                 fontSize: 13,
                 height: 1.3,
               ),
@@ -173,10 +177,11 @@ class NotaObligatorio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Text(
       '* Obligatorio',
       style: TextStyle(
-        color: AppColors.textSecondary.withOpacity(0.85),
+        color: c.textSecondary.withOpacity(0.85),
         fontSize: 12,
       ),
     );

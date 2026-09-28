@@ -47,6 +47,7 @@ class TourStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final actions = <TooltipActionButton>[
       // En el último paso no tiene sentido saltar: ya no queda nada por ver.
       if (!isLastStep)
@@ -55,7 +56,7 @@ class TourStep extends StatelessWidget {
           name: 'Saltar',
           backgroundColor: Colors.transparent,
           textStyle: TextStyle(
-            color: AppColors.textSecondary.withOpacity(0.7),
+            color: c.textSecondary.withOpacity(0.7),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -64,9 +65,9 @@ class TourStep extends StatelessWidget {
         TooltipActionButton(
           type: TooltipDefaultActionType.previous,
           name: 'Anterior',
-          backgroundColor: Colors.white.withOpacity(0.08),
-          textStyle: const TextStyle(
-            color: AppColors.textPrimary,
+          backgroundColor: c.contraste.withOpacity(0.08),
+          textStyle: TextStyle(
+            color: c.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -87,17 +88,17 @@ class TourStep extends StatelessWidget {
       key: tourKey,
       title: title,
       description: description,
-      tooltipBackgroundColor: AppColors.cardBackground,
-      textColor: AppColors.textPrimary,
-      titleTextStyle: const TextStyle(
+      tooltipBackgroundColor: c.cardBackground,
+      textColor: c.textPrimary,
+      titleTextStyle: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
+        color: c.textPrimary,
       ),
       descTextStyle: TextStyle(
         fontSize: 13,
         height: 1.35,
-        color: AppColors.textSecondary.withOpacity(0.85),
+        color: c.textSecondary.withOpacity(0.85),
       ),
       tooltipPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       tooltipBorderRadius: BorderRadius.circular(16),

@@ -12,8 +12,9 @@ class PermisosView extends GetView<PermisosController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: controller.desdeConfiguracion
           ? const GymAppBar(title: 'Permisos de la app')
           : null,
@@ -24,22 +25,22 @@ class PermisosView extends GetView<PermisosController> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
               if (!controller.desdeConfiguracion) ...[
-                const Text(
+                Text(
                   'Permisos de la app',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.titleColor,
+                    color: c.titleColor,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Para que todo funcione, GymOne te pedirá estos permisos. '
                   'Se preguntan ahora, todos juntos, para no interrumpirte '
                   'después.',
                   style: TextStyle(
                     fontSize: 14,
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                     height: 1.35,
                   ),
                 ),
@@ -51,7 +52,7 @@ class PermisosView extends GetView<PermisosController> {
                   estado: contestado ? controller.estados[permiso] : null,
                 ),
               const SizedBox(height: 16),
-              ..._botones(contestado),
+              ..._botones(context, contestado),
             ],
           );
         }),
@@ -59,7 +60,8 @@ class PermisosView extends GetView<PermisosController> {
     );
   }
 
-  List<Widget> _botones(bool contestado) {
+  List<Widget> _botones(BuildContext context, bool contestado) {
+    final c = context.colores;
     final pidiendo = controller.pidiendo.value;
 
     if (!contestado) {
@@ -72,7 +74,7 @@ class PermisosView extends GetView<PermisosController> {
         const SizedBox(height: 4),
         TextButton(
           onPressed: pidiendo ? null : controller.ahoraNo,
-          style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+          style: TextButton.styleFrom(foregroundColor: c.textSecondary),
           child: const Text('Ahora no'),
         ),
       ];
@@ -80,11 +82,11 @@ class PermisosView extends GetView<PermisosController> {
 
     return [
       if (controller.hayBloqueados) ...[
-        const Text(
+        Text(
           'Los bloqueados solo se pueden activar desde los ajustes del '
           'teléfono.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 13, color: c.textSecondary),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
@@ -164,13 +166,14 @@ class _FilaPermiso extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: c.cardBackground,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.disabled.withOpacity(0.4)),
+        border: Border.all(color: c.disabled.withOpacity(0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,18 +193,18 @@ class _FilaPermiso extends StatelessWidget {
               children: [
                 Text(
                   _titulo(permiso),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _motivo(permiso),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                     height: 1.3,
                   ),
                 ),
@@ -225,11 +228,12 @@ class _Estado extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final (texto, color) = switch (estado) {
       EstadoPermiso.permitido => ('Permitido', AppColors.success),
       EstadoPermiso.denegado => ('No permitido', AppColors.warning),
       EstadoPermiso.bloqueado => ('Bloqueado', AppColors.error),
-      EstadoPermiso.sinDato => ('Sin confirmar', AppColors.textSecondary),
+      EstadoPermiso.sinDato => ('Sin confirmar', c.textSecondary),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

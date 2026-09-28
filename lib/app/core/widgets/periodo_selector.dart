@@ -16,12 +16,13 @@ class PeriodoSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+          color: c.cardBackground,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.accent.withOpacity(0.2)),
         ),
@@ -30,7 +31,7 @@ class PeriodoSelector extends StatelessWidget {
             // Segmentado de modo
             Container(
               decoration: BoxDecoration(
-                color: AppColors.containerBackground,
+                color: c.containerBackground,
                 borderRadius: BorderRadius.circular(12),
               ),
               padding: const EdgeInsets.all(4),
@@ -38,9 +39,9 @@ class PeriodoSelector extends StatelessWidget {
                 final modo = controller.selectedPeriodo.value;
                 return Row(
                   children: [
-                    _modoButton('Día', 'dia', modo),
-                    _modoButton('Semana', 'semana', modo),
-                    _modoButton('Mes', 'mes', modo),
+                    _modoButton(context, 'Día', 'dia', modo),
+                    _modoButton(context, 'Semana', 'semana', modo),
+                    _modoButton(context, 'Mes', 'mes', modo),
                   ],
                 );
               }),
@@ -54,7 +55,7 @@ class PeriodoSelector extends StatelessWidget {
                         Icons.chevron_left,
                         color: controller.puedeRetroceder
                             ? AppColors.accent
-                            : AppColors.disabled,
+                            : c.disabled,
                       ),
                       onPressed: controller.puedeRetroceder
                           ? controller.goToPrevious
@@ -72,10 +73,10 @@ class PeriodoSelector extends StatelessWidget {
                         children: [
                           Obx(() => Text(
                                 controller.periodoLabel,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
+                                  color: c.textPrimary,
                                 ),
                               )),
                           const SizedBox(width: 4),
@@ -91,7 +92,7 @@ class PeriodoSelector extends StatelessWidget {
                         Icons.chevron_right,
                         color: controller.puedeAvanzar
                             ? AppColors.accent
-                            : AppColors.disabled,
+                            : c.disabled,
                       ),
                       onPressed:
                           controller.puedeAvanzar ? controller.goToNext : null,
@@ -116,7 +117,8 @@ class PeriodoSelector extends StatelessWidget {
     );
   }
 
-  Widget _modoButton(String label, String value, String activo) {
+  Widget _modoButton(BuildContext context, String label, String value, String activo) {
+    final c = context.colores;
     final seleccionado = activo == value;
     return Expanded(
       child: GestureDetector(
@@ -133,7 +135,7 @@ class PeriodoSelector extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: seleccionado ? FontWeight.w700 : FontWeight.w500,
-              color: seleccionado ? Colors.white : AppColors.textSecondary,
+              color: seleccionado ? Colors.white : c.textSecondary,
             ),
           ),
         ),
@@ -159,7 +161,6 @@ class PeriodoSelector extends StatelessWidget {
       lastDate: now,
       locale: const Locale('es'),
       helpText: modo == 'dia' ? 'Selecciona un día' : 'Selecciona una semana',
-      builder: (context, child) => Theme(data: _pickerTheme, child: child!),
     );
 
     if (fecha != null) {
@@ -184,17 +185,6 @@ class PeriodoSelector extends StatelessWidget {
       locale: const Locale('es'),
       helpText: 'Selecciona un rango de fechas',
       saveText: 'Aplicar',
-      builder: (context, child) => Theme(
-        data: _pickerTheme.copyWith(
-          datePickerTheme: DatePickerThemeData(
-            // Banda del rango translúcida para que inicio/fin resalten
-            rangeSelectionBackgroundColor: AppColors.accent.withOpacity(0.25),
-            rangePickerBackgroundColor: AppColors.backgroundColor,
-            rangePickerHeaderForegroundColor: AppColors.textPrimary,
-          ),
-        ),
-        child: child!,
-      ),
     );
 
     if (rango != null) {
@@ -205,26 +195,8 @@ class PeriodoSelector extends StatelessWidget {
     }
   }
 
-  /// Tema oscuro construido desde cero: copiar el tema claro de la app dejaba
-  /// la tipografía con texto negro y los días no se veían.
-  static final ThemeData _pickerTheme = ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.dark,
-    colorScheme: const ColorScheme.dark(
-      primary: AppColors.accent,
-      onPrimary: Colors.white,
-      surface: AppColors.cardBackground,
-      onSurface: AppColors.textPrimary,
-      secondary: AppColors.accent,
-    ),
-    scaffoldBackgroundColor: AppColors.backgroundColor,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.primary,
-      foregroundColor: AppColors.textPrimary,
-    ),
-  );
-
   void _showMonthPicker(BuildContext context) {
+    final c = context.colores;
     final now = DateTime.now();
     final current = controller.fechaInicio.value ?? now;
     int displayYear = current.year;
@@ -235,7 +207,7 @@ class PeriodoSelector extends StatelessWidget {
         return StatefulBuilder(
           builder: (context, setState) {
             return Dialog(
-              backgroundColor: AppColors.cardBackground,
+              backgroundColor: c.cardBackground,
               // Ancho de diálogo aunque el teléfono esté de lado, y desplazable si
               // no cabe a lo alto.
               constraints: const BoxConstraints(minWidth: 280, maxWidth: 420),
@@ -247,12 +219,12 @@ class PeriodoSelector extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
+                    Text(
                       'Selecciona un mes',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.titleColor,
+                        color: c.titleColor,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -269,7 +241,7 @@ class PeriodoSelector extends StatelessWidget {
                               Icons.chevron_left,
                               color: puedeRetroceder
                                   ? AppColors.accent
-                                  : AppColors.disabled,
+                                  : c.disabled,
                             ),
                             onPressed: puedeRetroceder
                                 ? () => setState(() => displayYear--)
@@ -279,10 +251,10 @@ class PeriodoSelector extends StatelessWidget {
                         }),
                         Text(
                           '$displayYear',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            color: c.textPrimary,
                           ),
                         ),
                         IconButton(
@@ -290,7 +262,7 @@ class PeriodoSelector extends StatelessWidget {
                             Icons.chevron_right,
                             color: displayYear < now.year
                                 ? AppColors.accent
-                                : AppColors.disabled,
+                                : c.disabled,
                           ),
                           onPressed: displayYear < now.year
                               ? () => setState(() => displayYear++)
@@ -325,7 +297,7 @@ class PeriodoSelector extends StatelessWidget {
                         return Material(
                           color: isSelected
                               ? AppColors.accent.withOpacity(0.2)
-                              : AppColors.containerBackground,
+                              : c.containerBackground,
                           borderRadius: BorderRadius.circular(14),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(14),
@@ -344,10 +316,10 @@ class PeriodoSelector extends StatelessWidget {
                                       ? FontWeight.w700
                                       : FontWeight.w500,
                                   color: isDisabled
-                                      ? AppColors.disabled
+                                      ? c.disabled
                                       : isSelected
                                           ? AppColors.accent
-                                          : AppColors.textPrimary,
+                                          : c.textPrimary,
                                 ),
                               ),
                             ),

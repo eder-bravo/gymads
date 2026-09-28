@@ -26,6 +26,7 @@ Future<void> _mostrarHoja(
   String? subtitulo,
   required Widget contenido,
 }) {
+    final c = context.colores;
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -35,9 +36,9 @@ Future<void> _mostrarHoja(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.8,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -49,7 +50,7 @@ Future<void> _mostrarHoja(
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.textSecondary.withOpacity(0.4),
+                color: c.textSecondary.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -65,19 +66,19 @@ Future<void> _mostrarHoja(
                     children: [
                       Text(
                         titulo,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.titleColor,
+                          color: c.titleColor,
                         ),
                       ),
                       if (subtitulo != null) ...[
                         const SizedBox(height: 2),
                         Text(
                           subtitulo,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            color: AppColors.textSecondary,
+                            color: c.textSecondary,
                           ),
                         ),
                       ],
@@ -86,7 +87,7 @@ Future<void> _mostrarHoja(
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  color: AppColors.textSecondary,
+                  color: c.textSecondary,
                   tooltip: 'Cerrar',
                   onPressed: () => Navigator.of(context).pop(),
                 ),
@@ -103,6 +104,7 @@ Future<void> _mostrarHoja(
 /// Detalle de un cobro: qué productos llevó (si fue una venta), total, método
 /// y referencia.
 Future<void> mostrarDetalleIngreso(BuildContext context, IngresoModel ingreso) {
+    final c = context.colores;
   final esVenta = ingreso.items.isNotEmpty;
   final filas = <Widget>[
     if (esVenta) ...[
@@ -116,7 +118,7 @@ Future<void> mostrarDetalleIngreso(BuildContext context, IngresoModel ingreso) {
           cantidad: item.cantidad,
           monto: item.total,
         ),
-      const Divider(color: AppColors.disabled, height: 24),
+      Divider(color: c.disabled, height: 24),
     ] else ...[
       if (ingreso.clienteNombre.isNotEmpty)
         _Dato('Cliente', ingreso.clienteNombre),
@@ -151,6 +153,7 @@ Future<void> mostrarDetalleIngreso(BuildContext context, IngresoModel ingreso) {
 /// vendido a lo menos.
 Future<void> mostrarProductosVendidos(
     BuildContext context, IngresosController controller) {
+    final c = context.colores;
   // Sin lo de otro periodo mientras llega lo de este.
   controller.productosVendidos.clear();
   controller.fetchProductosVendidos();
@@ -174,18 +177,18 @@ Future<void> mostrarProductosVendidos(
 
       final productos = controller.productosVendidos;
       if (productos.isEmpty) {
-        return const Padding(
-          padding: EdgeInsets.fromLTRB(20, 32, 20, 48),
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 32, 20, 48),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.shopping_bag_outlined,
-                  size: 48, color: AppColors.textSecondary),
-              SizedBox(height: 12),
+                  size: 48, color: c.textSecondary),
+              const SizedBox(height: 12),
               Text(
                 'No se vendieron productos en este periodo',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: c.textSecondary),
               ),
             ],
           ),
@@ -219,7 +222,7 @@ Future<void> mostrarProductosVendidos(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
             decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(color: AppColors.disabled.withOpacity(0.6)),
+                top: BorderSide(color: c.disabled.withOpacity(0.6)),
               ),
             ),
             child: Row(
@@ -229,9 +232,9 @@ Future<void> mostrarProductosVendidos(
                     piezas == 1
                         ? '1 pieza en total'
                         : '$piezas piezas en total',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: AppColors.textSecondary,
+                      color: c.textSecondary,
                     ),
                   ),
                 ),
@@ -259,14 +262,15 @@ class _Etiqueta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         texto,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: AppColors.textSecondary,
+          color: c.textSecondary,
         ),
       ),
     );
@@ -288,6 +292,7 @@ class _FilaProducto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -317,17 +322,17 @@ class _FilaProducto extends StatelessWidget {
                   nombre,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                   ),
                 ),
                 Text(
                   detalle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                   ),
                 ),
               ],
@@ -336,10 +341,10 @@ class _FilaProducto extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             _moneda(monto),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: c.textPrimary,
             ),
           ),
         ],
@@ -357,6 +362,7 @@ class _Dato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -366,9 +372,9 @@ class _Dato extends StatelessWidget {
             width: 120,
             child: Text(
               etiqueta,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: c.textSecondary,
               ),
             ),
           ),
@@ -379,7 +385,7 @@ class _Dato extends StatelessWidget {
               style: TextStyle(
                 fontSize: destacado ? 18 : 14,
                 fontWeight: destacado ? FontWeight.bold : FontWeight.w500,
-                color: destacado ? AppColors.success : AppColors.textPrimary,
+                color: destacado ? AppColors.success : c.textPrimary,
               ),
             ),
           ),

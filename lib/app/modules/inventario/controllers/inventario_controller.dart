@@ -404,21 +404,17 @@ class InventarioController extends GetxController
       final confirmed = await Get.dialog<bool>(
         AlertDialog(
           scrollable: true,
-          // Oscuro, como los demás diálogos (con el tema de la app salía
-          // blanco).
-          backgroundColor: AppColors.cardBackground,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text(
             'Eliminar producto',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
             ),
           ),
           content: const Text(
             '¿Seguro que quieres eliminar este producto? Esta acción no se '
             'puede deshacer.',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
+            style: TextStyle(fontSize: 15),
           ),
           actions: [
             BotonCancelar(onPressed: () => Get.back(result: false)),

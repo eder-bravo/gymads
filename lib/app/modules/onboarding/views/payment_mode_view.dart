@@ -12,12 +12,13 @@ class PaymentModeView extends GetView<OnboardingController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final bool isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
 
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: AppColors.backgroundColor,
+        backgroundColor: c.backgroundColor,
         appBar: const GymAppBar(
           title: 'Configuración inicial',
           leading: SizedBox.shrink(),
@@ -33,7 +34,7 @@ class PaymentModeView extends GetView<OnboardingController> {
                   style: TextStyle(
                     fontSize: isTablet ? 28 : 24,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                     letterSpacing: 0.3,
                   ),
                 ),
@@ -43,7 +44,7 @@ class PaymentModeView extends GetView<OnboardingController> {
                   'Puedes cambiarlo después desde Configuración.',
                   style: TextStyle(
                     fontSize: isTablet ? 15 : 14,
-                    color: AppColors.textSecondary.withOpacity(0.8),
+                    color: c.textSecondary.withOpacity(0.8),
                     height: 1.4,
                   ),
                 ),
@@ -105,6 +106,7 @@ class _ChoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Opacity(
       opacity: enabled ? 1 : 0.5,
       child: Material(
@@ -154,7 +156,7 @@ class _ChoiceCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: isTablet ? 19 : 17,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: c.textPrimary,
                           letterSpacing: 0.3,
                         ),
                       ),
@@ -163,7 +165,7 @@ class _ChoiceCard extends StatelessWidget {
                         description,
                         style: TextStyle(
                           fontSize: isTablet ? 14 : 12.5,
-                          color: AppColors.textSecondary.withOpacity(0.75),
+                          color: c.textSecondary.withOpacity(0.75),
                           fontWeight: FontWeight.w500,
                           height: 1.35,
                         ),
@@ -173,18 +175,18 @@ class _ChoiceCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 if (isLoading)
-                  const SizedBox(
+                  SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: AppColors.textSecondary,
+                      color: c.textSecondary,
                     ),
                   )
                 else
                   Icon(
                     Icons.arrow_forward_ios_rounded,
-                    color: Colors.white.withOpacity(0.25),
+                    color: c.contraste.withOpacity(0.25),
                     size: 16,
                   ),
               ],

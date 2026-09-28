@@ -10,7 +10,8 @@ void main() {
   late List<TextEditingController> c;
   late int guardados;
 
-  Future<void> abrir(WidgetTester tester, {bool editar = false}) async {
+  Future<void> abrir(WidgetTester tester,
+      {bool editar = false, ThemeData? tema}) async {
     tester.view.physicalSize = const Size(390, 1400) * 3;
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -18,7 +19,7 @@ void main() {
     c = List.generate(6, (_) => TextEditingController());
     guardados = 0;
     await tester.pumpWidget(GetMaterialApp(
-      theme: AppTheme.app,
+      theme: tema ?? AppTheme.oscuro,
       home: ClienteFormDialog(
         nombreController: c[0],
         phoneController: c[1],
@@ -117,17 +118,29 @@ void main() {
     await cerrar(tester);
   });
 
+  testWidgets('en modo claro se dibuja igual, sin errores', (tester) async {
+    await abrir(tester, tema: AppTheme.claro);
+    expect(find.text('Guardar cliente'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await cerrar(tester);
+  });
+
   group('Tema de los campos', () {
-    test('el foco y la etiqueta enfocada son naranjas, no del color del fondo',
-        () {
-      final tema = AppTheme.app.inputDecorationTheme;
-      final foco = tema.focusedBorder as OutlineInputBorder;
-      expect(foco.borderSide.color, AppColors.accent);
-      expect(tema.floatingLabelStyle?.color, AppColors.accent);
-      expect(AppTheme.app.textSelectionTheme.cursorColor, AppColors.accent);
-      // Las etiquetas se leen sobre fondo oscuro.
-      expect(tema.labelStyle?.color, AppColors.textSecondary);
-    });
+    for (final (nombre, tema, colores) in [
+      ('oscuro', AppTheme.oscuro, ColoresTema.oscuro),
+      ('claro', AppTheme.claro, ColoresTema.claro),
+    ]) {
+      test('$nombre: el foco y la etiqueta enfocada son naranjas', () {
+        final campos = tema.inputDecorationTheme;
+        final foco = campos.focusedBorder as OutlineInputBorder;
+        expect(foco.borderSide.color, AppColors.accent);
+        expect(campos.floatingLabelStyle?.color, AppColors.accent);
+        expect(tema.textSelectionTheme.cursorColor, AppColors.accent);
+        // La etiqueta, en el texto secundario del modo: se lee sobre su
+        // fondo.
+        expect(campos.labelStyle?.color, colores.textSecondary);
+      });
+    }
   });
 
   group('BotonGuardar', () {

@@ -19,6 +19,7 @@ class CategoryIconPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -35,19 +36,19 @@ class CategoryIconPicker extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? AppColors.accent
-                    : AppColors.containerBackground,
+                    : c.containerBackground,
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                   color: isSelected
                       ? AppColors.accent
-                      : Colors.white.withOpacity(0.08),
+                      : c.contraste.withOpacity(0.08),
                   width: 1.5,
                 ),
               ),
               child: Icon(
                 CategoryIcons.resolve(key),
                 size: 22,
-                color: isSelected ? Colors.white : AppColors.textSecondary,
+                color: isSelected ? Colors.white : c.textSecondary,
               ),
             ),
           ),

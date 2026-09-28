@@ -15,8 +15,9 @@ class ClientesView extends GetView<ClientesController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Clientes',
         actions: [
@@ -43,17 +44,17 @@ class ClientesView extends GetView<ClientesController> {
       body: SafeArea(
         child: Obx(() {
           if (controller.isLoading.value) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: AppColors.accent),
-                  SizedBox(height: 20),
+                  const CircularProgressIndicator(color: AppColors.accent),
+                  const SizedBox(height: 20),
                   Text(
                     'Cargando clientes...',
                     style: TextStyle(
                       fontSize: 16,
-                      color: AppColors.textSecondary,
+                      color: c.textSecondary,
                     ),
                   ),
                 ],
@@ -105,7 +106,7 @@ class ClientesView extends GetView<ClientesController> {
                               Icons.people_outline,
                               size: ResponsiveValues.getIconSize(context,
                                   mobile: 80, smallPhone: 60, tablet: 100),
-                              color: AppColors.textSecondary,
+                              color: c.textSecondary,
                             ),
                             SizedBox(
                                 height: ResponsiveValues.getSpacing(context,
@@ -114,9 +115,9 @@ class ClientesView extends GetView<ClientesController> {
                               controller.clientes.isEmpty
                                   ? 'No hay clientes registrados'
                                   : 'No hay resultados para tu búsqueda',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
-                                color: AppColors.textSecondary,
+                                color: c.textSecondary,
                               ),
                             ),
                           ],

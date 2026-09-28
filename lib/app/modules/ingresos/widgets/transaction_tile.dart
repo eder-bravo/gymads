@@ -15,6 +15,7 @@ class TransactionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final controller = Get.find<IngresosController>();
 
     return Padding(
@@ -27,9 +28,9 @@ class TransactionTile extends StatelessWidget {
           child: Ink(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.cardBackground,
+              color: c.cardBackground,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.disabled.withOpacity(0.4)),
+              border: Border.all(color: c.disabled.withOpacity(0.4)),
             ),
             child: Row(
               children: [
@@ -57,10 +58,10 @@ class TransactionTile extends StatelessWidget {
                     children: [
                       Text(
                         ingreso.clienteNombre,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: c.textPrimary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -71,9 +72,9 @@ class TransactionTile extends StatelessWidget {
                           Flexible(
                             child: Text(
                               ingreso.conceptoDescripcion,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
-                                color: AppColors.textSecondary,
+                                color: c.textSecondary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -104,9 +105,9 @@ class TransactionTile extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           'Ref. ${ingreso.referenciaPago}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: c.textSecondary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -132,9 +133,9 @@ class TransactionTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       controller.formatFechaCorta(ingreso.fecha),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textSecondary,
+                        color: c.textSecondary,
                       ),
                     ),
                   ],

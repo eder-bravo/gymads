@@ -17,8 +17,9 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Punto de Venta',
         actions: [
@@ -104,11 +105,11 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.inventory_2_outlined,
-                                size: 64, color: AppColors.textSecondary),
+                                size: 64, color: c.textSecondary),
                             const SizedBox(height: 16),
                             Text(
                               'No hay productos disponibles',
-                              style: TextStyle(color: AppColors.textSecondary),
+                              style: TextStyle(color: c.textSecondary),
                             ),
                           ],
                         ),
@@ -132,7 +133,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                         ),
                         itemCount: products.length,
                         itemBuilder: (context, index) {
-                          return _buildProductCard(products[index]);
+                          return _buildProductCard(context, products[index]);
                         },
                       ),
                     );
@@ -156,7 +157,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     );
   }
 
-  Widget _buildProductCard(Product product) {
+  Widget _buildProductCard(BuildContext context, Product product) {
+    final c = context.colores;
     return Obx(() {
       final cartItem = controller.cartItems.firstWhereOrNull(
         (item) => item.productId == product.id,
@@ -175,7 +177,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.cardBackground,
+            color: c.cardBackground,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: inCart
@@ -201,8 +203,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   Container(
                     width: 40,
                     height: 40,
-                    decoration: const BoxDecoration(
-                      color: AppColors.containerBackground,
+                    decoration: BoxDecoration(
+                      color: c.containerBackground,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -232,10 +234,10 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 product.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
-                  color: AppColors.textPrimary,
+                  color: c.textPrimary,
                 ),
               ),
               const Spacer(),
@@ -252,7 +254,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               const SizedBox(height: 10),
 
               // Control de cantidad
-              _buildQuantityControl(product, quantity),
+              _buildQuantityControl(context, product, quantity),
             ],
           ),
         ),
@@ -283,7 +285,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     );
   }
 
-  Widget _buildQuantityControl(Product product, int quantity) {
+  Widget _buildQuantityControl(BuildContext context, Product product, int quantity) {
+    final c = context.colores;
     if (quantity == 0) {
       return SizedBox(
         width: double.infinity,
@@ -306,7 +309,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.containerBackground,
+        color: c.containerBackground,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -318,17 +321,17 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               quantity - 1,
             ),
             icon: const Icon(Icons.remove, size: 18),
-            color: AppColors.textSecondary,
+            color: c.textSecondary,
             padding: EdgeInsets.zero,
             splashRadius: 18,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           ),
           Text(
             '$quantity',
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 15,
-              color: AppColors.textPrimary,
+              color: c.textPrimary,
             ),
           ),
           IconButton(
@@ -345,6 +348,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   }
 
   Widget _buildCartPanel(BuildContext context) {
+    final c = context.colores;
     return Obx(() {
       final itemCount = controller.cartItems.length;
       final total = controller.finalAmount;
@@ -354,7 +358,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         padding:
             EdgeInsets.symmetric(horizontal: 16, vertical: isEmpty ? 14 : 16),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+          color: c.cardBackground,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.2),
@@ -370,7 +374,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   child: Text(
                     'Selecciona productos para cobrar',
                     style:
-                        TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                        TextStyle(color: c.textSecondary, fontSize: 13),
                   ),
                 )
               : Row(
@@ -395,18 +399,18 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                         children: [
                           Text(
                             '$itemCount ${itemCount == 1 ? 'producto' : 'productos'}',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
+                            style: TextStyle(
+                              color: c.textSecondary,
                               fontSize: 13,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             '\$${total.toStringAsFixed(2)}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 22,
-                              color: AppColors.textPrimary,
+                              color: c.textPrimary,
                             ),
                           ),
                         ],
@@ -417,7 +421,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     IconButton(
                       onPressed: () => controller.clearCart(),
                       icon: const Icon(Icons.delete_outline),
-                      color: AppColors.textSecondary,
+                      color: c.textSecondary,
                       tooltip: 'Vaciar carrito',
                     ),
                     const SizedBox(width: 4),
@@ -464,6 +468,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   }
 
   void _showPaymentDialog(BuildContext context) {
+    final c = context.colores;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -474,9 +479,9 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        decoration: const BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: c.cardBackground,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         // Desplazable: de lado, o con el teclado abierto para la referencia,
         // el resumen y los métodos de pago no caben.
@@ -492,7 +497,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -500,12 +505,12 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               const SizedBox(height: 20),
 
               // Título
-              const Text(
+              Text(
                 'Confirmar Pago',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: c.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -552,21 +557,21 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.containerBackground,
+                  color: c.containerBackground,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Obx(() => Column(
                       children: [
-                        _buildSummaryRow(
+                        _buildSummaryRow(context,
                             '${controller.cartItems.length} productos',
                             '\$${controller.totalAmount.toStringAsFixed(2)}'),
                         if (controller.discountAmount > 0) ...[
                           const SizedBox(height: 8),
-                          _buildSummaryRow('Descuento',
+                          _buildSummaryRow(context, 'Descuento',
                               '-\$${controller.discountAmount.toStringAsFixed(2)}'),
                         ],
                         const Divider(height: 24),
-                        _buildSummaryRow(
+                        _buildSummaryRow(context,
                           'TOTAL',
                           '\$${controller.finalAmount.toStringAsFixed(2)}',
                           isBold: true,
@@ -577,15 +582,15 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               const SizedBox(height: 20),
 
               // Método de pago
-              const Text(
+              Text(
                 'Método de pago',
                 style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: c.textSecondary,
                   fontSize: 14,
                 ),
               ),
               const SizedBox(height: 10),
-              _buildPaymentMethodChips(),
+              _buildPaymentMethodChips(context),
               const SizedBox(height: 16),
 
               // Campo monto recibido (solo efectivo)
@@ -594,10 +599,10 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Monto recibido',
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: c.textSecondary,
                           fontSize: 14,
                         ),
                       ),
@@ -609,8 +614,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                           FilteringTextInputFormatter.allow(
                               RegExp(r'^\d+\.?\d{0,2}')),
                         ],
-                        style: const TextStyle(
-                            color: AppColors.textPrimary, fontSize: 18),
+                        style: TextStyle(
+                            color: c.textPrimary, fontSize: 18),
                         decoration: _decoracionCampoCobro(
                           hintText: 'Cuánto te entregó',
                         ).copyWith(
@@ -649,10 +654,10 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Folio o referencia (opcional)',
                       style: TextStyle(
-                        color: AppColors.textSecondary,
+                        color: c.textSecondary,
                         fontSize: 14,
                       ),
                     ),
@@ -661,7 +666,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       // El controlador vive en PointOfSaleController para que
                       // el OCR pueda escribir aquí la referencia que leyó.
                       controller: controller.referenciaCtrl,
-                      style: const TextStyle(color: AppColors.textPrimary),
+                      style: TextStyle(color: c.textPrimary),
                       textCapitalization: TextCapitalization.characters,
                       inputFormatters: [
                         LengthLimitingTextInputFormatter(50),
@@ -677,7 +682,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       onChanged: controller.setReferenciaPago,
                     ),
                     const SizedBox(height: 12),
-                    _buildEscanearReferencia(),
+                    _buildEscanearReferencia(context),
                     const SizedBox(height: 16),
                   ],
                 );
@@ -702,7 +707,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     );
   }
 
-  Widget _buildPaymentMethodChips() {
+  Widget _buildPaymentMethodChips(BuildContext context) {
+    final c = context.colores;
     return Obx(() => Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -714,7 +720,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: selected ? AppColors.accent : AppColors.cardBackground,
+                  color: selected ? AppColors.accent : c.cardBackground,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: selected
@@ -729,14 +735,14 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     Icon(
                       _iconForPaymentMethod(method),
                       size: 16,
-                      color: selected ? Colors.white : AppColors.textSecondary,
+                      color: selected ? Colors.white : c.textSecondary,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       _getPaymentMethodName(method),
                       style: TextStyle(
                         color:
-                            selected ? Colors.white : AppColors.textSecondary,
+                            selected ? Colors.white : c.textSecondary,
                         fontWeight:
                             selected ? FontWeight.bold : FontWeight.normal,
                         fontSize: 13,
@@ -766,14 +772,15 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     }
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
+  Widget _buildSummaryRow(BuildContext context, String label, String value, {bool isBold = false}) {
+    final c = context.colores;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
           style: TextStyle(
-            color: isBold ? AppColors.textPrimary : AppColors.textSecondary,
+            color: isBold ? c.textPrimary : c.textSecondary,
             fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
             fontSize: isBold ? 18 : 14,
           ),
@@ -781,7 +788,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         Text(
           value,
           style: TextStyle(
-            color: isBold ? AppColors.accent : AppColors.textPrimary,
+            color: isBold ? AppColors.accent : c.textPrimary,
             fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
             fontSize: isBold ? 18 : 14,
           ),
@@ -812,22 +819,23 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   /// La foto solo se usa para leerla y no se guarda. Lo que se muestra son
   /// SUGERENCIAS: el campo de arriba sigue mandando, porque el
   /// reconocimiento falla a veces.
-  Widget _buildEscanearReferencia() {
+  Widget _buildEscanearReferencia(BuildContext context) {
+    final c = context.colores;
     return Obx(() {
       if (controller.leyendoReferencia.value) {
-        return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
             children: [
-              SizedBox(
+              const SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
                     strokeWidth: 2, color: AppColors.accent),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Text('Leyendo la referencia...',
-                  style: TextStyle(color: AppColors.textSecondary)),
+                  style: TextStyle(color: c.textSecondary)),
             ],
           ),
         );
@@ -865,9 +873,9 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
           ),
           if (controller.referenciasSugeridas.isNotEmpty) ...[
             const SizedBox(height: 8),
-            const Text('Referencias encontradas — toca la correcta:',
+            Text('Referencias encontradas — toca la correcta:',
                 style:
-                    TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
+                    TextStyle(color: c.textSecondary, fontSize: 12.5)),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,
@@ -877,9 +885,9 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                         label: Text(referencia,
                             style: const TextStyle(
                                 fontFamily: 'monospace', fontSize: 12.5)),
-                        backgroundColor: AppColors.containerBackground,
+                        backgroundColor: c.containerBackground,
                         labelStyle:
-                            const TextStyle(color: AppColors.textPrimary),
+                            TextStyle(color: c.textPrimary),
                         onPressed: () =>
                             controller.usarReferenciaSugerida(referencia),
                       ))
@@ -891,7 +899,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               'No se reconoció ninguna referencia en la foto. '
               'Escríbela arriba.',
               style: TextStyle(
-                  color: AppColors.textSecondary.withOpacity(0.8),
+                  color: c.textSecondary.withOpacity(0.8),
                   fontSize: 12.5),
             ),
           ],

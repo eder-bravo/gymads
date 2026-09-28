@@ -70,8 +70,9 @@ class _RfidReaderAnimationState extends State<RfidReaderAnimation>
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return AlertDialog(
-      backgroundColor: AppColors.cardBackground,
+      backgroundColor: c.cardBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       content: SingleChildScrollView(
         child: Column(
@@ -85,7 +86,7 @@ class _RfidReaderAnimationState extends State<RfidReaderAnimation>
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: c.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -111,7 +112,7 @@ class _RfidReaderAnimationState extends State<RfidReaderAnimation>
                             width: 2,
                           ),
                         ),
-                        child: Center(
+                        child: const Center(
                           child: Icon(
                             Icons.contactless,
                             size: 70,
@@ -153,7 +154,7 @@ class _RfidReaderAnimationState extends State<RfidReaderAnimation>
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.containerBackground,
+                      color: c.containerBackground,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: AppColors.accent.withOpacity(0.5),
@@ -161,7 +162,7 @@ class _RfidReaderAnimationState extends State<RfidReaderAnimation>
                     ),
                     child: Text(
                       widget.detectedUid!,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'monospace',
@@ -182,7 +183,7 @@ class _RfidReaderAnimationState extends State<RfidReaderAnimation>
                   : 'Tarjeta leída correctamente',
               style: TextStyle(
                 fontSize: 16,
-                color: AppColors.textSecondary,
+                color: c.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),

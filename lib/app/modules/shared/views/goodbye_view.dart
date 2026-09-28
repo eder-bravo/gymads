@@ -60,8 +60,9 @@ class _GoodbyeViewState extends State<GoodbyeView>
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor.withOpacity(0.95),
+      backgroundColor: c.backgroundColor.withOpacity(0.95),
       body: AnimatedBuilder(
         animation: _animationController,
         builder: (context, child) {
@@ -86,7 +87,7 @@ class _GoodbyeViewState extends State<GoodbyeView>
                           width: 3,
                         ),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.waving_hand,
                         size: 60,
                         color: AppColors.warning,
@@ -101,7 +102,7 @@ class _GoodbyeViewState extends State<GoodbyeView>
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.titleColor,
+                        color: c.titleColor,
                       ),
                     ),
                     
@@ -112,17 +113,17 @@ class _GoodbyeViewState extends State<GoodbyeView>
                       'Que tengas un excelente día',
                       style: TextStyle(
                         fontSize: 18,
-                        color: AppColors.textSecondary,
+                        color: c.textSecondary,
                       ),
                     ),
                     
                     const SizedBox(height: 12),
                     
                     // Icono de despedida
-                    const Icon(
+                    Icon(
                       Icons.waving_hand_outlined,
                       size: 48,
-                      color: AppColors.textSecondary,
+                      color: c.textSecondary,
                     ),
                     
                     const SizedBox(height: 40),
@@ -134,10 +135,10 @@ class _GoodbyeViewState extends State<GoodbyeView>
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.cardBackground,
+                        color: c.cardBackground,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: AppColors.textSecondary.withOpacity(0.3),
+                          color: c.textSecondary.withOpacity(0.3),
                         ),
                       ),
                       child: Row(
@@ -149,7 +150,7 @@ class _GoodbyeViewState extends State<GoodbyeView>
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.textSecondary,
+                                c.textSecondary,
                               ),
                             ),
                           ),
@@ -158,7 +159,7 @@ class _GoodbyeViewState extends State<GoodbyeView>
                             'Cerrando automáticamente...',
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textSecondary,
+                              color: c.textSecondary,
                             ),
                           ),
                         ],

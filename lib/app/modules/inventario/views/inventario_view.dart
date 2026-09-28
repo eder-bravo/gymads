@@ -18,8 +18,9 @@ class InventarioView extends GetView<InventarioController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Inventario',
         actions: [
@@ -30,7 +31,7 @@ class InventarioView extends GetView<InventarioController> {
             IconButton(
               icon: const Icon(Icons.qr_code_scanner),
               tooltip: 'Escanear código',
-              onPressed: _escanearParaAjustar,
+              onPressed: () => _escanearParaAjustar(context),
             ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -81,8 +82,8 @@ class InventarioView extends GetView<InventarioController> {
       body: SafeArea(
         child: CabeceraConLista(
           cabecera: [
-            _buildStatsSection(),
-            _buildFaltantesBanner(),
+            _buildStatsSection(context),
+            _buildFaltantesBanner(context),
             TourStep(
               tourKey: controller.keyBuscar,
               title: 'Buscador',
@@ -98,7 +99,7 @@ class InventarioView extends GetView<InventarioController> {
             description: 'Toca un producto para ver su detalle, editarlo '
                 'o registrar entradas y salidas de stock.',
             isLastStep: controller.esUltimoPasoDelTour(controller.keyLista),
-            child: _buildProductList(),
+            child: _buildProductList(context),
           ),
         ),
       ),
@@ -109,7 +110,8 @@ class InventarioView extends GetView<InventarioController> {
   ///
   /// El diálogo de ajuste ya recibe el producto resuelto, así que escanear
   /// solo sustituye al paso de buscarlo a mano en la lista.
-  Future<void> _escanearParaAjustar() async {
+  Future<void> _escanearParaAjustar(BuildContext context) async {
+    final c = context.colores;
     final codigo = await controller.escanearCodigo(
       instruccion: 'Apunta al código del producto para ajustar su stock',
     );
@@ -134,10 +136,10 @@ class InventarioView extends GetView<InventarioController> {
     final agregar = await Get.dialog<bool>(
       AlertDialog(
         scrollable: true,
-        backgroundColor: AppColors.cardBackground,
+        backgroundColor: c.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Código no registrado',
-            style: TextStyle(color: AppColors.textPrimary)),
+        title: Text('Código no registrado',
+            style: TextStyle(color: c.textPrimary)),
         content: Text(
           puedeAgregar
               ? 'Ningún producto tiene este código. ¿Quieres agregarlo como '
@@ -145,8 +147,8 @@ class InventarioView extends GetView<InventarioController> {
                   'Si el producto ya existe, edítalo y escanea ahí su código.'
               : 'Ningún producto tiene este código. Pide a un encargado que '
                   'lo dé de alta o que se lo asigne al producto.',
-          style: const TextStyle(
-              color: AppColors.textSecondary, height: 1.35),
+          style: TextStyle(
+              color: c.textSecondary, height: 1.35),
         ),
         actions: puedeAgregar
             ? [
@@ -173,7 +175,8 @@ class InventarioView extends GetView<InventarioController> {
     Get.toNamed(Routes.PRODUCT_FORM, arguments: {'barcode': codigo});
   }
 
-  Widget _buildStatsSection() {
+  Widget _buildStatsSection(BuildContext context) {
+    final c = context.colores;
     return Obx(() {
       if (controller.inventoryStats.isEmpty) {
         return const SizedBox.shrink();
@@ -182,7 +185,7 @@ class InventarioView extends GetView<InventarioController> {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+          color: c.cardBackground,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.accent.withOpacity(0.3)),
         ),
@@ -190,11 +193,11 @@ class InventarioView extends GetView<InventarioController> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildStatItem('Total Productos',
+            _buildStatItem(context, 'Total Productos',
                 '${controller.inventoryStats['totalProducts'] ?? 0}'),
-            _buildStatItem('Stock Total',
+            _buildStatItem(context, 'Stock Total',
                 '${controller.inventoryStats['totalStock'] ?? 0}'),
-            _buildStatItem('Valor Total',
+            _buildStatItem(context, 'Valor Total',
                 '\$${(controller.inventoryStats['totalValue'] ?? 0.0).toStringAsFixed(2)}'),
           ],
         ),
@@ -204,7 +207,8 @@ class InventarioView extends GetView<InventarioController> {
 
   /// Resumen de lo vendido sin existencias. Solo aparece si hay faltantes,
   /// para no robar espacio cuando el inventario está sano.
-  Widget _buildFaltantesBanner() {
+  Widget _buildFaltantesBanner(BuildContext context) {
+    final c = context.colores;
     return Obx(() {
       if (!controller.hayFaltantes) return const SizedBox.shrink();
 
@@ -252,8 +256,8 @@ class InventarioView extends GetView<InventarioController> {
                         '$productos ${productos == 1 ? 'producto' : 'productos'} · '
                         '$unidades ${unidades == 1 ? 'unidad' : 'unidades'} · '
                         '\$${valor.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
+                        style: TextStyle(
+                          color: c.textSecondary,
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
@@ -263,8 +267,8 @@ class InventarioView extends GetView<InventarioController> {
                         filtrando
                             ? 'Toca para ver todos los productos'
                             : 'Se descontarán solas al reponer stock',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
+                        style: TextStyle(
+                          color: c.textSecondary,
                           fontSize: 12,
                         ),
                       ),
@@ -284,7 +288,8 @@ class InventarioView extends GetView<InventarioController> {
     });
   }
 
-  Widget _buildStatItem(String label, String value) {
+  Widget _buildStatItem(BuildContext context, String label, String value) {
+    final c = context.colores;
     return Column(
       children: [
         Text(
@@ -297,9 +302,9 @@ class InventarioView extends GetView<InventarioController> {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: AppColors.textSecondary,
+            color: c.textSecondary,
           ),
         ),
       ],
@@ -335,7 +340,8 @@ class InventarioView extends GetView<InventarioController> {
     });
   }
 
-  Widget _buildProductList() {
+  Widget _buildProductList(BuildContext context) {
+    final c = context.colores;
     return Obx(() {
       if (controller.isLoading.value) {
         return const Center(
@@ -352,12 +358,12 @@ class InventarioView extends GetView<InventarioController> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.inventory_2, size: 64, color: AppColors.textSecondary),
+              Icon(Icons.inventory_2, size: 64, color: c.textSecondary),
               const SizedBox(height: 16),
               Text(
                 'No hay productos registrados',
                 style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: c.textSecondary,
                   fontSize: 16,
                 ),
               ),
@@ -372,7 +378,7 @@ class InventarioView extends GetView<InventarioController> {
                   label: const Text('Agregar primer producto'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.textPrimary,
+                    foregroundColor: c.textPrimary,
                   ),
                 ),
             ],
@@ -393,15 +399,15 @@ class InventarioView extends GetView<InventarioController> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.search_off,
-                    size: 56, color: AppColors.textSecondary.withOpacity(0.5)),
+                    size: 56, color: c.textSecondary.withOpacity(0.5)),
                 const SizedBox(height: 16),
                 Text(
                   hayFiltroDeCategoria
                       ? 'No hay productos en esta categoría'
                       : 'Ningún producto coincide con la búsqueda',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  style: TextStyle(
+                    color: c.textSecondary,
                     fontSize: 16,
                   ),
                 ),
@@ -426,17 +432,18 @@ class InventarioView extends GetView<InventarioController> {
           itemCount: controller.filteredProducts.length,
           itemBuilder: (context, index) {
             final product = controller.filteredProducts[index];
-            return _buildProductCard(product);
+            return _buildProductCard(context, product);
           },
         ),
       );
     });
   }
 
-  Widget _buildProductCard(Product product) {
+  Widget _buildProductCard(BuildContext context, Product product) {
+    final c = context.colores;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: AppColors.cardBackground,
+      color: c.cardBackground,
       elevation: 2,
       child: ListTile(
         leading: CircleAvatar(
@@ -456,9 +463,9 @@ class InventarioView extends GetView<InventarioController> {
             Expanded(
               child: Text(
                 product.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: c.textPrimary,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -480,7 +487,7 @@ class InventarioView extends GetView<InventarioController> {
           children: [
             Text(
               product.description,
-              style: const TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: c.textSecondary),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -501,8 +508,8 @@ class InventarioView extends GetView<InventarioController> {
                     product.stock < 0
                         ? 'Faltan ${-product.stock}'
                         : 'Stock: ${product.stock}',
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: c.textPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -516,8 +523,8 @@ class InventarioView extends GetView<InventarioController> {
           ],
         ),
         trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
-          color: AppColors.cardBackground,
+          icon: Icon(Icons.more_vert, color: c.textSecondary),
+          color: c.cardBackground,
           onSelected: (value) {
             if (value == 'edit') {
               controller.editProduct(product);
@@ -538,10 +545,10 @@ class InventarioView extends GetView<InventarioController> {
                 value: 'edit',
                 child: Row(
                   children: [
-                    Icon(Icons.edit, color: AppColors.accent, size: 20),
+                    const Icon(Icons.edit, color: AppColors.accent, size: 20),
                     const SizedBox(width: 12),
                     Text('Editar',
-                        style: TextStyle(color: AppColors.textPrimary)),
+                        style: TextStyle(color: c.textPrimary)),
                   ],
                 ),
               ),
@@ -550,10 +557,10 @@ class InventarioView extends GetView<InventarioController> {
                 value: 'stock',
                 child: Row(
                   children: [
-                    Icon(Icons.sync_alt, color: AppColors.info, size: 20),
+                    const Icon(Icons.sync_alt, color: AppColors.info, size: 20),
                     const SizedBox(width: 12),
                     Text('Ajustar stock',
-                        style: TextStyle(color: AppColors.textPrimary)),
+                        style: TextStyle(color: c.textPrimary)),
                   ],
                 ),
               ),
@@ -565,11 +572,11 @@ class InventarioView extends GetView<InventarioController> {
                 value: 'deactivate',
                 child: Row(
                   children: [
-                    Icon(Icons.visibility_off,
+                    const Icon(Icons.visibility_off,
                         color: AppColors.warning, size: 20),
                     const SizedBox(width: 12),
                     Text('Desactivar',
-                        style: TextStyle(color: AppColors.textPrimary)),
+                        style: TextStyle(color: c.textPrimary)),
                   ],
                 ),
               ),
@@ -579,11 +586,11 @@ class InventarioView extends GetView<InventarioController> {
                 value: 'delete',
                 child: Row(
                   children: [
-                    Icon(Icons.delete_forever,
+                    const Icon(Icons.delete_forever,
                         color: AppColors.error, size: 20),
                     const SizedBox(width: 12),
                     Text('Eliminar permanentemente',
-                        style: TextStyle(color: AppColors.textPrimary)),
+                        style: TextStyle(color: c.textPrimary)),
                   ],
                 ),
               ),

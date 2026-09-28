@@ -18,8 +18,9 @@ class AbonarView extends GetView<AbonarController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Abonar',
         actions: [
@@ -40,20 +41,21 @@ class AbonarView extends GetView<AbonarController> {
       body: SafeArea(
         child: Obx(() {
           if (controller.isSuccess.value) {
-            return _buildSuccessState();
+            return _buildSuccessState(context);
           }
 
           if (controller.selectedClient.value == null) {
             return _buildSearchState(context);
           }
 
-          return _buildAbonarForm();
+          return _buildAbonarForm(context);
         }),
       ),
     );
   }
 
   Widget _buildSearchState(BuildContext context) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -94,7 +96,7 @@ class AbonarView extends GetView<AbonarController> {
                       controller.searchController.text.trim().isEmpty
                           ? 'No hay clientes registrados'
                           : 'No se encontraron resultados',
-                      style: const TextStyle(color: AppColors.textSecondary),
+                      style: TextStyle(color: c.textSecondary),
                     ),
                   );
                 }
@@ -106,7 +108,7 @@ class AbonarView extends GetView<AbonarController> {
                     itemBuilder: (context, index) {
                       final client = controller.searchResults[index];
                       return Card(
-                        color: AppColors.cardBackground,
+                        color: c.cardBackground,
                         margin: const EdgeInsets.only(bottom: 8),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
@@ -119,14 +121,14 @@ class AbonarView extends GetView<AbonarController> {
                           ),
                           title: Text(
                             client.name,
-                            style: const TextStyle(
-                                color: AppColors.textPrimary,
+                            style: TextStyle(
+                                color: c.textPrimary,
                                 fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
                             'Tel: ${client.phone}',
                             style:
-                                const TextStyle(color: AppColors.textSecondary),
+                                TextStyle(color: c.textSecondary),
                           ),
                           trailing: const Icon(Icons.arrow_forward_ios,
                               size: 16, color: AppColors.accent),
@@ -143,7 +145,8 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
-  Widget _buildAbonarForm() {
+  Widget _buildAbonarForm(BuildContext context) {
+    final c = context.colores;
     final client = controller.selectedClient.value!;
 
     // La cabecera del cliente deja de estar fija cuando falta altura
@@ -153,9 +156,9 @@ class AbonarView extends GetView<AbonarController> {
         // Cabecera Cliente
         Container(
           padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.only(
+          decoration: BoxDecoration(
+            color: c.backgroundColor,
+            borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(24),
               bottomRight: Radius.circular(24),
             ),
@@ -174,10 +177,10 @@ class AbonarView extends GetView<AbonarController> {
                   children: [
                     Text(
                       client.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.titleColor,
+                        color: c.titleColor,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -197,7 +200,7 @@ class AbonarView extends GetView<AbonarController> {
               ),
               IconButton(
                 onPressed: controller.clearSelection,
-                icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                icon: Icon(Icons.close, color: c.textSecondary),
                 tooltip: 'Cambiar cliente',
               ),
             ],
@@ -209,22 +212,22 @@ class AbonarView extends GetView<AbonarController> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Detalles del Abono',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.titleColor,
+                color: c.titleColor,
               ),
             ),
             const SizedBox(height: 20),
 
             // Selector de precio fijo / libre
-            _buildModoToggle(),
+            _buildModoToggle(context),
             const SizedBox(height: 20),
 
             // Cantidad, periodo y precio unitario
-            _buildCamposAbono(),
+            _buildCamposAbono(context),
 
             // Total a pagar (solo lectura)
             Obx(() {
@@ -241,10 +244,10 @@ class AbonarView extends GetView<AbonarController> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Total a Pagar',
                       style: TextStyle(
-                        color: AppColors.textSecondary,
+                        color: c.textSecondary,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -266,12 +269,12 @@ class AbonarView extends GetView<AbonarController> {
             // Metodo de pago
             Obx(() => DropdownButtonFormField<String>(
                   value: controller.paymentMethod.value,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Método de pago',
-                    prefixIcon: const Icon(Icons.payments_outlined),
+                    prefixIcon: Icon(Icons.payments_outlined),
                   ),
-                  dropdownColor: AppColors.cardBackground,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  dropdownColor: c.cardBackground,
+                  style: TextStyle(color: c.textPrimary),
                   items: controller.paymentMethods.map((method) {
                     return DropdownMenuItem(value: method, child: Text(method));
                   }).toList(),
@@ -300,10 +303,10 @@ class AbonarView extends GetView<AbonarController> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Nueva Fecha de Expiración',
                             style: TextStyle(
-                                color: AppColors.textSecondary, fontSize: 12),
+                                color: c.textSecondary, fontSize: 12),
                           ),
                           Text(
                             formattedDate,
@@ -335,27 +338,29 @@ class AbonarView extends GetView<AbonarController> {
   }
 
   // Toggle segmentado Precio fijo / Libre
-  Widget _buildModoToggle() {
+  Widget _buildModoToggle(BuildContext context) {
+    final c = context.colores;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: c.contraste.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: c.contraste.withOpacity(0.10)),
       ),
       padding: const EdgeInsets.all(4),
       child: Obx(() {
         final fijo = controller.isPrecioFijo.value;
         return Row(
           children: [
-            _modoButton('Precio fijo', true, fijo),
-            _modoButton('Libre', false, fijo),
+            _modoButton(context, 'Precio fijo', true, fijo),
+            _modoButton(context, 'Libre', false, fijo),
           ],
         );
       }),
     );
   }
 
-  Widget _modoButton(String label, bool value, bool fijoActivo) {
+  Widget _modoButton(BuildContext context, String label, bool value, bool fijoActivo) {
+    final c = context.colores;
     final seleccionado = fijoActivo == value;
     return Expanded(
       child: GestureDetector(
@@ -372,7 +377,7 @@ class AbonarView extends GetView<AbonarController> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: seleccionado ? FontWeight.w700 : FontWeight.w500,
-              color: seleccionado ? Colors.white : AppColors.textSecondary,
+              color: seleccionado ? Colors.white : c.textSecondary,
             ),
           ),
         ),
@@ -381,7 +386,8 @@ class AbonarView extends GetView<AbonarController> {
   }
 
   // Cantidad de periodos, tipo de periodo y precio unitario
-  Widget _buildCamposAbono() {
+  Widget _buildCamposAbono(BuildContext context) {
+    final c = context.colores;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -395,7 +401,7 @@ class AbonarView extends GetView<AbonarController> {
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: const TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: c.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Cantidad',
                   contentPadding:
@@ -432,12 +438,12 @@ class AbonarView extends GetView<AbonarController> {
               flex: 3,
               child: Obx(() => DropdownButtonFormField<String>(
                     value: controller.durationType.value,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(
                           horizontal: 12, vertical: 18),
                     ),
-                    dropdownColor: AppColors.cardBackground,
-                    style: const TextStyle(color: AppColors.textPrimary),
+                    dropdownColor: c.cardBackground,
+                    style: TextStyle(color: c.textPrimary),
                     items: controller.durationTypes.map((type) {
                       return DropdownMenuItem(value: type, child: Text(type));
                     }).toList(),
@@ -461,19 +467,19 @@ class AbonarView extends GetView<AbonarController> {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
             ],
-            style: const TextStyle(
-                color: AppColors.textPrimary,
+            style: TextStyle(
+                color: c.textPrimary,
                 fontSize: 24,
                 fontWeight: FontWeight.bold),
             decoration: InputDecoration(
               labelText: 'Precio por ${controller.durationUnitLabel}',
               helperText: fijo ? 'Precio configurado' : 'Precio libre',
-              helperStyle: const TextStyle(color: AppColors.textSecondary),
+              helperStyle: TextStyle(color: c.textSecondary),
               errorText:
                   sinPrecio ? 'Sin precio configurado para este periodo' : null,
               suffixIcon: fijo
-                  ? const Icon(Icons.lock_outline,
-                      size: 18, color: AppColors.textSecondary)
+                  ? Icon(Icons.lock_outline,
+                      size: 18, color: c.textSecondary)
                   : null,
               prefixText: '\$ ',
               prefixStyle: const TextStyle(
@@ -481,7 +487,7 @@ class AbonarView extends GetView<AbonarController> {
                   fontSize: 24,
                   fontWeight: FontWeight.bold),
               // Bloqueado (precio fijo): más apagado que un campo normal.
-              fillColor: fijo ? Colors.white.withOpacity(0.02) : null,
+              fillColor: fijo ? c.contraste.withOpacity(0.02) : null,
             ),
           );
         }),
@@ -490,7 +496,8 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
-  Widget _buildSuccessState() {
+  Widget _buildSuccessState(BuildContext context) {
+    final c = context.colores;
     final client = controller.selectedClient.value!;
     return CentradoDesplazable(
       child: Padding(
@@ -508,12 +515,12 @@ class AbonarView extends GetView<AbonarController> {
                   size: 80, color: AppColors.success),
             ),
             const SizedBox(height: 32),
-            const Text(
+            Text(
               '¡Abono Registrado!',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: AppColors.titleColor,
+                color: c.titleColor,
               ),
             ),
             const SizedBox(height: 16),
@@ -521,7 +528,7 @@ class AbonarView extends GetView<AbonarController> {
               'Se registró el abono para ${client.name} correctamente.',
               textAlign: TextAlign.center,
               style:
-                  const TextStyle(fontSize: 16, color: AppColors.textSecondary),
+                  TextStyle(fontSize: 16, color: c.textSecondary),
             ),
             const SizedBox(height: 40),
             BotonGuardar(

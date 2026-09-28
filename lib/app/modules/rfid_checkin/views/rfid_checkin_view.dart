@@ -194,6 +194,7 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
   // Animación de tarjeta RFID con ondas
   Widget _buildRfidAnimation(
       BuildContext context, bool isTabletSize, bool isSmallPhone) {
+    final c = context.colores;
     // Tamaños responsivos
     final containerSize = isTabletSize ? 280.0 : (isSmallPhone ? 170.0 : 200.0);
 
@@ -230,7 +231,7 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
                 _buildRipple(
                   context: context,
                   delay: 1000,
-                  color: AppColors.primary.withOpacity(0.7),
+                  color: c.backgroundColor.withOpacity(0.7),
                   size: rippleMiddleSize,
                   isTabletSize: isTabletSize,
                   isSmallPhone: isSmallPhone,
@@ -264,6 +265,7 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
   // Texto animado de carga con efecto de pulsado
   Widget _buildLoadingText(
       BuildContext context, bool isTabletSize, bool isSmallPhone) {
+    final c = context.colores;
     // Tamaño de texto adaptativo
     final textSize = isTabletSize ? 22.0 : (isSmallPhone ? 16.0 : 18.0);
 
@@ -289,18 +291,18 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
                 horizontal: isTabletSize ? 28 : 20,
                 vertical: isTabletSize ? 16 : 12),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.8),
+              color: c.backgroundColor.withOpacity(0.8),
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.3),
+                  color: c.backgroundColor.withOpacity(0.3),
                   spreadRadius: 1,
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
               ],
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: c.contraste.withOpacity(0.2),
                 width: 1,
               ),
             ),
@@ -311,7 +313,7 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
               children: [
                 Icon(
                   Icons.contactless_rounded,
-                  color: Colors.white,
+                  color: c.contraste,
                   size: iconSize,
                 ),
                 SizedBox(width: isSmallPhone ? 6 : 10),
@@ -321,7 +323,7 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
                     style: TextStyle(
                       fontSize: textSize,
                       fontWeight: FontWeight.w500,
-                      color: Colors.white,
+                      color: c.contraste,
                       letterSpacing: 0.5,
                     ),
                     overflow: TextOverflow.ellipsis,

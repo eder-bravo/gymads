@@ -18,8 +18,9 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Accesos del personal'),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.accent,
@@ -37,7 +38,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
               child: CircularProgressIndicator(color: AppColors.accent),
             );
           }
-          if (controller.accesos.isEmpty) return _buildEmpty();
+          if (controller.accesos.isEmpty) return _buildEmpty(context);
           return _buildList();
         }),
       ),
@@ -61,17 +62,18 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
 
   /// Cambia el rol sin regenerar el código: si la persona ya está trabajando,
   /// su perfil cambia con el acceso y no tiene que volver a entrar.
-  Future<void> _cambiarRol(StaffAccesoModel acceso) async {
+  Future<void> _cambiarRol(BuildContext context, StaffAccesoModel acceso) async {
+    final c = context.colores;
     final elegido = await Get.dialog<StaffRole>(
       SimpleDialog(
-        backgroundColor: AppColors.cardBackground,
+        backgroundColor: c.cardBackground,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
         title: Text(
           'Rol de ${acceso.nombre}',
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: c.textPrimary,
             fontSize: 17,
             fontWeight: FontWeight.w700,
           ),
@@ -89,7 +91,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
                         ? Icons.radio_button_checked
                         : Icons.radio_button_unchecked,
                     size: 20,
-                    color: actual ? AppColors.accent : AppColors.textSecondary,
+                    color: actual ? AppColors.accent : c.textSecondary,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -98,8 +100,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
                       children: [
                         Text(
                           rol.label,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
+                          style: TextStyle(
+                            color: c.textPrimary,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
@@ -108,7 +110,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
                         Text(
                           rol.descripcion,
                           style: TextStyle(
-                            color: AppColors.textSecondary.withOpacity(0.8),
+                            color: c.textSecondary.withOpacity(0.8),
                             fontSize: 12,
                             height: 1.3,
                           ),
@@ -127,8 +129,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
     if (elegido != null) await controller.cambiarRol(acceso, elegido);
   }
 
-  Future<void> _regenerar(StaffAccesoModel acceso) async {
-    final confirmado = await _confirmar(
+  Future<void> _regenerar(BuildContext context, StaffAccesoModel acceso) async {
+    final confirmado = await _confirmar(context,
       titulo: 'Generar código nuevo',
       mensaje: acceso.estaActivo
           ? '${acceso.nombre} dejará de tener acceso en el dispositivo donde '
@@ -150,8 +152,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
     );
   }
 
-  Future<void> _revocar(StaffAccesoModel acceso) async {
-    final confirmado = await _confirmar(
+  Future<void> _revocar(BuildContext context, StaffAccesoModel acceso) async {
+    final confirmado = await _confirmar(context,
       titulo: 'Revocar acceso',
       mensaje: '${acceso.nombre} perderá el acceso a la app. Podrás volver a '
           'darle uno generando un código nuevo.',
@@ -161,8 +163,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
     if (confirmado) await controller.revocar(acceso);
   }
 
-  Future<void> _eliminar(StaffAccesoModel acceso) async {
-    final confirmado = await _confirmar(
+  Future<void> _eliminar(BuildContext context, StaffAccesoModel acceso) async {
+    final confirmado = await _confirmar(context,
       titulo: 'Eliminar acceso',
       mensaje: 'Se borrará el acceso de ${acceso.nombre} por completo. '
           'Esta acción no se puede deshacer.',
@@ -172,26 +174,27 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
     if (confirmado) await controller.eliminar(acceso);
   }
 
-  Future<bool> _confirmar({
+  Future<bool> _confirmar(BuildContext context, {
     required String titulo,
     required String mensaje,
     required String textoConfirmar,
     required Color color,
   }) async {
+    final c = context.colores;
     final result = await Get.dialog<bool>(
       AlertDialog(
         scrollable: true,
-        backgroundColor: AppColors.cardBackground,
+        backgroundColor: c.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(titulo,
-            style: const TextStyle(
-                color: AppColors.textPrimary,
+            style: TextStyle(
+                color: c.textPrimary,
                 fontSize: 17,
                 fontWeight: FontWeight.w700)),
         content: Text(
           mensaje,
           style: TextStyle(
-            color: AppColors.textSecondary.withOpacity(0.9),
+            color: c.textSecondary.withOpacity(0.9),
             fontSize: 14,
             height: 1.4,
           ),
@@ -214,7 +217,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
   // UI
   // ============================================
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(BuildContext context) {
+    final c = context.colores;
     return CentradoDesplazable(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -222,12 +226,12 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.badge_outlined,
-                size: 64, color: AppColors.textSecondary.withOpacity(0.4)),
+                size: 64, color: c.textSecondary.withOpacity(0.4)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Aún no tienes personal',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: c.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -238,7 +242,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
               'correo ni contraseña, y no verá la configuración del gimnasio.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.textSecondary.withOpacity(0.8),
+                color: c.textSecondary.withOpacity(0.8),
                 fontSize: 14,
                 height: 1.4,
               ),
@@ -275,17 +279,18 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
         itemCount: controller.accesos.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (context, index) => _buildTile(controller.accesos[index]),
+        itemBuilder: (context, index) => _buildTile(context, controller.accesos[index]),
       ),
     );
   }
 
-  Widget _buildTile(StaffAccesoModel acceso) {
+  Widget _buildTile(BuildContext context, StaffAccesoModel acceso) {
+    final c = context.colores;
     final color = _colorEstado(acceso);
 
     return Card(
       elevation: 3,
-      color: AppColors.cardBackground,
+      color: c.cardBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -299,8 +304,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
         ),
         title: Text(
           acceso.nombre,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: c.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
@@ -330,8 +335,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
                       // se lee de un vistazo sin abrir el menú.
                       TextSpan(
                         text: '  ·  ${acceso.rol.label}',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
+                        style: TextStyle(
+                          color: c.textSecondary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -349,25 +354,25 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
         trailing: !controller.puedeGestionar(acceso)
             ? null
             : PopupMenuButton<String>(
-                color: AppColors.cardBackground,
+                color: c.cardBackground,
                 icon:
-                    const Icon(Icons.more_vert, color: AppColors.textSecondary),
+                    Icon(Icons.more_vert, color: c.textSecondary),
                 onSelected: (value) {
                   switch (value) {
                     case 'renombrar':
                       showStaffAccesoFormDialog(existing: acceso);
                       break;
                     case 'rol':
-                      _cambiarRol(acceso);
+                      _cambiarRol(context, acceso);
                       break;
                     case 'regenerar':
-                      _regenerar(acceso);
+                      _regenerar(context, acceso);
                       break;
                     case 'revocar':
-                      _revocar(acceso);
+                      _revocar(context, acceso);
                       break;
                     case 'eliminar':
-                      _eliminar(acceso);
+                      _eliminar(context, acceso);
                       break;
                   }
                 },
@@ -392,7 +397,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
     String value,
     IconData icon,
     String label, {
-    Color color = AppColors.textPrimary,
+    Color? color,
   }) {
     return PopupMenuItem<String>(
       value: value,
@@ -400,7 +405,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
         children: [
           Icon(icon, size: 18, color: color),
           const SizedBox(width: 10),
-          Text(label, style: TextStyle(color: color)),
+          // Sin color: el del menú, que depende del modo.
+          Text(label, style: color == null ? null : TextStyle(color: color)),
         ],
       ),
     );

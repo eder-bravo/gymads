@@ -96,6 +96,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
   /// La descripción va a la vista porque elegir mal aquí es lo que abre o
   /// cierra medio menú al empleado.
   Widget _buildOpcionRol(StaffRole rol) {
+    final c = context.colores;
     final seleccionado = rol == _rol;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -107,12 +108,12 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
           decoration: BoxDecoration(
             color: seleccionado
                 ? AppColors.accent.withOpacity(0.08)
-                : Colors.white.withOpacity(0.04),
+                : c.contraste.withOpacity(0.04),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: seleccionado
                   ? AppColors.accent
-                  : Colors.white.withOpacity(0.10),
+                  : c.contraste.withOpacity(0.10),
               width: seleccionado ? 1.5 : 1,
             ),
           ),
@@ -124,7 +125,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
                     : Icons.radio_button_unchecked,
                 size: 20,
                 color:
-                    seleccionado ? AppColors.accent : AppColors.textSecondary,
+                    seleccionado ? AppColors.accent : c.textSecondary,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -133,8 +134,8 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
                   children: [
                     Text(
                       rol.label,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
+                      style: TextStyle(
+                        color: c.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -143,7 +144,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
                     Text(
                       rol.descripcion,
                       style: TextStyle(
-                        color: AppColors.textSecondary.withOpacity(0.8),
+                        color: c.textSecondary.withOpacity(0.8),
                         fontSize: 12,
                         height: 1.3,
                       ),
@@ -164,8 +165,9 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
 
   /// Crear: pantalla completa con el botón fijo abajo.
   Widget _pantallaNuevo() {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Nuevo acceso'),
       body: SafeArea(
         child: ListView(
@@ -188,8 +190,9 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
 
   /// Renombrar: un solo campo, en un diálogo.
   Widget _dialogoRenombrar() {
+    final c = context.colores;
     return Dialog(
-      backgroundColor: AppColors.cardBackground,
+      backgroundColor: c.cardBackground,
       // Ancho de diálogo aunque el teléfono esté de lado, y desplazable si
       // no cabe a lo alto.
       constraints: const BoxConstraints(minWidth: 280, maxWidth: 420),
@@ -200,10 +203,10 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Cambiar nombre',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: c.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -233,7 +236,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
   Widget _explicacion(String texto) => Text(
         texto,
         style: TextStyle(
-          color: AppColors.textSecondary.withOpacity(0.8),
+          color: context.colores.textSecondary.withOpacity(0.8),
           fontSize: 13,
           height: 1.35,
         ),
@@ -243,7 +246,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
         controller: _nombreCtrl,
         autofocus: true,
         textCapitalization: TextCapitalization.words,
-        style: const TextStyle(color: AppColors.textPrimary),
+        style: TextStyle(color: context.colores.textPrimary),
         onSubmitted: (_) => _guardar(),
         decoration: InputDecoration(
           labelText: 'Nombre del empleado',

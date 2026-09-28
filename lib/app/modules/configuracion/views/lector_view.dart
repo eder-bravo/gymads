@@ -61,8 +61,9 @@ class _LectorViewState extends State<LectorView> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Lector de tarjetas'),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -94,6 +95,7 @@ class _LectorViewState extends State<LectorView> {
   // ─────────────────────────────────────────────────────────
 
   Widget _tarjetaEstado() {
+    final c = context.colores;
     final estado = controller.estadoLector.value;
 
     late final IconData icono;
@@ -141,7 +143,7 @@ class _LectorViewState extends State<LectorView> {
         break;
       case EstadoLector.sinConfigurar:
         icono = Icons.nfc;
-        color = AppColors.textSecondary;
+        color = c.textSecondary;
         titulo = 'Sin lector';
         detalle = 'Agrega tu lector: la app lo configura por Bluetooth, sin '
             'escribir direcciones.';
@@ -176,7 +178,7 @@ class _LectorViewState extends State<LectorView> {
                 Text(
                   detalle,
                   style: TextStyle(
-                    color: AppColors.textSecondary.withOpacity(0.9),
+                    color: c.textSecondary.withOpacity(0.9),
                     fontSize: 13,
                     height: 1.35,
                   ),
@@ -348,18 +350,19 @@ class _LectorViewState extends State<LectorView> {
   }
 
   Future<void> _confirmarDesvincular() async {
+    final c = context.colores;
     final confirmado = await Get.dialog<bool>(
       AlertDialog(
         scrollable: true,
-        backgroundColor: AppColors.cardBackground,
+        backgroundColor: c.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Desvincular el lector',
-            style: TextStyle(color: AppColors.textPrimary)),
-        content: const Text(
+        title: Text('Desvincular el lector',
+            style: TextStyle(color: c.textPrimary)),
+        content: Text(
           'El lector olvidará tu gimnasio y tu WiFi, y se reiniciará. Quedará '
           'listo para agregarse en cualquier lugar (su luz parpadea rápido).\n\n'
           'Para volver a usarlo aquí, agrégalo de nuevo con "Agregar lector".',
-          style: TextStyle(color: AppColors.textSecondary, height: 1.35),
+          style: TextStyle(color: c.textSecondary, height: 1.35),
         ),
         actions: [
           BotonCancelar(onPressed: () => Get.back(result: false)),
@@ -377,20 +380,21 @@ class _LectorViewState extends State<LectorView> {
   }
 
   Future<void> _confirmarFormateo() async {
+    final c = context.colores;
     final confirmado = await Get.dialog<bool>(
       AlertDialog(
         scrollable: true,
-        backgroundColor: AppColors.cardBackground,
+        backgroundColor: c.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Formatear el lector',
-            style: TextStyle(color: AppColors.textPrimary)),
-        content: const Text(
+        title: Text('Formatear el lector',
+            style: TextStyle(color: c.textPrimary)),
+        content: Text(
           'Este lector pertenece a otro gimnasio. Al formatearlo dejará de '
           'funcionarle a ese gimnasio de inmediato, y quedará libre para que '
           'lo vincules al tuyo.\n\n'
           'El lector pitará mientras se formatea. Hazlo solo si el aparato es '
           'tuyo.',
-          style: TextStyle(color: AppColors.textSecondary, height: 1.35),
+          style: TextStyle(color: c.textSecondary, height: 1.35),
         ),
         actions: [
           BotonCancelar(onPressed: () => Get.back(result: false)),
@@ -412,25 +416,26 @@ class _LectorViewState extends State<LectorView> {
   // ─────────────────────────────────────────────────────────
 
   Widget _interruptorLector() {
+    final c = context.colores;
     return Obx(() => Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.cardBackground,
+            color: c.cardBackground,
             borderRadius: BorderRadius.circular(12),
           ),
           child: SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: controller.rfidEnabled.value,
             activeColor: AppColors.accent,
-            title: const Text('Usar el lector de tarjetas',
+            title: Text('Usar el lector de tarjetas',
                 style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600)),
             subtitle: Text(
               controller.connectionStatusMessage.value,
               style: TextStyle(
-                  color: AppColors.textSecondary.withOpacity(0.8),
+                  color: c.textSecondary.withOpacity(0.8),
                   fontSize: 13),
             ),
             onChanged: (activar) {
@@ -451,6 +456,7 @@ class _LectorViewState extends State<LectorView> {
   /// en el gimnasio (o el perfil de mostrador es de prueba), nadie los
   /// recibía; esto permite que el dueño o el encargado los tomen.
   Widget _interruptorAvisosAqui() {
+    final c = context.colores;
     final servicio = Get.find<BackgroundRfidService>();
 
     return Obx(() {
@@ -473,22 +479,22 @@ class _LectorViewState extends State<LectorView> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+          color: c.cardBackground,
           borderRadius: BorderRadius.circular(12),
         ),
         child: SwitchListTile(
           contentPadding: EdgeInsets.zero,
           value: activo,
           activeColor: AppColors.accent,
-          title: const Text('Recibir avisos en este teléfono',
+          title: Text('Recibir avisos en este teléfono',
               style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: c.textPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w600)),
           subtitle: Text(
             detalle,
             style: TextStyle(
-                color: AppColors.textSecondary.withOpacity(0.8), fontSize: 13),
+                color: c.textSecondary.withOpacity(0.8), fontSize: 13),
           ),
           onChanged: servicio.setRecibirAvisosAqui,
         ),
@@ -497,17 +503,18 @@ class _LectorViewState extends State<LectorView> {
   }
 
   Widget _ayuda() {
+    final c = context.colores;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.containerBackground,
+        color: c.containerBackground,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline,
-              color: AppColors.textSecondary, size: 18),
+          Icon(Icons.info_outline,
+              color: c.textSecondary, size: 18),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -517,7 +524,7 @@ class _LectorViewState extends State<LectorView> {
               'y uno largo al confirmar. Olvida el WiFi y el gimnasio, y su '
               'luz parpadea rápido: ya se puede agregar de nuevo.',
               style: TextStyle(
-                color: AppColors.textSecondary.withOpacity(0.9),
+                color: c.textSecondary.withOpacity(0.9),
                 fontSize: 12.5,
                 height: 1.4,
               ),

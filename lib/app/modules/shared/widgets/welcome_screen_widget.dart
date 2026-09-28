@@ -91,6 +91,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
   }
 
   Widget _buildWelcomeScreen(BuildContext context, bool isTabletSize, bool isSmallPhone) {
+    final c = context.colores;
     // Tamaños responsivos para pantalla de bienvenida
     // Con el teléfono de lado la pantalla es muy baja: la foto y el título,
     // a tamaño normal, empujaban los días restantes fuera de la vista. Se
@@ -118,15 +119,15 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
         escala;
 
     final contenido = Container(
-      // Negro sólido: al 95 % se transparentaba Inicio por detrás (sus
+      // Fondo sólido: al 95 % se transparentaba Inicio por detrás (sus
       // títulos y el borde de las tarjetas se veían como rayas).
-      color: Colors.black,
+      color: c.backgroundColor,
       child: Center(
         child: AnimatedBuilder(
           animation: _animationController,
           builder: (context, child) {
             // Valor fijo para la escala
-            final scale = 1.0;
+            const scale = 1.0;
             
             // Ligero movimiento ondulante
             final animValue = _animationController.value * pi * 2;
@@ -172,7 +173,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                 style: TextStyle(
                                   fontSize: widget.isNotFound ? (isTabletSize ? 50.0 : (isSmallPhone ? 30.0 : 40.0)) * escala : titleSize,
                                   fontWeight: FontWeight.bold,
-                                  color: widget.isNotFound ? Colors.redAccent : (widget.isExpired ? Colors.redAccent : Colors.white),
+                                  color: widget.isNotFound ? Colors.redAccent : (widget.isExpired ? Colors.redAccent : c.contraste),
                                   shadows: [
                                     Shadow(
                                       color: Colors.black.withOpacity(0.5),
@@ -207,7 +208,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   height: (photoSize + 20) * value,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: (widget.isNotFound || widget.isExpired ? Colors.red : AppColors.primary).withOpacity(0.2),
+                                    color: (widget.isNotFound || widget.isExpired ? Colors.red : c.backgroundColor).withOpacity(0.2),
                                   ),
                                 ),
                                 // Aura interior
@@ -226,12 +227,12 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white,
+                                      color: c.contraste,
                                       width: 4,
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: (widget.isNotFound || widget.isExpired ? Colors.red : AppColors.primary).withOpacity(0.5),
+                                        color: (widget.isNotFound || widget.isExpired ? Colors.red : c.backgroundColor).withOpacity(0.5),
                                         spreadRadius: 5,
                                         blurRadius: 15,
                                       ),
@@ -257,11 +258,11 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                             )
                                           : CircleAvatar(
                                               radius: photoSize/2 * value,
-                                              backgroundColor: widget.isExpired ? Colors.red : AppColors.primary,
+                                              backgroundColor: widget.isExpired ? Colors.red : c.backgroundColor,
                                               child: Icon(
                                                 Icons.person,
                                                 size: photoSize/3 * value,
-                                                color: Colors.white,
+                                                color: widget.isExpired ? Colors.white : c.contraste,
                                               ),
                                             )),
                                 ),
@@ -289,7 +290,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   style: TextStyle(
                                     fontSize: nameSize,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: c.contraste,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -318,7 +319,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   vertical: isTabletSize ? 12 : 8
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
+                                  color: c.contraste.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(15),
                                 ),
                                 child: Column(
@@ -329,7 +330,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                       children: [
                                         Icon(
                                           Icons.event_available,
-                                          color: Colors.white,
+                                          color: c.contraste,
                                           size: isTabletSize ? 28 : 24,
                                         ),
                                         SizedBox(width: isTabletSize ? 12 : 8),
@@ -337,7 +338,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                           widget.isExpired ? '0 días restantes' : '${widget.daysLeft} días restantes',
                                           style: TextStyle(
                                             fontSize: infoTextSize,
-                                            color: Colors.white,
+                                            color: c.contraste,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
@@ -350,7 +351,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                           'Hasta qué fecha puede entrar: ${DateFormat('dd/MM/yyyy').format(widget.expirationDate!)}',
                                           style: TextStyle(
                                             fontSize: infoTextSize * 0.85,
-                                            color: Colors.white.withOpacity(0.9),
+                                            color: c.contraste.withOpacity(0.9),
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
@@ -381,7 +382,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   fontSize: isTabletSize
                                       ? 20.0
                                       : (isSmallPhone ? 14.0 : 16.0),
-                                  color: Colors.white.withOpacity(0.8),
+                                  color: c.contraste.withOpacity(0.8),
                                   fontStyle: FontStyle.italic,
                                 ),
                                 textAlign: TextAlign.center,
@@ -434,10 +435,10 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                 if (!widget.isNotFound && widget.onEditar != null)
                                   ElevatedButton.icon(
                                     onPressed: widget.onEditar,
-                                    icon: const Icon(Icons.edit, color: Colors.white),
-                                    label: const Text('Editar', style: TextStyle(color: Colors.white)),
+                                    icon: Icon(Icons.edit, color: c.contraste),
+                                    label: Text('Editar', style: TextStyle(color: c.contraste)),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.white.withOpacity(0.2),
+                                      backgroundColor: c.contraste.withOpacity(0.2),
                                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
@@ -480,10 +481,10 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                 onPressed: cerrar,
                 tooltip: 'Cerrar',
                 icon: const Icon(Icons.close, size: 28),
-                color: Colors.white,
+                color: c.contraste,
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.white.withOpacity(0.2),
-                  side: BorderSide(color: Colors.white.withOpacity(0.35)),
+                  backgroundColor: c.contraste.withOpacity(0.2),
+                  side: BorderSide(color: c.contraste.withOpacity(0.35)),
                   minimumSize: const Size(52, 52),
                   shape: const CircleBorder(),
                 ),

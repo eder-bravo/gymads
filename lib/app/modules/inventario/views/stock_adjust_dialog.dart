@@ -73,13 +73,14 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return AlertDialog(
-      backgroundColor: AppColors.cardBackground,
+      backgroundColor: c.cardBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text(
         widget.product.name,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
+        style: TextStyle(
+          color: c.textPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
         ),
@@ -98,9 +99,9 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
               autofocus: true,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color: c.textPrimary),
               onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Cantidad',
               ),
             ),
@@ -110,8 +111,8 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
             TextField(
               controller: _notaController,
               maxLines: 2,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: InputDecoration(
+              style: TextStyle(color: c.textPrimary),
+              decoration: const InputDecoration(
                 labelText: 'Nota (opcional)',
                 hintText: 'Compra a proveedor, merma, conteo…',
               ),
@@ -133,6 +134,7 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
 
   /// Encabezado: stock normal, o el faltante con su valor.
   Widget _buildEstadoActual() {
+    final c = context.colores;
     if (_faltante > 0) {
       final valor = _faltante * widget.product.price;
       return Container(
@@ -166,16 +168,17 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
 
     return Text(
       'Stock actual: $_stockActual ${_unidades(_stockActual)}',
-      style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+      style: TextStyle(color: c.textSecondary, fontSize: 14),
     );
   }
 
   Widget _buildSelectorDireccion() {
+    final c = context.colores;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: c.contraste.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: c.contraste.withOpacity(0.10)),
       ),
       padding: const EdgeInsets.all(4),
       child: Row(
@@ -188,6 +191,7 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
   }
 
   Widget _direccionButton(String label, IconData icon, bool valor) {
+    final c = context.colores;
     final seleccionado = _agregar == valor;
     return Expanded(
       child: GestureDetector(
@@ -205,7 +209,7 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
             children: [
               Icon(icon,
                   size: 18,
-                  color: seleccionado ? Colors.white : AppColors.textSecondary),
+                  color: seleccionado ? Colors.white : c.textSecondary),
               const SizedBox(width: 6),
               Text(
                 label,
@@ -213,7 +217,7 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
                   fontSize: 14,
                   fontWeight: seleccionado ? FontWeight.w700 : FontWeight.w500,
                   color:
-                      seleccionado ? Colors.white : AppColors.textSecondary,
+                      seleccionado ? Colors.white : c.textSecondary,
                 ),
               ),
             ],
@@ -227,13 +231,14 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
   /// salda y lo que queda disponible, porque el número final por sí solo no
   /// explica por qué agregar 10 sobre -3 deja 7.
   Widget _buildResultado() {
+    final c = context.colores;
     if (_cantidad <= 0) return const SizedBox.shrink();
 
     final lineas = <(String, Color)>[];
 
     if (_agregar && _faltante > 0) {
       final cubierto = _cantidad >= _faltante ? _faltante : _cantidad;
-      lineas.add(('Cubre el faltante de $cubierto', AppColors.textSecondary));
+      lineas.add(('Cubre el faltante de $cubierto', c.textSecondary));
       lineas.add(_resultado >= 0
           ? ('Quedarán $_resultado ${_unidades(_resultado)} disponibles',
               AppColors.success)
@@ -241,7 +246,7 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
     } else {
       lineas.add(_resultado >= 0
           ? ('Quedará en $_resultado ${_unidades(_resultado)}',
-              AppColors.textPrimary)
+              c.textPrimary)
           : ('Quedará con ${-_resultado} ${_unidades(-_resultado)} faltantes',
               AppColors.error));
     }
@@ -250,9 +255,9 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: c.contraste.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: c.contraste.withOpacity(0.10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

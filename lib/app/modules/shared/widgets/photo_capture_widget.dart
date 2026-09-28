@@ -55,25 +55,26 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
   /// Sin permiso no se abre la cámara (fallaría en negro); se explica cómo
   /// darlo.
   Future<bool> _permisoDeCamara() async {
+    final c = context.colores;
     final estado = await Permission.camera.request();
     if (estado.isGranted || estado.isLimited) return true;
     if (!mounted) return false;
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: const Text('Se necesita la cámara',
-            style: TextStyle(color: AppColors.textPrimary)),
-        content: const Text(
+        backgroundColor: c.cardBackground,
+        title: Text('Se necesita la cámara',
+            style: TextStyle(color: c.textPrimary)),
+        content: Text(
           'Para tomar la foto del cliente, permite el acceso a la cámara en '
           'los ajustes del teléfono.',
-          style: TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(color: c.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Ahora no',
-                style: TextStyle(color: AppColors.textSecondary)),
+            child: Text('Ahora no',
+                style: TextStyle(color: c.textSecondary)),
           ),
           TextButton(
             onPressed: () {
@@ -155,6 +156,7 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
   }
 
   Widget _miniatura() {
+    final c = context.colores;
     const tamano = 112.0;
     final foto = _foto;
     final Widget contenido;
@@ -168,7 +170,7 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
       );
     } else {
       contenido = Icon(Icons.person,
-          size: 64, color: AppColors.textSecondary.withOpacity(0.6));
+          size: 64, color: c.textSecondary.withOpacity(0.6));
     }
 
     return GestureDetector(
@@ -182,13 +184,13 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.06),
+              color: c.superficie,
               border: Border.all(
                 color: _faltaFoto
                     ? AppColors.error
                     : _tieneFoto
                         ? AppColors.accent
-                        : Colors.white.withOpacity(0.25),
+                        : c.contraste.withOpacity(0.25),
                 width: 2,
               ),
             ),
@@ -203,7 +205,7 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
               decoration: BoxDecoration(
                 color: AppColors.accent,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.backgroundColor, width: 3),
+                border: Border.all(color: c.backgroundColor, width: 3),
               ),
               child: const Icon(Icons.photo_camera,
                   size: 18, color: Colors.white),

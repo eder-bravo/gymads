@@ -16,8 +16,9 @@ class CategoriasView extends GetView<CategoriasController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Categorías'),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.accent,
@@ -35,14 +36,15 @@ class CategoriasView extends GetView<CategoriasController> {
               child: CircularProgressIndicator(color: AppColors.accent),
             );
           }
-          if (controller.categories.isEmpty) return _buildEmpty();
-          return _buildList();
+          if (controller.categories.isEmpty) return _buildEmpty(context);
+          return _buildList(context);
         }),
       ),
     );
   }
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(BuildContext context) {
+    final c = context.colores;
     return CentradoDesplazable(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -50,12 +52,12 @@ class CategoriasView extends GetView<CategoriasController> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.category_outlined,
-                size: 64, color: AppColors.textSecondary.withOpacity(0.4)),
+                size: 64, color: c.textSecondary.withOpacity(0.4)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Aún no tienes categorías',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: c.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -65,7 +67,7 @@ class CategoriasView extends GetView<CategoriasController> {
               'Sirven para organizar el inventario y el punto de venta.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.textSecondary.withOpacity(0.8),
+                color: c.textSecondary.withOpacity(0.8),
                 fontSize: 14,
               ),
             ),
@@ -93,7 +95,8 @@ class CategoriasView extends GetView<CategoriasController> {
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(BuildContext context) {
+    final c = context.colores;
     return Column(
       children: [
         Padding(
@@ -101,13 +104,13 @@ class CategoriasView extends GetView<CategoriasController> {
           child: Row(
             children: [
               Icon(Icons.drag_indicator,
-                  size: 16, color: AppColors.textSecondary.withOpacity(0.6)),
+                  size: 16, color: c.textSecondary.withOpacity(0.6)),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   'Mantén pulsada una categoría para cambiar su orden.',
                   style: TextStyle(
-                    color: AppColors.textSecondary.withOpacity(0.7),
+                    color: c.textSecondary.withOpacity(0.7),
                     fontSize: 12,
                   ),
                 ),
@@ -122,7 +125,7 @@ class CategoriasView extends GetView<CategoriasController> {
             onReorder: controller.reorder,
             itemBuilder: (context, index) {
               final category = controller.categories[index];
-              return _buildTile(category, key: ValueKey(category.id));
+              return _buildTile(context, category, key: ValueKey(category.id));
             },
           ),
         ),
@@ -130,7 +133,8 @@ class CategoriasView extends GetView<CategoriasController> {
     );
   }
 
-  Widget _buildTile(ProductCategory category, {required Key key}) {
+  Widget _buildTile(BuildContext context, ProductCategory category, {required Key key}) {
+    final c = context.colores;
     final count = controller.countFor(category.id);
     final isInactive = !category.isActive;
 
@@ -139,9 +143,9 @@ class CategoriasView extends GetView<CategoriasController> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: c.cardBackground,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: c.contraste.withOpacity(0.06)),
       ),
       child: Opacity(
         opacity: isInactive ? 0.55 : 1,
@@ -166,8 +170,8 @@ class CategoriasView extends GetView<CategoriasController> {
                       Flexible(
                         child: Text(
                           category.name,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
+                          style: TextStyle(
+                            color: c.textPrimary,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
@@ -198,7 +202,7 @@ class CategoriasView extends GetView<CategoriasController> {
                   Text(
                     count == 1 ? '1 producto' : '$count productos',
                     style: TextStyle(
-                      color: AppColors.textSecondary.withOpacity(0.75),
+                      color: c.textSecondary.withOpacity(0.75),
                       fontSize: 12,
                     ),
                   ),
@@ -206,10 +210,10 @@ class CategoriasView extends GetView<CategoriasController> {
               ),
             ),
             PopupMenuButton<String>(
-              color: AppColors.cardBackground,
+              color: c.cardBackground,
               icon: Icon(Icons.more_vert,
-                  color: AppColors.textSecondary.withOpacity(0.8)),
-              onSelected: (value) => _onMenuAction(value, category),
+                  color: c.textSecondary.withOpacity(0.8)),
+              onSelected: (value) => _onMenuAction(context, value, category),
               itemBuilder: (context) => [
                 const PopupMenuItem(value: 'edit', child: Text('Editar')),
                 PopupMenuItem(
@@ -230,7 +234,7 @@ class CategoriasView extends GetView<CategoriasController> {
     );
   }
 
-  void _onMenuAction(String action, ProductCategory category) {
+  void _onMenuAction(BuildContext context, String action, ProductCategory category) {
     switch (action) {
       case 'edit':
         showCategoryFormDialog(existing: category);
@@ -239,26 +243,27 @@ class CategoriasView extends GetView<CategoriasController> {
         controller.toggleActive(category);
         break;
       case 'delete':
-        _confirmDelete(category);
+        _confirmDelete(context, category);
         break;
     }
   }
 
   /// Con productos asignados ni siquiera se ofrece borrar: se explica por qué
   /// y se propone desactivar, que es lo que casi siempre se quiere.
-  void _confirmDelete(ProductCategory category) {
+  void _confirmDelete(BuildContext context, ProductCategory category) {
+    final c = context.colores;
     final count = controller.countFor(category.id);
     final hasProducts = count > 0;
 
     Get.dialog(
       AlertDialog(
         scrollable: true,
-        backgroundColor: AppColors.cardBackground,
+        backgroundColor: c.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           hasProducts ? 'No se puede eliminar' : '¿Eliminar categoría?',
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: c.textPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -269,7 +274,7 @@ class CategoriasView extends GetView<CategoriasController> {
                   'También puedes desactivarla: dejará de aparecer al crear '
                   'productos, pero los que ya la usan la conservan.'
               : '¿Eliminar "${category.name}"? Esta acción no se puede deshacer.',
-          style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
+          style: TextStyle(color: c.textSecondary, height: 1.4),
         ),
         actions: [
           BotonCancelar(onPressed: () => Get.back()),

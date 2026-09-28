@@ -26,6 +26,7 @@ class HomeView extends GetView<HomeController> {
   }
 
   Widget _pantalla(BuildContext context) {
+    final c = context.colores;
     // `sizeOf` y no `of`: este último crea dependencia con el MediaQueryData
     // entero —`viewInsets` incluido—, así que la animación del teclado
     // reconstruía esta pantalla en cada frame aunque estuviera oculta debajo.
@@ -44,15 +45,12 @@ class HomeView extends GetView<HomeController> {
     }
 
     final pantalla = Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-        ),
+        // Los íconos de la barra de estado los pone el tema según el modo.
       ),
       body: SafeArea(
         top: false,
@@ -74,7 +72,7 @@ class HomeView extends GetView<HomeController> {
                   style: TextStyle(
                     fontSize: isTablet ? 22 : 18,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -92,7 +90,7 @@ class HomeView extends GetView<HomeController> {
                   style: TextStyle(
                     fontSize: isTablet ? 22 : 18,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -124,6 +122,7 @@ class HomeView extends GetView<HomeController> {
   // HEADER
   // ─────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, bool isTablet) {
+    final c = context.colores;
     final topPadding = MediaQuery.of(context).padding.top;
     return TourStep(
       tourKey: controller.keyHeader,
@@ -146,8 +145,8 @@ class HomeView extends GetView<HomeController> {
             end: Alignment.bottomRight,
             stops: const [0.0, 0.55, 1.0],
             colors: [
-              const Color(0xFF11151F),
-              const Color(0xFF1A2332),
+              c.cabeceraDesde,
+              c.cabeceraHasta,
               AppColors.brand.withOpacity(0.28),
             ],
           ),
@@ -183,7 +182,7 @@ class HomeView extends GetView<HomeController> {
               style: TextStyle(
                 fontSize: isTablet ? 26 : 22,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
+                color: c.contraste,
                 letterSpacing: 0.5,
               ),
             ),
@@ -433,6 +432,7 @@ class _ModuleCardState extends State<_ModuleCard>
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final m = widget.module;
     final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
 
@@ -511,7 +511,7 @@ class _ModuleCardState extends State<_ModuleCard>
                   style: TextStyle(
                     fontSize: isTablet ? 17 : 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                     letterSpacing: 0.3,
                   ),
                 ),
@@ -522,7 +522,7 @@ class _ModuleCardState extends State<_ModuleCard>
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: isTablet ? 13 : 11,
-                    color: AppColors.textSecondary.withOpacity(0.7),
+                    color: c.textSecondary.withOpacity(0.7),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -552,6 +552,7 @@ class _QuickActionTileState extends State<_QuickActionTile> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final a = widget.action;
 
     return GestureDetector(
@@ -567,7 +568,7 @@ class _QuickActionTileState extends State<_QuickActionTile> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           decoration: BoxDecoration(
-            color: AppColors.cardBackground,
+            color: c.cardBackground,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: a.color.withOpacity(0.12),
@@ -600,10 +601,10 @@ class _QuickActionTileState extends State<_QuickActionTile> {
                   children: [
                     Text(
                       a.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: c.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -611,7 +612,7 @@ class _QuickActionTileState extends State<_QuickActionTile> {
                       a.subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary.withOpacity(0.7),
+                        color: c.textSecondary.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -621,7 +622,7 @@ class _QuickActionTileState extends State<_QuickActionTile> {
               // Arrow
               Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Colors.white.withOpacity(0.2),
+                color: c.contraste.withOpacity(0.2),
                 size: 16,
               ),
             ],

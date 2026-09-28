@@ -12,8 +12,9 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Precios de abonos'),
       // Como en los demás formularios: el botón para guardar, fijo abajo.
       bottomNavigationBar: Obx(() => controller.isLoading.value
@@ -44,17 +45,17 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                     color: AppColors.accent.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.attach_money,
+                      const Icon(Icons.attach_money,
                           color: AppColors.accent, size: 28),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Al registrar un abono el precio se llena solo según '
                           'el periodo elegido y el total se calcula automáticamente.',
                           style: TextStyle(
-                            color: AppColors.textSecondary,
+                            color: c.textSecondary,
                             fontSize: 13,
                           ),
                         ),
@@ -65,25 +66,25 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                 const SizedBox(height: 24),
                 const TituloSeccion('Precio por periodo',
                     detalle: 'Deja vacío el periodo que no ofrezcas.'),
-                _priceField(
+                _priceField(context,
                   controller: controller.dayController,
                   label: 'Precio por día',
                   icon: Icons.today,
                 ),
                 const SizedBox(height: 16),
-                _priceField(
+                _priceField(context,
                   controller: controller.weekController,
                   label: 'Precio por semana',
                   icon: Icons.date_range,
                 ),
                 const SizedBox(height: 16),
-                _priceField(
+                _priceField(context,
                   controller: controller.monthController,
                   label: 'Precio por mes',
                   icon: Icons.calendar_month,
                 ),
                 const SizedBox(height: 16),
-                _priceField(
+                _priceField(context,
                   controller: controller.yearController,
                   label: 'Precio por año',
                   icon: Icons.event_repeat,
@@ -96,19 +97,20 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
     );
   }
 
-  Widget _priceField({
+  Widget _priceField(BuildContext context, {
     required TextEditingController controller,
     required String label,
     required IconData icon,
   }) {
+    final c = context.colores;
     return TextField(
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
       ],
-      style: const TextStyle(
-        color: AppColors.textPrimary,
+      style: TextStyle(
+        color: c.textPrimary,
         fontSize: 20,
         fontWeight: FontWeight.bold,
       ),

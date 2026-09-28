@@ -13,21 +13,22 @@ class CuentaView extends GetView<ConfiguracionController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Mi Cuenta'),
       body: SafeArea(
         child: Obx(() => ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
                 // Avatar + name header
-                _buildProfileHeader(),
+                _buildProfileHeader(context),
                 const SizedBox(height: 24),
 
                 // Personal info section
-                _buildSectionLabel('Información Personal'),
+                _buildSectionLabel(context, 'Información Personal'),
                 const SizedBox(height: 12),
-                _buildInfoTile(
+                _buildInfoTile(context,
                   icon: Icons.person_outline,
                   label: 'Nombre(s)',
                   value: controller.firstName.value,
@@ -39,7 +40,7 @@ class CuentaView extends GetView<ConfiguracionController> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _buildInfoTile(
+                _buildInfoTile(context,
                   icon: Icons.person_outline,
                   label: 'Apellidos',
                   value: controller.lastName.value,
@@ -54,12 +55,12 @@ class CuentaView extends GetView<ConfiguracionController> {
                 const SizedBox(height: 24),
 
                 // Account info section
-                _buildSectionLabel('Cuenta'),
+                _buildSectionLabel(context, 'Cuenta'),
                 const SizedBox(height: 12),
                 // El staff entra con código, sin correo: no tiene sentido
                 // mostrar una fila vacía.
                 if (controller.userEmail.value.isNotEmpty) ...[
-                  _buildInfoTile(
+                  _buildInfoTile(context,
                     icon: Icons.email_outlined,
                     label: 'Correo electrónico',
                     value: controller.userEmail.value,
@@ -67,7 +68,7 @@ class CuentaView extends GetView<ConfiguracionController> {
                   ),
                   const SizedBox(height: 8),
                 ],
-                _buildInfoTile(
+                _buildInfoTile(context,
                   icon: Icons.badge_outlined,
                   label: 'Rol',
                   value: controller.userRole.value,
@@ -77,9 +78,9 @@ class CuentaView extends GetView<ConfiguracionController> {
                 const SizedBox(height: 24),
 
                 // Gym info section
-                _buildSectionLabel('Gimnasio'),
+                _buildSectionLabel(context, 'Gimnasio'),
                 const SizedBox(height: 12),
-                _buildInfoTile(
+                _buildInfoTile(context,
                   icon: Icons.fitness_center,
                   label: 'Gimnasio',
                   value: controller.gymName.value.isNotEmpty
@@ -96,7 +97,7 @@ class CuentaView extends GetView<ConfiguracionController> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _buildInfoTile(
+                _buildInfoTile(context,
                   icon: Icons.location_on_outlined,
                   label: 'Sucursal',
                   value: controller.branchName.value.isNotEmpty
@@ -120,7 +121,7 @@ class CuentaView extends GetView<ConfiguracionController> {
                   const SizedBox(height: 40),
 
                   // Danger zone
-                  _buildSectionLabel('Zona de Peligro'),
+                  _buildSectionLabel(context, 'Zona de Peligro'),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -132,10 +133,10 @@ class CuentaView extends GetView<ConfiguracionController> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Borrar todos los datos',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: c.textPrimary,
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
                           ),
@@ -144,7 +145,7 @@ class CuentaView extends GetView<ConfiguracionController> {
                         Text(
                           'Elimina permanentemente tu gimnasio, clientes, inventario, pagos y tu cuenta. Esta acción no se puede deshacer.',
                           style: TextStyle(
-                            color: AppColors.textSecondary,
+                            color: c.textSecondary,
                             fontSize: 12,
                             height: 1.4,
                           ),
@@ -188,10 +189,11 @@ class CuentaView extends GetView<ConfiguracionController> {
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(BuildContext context) {
+    final c = context.colores;
     return Card(
       elevation: 4,
-      color: AppColors.cardBackground,
+      color: c.cardBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -200,21 +202,21 @@ class CuentaView extends GetView<ConfiguracionController> {
             Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.titleColor.withOpacity(0.2),
+                color: c.titleColor.withOpacity(0.2),
                 border: Border.all(
-                  color: AppColors.titleColor.withOpacity(0.5),
+                  color: c.titleColor.withOpacity(0.5),
                   width: 3,
                 ),
               ),
               child: CircleAvatar(
                 radius: 44,
-                backgroundColor: AppColors.titleColor.withOpacity(0.1),
+                backgroundColor: c.titleColor.withOpacity(0.1),
                 child: Text(
                   _getInitials(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.titleColor,
+                    color: c.titleColor,
                   ),
                 ),
               ),
@@ -222,10 +224,10 @@ class CuentaView extends GetView<ConfiguracionController> {
             const SizedBox(height: 16),
             Text(
               controller.userName.value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: c.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
@@ -233,7 +235,7 @@ class CuentaView extends GetView<ConfiguracionController> {
               controller.userEmail.value,
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: c.textSecondary,
               ),
             ),
           ],
@@ -256,43 +258,45 @@ class CuentaView extends GetView<ConfiguracionController> {
     return initials;
   }
 
-  Widget _buildSectionLabel(String label) {
+  Widget _buildSectionLabel(BuildContext context, String label) {
+    final c = context.colores;
     return Text(
       label,
       style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textSecondary,
+        color: c.textSecondary,
         letterSpacing: 0.5,
       ),
     );
   }
 
-  Widget _buildInfoTile({
+  Widget _buildInfoTile(BuildContext context, {
     required IconData icon,
     required String label,
     required String value,
     VoidCallback? onEdit,
     bool editable = true,
   }) {
+    final c = context.colores;
     return Card(
       elevation: 2,
-      color: AppColors.cardBackground,
+      color: c.cardBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.titleColor.withOpacity(0.1),
+            color: c.titleColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: AppColors.titleColor, size: 22),
+          child: Icon(icon, color: c.titleColor, size: 22),
         ),
         title: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: AppColors.textSecondary,
+            color: c.textSecondary,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -300,9 +304,9 @@ class CuentaView extends GetView<ConfiguracionController> {
           padding: const EdgeInsets.only(top: 2),
           child: Text(
             value.isNotEmpty ? value : '—',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
-              color: AppColors.textPrimary,
+              color: c.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -310,7 +314,7 @@ class CuentaView extends GetView<ConfiguracionController> {
         trailing: editable && onEdit != null
             ? IconButton(
                 icon: Icon(Icons.edit_outlined,
-                    size: 20, color: AppColors.titleColor),
+                    size: 20, color: c.titleColor),
                 onPressed: onEdit,
               )
             : null,
@@ -384,17 +388,18 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return AlertDialog(
       scrollable: true,
-      backgroundColor: AppColors.cardBackground,
+      backgroundColor: c.cardBackground,
       title: Text(
         'Editar ${widget.title}',
-        style: const TextStyle(color: AppColors.textPrimary),
+        style: TextStyle(color: c.textPrimary),
       ),
       content: TextField(
         controller: _textController,
         autofocus: true,
-        style: const TextStyle(color: AppColors.textPrimary),
+        style: TextStyle(color: c.textPrimary),
         decoration: InputDecoration(labelText: widget.title),
       ),
       actions: [

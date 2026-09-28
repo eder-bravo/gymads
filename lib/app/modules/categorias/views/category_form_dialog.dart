@@ -96,15 +96,16 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final controller = Get.find<CategoriasController>();
 
     return AlertDialog(
-      backgroundColor: AppColors.cardBackground,
+      backgroundColor: c.cardBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text(
         _isEditing ? 'Editar categoría' : 'Nueva categoría',
-        style: const TextStyle(
-          color: AppColors.textPrimary,
+        style: TextStyle(
+          color: c.textPrimary,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -117,7 +118,7 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
               controller: _nameCtrl,
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color: c.textPrimary),
               decoration: InputDecoration(
                 labelText: 'Nombre *',
                 hintText: 'Ej: Suplementos',
@@ -129,16 +130,16 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
             TextField(
               controller: _descCtrl,
               textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: InputDecoration(
+              style: TextStyle(color: c.textPrimary),
+              decoration: const InputDecoration(
                 labelText: 'Descripción (opcional)',
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
+            Text(
               'Icono',
               style: TextStyle(
-                color: AppColors.textSecondary,
+                color: c.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),

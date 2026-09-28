@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
+import '../../../../core/theme/siempre_oscuro.dart';
 
 class CircularCameraView extends StatefulWidget {
   final Function(File) onPhotoTaken;
@@ -170,12 +170,13 @@ class _CircularCameraViewState extends State<CircularCameraView>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SiempreOscuro(
+        child: Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: _buildBody(),
       ),
-    );
+    ));
   }
 
   /// Descarta la foto tomada y vuelve a la cámara.
@@ -206,8 +207,8 @@ class _CircularCameraViewState extends State<CircularCameraView>
         Expanded(
           child: Center(
             child: LayoutBuilder(builder: (context, limites) {
-              final lado = (limites.biggest.shortestSide * 0.85)
-                  .clamp(160.0, 360.0);
+              final lado =
+                  (limites.biggest.shortestSide * 0.85).clamp(160.0, 360.0);
               return Container(
                 width: lado,
                 height: lado,
@@ -509,7 +510,7 @@ class CircularMaskPainter extends CustomPainter {
       ..color = Colors.white.withOpacity(0.8)
       ..style = PaintingStyle.fill;
 
-    final double dotRadius = 2.5;
+    const double dotRadius = 2.5;
     final double guideRadius = radius * 0.75;
 
     // Puntos de guía (ojos y boca aproximadamente)

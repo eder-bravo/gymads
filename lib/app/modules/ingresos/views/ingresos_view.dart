@@ -15,8 +15,9 @@ class IngresosView extends GetView<IngresosController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Ingresos',
         actions: [
@@ -72,12 +73,12 @@ class IngresosView extends GetView<IngresosController> {
               padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
               child: Row(
                 children: [
-                  const Text(
+                  Text(
                     'Transacciones',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.titleColor,
+                      color: c.titleColor,
                     ),
                   ),
                   const Spacer(),
@@ -109,7 +110,7 @@ class IngresosView extends GetView<IngresosController> {
             description: 'Cada cobro registrado, con su fecha, su monto y '
                 'de dónde vino.',
             isLastStep: true,
-            child: _buildTransactionsList(),
+            child: _buildTransactionsList(context),
           ),
         ),
       ),
@@ -120,6 +121,7 @@ class IngresosView extends GetView<IngresosController> {
   // TOTAL DEL MES
   // ─────────────────────────────────────────────────────────
   Widget _buildMonthTotal(BuildContext context) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -150,9 +152,9 @@ class IngresosView extends GetView<IngresosController> {
                   Expanded(
                     child: Text(
                       controller.periodoTotalLabel,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textSecondary,
+                        color: c.textSecondary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -171,9 +173,9 @@ class IngresosView extends GetView<IngresosController> {
               const SizedBox(height: 6),
               Text(
                 '${stats.totalTransacciones} transacciones · Promedio ${controller.formatCurrency(stats.promedioTransaccion)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: c.textSecondary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -199,7 +201,8 @@ class IngresosView extends GetView<IngresosController> {
   // ─────────────────────────────────────────────────────────
   // LISTA DE TRANSACCIONES
   // ─────────────────────────────────────────────────────────
-  Widget _buildTransactionsList() {
+  Widget _buildTransactionsList(BuildContext context) {
+    final c = context.colores;
     return Obx(() {
       if (controller.isLoading.value) {
         return const Center(
@@ -212,15 +215,15 @@ class IngresosView extends GetView<IngresosController> {
           onRefresh: controller.refreshData,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            children: const [
-              SizedBox(height: 80),
+            children: [
+              const SizedBox(height: 80),
               Icon(Icons.receipt_long,
-                  size: 64, color: AppColors.textSecondary),
-              SizedBox(height: 16),
+                  size: 64, color: c.textSecondary),
+              const SizedBox(height: 16),
               Center(
                 child: Text(
                   'No hay transacciones en este periodo',
-                  style: TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: c.textSecondary),
                 ),
               ),
             ],

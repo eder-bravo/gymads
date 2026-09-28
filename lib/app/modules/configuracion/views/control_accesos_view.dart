@@ -29,8 +29,9 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Control de accesos'),
       body: SafeArea(
         child: Obx(() {
@@ -65,14 +66,14 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
                 onSelect: controller.setHoraCierre,
               ),
               const SizedBox(height: 12),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
                   'El reporte de entradas usa este horario para mostrar las '
                   'horas con más afluencia.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                     height: 1.4,
                   ),
                 ),
@@ -85,21 +86,23 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
   }
 
   Widget _buildSectionLabel(String label) {
+    final c = context.colores;
     return Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textSecondary,
+        color: c.textSecondary,
         letterSpacing: 0.5,
       ),
     );
   }
 
   Widget _buildSalidasTile(GymSettingsModel ajustes) {
+    final c = context.colores;
     return Card(
       elevation: 2,
-      color: AppColors.cardBackground,
+      color: c.cardBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SwitchListTile(
         value: ajustes.registrarSalidas,
@@ -108,17 +111,17 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
         secondary: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.titleColor.withOpacity(0.1),
+            color: c.titleColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.door_front_door_outlined,
-              color: AppColors.titleColor, size: 22),
+          child: Icon(Icons.door_front_door_outlined,
+              color: c.titleColor, size: 22),
         ),
-        title: const Text(
+        title: Text(
           'Registrar salidas',
           style: TextStyle(
             fontSize: 16,
-            color: AppColors.textPrimary,
+            color: c.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -128,9 +131,9 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
             ajustes.registrarSalidas
                 ? 'El segundo pase del día marca la salida del cliente'
                 : 'Solo se registra la entrada de cada día',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: c.textSecondary,
             ),
           ),
         ),
@@ -145,25 +148,26 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
     required HoraDelDia hora,
     required Future<void> Function(HoraDelDia) onSelect,
   }) {
+    final c = context.colores;
     return Card(
       elevation: 2,
-      color: AppColors.cardBackground,
+      color: c.cardBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.titleColor.withOpacity(0.1),
+            color: c.titleColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.schedule,
-              color: AppColors.titleColor, size: 22),
+          child: Icon(Icons.schedule,
+              color: c.titleColor, size: 22),
         ),
         title: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: AppColors.textSecondary,
+            color: c.textSecondary,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -171,15 +175,15 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
           padding: const EdgeInsets.only(top: 2),
           child: Text(
             hora.etiqueta,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
-              color: AppColors.textPrimary,
+              color: c.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
         ),
-        trailing: const Icon(Icons.edit_outlined,
-            size: 20, color: AppColors.titleColor),
+        trailing: Icon(Icons.edit_outlined,
+            size: 20, color: c.titleColor),
         onTap: () => _elegirHora(context, hora, onSelect),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
@@ -197,19 +201,6 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
       helpText: 'Selecciona la hora',
       // El reloj sale en 12 h por MaterialLocalizations12h (ver main.dart);
       // el idioma por sí solo lo daría en 24 h.
-      builder: (context, child) => Theme(
-        data: ThemeData(
-          useMaterial3: true,
-          brightness: Brightness.dark,
-          colorScheme: const ColorScheme.dark(
-            primary: AppColors.accent,
-            onPrimary: Colors.white,
-            surface: AppColors.cardBackground,
-            onSurface: AppColors.textPrimary,
-          ),
-        ),
-        child: child!,
-      ),
     );
 
     if (elegida != null) {

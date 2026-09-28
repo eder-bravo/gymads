@@ -7,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../utils/confirmador_codigo.dart';
+import '../../../core/theme/siempre_oscuro.dart';
 
 /// Lector de códigos de barras.
 ///
@@ -173,7 +174,8 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SiempreOscuro(
+        child: Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
@@ -222,7 +224,7 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
           _pie(),
         ],
       ),
-    );
+    ));
   }
 
   static const double _anchoMarco = 280;

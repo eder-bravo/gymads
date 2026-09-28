@@ -11,19 +11,10 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1a1a2e),
-              Color(0xFF16213e),
-              Color(0xFF0f3460),
-            ],
-          ),
-        ),
+        decoration: BoxDecoration(gradient: c.fondoAcceso),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -52,12 +43,12 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                   const SizedBox(height: 28),
 
                   // Title
-                  const Text(
+                  Text(
                     '¡Bienvenido a GymOne!',
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: c.contraste,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -68,7 +59,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                     'Solo necesitamos los datos de tu gimnasio para empezar',
                     style: TextStyle(
                       fontSize: 15,
-                      color: Colors.white.withOpacity(0.6),
+                      color: c.contraste.withOpacity(0.6),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -79,21 +70,21 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.06),
+                      color: c.contraste.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.account_circle,
-                            color: Colors.white54, size: 20),
+                            color: c.contraste.withOpacity(0.54), size: 20),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                                 '${controller.firstNameController.text} ${controller.lastNameController.text}'
                                     .trim(),
-                                style: const TextStyle(
-                                  color: Colors.white70,
+                                style: TextStyle(
+                                  color: c.contraste.withOpacity(0.70),
                                   fontSize: 14,
                                 ),
                               ),
@@ -109,10 +100,10 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                     constraints: const BoxConstraints(maxWidth: 450),
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: c.contraste.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(20),
                       border:
-                          Border.all(color: Colors.white.withOpacity(0.1)),
+                          Border.all(color: c.contraste.withOpacity(0.1)),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.2),
@@ -125,7 +116,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Row(
-                          children: const [
+                          children: [
                             Icon(Icons.store, color: AppColors.accent, size: 22),
                             SizedBox(width: 10),
                             Text(
@@ -133,7 +124,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: c.contraste,
                               ),
                             ),
                           ],
@@ -141,7 +132,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                         const SizedBox(height: 20),
 
                         // Gym name
-                        _buildTextField(
+                        _buildTextField(context,
                           controller: controller.gymNameController,
                           label: 'Nombre del gimnasio',
                           icon: Icons.fitness_center,
@@ -150,7 +141,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                         const SizedBox(height: 16),
 
                         // Location
-                        _buildTextField(
+                        _buildTextField(context,
                           controller: controller.locationController,
                           label: 'Ubicación',
                           icon: Icons.location_on_outlined,
@@ -257,23 +248,24 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildTextField(BuildContext context, {
     required TextEditingController controller,
     required String label,
     required IconData icon,
     TextInputAction? textInputAction,
     String? hint,
   }) {
+    final c = context.colores;
     return TextField(
       controller: controller,
       textInputAction: textInputAction,
-      style: const TextStyle(color: Colors.white, fontSize: 15),
+      style: TextStyle(color: c.contraste, fontSize: 15),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         hintStyle:
-            TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
-        prefixIcon: Icon(icon, color: Colors.white54, size: 20),
+            TextStyle(color: c.contraste.withOpacity(0.3), fontSize: 13),
+        prefixIcon: Icon(icon, color: c.contraste.withOpacity(0.54), size: 20),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),

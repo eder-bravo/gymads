@@ -10,19 +10,10 @@ class LoginView extends GetView<AuthController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF1a1a2e),
-              const Color(0xFF16213e),
-              const Color(0xFF0f3460),
-            ],
-          ),
-        ),
+        decoration: BoxDecoration(gradient: c.fondoAcceso),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -31,11 +22,11 @@ class LoginView extends GetView<AuthController> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Logo / Title
-                  _buildHeader(),
+                  _buildHeader(context),
                   const SizedBox(height: 48),
 
                   // Login Card
-                  _buildLoginCard(),
+                  _buildLoginCard(context),
                   const SizedBox(height: 24),
 
                   // Create account link
@@ -45,7 +36,7 @@ class LoginView extends GetView<AuthController> {
                       Text(
                         '¿No tienes cuenta? ',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: c.contraste.withOpacity(0.6),
                           fontSize: 14,
                         ),
                       ),
@@ -73,7 +64,8 @@ class LoginView extends GetView<AuthController> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    final c = context.colores;
     return Column(
       children: [
         // App Icon
@@ -81,28 +73,28 @@ class LoginView extends GetView<AuthController> {
           width: 100,
           height: 100,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: c.contraste.withOpacity(0.1),
             borderRadius: BorderRadius.circular(25),
             border: Border.all(
-              color: Colors.white.withOpacity(0.2),
+              color: c.contraste.withOpacity(0.2),
               width: 2,
             ),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.fitness_center,
             size: 50,
-            color: Colors.white,
+            color: c.contraste,
           ),
         ),
         const SizedBox(height: 24),
 
         // App Name
-        const Text(
+        Text(
           'GYMONE',
           style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: c.contraste,
             letterSpacing: 4,
           ),
         ),
@@ -111,22 +103,23 @@ class LoginView extends GetView<AuthController> {
           'Sistema de Gestión de Gimnasio',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.white.withOpacity(0.7),
+            color: c.contraste.withOpacity(0.7),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLoginCard() {
+  Widget _buildLoginCard(BuildContext context) {
+    final c = context.colores;
     return Container(
       constraints: const BoxConstraints(maxWidth: 400),
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: c.contraste.withOpacity(0.05),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: c.contraste.withOpacity(0.1),
         ),
         boxShadow: [
           BoxShadow(
@@ -139,12 +132,12 @@ class LoginView extends GetView<AuthController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Iniciar Sesión',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: c.contraste,
             ),
             textAlign: TextAlign.center,
           ),
@@ -153,18 +146,18 @@ class LoginView extends GetView<AuthController> {
             'Ingresa tus credenciales para acceder',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.white.withOpacity(0.6),
+              color: c.contraste.withOpacity(0.6),
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
 
           // Email field
-          _buildEmailField(),
+          _buildEmailField(context),
           const SizedBox(height: 16),
 
           // Password field
-          _buildPasswordField(),
+          _buildPasswordField(context),
           const SizedBox(height: 24),
 
           // Error message
@@ -179,28 +172,28 @@ class LoginView extends GetView<AuthController> {
           // Divider
           Row(
             children: [
-              Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+              Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
                   'o',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                    color: c.contraste.withOpacity(0.5),
                     fontSize: 13,
                   ),
                 ),
               ),
-              Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+              Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
             ],
           ),
           const SizedBox(height: 20),
 
           // Google Sign-In button
-          _buildGoogleButton(),
+          _buildGoogleButton(context),
           const SizedBox(height: 12),
 
           // Entrada del personal con código de un solo uso
-          _buildStaffButton(),
+          _buildStaffButton(context),
         ],
       ),
     );
@@ -208,27 +201,28 @@ class LoginView extends GetView<AuthController> {
 
   /// Los empleados no tienen cuenta: entran con el código que les dio el
   /// dueño desde Configuración.
-  Widget _buildStaffButton() {
+  Widget _buildStaffButton(BuildContext context) {
+    final c = context.colores;
     return SizedBox(
       height: 50,
       child: OutlinedButton(
         onPressed: () => Get.toNamed(Routes.STAFF_CODE),
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Colors.white24),
+          side: BorderSide(color: c.contraste.withOpacity(0.24)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          backgroundColor: Colors.white.withOpacity(0.05),
+          backgroundColor: c.contraste.withOpacity(0.05),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.badge_outlined, size: 20, color: Colors.white),
+            Icon(Icons.badge_outlined, size: 20, color: c.contraste),
             SizedBox(width: 12),
             Text(
               'Entrar como staff',
               style: TextStyle(
-                color: Colors.white,
+                color: c.contraste,
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
               ),
@@ -239,41 +233,43 @@ class LoginView extends GetView<AuthController> {
     );
   }
 
-  Widget _buildEmailField() {
+  Widget _buildEmailField(BuildContext context) {
+    final c = context.colores;
     return TextField(
       controller: controller.emailController,
       keyboardType: TextInputType.emailAddress,
       textInputAction: TextInputAction.next,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: c.contraste),
       decoration: InputDecoration(
         labelText: 'Correo electrónico',
         prefixIcon: Icon(
           Icons.email_outlined,
-          color: Colors.white.withOpacity(0.7),
+          color: c.contraste.withOpacity(0.7),
         ),
       ),
       onChanged: (_) => controller.clearError(),
     );
   }
 
-  Widget _buildPasswordField() {
+  Widget _buildPasswordField(BuildContext context) {
+    final c = context.colores;
     return Obx(() => TextField(
           controller: controller.passwordController,
           obscureText: controller.obscurePassword.value,
           textInputAction: TextInputAction.done,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: c.contraste),
           decoration: InputDecoration(
             labelText: 'Contraseña',
             prefixIcon: Icon(
               Icons.lock_outline,
-              color: Colors.white.withOpacity(0.7),
+              color: c.contraste.withOpacity(0.7),
             ),
             suffixIcon: IconButton(
               icon: Icon(
                 controller.obscurePassword.value
                     ? Icons.visibility_off
                     : Icons.visibility,
-                color: Colors.white.withOpacity(0.7),
+                color: c.contraste.withOpacity(0.7),
               ),
               onPressed: controller.togglePasswordVisibility,
             ),
@@ -354,18 +350,19 @@ class LoginView extends GetView<AuthController> {
         ));
   }
 
-  Widget _buildGoogleButton() {
+  Widget _buildGoogleButton(BuildContext context) {
+    final c = context.colores;
     return Obx(() => SizedBox(
           height: 50,
           child: OutlinedButton(
             onPressed:
                 controller.isLoading.value ? null : controller.loginWithGoogle,
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.white24),
+              side: BorderSide(color: c.contraste.withOpacity(0.24)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              backgroundColor: Colors.white.withOpacity(0.05),
+              backgroundColor: c.contraste.withOpacity(0.05),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -384,10 +381,10 @@ class LoginView extends GetView<AuthController> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                Text(
                   'Continuar con Google',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: c.contraste,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),

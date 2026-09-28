@@ -15,8 +15,9 @@ class AccessLogsView extends GetView<AccessLogsController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Entradas',
         actions: [
@@ -64,8 +65,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
               borderRadius: 20,
               child: Column(
                 children: [
-                  _buildStatsSection(),
-                  _buildFranjasSection(),
+                  _buildStatsSection(context),
+                  _buildFranjasSection(context),
                 ],
               ),
             ),
@@ -78,32 +79,32 @@ class AccessLogsView extends GetView<AccessLogsController> {
             description: 'Quién entró al gimnasio, a qué hora y quién lo '
                 'registró. Desliza hacia abajo para actualizar.',
             isLastStep: true,
-            child: _buildLogsList(),
+            child: _buildLogsList(context),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildStatsSection() {
+  Widget _buildStatsSection(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Obx(() {
         return Row(
           children: [
-            _buildStatCard(
+            _buildStatCard(context,
               'Entradas',
               '${controller.totalEntries.value}',
               AppColors.success,
             ),
             // Solo tiene sentido si el gimnasio registra salidas.
             if (controller.muestraSalidas)
-              _buildStatCard(
+              _buildStatCard(context,
                 'Salidas',
                 '${controller.totalExits.value}',
                 AppColors.warning,
               ),
-            _buildStatCard(
+            _buildStatCard(context,
               'Hora pico',
               controller.franjaPicoLabel,
               AppColors.accent,
@@ -115,7 +116,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
   }
 
   /// Afluencia por franja de dos horas, dentro del horario configurado.
-  Widget _buildFranjasSection() {
+  Widget _buildFranjasSection(BuildContext context) {
+    final c = context.colores;
     return Obx(() {
       final porFranja = controller.entradasPorFranja;
       final maximo = controller.maximoPorFranja;
@@ -128,7 +130,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+          color: c.cardBackground,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.accent.withOpacity(0.2)),
         ),
@@ -142,20 +144,20 @@ class AccessLogsView extends GetView<AccessLogsController> {
               onTap: controller.alternarFranjas,
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Entradas por hora',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                        color: c.textSecondary,
                       ),
                     ),
                   ),
                   Icon(
                     expandido ? Icons.expand_less : Icons.expand_more,
                     size: 20,
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                   ),
                 ],
               ),
@@ -174,7 +176,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                           controller.etiquetaFranja(entrada.key),
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: c.textSecondary,
                             fontWeight: entrada.key == pico
                                 ? FontWeight.w700
                                 : FontWeight.w400,
@@ -187,7 +189,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                           child: LinearProgressIndicator(
                             value: entrada.value / maximo,
                             minHeight: 10,
-                            backgroundColor: AppColors.containerBackground,
+                            backgroundColor: c.containerBackground,
                             valueColor: AlwaysStoppedAnimation(
                               entrada.key == pico
                                   ? AppColors.accent
@@ -203,7 +205,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                           textAlign: TextAlign.right,
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textPrimary,
+                            color: c.textPrimary,
                             fontWeight: entrada.key == pico
                                 ? FontWeight.w700
                                 : FontWeight.w500,
@@ -219,13 +221,14 @@ class AccessLogsView extends GetView<AccessLogsController> {
     });
   }
 
-  Widget _buildStatCard(String title, String value, Color color) {
+  Widget _buildStatCard(BuildContext context, String title, String value, Color color) {
+    final c = context.colores;
     return Expanded(
       child: Container(
         height: 88,
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+          color: c.cardBackground,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: color.withOpacity(0.3),
@@ -255,7 +258,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
               title,
               style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textSecondary,
+                color: c.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
@@ -268,7 +271,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
     );
   }
 
-  Widget _buildLogsList() {
+  Widget _buildLogsList(BuildContext context) {
+    final c = context.colores;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Obx(() {
@@ -277,11 +281,11 @@ class AccessLogsView extends GetView<AccessLogsController> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                CircularProgressIndicator(color: AppColors.primary),
+                const CircularProgressIndicator(color: AppColors.accent),
                 const SizedBox(height: 16),
                 Text(
                   'Cargando logs de acceso...',
-                  style: TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: c.textPrimary),
                 ),
               ],
             ),
@@ -293,7 +297,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.error,
                   size: 64,
                   color: AppColors.error,
@@ -301,7 +305,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                 const SizedBox(height: 16),
                 Text(
                   controller.errorMessage.value,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: AppColors.error,
                     fontSize: 16,
                   ),
@@ -313,8 +317,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
                   icon: const Icon(Icons.refresh),
                   label: const Text('Reintentar'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.textPrimary,
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
                   ),
                 ),
               ],
@@ -331,13 +335,13 @@ class AccessLogsView extends GetView<AccessLogsController> {
                 Icon(
                   Icons.inbox,
                   size: 64,
-                  color: AppColors.textSecondary,
+                  color: c.textSecondary,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'Sin entradas en este periodo',
                   style: TextStyle(
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                     fontSize: 16,
                   ),
                 ),
@@ -348,12 +352,12 @@ class AccessLogsView extends GetView<AccessLogsController> {
 
         return RefreshIndicator(
           onRefresh: controller.refreshData,
-          color: AppColors.primary,
+          color: AppColors.accent,
           child: ListView.builder(
             itemCount: controller.accessLogs.length,
             itemBuilder: (context, index) {
               final log = controller.accessLogs[index];
-              return _buildLogCard(log);
+              return _buildLogCard(context, log);
             },
           ),
         );
@@ -361,14 +365,15 @@ class AccessLogsView extends GetView<AccessLogsController> {
     );
   }
 
-  Widget _buildLogCard(AccessLogModel log) {
+  Widget _buildLogCard(BuildContext context, AccessLogModel log) {
+    final c = context.colores;
     final isEntry = log.accessType == 'entrada';
     final color = isEntry ? AppColors.success : AppColors.error;
     final icon = isEntry ? Icons.login : Icons.logout;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      color: AppColors.cardBackground,
+      color: c.cardBackground,
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -402,7 +407,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                     log.userName,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: c.textPrimary,
                       fontSize: 18,
                     ),
                   ),
@@ -410,7 +415,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                   Text(
                     'Staff: ${log.staffUser}',
                     style: TextStyle(
-                      color: AppColors.textSecondary,
+                      color: c.textSecondary,
                       fontSize: 14,
                     ),
                   ),
@@ -442,7 +447,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                 Text(
                   HoraFormato.fechaYHora(log.accessTime),
                   style: TextStyle(
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                     fontSize: 13,
                   ),
                 ),

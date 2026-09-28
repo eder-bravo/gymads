@@ -160,6 +160,7 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final formulario = Form(
       key: _formKey,
       child: ListView(
@@ -195,11 +196,11 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
 
     if (!widget.fullScreen) {
       return AlertDialog(
-        backgroundColor: AppColors.cardBackground,
+        backgroundColor: c.cardBackground,
         surfaceTintColor: Colors.transparent,
         contentPadding: EdgeInsets.zero,
         title: Text(_titulo,
-            style: const TextStyle(color: AppColors.textPrimary)),
+            style: TextStyle(color: c.textPrimary)),
         content: SizedBox(width: 420, height: 560, child: formulario),
         actions: [
           Obx(() => BotonCancelar(
@@ -217,7 +218,7 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
       return PopScope(
         canPop: !guardando,
         child: Scaffold(
-          backgroundColor: AppColors.backgroundColor,
+          backgroundColor: c.backgroundColor,
           appBar: GymAppBar(
             title: _titulo,
             leading: IconButton(
@@ -234,12 +235,13 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
   }
 
   Widget _campoNombre() {
+    final c = context.colores;
     return TextFormField(
       controller: widget.nombreController,
       autofocus: !widget.isEditing,
       textCapitalization: TextCapitalization.words,
       textInputAction: TextInputAction.next,
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+      style: TextStyle(color: c.textPrimary, fontSize: 16),
       decoration: const InputDecoration(
         labelText: 'Nombre completo *',
         prefixIcon: Icon(Icons.person_outline),
@@ -251,6 +253,7 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
   }
 
   Widget _campoTelefono() {
+    final c = context.colores;
     return InternationalPhoneNumberInput(
       initialValue: _telefonoInicial,
       onInputChanged: (numero) =>
@@ -263,8 +266,8 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
         trailingSpace: false,
       ),
       selectorTextStyle:
-          const TextStyle(color: AppColors.textPrimary, fontSize: 16),
-      textStyle: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+          TextStyle(color: c.textPrimary, fontSize: 16),
+      textStyle: TextStyle(color: c.textPrimary, fontSize: 16),
       keyboardType: TextInputType.phone,
       inputDecoration: const InputDecoration(labelText: 'Teléfono *'),
       errorMessage: 'Escribe un teléfono válido',
@@ -275,6 +278,7 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
 
   /// La tarjeta del lector: se asigna pasándola; nunca se muestra su número.
   Widget _tarjeta() {
+    final c = context.colores;
     final hayLector = RfidConfig.isConfigured || RfidConfig.tieneLector;
     return AnimatedBuilder(
       animation: widget.rfidController,
@@ -292,26 +296,26 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
           decoration: BoxDecoration(
             color: lista
                 ? AppColors.success.withOpacity(0.10)
-                : Colors.white.withOpacity(0.06),
+                : c.superficie,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: lista
                   ? AppColors.success.withOpacity(0.6)
-                  : Colors.white.withOpacity(0.18),
+                  : c.borde,
             ),
           ),
           child: Row(
             children: [
               Icon(
                 lista ? Icons.check_circle : Icons.contactless_outlined,
-                color: lista ? AppColors.success : AppColors.textSecondary,
+                color: lista ? AppColors.success : c.textSecondary,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   texto,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
+                  style: TextStyle(
+                    color: c.textPrimary,
                     fontSize: 16,
                   ),
                 ),
@@ -320,7 +324,7 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
                 TextButton(
                   onPressed: () => widget.rfidController.clear(),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
+                    foregroundColor: c.textSecondary,
                   ),
                   child: const Text('Quitar'),
                 ),
@@ -334,6 +338,7 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
   /// Correo y dirección: opcionales, plegados para no estorbar. Al editar se
   /// abren si ya tienen algo.
   Widget _masDatos() {
+    final c = context.colores;
     final tieneAlgo = widget.emailController.text.trim().isNotEmpty ||
         widget.addressController.text.trim().isNotEmpty;
     return Theme(
@@ -343,16 +348,16 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(top: 4),
         iconColor: AppColors.accent,
-        collapsedIconColor: AppColors.textSecondary,
-        title: const Text(
+        collapsedIconColor: c.textSecondary,
+        title: Text(
           'Correo y dirección (opcional)',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
+          style: TextStyle(color: c.textSecondary, fontSize: 15),
         ),
         children: [
           TextFormField(
             controller: widget.emailController,
             keyboardType: TextInputType.emailAddress,
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+            style: TextStyle(color: c.textPrimary, fontSize: 16),
             decoration: const InputDecoration(
               labelText: 'Correo electrónico',
               prefixIcon: Icon(Icons.email_outlined),
@@ -362,7 +367,7 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
           TextFormField(
             controller: widget.addressController,
             maxLines: 2,
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+            style: TextStyle(color: c.textPrimary, fontSize: 16),
             decoration: const InputDecoration(
               labelText: 'Dirección',
               prefixIcon: Icon(Icons.location_on_outlined),

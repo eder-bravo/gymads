@@ -305,10 +305,6 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     _loadConfiguration();
   }
 
-  @override
-  void onClose() {
-    super.onClose();
-  }
 
   // =================== USER INFO FROM SESSION ===================
 
@@ -798,15 +794,8 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     Get.dialog(
       AlertDialog(
         scrollable: true,
-        backgroundColor: AppColors.cardBackground,
-        title: const Text(
-          'Cerrar Sesión',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: const Text(
-          '¿Estás seguro que deseas cerrar la sesión?',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
+        title: const Text('Cerrar Sesión'),
+        content: const Text('¿Estás seguro que deseas cerrar la sesión?'),
         actions: [
           BotonCancelar(onPressed: () => Get.back()),
           BotonGuardar(
@@ -857,7 +846,6 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
         scrollable: true,
-        backgroundColor: AppColors.cardBackground,
         title: Row(
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.red[400], size: 28),
@@ -865,7 +853,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
             const Expanded(
               child: Text(
                 '¿Borrar todos los datos?',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 18),
+                style: TextStyle(fontSize: 18),
               ),
             ),
           ],
@@ -879,7 +867,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
           '• El gimnasio y sus sucursales\n'
           '• Tu cuenta de usuario\n\n'
           'Esta acción NO se puede deshacer.',
-          style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+          style: TextStyle(height: 1.5),
         ),
         actions: [
           BotonCancelar(onPressed: () => Get.back(result: false)),
@@ -953,28 +941,25 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
 /// Dialog that requires typing the gym name to confirm deletion
 class _ConfirmDeleteDialog extends StatelessWidget {
   final String gymName;
-  _ConfirmDeleteDialog({required this.gymName});
+  const _ConfirmDeleteDialog({required this.gymName});
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final controller = TextEditingController();
     final isMatch = false.obs;
 
     return Obx(() => AlertDialog(
           scrollable: true,
-          backgroundColor: AppColors.cardBackground,
-          title: const Text(
-            'Confirmar eliminación',
-            style: TextStyle(color: AppColors.textPrimary),
-          ),
+          title: const Text('Confirmar eliminación'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               RichText(
                 text: TextSpan(
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, height: 1.5),
+                  style: TextStyle(
+                      color: c.textSecondary, height: 1.5),
                   children: [
                     const TextSpan(
                         text:
@@ -992,11 +977,11 @@ class _ConfirmDeleteDialog extends StatelessWidget {
               const SizedBox(height: 16),
               TextField(
                 controller: controller,
-                style: const TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: c.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Escribe el nombre aquí',
                   hintStyle: TextStyle(
-                      color: AppColors.textSecondary.withOpacity(0.5)),
+                      color: c.textSecondary.withOpacity(0.5)),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.red.withOpacity(0.3)),
@@ -1006,7 +991,7 @@ class _ConfirmDeleteDialog extends StatelessWidget {
                     borderSide: BorderSide(color: Colors.red[400]!),
                   ),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: c.superficie,
                 ),
                 onChanged: (val) {
                   isMatch.value =

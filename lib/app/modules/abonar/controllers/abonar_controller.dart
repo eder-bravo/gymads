@@ -135,6 +135,7 @@ class AbonarController extends GetxController
   // ─── Tour de bienvenida ───
   // Solo cubre la pantalla de búsqueda: el formulario de cobro no existe
   // todavía cuando arranca el tour, porque aparece al elegir un cliente.
+  final keyVisita = GlobalKey();
   final keyBuscar = GlobalKey();
   final keyResultados = GlobalKey();
 
@@ -142,7 +143,7 @@ class AbonarController extends GetxController
   String get tourId => AppTours.abonar;
 
   @override
-  List<GlobalKey> get tourSteps => [keyBuscar, keyResultados];
+  List<GlobalKey> get tourSteps => [keyVisita, keyBuscar, keyResultados];
 
   @override
   void onInit() {

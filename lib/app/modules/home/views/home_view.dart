@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -10,6 +9,7 @@ import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/background_welcome_dialog.dart';
+import '../widgets/fondo_estirable.dart';
 
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
@@ -55,7 +55,8 @@ class HomeView extends GetView<HomeController> {
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
+          physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics()),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -131,15 +132,19 @@ class HomeView extends GetView<HomeController> {
           'Este es tu panel principal: desde aquí llegas a todo lo del día a día.',
       borderRadius: 28,
       isFirstStep: true,
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(
-          isTablet ? 32 : 24,
-          topPadding + (isTablet ? 18 : 14),
-          isTablet ? 32 : 24,
-          isTablet ? 16 : 14,
+      // El fondo crece hacia arriba lo que se jala la pantalla (el rebote):
+      // antes la cabecera bajaba entera y dejaba una franja vacía arriba.
+      child: FondoEstirable(
+        // Lo que se ve arriba al jalar: el borde de arriba del degradado.
+        colorArriba: LinearGradient(
+          stops: const [0.0, 0.55, 1.0],
+          colors: [
+            c.cabeceraDesde,
+            c.cabeceraHasta,
+            AppColors.brand.withOpacity(0.28),
+          ],
         ),
-        decoration: BoxDecoration(
+        decoracion: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -162,31 +167,40 @@ class HomeView extends GetView<HomeController> {
             ),
           ],
         ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.brand.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(
+            isTablet ? 32 : 24,
+            topPadding + (isTablet ? 18 : 14),
+            isTablet ? 32 : 24,
+            isTablet ? 16 : 14,
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.brand.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.dashboard_rounded,
+                  color: AppColors.brand,
+                  size: isTablet ? 26 : 22,
+                ),
               ),
-              child: Icon(
-                Icons.dashboard_rounded,
-                color: AppColors.brand,
-                size: isTablet ? 26 : 22,
+              const SizedBox(width: 14),
+              Text(
+                'Inicio',
+                style: TextStyle(
+                  fontSize: isTablet ? 26 : 22,
+                  fontWeight: FontWeight.w800,
+                  color: c.contraste,
+                  letterSpacing: 0.5,
+                ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Text(
-              'Inicio',
-              style: TextStyle(
-                fontSize: isTablet ? 26 : 22,
-                fontWeight: FontWeight.w800,
-                color: c.contraste,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

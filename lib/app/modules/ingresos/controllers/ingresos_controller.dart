@@ -323,6 +323,8 @@ class IngresosController extends GetxController
         return Colors.blue;
       case 'registro':
         return Colors.orange;
+      case 'visita':
+        return Colors.teal;
       default:
         return Colors.grey;
     }

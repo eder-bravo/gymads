@@ -156,6 +156,8 @@ class TransactionTile extends StatelessWidget {
         return Icons.refresh;
       case 'registro':
         return Icons.how_to_reg;
+      case 'visita':
+        return Icons.confirmation_number_outlined;
       default:
         return Icons.receipt;
     }

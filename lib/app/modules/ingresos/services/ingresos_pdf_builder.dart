@@ -69,6 +69,7 @@ class IngresosPdfBuilder {
       'renovacion': 'Renovación',
       'producto': 'Venta de producto',
       'abono': 'Abono',
+      'visita': 'Visita',
     };
     return {
       for (final e in datos.entries) nombres[e.key] ?? e.key: e.value,

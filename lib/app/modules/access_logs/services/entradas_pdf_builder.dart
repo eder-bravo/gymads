@@ -55,7 +55,9 @@ class EntradasPdfBuilder {
                 PdfReportService.horaLegible(a.accessTime),
                 a.userName,
                 if (muestraSalidas)
-                  a.accessType == 'salida' ? 'Salida' : 'Entrada',
+                  a.method == 'visita'
+                      ? 'Visita'
+                      : (a.accessType == 'salida' ? 'Salida' : 'Entrada'),
                 a.staffUser,
               ],
           ],

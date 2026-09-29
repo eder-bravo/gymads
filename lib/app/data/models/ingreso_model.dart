@@ -159,6 +159,8 @@ class IngresoModel {
         return 'Venta de producto';
       case 'abono':
         return 'Abono';
+      case 'visita':
+        return 'Visita';
       default:
         return concepto;
     }

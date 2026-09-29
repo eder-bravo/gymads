@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/widgets/refrescable.dart';
 import '../controllers/abonar_controller.dart';
+import 'cobrar_visita_view.dart';
 import '../../../core/widgets/centrado_desplazable.dart';
 import '../../../core/widgets/cabecera_con_lista.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
@@ -62,12 +63,39 @@ class AbonarView extends GetView<AbonarController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Quien viene a probar: se cobra el día sin registrarlo.
+          TourStep(
+            tourKey: controller.keyVisita,
+            title: 'Cobrar una visita',
+            description: 'Para quien viene a probar: cobras el día sin '
+                'registrarlo como cliente y su entrada queda anotada.',
+            isFirstStep: true,
+            child: Obx(() {
+              final precio = controller.prices.value?.priceDay;
+              return OutlinedButton.icon(
+                onPressed: () => abrirCobrarVisita(precioDia: precio),
+                icon: const Icon(Icons.confirmation_number_outlined, size: 20),
+                label: Text(precio == null
+                    ? 'Cobrar visita'
+                    : 'Cobrar visita · \$${_montoCorto(precio)}'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  textStyle: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 16),
           TourStep(
             tourKey: controller.keyBuscar,
             title: 'Busca al cliente',
             description: 'Escribe su teléfono o su nombre para encontrarlo. '
                 'También puedes pasar su tarjeta por el lector.',
-            isFirstStep: true,
             child: AppSearchField(
               hintText: 'Buscar cliente...',
               controller: controller.searchController,
@@ -546,3 +574,7 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 }
+
+/// "\$50" en vez de "\$50.00"; con centavos, completos.
+String _montoCorto(double v) =>
+    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);

@@ -368,8 +368,15 @@ class AccessLogsView extends GetView<AccessLogsController> {
   Widget _buildLogCard(BuildContext context, AccessLogModel log) {
     final c = context.colores;
     final isEntry = log.accessType == 'entrada';
-    final color = isEntry ? AppColors.success : AppColors.error;
-    final icon = isEntry ? Icons.login : Icons.logout;
+    // Una visita (pagó el día sin registrarse) solo marca la entrada: se
+    // rotula "Visita" para que no parezca que le falta la salida.
+    final esVisita = log.method == 'visita';
+    final color = esVisita
+        ? Colors.teal
+        : (isEntry ? AppColors.success : AppColors.error);
+    final icon = esVisita
+        ? Icons.confirmation_number_outlined
+        : (isEntry ? Icons.login : Icons.logout);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -435,7 +442,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    log.accessType.toUpperCase(),
+                    esVisita ? 'VISITA' : log.accessType.toUpperCase(),
                     style: TextStyle(
                       color: color,
                       fontSize: 12,

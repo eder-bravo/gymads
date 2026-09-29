@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gymads/app/data/models/gym_settings_model.dart';
+import '../../../data/config/auth_config.dart';
 import '../../../data/providers/staff_profile_provider.dart';
+import '../../../data/services/google_play_services.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
 
@@ -36,6 +39,7 @@ class RegisterController extends GetxController {
     horaApertura.value = apertura;
     horaCierre.value = cierre;
   }
+
   final locationController = TextEditingController();
 
   // State
@@ -155,14 +159,38 @@ class RegisterController extends GetxController {
     isLoading.value = true;
 
     try {
-      if (GetPlatform.isAndroid || GetPlatform.isIOS) {
+      if (GetPlatform.isAndroid) {
+        if (!await GooglePlayServices.disponibles) {
+          AppLogger.info(
+            'RegisterController',
+            'Google Play Services no disponible; usando OAuth por navegador',
+          );
+          await _registerWithGoogleNavegador();
+        } else {
+          try {
+            await _registerWithGoogleNativo();
+          } on PlatformException catch (e) {
+            if (e.code == 'sign_in_failed' ||
+                e.message?.contains('12500') == true) {
+              AppLogger.warning(
+                'RegisterController',
+                'Google nativo no disponible; usando OAuth por navegador',
+              );
+              await _registerWithGoogleNavegador();
+            } else {
+              rethrow;
+            }
+          }
+        }
+      } else if (GetPlatform.isIOS) {
         await _registerWithGoogleNativo();
       } else {
-        // Escritorio y web: no hay Google nativo, queda el flujo por navegador.
+        // Escritorio y web: flujo por navegador.
         await _registerWithGoogleNavegador();
       }
     } on AuthException catch (e) {
-      AppLogger.error('RegisterController', 'Fallo de autenticación con Google', e);
+      AppLogger.error(
+          'RegisterController', 'Fallo de autenticación con Google', e);
       errorMessage.value = 'Error con Google: ${e.message}';
     } catch (e) {
       AppLogger.error('RegisterController', 'Google sign-in error', e);
@@ -214,36 +242,33 @@ class RegisterController extends GetxController {
     );
   }
 
-  /// Plataformas sin Google nativo: flujo OAuth por navegador. Necesita el
-  /// esquema `redirectTo` tanto en las Redirect URLs del proyecto como en el
-  /// `Info.plist` de la plataforma.
+  /// Huawei sin GMS, escritorio y web: flujo OAuth por navegador.
   Future<void> _registerWithGoogleNavegador() async {
-    AppLogger.info('RegisterController', 'Starting Supabase OAuth flow for registration');
+    AppLogger.info(
+        'RegisterController', 'Starting Supabase OAuth flow for registration');
+
+    // Se escucha antes de abrir el navegador para no perder un retorno rápido.
+    final authResult = _supabase.auth.onAuthStateChange.firstWhere((data) =>
+        data.event == AuthChangeEvent.signedIn && data.session != null);
 
     final success = await _supabase.auth.signInWithOAuth(
       OAuthProvider.google,
-      redirectTo: 'com.googleusercontent.apps.161338034924-4kfeihb6hgt7hf8f3ritrb1v6lukodv5://',
+      redirectTo: AuthConfig.oauthRedirectUrl,
     );
 
     if (!success) {
       throw Exception('No se pudo iniciar sesión con Google');
     }
 
-    // Listen for the auth state change when the OAuth redirect comes back
-    final session = await _supabase.auth.onAuthStateChange
-        .firstWhere((data) =>
-            data.event == AuthChangeEvent.signedIn &&
-            data.session != null)
-        .timeout(
-          const Duration(minutes: 2),
-          onTimeout: () => throw Exception('Tiempo de espera agotado'),
-        );
+    final session = await authResult.timeout(
+      const Duration(minutes: 2),
+      onTimeout: () => throw Exception('Tiempo de espera agotado'),
+    );
 
     final userId = session.session!.user.id;
     final userMeta = session.session!.user.userMetadata;
-    final fullName = userMeta?['full_name'] as String? ??
-        userMeta?['name'] as String? ??
-        '';
+    final fullName =
+        userMeta?['full_name'] as String? ?? userMeta?['name'] as String? ?? '';
     final email = session.session!.user.email ?? '';
 
     await _handleGoogleRegResult(userId, fullName, email);
@@ -371,7 +396,8 @@ class RegisterController extends GetxController {
       AppLogger.info('RegisterController', 'Gym registered');
 
       // 3. Auto-login: fetch staff profile and set tenant context
-      AppLogger.info('RegisterController', 'Auto-login: fetching staff profile');
+      AppLogger.info(
+          'RegisterController', 'Auto-login: fetching staff profile');
       final staffProfile = await _staffProfileProvider.getByUserId(userId);
 
       if (staffProfile != null && staffProfile.isActive) {
@@ -379,7 +405,8 @@ class RegisterController extends GetxController {
         Get.offAllNamed(Routes.HOME);
       } else {
         // Fallback: staff profile not ready yet, go to login
-        AppLogger.warning('RegisterController', 'Staff profile not ready, redirecting to login');
+        AppLogger.warning('RegisterController',
+            'Staff profile not ready, redirecting to login');
         Get.offAllNamed(Routes.LOGIN);
       }
     } on AuthException catch (e) {

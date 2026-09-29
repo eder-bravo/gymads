@@ -52,4 +52,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Permite detectar si el dispositivo tiene Google Play Services antes de
+    // intentar abrir el selector nativo (Huawei usa OAuth por navegador).
+    implementation("com.google.android.gms:play-services-base:18.5.0")
 }

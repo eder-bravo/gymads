@@ -1,17 +1,20 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../../data/config/auth_config.dart';
 import '../../../data/models/staff_profile_model.dart';
 import '../../../data/providers/staff_profile_provider.dart';
 import '../../../core/permissions/staff_role.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../data/services/cambio_de_perfil.dart';
 import '../../../data/services/cambios_en_vivo_service.dart';
+import '../../../data/services/google_play_services.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../../routes/app_pages.dart';
@@ -237,16 +240,42 @@ class AuthController extends GetxController {
     isLoading.value = true;
 
     try {
-      if (GetPlatform.isAndroid || GetPlatform.isIOS) {
+      if (GetPlatform.isAndroid) {
+        if (!await GooglePlayServices.disponibles) {
+          AppLogger.info(
+            'AuthController',
+            'Google Play Services no disponible; usando OAuth por navegador',
+          );
+          return await _loginWithGoogleNavegador();
+        }
+
+        try {
+          return await _loginWithGoogleNativo();
+        } on PlatformException catch (e) {
+          // Algunos Huawei incluyen rastros de GMS, pero Google Sign-In no
+          // puede completar el selector. En ese caso el navegador sí funciona.
+          if (e.code == 'sign_in_failed' ||
+              e.message?.contains('12500') == true) {
+            AppLogger.warning(
+              'AuthController',
+              'Google nativo no disponible; usando OAuth por navegador',
+            );
+            return await _loginWithGoogleNavegador();
+          }
+          rethrow;
+        }
+      } else if (GetPlatform.isIOS) {
         return await _loginWithGoogleNativo();
       } else {
-        // Escritorio y web: no hay Google nativo, queda el flujo por navegador.
+        // Escritorio y web: flujo por navegador.
         return await _loginWithGoogleNavegador();
       }
     } on AuthException catch (e) {
       AppLogger.error('AuthController', 'Fallo de autenticación', e);
-      if (e.message.contains('host lookup') || e.message.contains('SocketException')) {
-        errorMessage.value = 'Sin conexión a internet. Verifica tu red e intenta de nuevo.';
+      if (e.message.contains('host lookup') ||
+          e.message.contains('SocketException')) {
+        errorMessage.value =
+            'Sin conexión a internet. Verifica tu red e intenta de nuevo.';
       } else {
         errorMessage.value = 'Error con Google: ${e.message}';
       }
@@ -322,20 +351,21 @@ class AuthController extends GetxController {
       throw Exception('Error al autenticar con Google');
     }
 
-    return await _handleGoogleAuthResult(response.user!.id, googleUser.displayName, googleUser.email);
+    return await _handleGoogleAuthResult(
+        response.user!.id, googleUser.displayName, googleUser.email);
   }
 
-  /// Plataformas sin Google nativo: flujo OAuth por navegador.
-  ///
-  /// Para que funcione hacen falta dos cosas que hoy no están: el esquema
-  /// `redirectTo` en la lista de Redirect URLs del proyecto, y ese mismo
-  /// esquema registrado en el `Info.plist` de la plataforma.
+  /// Huawei sin GMS, escritorio y web: flujo OAuth por navegador.
   Future<bool> _loginWithGoogleNavegador() async {
     AppLogger.info('AuthController', 'Starting Supabase OAuth flow');
 
+    // Se escucha antes de abrir el navegador para no perder un retorno rápido.
+    final authResult = _supabase.auth.onAuthStateChange.firstWhere((data) =>
+        data.event == AuthChangeEvent.signedIn && data.session != null);
+
     final success = await _supabase.auth.signInWithOAuth(
       OAuthProvider.google,
-      redirectTo: 'com.googleusercontent.apps.161338034924-4kfeihb6hgt7hf8f3ritrb1v6lukodv5://',
+      redirectTo: AuthConfig.oauthRedirectUrl,
     );
 
     if (!success) {
@@ -345,24 +375,18 @@ class AuthController extends GetxController {
 
     AppLogger.info('AuthController', 'OAuth launched, waiting for session');
 
-    // Listen for the auth state change when the OAuth redirect comes back
-    final session = await _supabase.auth.onAuthStateChange
-        .firstWhere((data) =>
-            data.event == AuthChangeEvent.signedIn &&
-            data.session != null)
-        .timeout(
-          const Duration(minutes: 2),
-          onTimeout: () => throw Exception('Tiempo de espera agotado'),
-        );
+    final session = await authResult.timeout(
+      const Duration(minutes: 2),
+      onTimeout: () => throw Exception('Tiempo de espera agotado'),
+    );
 
     final userId = session.session!.user.id;
     AppLogger.info('AuthController', 'Supabase auth successful');
 
     // Get user metadata from Supabase session
     final userMeta = session.session!.user.userMetadata;
-    final fullName = userMeta?['full_name'] as String? ??
-        userMeta?['name'] as String? ??
-        '';
+    final fullName =
+        userMeta?['full_name'] as String? ?? userMeta?['name'] as String? ?? '';
     final email = session.session!.user.email ?? '';
 
     return await _handleGoogleAuthResult(userId, fullName, email);
@@ -384,7 +408,8 @@ class AuthController extends GetxController {
       Get.offAllNamed(Routes.HOME);
       return true;
     } else {
-      AppLogger.info('AuthController', 'New user, navigating to GOOGLE_COMPLETE');
+      AppLogger.info(
+          'AuthController', 'New user, navigating to GOOGLE_COMPLETE');
       final registerCtrl = Get.put(RegisterController());
       final gName = displayName ?? '';
       final nameParts = gName.split(' ');

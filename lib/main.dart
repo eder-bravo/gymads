@@ -13,6 +13,7 @@ import 'package:gymads/app/data/services/image_cache_service.dart';
 import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
+import 'package:gymads/app/data/services/windows_oauth_protocol.dart';
 import 'package:gymads/app/modules/auth/controllers/auth_controller.dart';
 import 'package:gymads/app/routes/app_pages.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -36,6 +37,10 @@ void main() async {
 
   // Asegura la inicialización de los bindings de Flutter
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Permite que el navegador devuelva el resultado de Google a la app de
+  // Windows. En las demás plataformas no hace nada.
+  WindowsOAuthProtocol.register();
 
   // Initialize GetStorage for local caching
   await GetStorage.init();

@@ -45,6 +45,7 @@ dependencies:
   get_storage: ^2.1.1
   showcaseview: ^5.1.0
   google_sign_in: ^6.1.6
+  win32_registry: ^2.1.0
   pdf: ^3.11.1
   printing: ^5.13.4
   bonsoir: ^7.1.4

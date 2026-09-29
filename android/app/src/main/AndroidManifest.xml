@@ -80,6 +80,14 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Retorno del navegador después de autenticar con Google.
+                 Esta ruta funciona también en Huawei sin Google Play Services. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.googleusercontent.apps.161338034924-4kfeihb6hgt7hf8f3ritrb1v6lukodv5" />
+            </intent-filter>
         </activity>
         <!-- Servicio de flutter_foreground_task (no cambiar el nombre). Con
              stopWithTask, cerrar la app desde recientes lo detiene: sin la app

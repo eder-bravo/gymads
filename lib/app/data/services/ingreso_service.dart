@@ -20,6 +20,7 @@ class IngresoService {
     String? notas,
     DateTime? periodoInicio,
     DateTime? periodoFin,
+    String? referenciaPago,
   }) async {
     try {
       final ingreso = IngresoModel(
@@ -37,6 +38,7 @@ class IngresoService {
         periodoFin: periodoFin,
         usuarioStaff: usuarioStaff,
         notas: notas,
+        referenciaPago: referenciaPago,
       );
 
       AppLogger.info('IngresoService', 'Registrando abono');

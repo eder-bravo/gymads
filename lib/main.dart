@@ -17,6 +17,7 @@ import 'package:gymads/app/modules/auth/controllers/auth_controller.dart';
 import 'package:gymads/app/routes/app_pages.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/app/data/services/fotos_de_clientes.dart';
 import 'package:gymads/app/data/services/avisos_sistema_service.dart';
 import 'package:gymads/app/data/services/permisos_app.dart';
 import 'package:gymads/app/data/services/tema_service.dart';
@@ -62,6 +63,10 @@ void main() async {
   // Actualización automática: lo que cambia otro teléfono del gimnasio se ve
   // sin refrescar. Sigue a la sesión (abre y cierra el canal solo).
   Get.put(CambiosEnVivoService(), permanent: true);
+
+  // Las fotos de los clientes, descargadas de antemano en este teléfono (y al
+  // día con lo que agregan los demás): el aviso del lector sale ya con ella.
+  Get.put(FotosDeClientes(), permanent: true);
 
   // Notificaciones de los pases del lector con la app en segundo plano. El
   // permiso se pide después, solo en el teléfono que atiende el lector.
@@ -185,6 +190,14 @@ class _MyAppState extends State<MyApp> {
         Locale('es'),
         Locale('en'),
       ],
+      // Tocar fuera de un campo cierra el teclado, en toda la app. El
+      // numérico del iPhone no tiene tecla para cerrarse. Los botones y
+      // campos siguen recibiendo su toque: este solo gana cuando nadie más
+      // lo quiere.
+      builder: (context, child) => GestureDetector(
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: child,
+      ),
       theme: AppTheme.claro,
       darkTheme: AppTheme.oscuro,
       themeMode: TemaService.to.modo.value,

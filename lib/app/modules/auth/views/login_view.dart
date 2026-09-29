@@ -116,14 +116,14 @@ class LoginView extends GetView<AuthController> {
       constraints: const BoxConstraints(maxWidth: 400),
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: c.contraste.withOpacity(0.05),
+        color: c.tarjetaAcceso,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: c.contraste.withOpacity(0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: c.sombra,
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -218,7 +218,7 @@ class LoginView extends GetView<AuthController> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.badge_outlined, size: 20, color: c.contraste),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text(
               'Entrar como staff',
               style: TextStyle(

@@ -185,6 +185,12 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: c.superficie,
+            ),
+            // El aro va encima de la foto: como `decoration` se pintaba
+            // debajo, la foto lo tapaba en las diagonales y el círculo se
+            // veía mal recortado.
+            foregroundDecoration: BoxDecoration(
+              shape: BoxShape.circle,
               border: Border.all(
                 color: _faltaFoto
                     ? AppColors.error

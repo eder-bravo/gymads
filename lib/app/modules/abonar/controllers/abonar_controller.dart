@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
+import 'package:gymads/app/core/utils/referencia_de_pago.dart';
 import 'package:gymads/app/data/models/abono_prices_model.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
@@ -48,7 +49,7 @@ AlTerminarAbono alTerminarDesde(Object? argumentos) {
 }
 
 class AbonarController extends GetxController
-    with ScreenTourMixin, RecargaEnVivoMixin {
+    with ScreenTourMixin, RecargaEnVivoMixin, ReferenciaDePago {
   final UserRepository userRepository;
   final IngresoService ingresoService;
   final AbonoPricesRepository pricesRepository;
@@ -80,7 +81,8 @@ class AbonarController extends GetxController
   final unitPriceController = TextEditingController(); // Precio por periodo
   final durationController = TextEditingController(text: '1'); // Cantidad de periodos
   final durationType = 'Meses'.obs; // Tipo de tiempo: Meses, Semanas, Días
-  final paymentMethod = 'Efectivo'.obs;
+  /// Como se guarda en `metodo_pago` (efectivo, tarjeta_debito…).
+  final paymentMethod = 'efectivo'.obs;
 
   // Espejo reactivo de los campos de texto, para recalcular total y fecha en vivo
   final unitPrice = 0.0.obs;
@@ -104,7 +106,17 @@ class AbonarController extends GetxController
     }
   }
 
-  final paymentMethods = ['Efectivo', 'Tarjeta', 'Transferencia'];
+  /// Los mismos que en Vender: débito y crédito por separado.
+  final paymentMethods = metodosDePago;
+
+  /// Si el método elegido lleva folio o referencia.
+  bool get usaReferenciaPago => metodosConReferencia.contains(paymentMethod.value);
+
+  void setPaymentMethod(String metodo) {
+    paymentMethod.value = metodo;
+    // La referencia es de una operación concreta: no sobrevive al cambio.
+    limpiarReferencia();
+  }
   final durationTypes = ['Meses', 'Semanas', 'Días', 'Años'];
 
   // Precios fijos configurados por el gimnasio (por día, semana, mes y año)
@@ -398,6 +410,8 @@ class AbonarController extends GetxController
 
   void clearSelection() {
     selectedClient.value = null;
+    paymentMethod.value = 'efectivo';
+    limpiarReferencia();
     unitPriceController.clear();
     durationController.text = '1';
     durationType.value = 'Meses';
@@ -493,7 +507,9 @@ class AbonarController extends GetxController
             clienteId: client.id!,
             clienteNombre: client.name,
             monto: amount,
-            metodoPago: paymentMethod.value.toLowerCase(),
+            metodoPago: paymentMethod.value,
+            referenciaPago:
+                usaReferenciaPago ? referenciaParaGuardar : null,
             descripcion: descripcion,
             usuarioStaff: 'Staff',
             notas: isPrecioFijo.value ? 'Abono fijo' : 'Abono libre',

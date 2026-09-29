@@ -6,6 +6,7 @@ import '../../../data/config/rfid_config.dart';
 import '../../../data/services/lector_ble_service.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/agregar_lector_controller.dart';
+import '../widgets/escena_conexion_lector.dart';
 
 /// Abre el asistente. [cambiarWifi] solo cambia los textos: el camino es el
 /// mismo para un lector nuevo que para uno al que se le cambia la red.
@@ -47,7 +48,16 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 480),
-                    child: _paso(context),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Lo que está pasando, de un vistazo: teléfono,
+                        // lector y WiFi, y en qué paso va.
+                        _progreso(),
+                        const SizedBox(height: 20),
+                        _paso(context),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -56,34 +66,43 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
         ));
   }
 
+  Widget _progreso() {
+    final paso = controller.paso.value;
+    final etapa = etapaDe(paso, controller.pasoAntesDelFallo);
+    // Más baja mientras se escribe: con el teclado abierto falta espacio.
+    final escribiendo =
+        paso == PasoAgregar.elegirRed || paso == PasoAgregar.escribirClave;
+    return Column(
+      children: [
+        EscenaConexion(etapa: etapa, alto: escribiendo ? 96 : 120),
+        const SizedBox(height: 12),
+        PasosConexion(etapa: etapa),
+      ],
+    );
+  }
+
   Widget _paso(BuildContext context) {
     switch (controller.paso.value) {
       case PasoAgregar.buscando:
         return _buscando(context);
       case PasoAgregar.preparando:
-        return _esperando(context,
-          icono: Icons.bluetooth_connected,
+        return _encabezado(context,
           titulo: 'Lector encontrado',
-          texto: 'Preguntándole qué redes WiFi ve...',
+          texto: 'Conectándose por Bluetooth...',
         );
       case PasoAgregar.elegirRed:
         return _elegirRed(context);
       case PasoAgregar.escribirClave:
         return _escribirClave(context);
       case PasoAgregar.conectando:
-        return _esperando(context,
-          icono: Icons.wifi,
+        return _encabezado(context,
           titulo: 'Conectando al WiFi...',
-          texto: 'El lector está probando la red. Mientras tanto se '
-              'desconecta del teléfono: es normal. Puede tardar hasta un '
-              'minuto; no cierres esta pantalla.',
+          texto: 'Puede tardar un minuto. No cierres esta pantalla.',
         );
       case PasoAgregar.comprobando:
-        return _esperando(context,
-          icono: Icons.wifi_find,
+        return _encabezado(context,
           titulo: 'Casi listo',
-          texto: 'El lector se está reiniciando para empezar a trabajar. '
-              'Buscándolo en la red...',
+          texto: 'Buscando el lector en tu WiFi...',
         );
       case PasoAgregar.listo:
         return _listo(context);
@@ -101,21 +120,15 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _encabezado(context,
-          icono: Icons.bluetooth_searching,
           titulo: varios ? '¿Cuál es tu lector?' : 'Buscando el lector...',
           texto: varios
               ? 'Hay más de un lector cerca. Elige el tuyo.'
               : cambiarWifi
                   ? 'Mantén el teléfono cerca del lector.'
                   : 'Conecta el lector a la corriente y deja el teléfono '
-                      'cerca. Su luz parpadea rápido cuando está listo; si '
-                      'viene de otro lugar, tarda unos 30 segundos en '
-                      'empezar.',
+                      'cerca.',
         ),
-        const SizedBox(height: 24),
-        if (!varios)
-          const Center(
-              child: CircularProgressIndicator(color: AppColors.accent)),
+        if (varios) const SizedBox(height: 16),
         for (final lector in controller.lectores)
           if (varios)
             Card(
@@ -149,7 +162,6 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _encabezado(context,
-          icono: Icons.wifi,
           titulo: '¿A qué WiFi se conecta?',
           texto: redes.isEmpty
               ? 'El lector no vio ninguna red. Acércalo al módem y busca de '
@@ -209,7 +221,6 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _encabezado(context,
-          icono: Icons.wifi_password,
           titulo: otraRed ? 'Otra red' : (red?.ssid ?? 'Red elegida'),
           texto: otraRed
               ? 'Escribe el nombre de la red tal como aparece en el teléfono, '
@@ -304,8 +315,6 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _encabezado(context,
-          icono: Icons.check_circle,
-          color: AppColors.success,
           titulo: '¡Listo!',
           texto: cambiarWifi
               ? 'El lector ya está en la red nueva.'
@@ -323,19 +332,9 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _encabezado(context,
-          icono: Icons.error_outline,
-          color: AppColors.error,
           titulo: 'No se pudo',
           texto: controller.mensaje.value ?? 'Algo salió mal.',
         ),
-        if (cambiarWifi || RfidConfig.tieneLector) ...[
-          const SizedBox(height: 16),
-          _aviso(context, 'Si acabas de conectar el lector en otro lugar, tarda unos '
-              '30 segundos en empezar a parpadear rápido. Si ya estaba '
-              'funcionando y perdió el WiFi, tarda 2 minutos. También puedes '
-              'desconectarlo, volver a conectarlo y, en los primeros 10 '
-              'segundos, mantener el botón BOOT 3 segundos: queda como nuevo.'),
-        ],
         const SizedBox(height: 24),
         _botonPrincipal('Intentar de nuevo', Icons.refresh, controller.buscar),
       ],
@@ -344,40 +343,15 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
 
   // ─────────────────────────────────────────────────────────
 
-  Widget _esperando(BuildContext context, {
-    required IconData icono,
-    required String titulo,
-    required String texto,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _encabezado(context, icono: icono, titulo: titulo, texto: texto),
-        const SizedBox(height: 24),
-        const Center(child: CircularProgressIndicator(color: AppColors.accent)),
-      ],
-    );
-  }
-
+  /// El título y una frase de lo que toca hacer. El dibujo de arriba
+  /// ([EscenaConexion]) ya muestra en qué va el proceso.
   Widget _encabezado(BuildContext context, {
-    required IconData icono,
     required String titulo,
     required String texto,
-    Color color = AppColors.accent,
   }) {
     final c = context.colores;
     return Column(
       children: [
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icono, color: color, size: 40),
-        ),
-        const SizedBox(height: 16),
         Text(
           titulo,
           textAlign: TextAlign.center,

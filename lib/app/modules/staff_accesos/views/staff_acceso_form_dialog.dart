@@ -171,6 +171,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
       appBar: const GymAppBar(title: 'Nuevo acceso'),
       body: SafeArea(
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
             _explicacion(
@@ -198,6 +199,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
       constraints: const BoxConstraints(minWidth: 280, maxWidth: 420),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,

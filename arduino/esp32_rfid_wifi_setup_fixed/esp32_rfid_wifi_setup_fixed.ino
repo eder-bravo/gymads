@@ -2,12 +2,40 @@
  * GYMONE - ESP32 RFID Reader con WiFi
  * LECTOR RFID CON CONEXIÓN WIFI AUTOMÁTICA PARA GYMONE
  *
- * Versión 6.4.0 - WiFi para trabajar, Bluetooth solo para configurar
+ * Versión 6.4.2 - WiFi para trabajar, Bluetooth solo para configurar
  * Dispositivo: ESP32 (clásico, con BLE)
  *
  * Compilar con una partición grande: WiFi + BLE + servidor no caben en la
  * de 1.2 MB que trae por defecto.
  *   arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app
+ *
+ * CAMBIOS v6.4.2:
+ * - "Cambiar WiFi" (POST /api/configurar) ya no enciende el Bluetooth
+ *   encima del WiFi, el servidor y el mDNS en marcha: ahí el Bluetooth podía
+ *   quedarse sin memoria y no anunciarse, y la app decía "no apareció ningún
+ *   lector" aunque estuviera conectado. Ahora anota el pedido, se reinicia y
+ *   arranca directo en modo configuración, igual que un lector nuevo: el
+ *   Bluetooth primero y la red guardada después. Si nadie lo usa en 5 min,
+ *   se reinicia y vuelve a trabajar normal.
+ *
+ * CAMBIOS v6.4.1:
+ * - En modo configuración el lector dejaba de verse por Bluetooth al rato
+ *   (sobre todo después de que un teléfono se conectaba y se iba), y solo
+ *   volvía desconectándolo de la corriente. Se volvía a anunciar DENTRO del
+ *   aviso de desconexión, cuando el Bluetooth todavía estaba cerrando el
+ *   enlace: si ese arranque fallaba (y su único reintento también), el
+ *   anuncio quedaba apagado para siempre. Ahora:
+ *     - vuelve a anunciarse desde el loop, 500 ms después de la
+ *       desconexión (como los ejemplos de Espressif);
+ *     - mientras nadie está conectado, cada 30 s se asegura de que el
+ *       anuncio siga activo;
+ *     - si pasan 10 min sin que nadie se conecte, se reinicia solo (lo
+ *       mismo que desconectarlo y volver a conectarlo);
+ *     - un teléfono que se queda conectado 3 min sin mandar nada se suelta:
+ *       mientras está conectado, el lector no se anuncia y ningún otro
+ *       teléfono lo encontraba.
+ * - Sin el "TWDT already initialized" al arrancar: el core ya trae el
+ *   watchdog iniciado; ahora se reconfigura directamente.
  *
  * CAMBIOS v6.4.0:
  * - El lector se llama GymOne, como la app: por Bluetooth se anuncia como
@@ -151,7 +179,7 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
-#define FIRMWARE_VERSION "6.4.0"
+#define FIRMWARE_VERSION "6.4.2"
 
 
 // =================== CONFIGURACIÓN DEL BUZZER ===================
@@ -303,6 +331,17 @@ bool borrarWifiAlReiniciar = false;
 bool bleIniciado = false;
 volatile bool clienteBleConectado = false;
 
+// Guardián del anuncio por Bluetooth (ver cuidarAnuncioBle).
+#define REANUNCIAR_TRAS_DESCONEXION_MS 500
+#define REFRESCAR_ANUNCIO_MS 30000
+#define REINICIO_SIN_USO_CONFIG_MS 600000  // 10 min
+#define SOLTAR_CLIENTE_INACTIVO_MS 180000  // 3 min
+// Cuándo se fue la app (lo pone el callback; el loop vuelve a anunciar).
+volatile unsigned long bleDesconectadoEn = 0;
+// La última vez que una app se conectó, escribió algo o se fue.
+volatile unsigned long ultimaActividadBle = 0;
+unsigned long ultimoRefrescoAnuncio = 0;
+
 BLEServer *servidorBle = nullptr;
 BLECharacteristic *chRedes = nullptr;
 BLECharacteristic *chEstado = nullptr;
@@ -382,6 +421,7 @@ void entrarModoConfig(MotivoConfig motivo, unsigned long duracionMs = 0);
 void iniciarBle();
 void publicarEstado(const String &estado);
 void atenderModoConfig(unsigned long ahora);
+void cuidarAnuncioBle(unsigned long ahora);
 void empezarEscaneo();
 void revisarEscaneo();
 void empezarConexionNueva();
@@ -401,6 +441,8 @@ String getCardUID(uint8_t *uid, uint8_t uidLength);
 class ServidorCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *servidor, esp_ble_gatts_cb_param_t *param) override {
     clienteBleConectado = true;
+    bleDesconectadoEn = 0;
+    ultimaActividadBle = millis();
     Serial.println("[BLE] App conectada");
     // Intervalo de conexión más holgado (60-120 ms en vez de los ~30 ms de
     // iOS): el Bluetooth ocupa menos la antena mientras el WiFi busca redes.
@@ -410,13 +452,14 @@ class ServidorCallbacks : public BLEServerCallbacks {
 
   void onDisconnect(BLEServer *servidor) override {
     clienteBleConectado = false;
+    ultimaActividadBle = millis();
     Serial.println("[BLE] App desconectada");
-    // Se vuelve a anunciar para que la app pueda reconectar si se cortó a la
-    // mitad. El estado sigue en el loop, así que no se pierde el avance.
-    // Mientras se prueba el WiFi NO: el Bluetooth está en pausa a propósito.
-    if (modoConfig && faseConexion == CONEXION_INACTIVA) {
-      BLEDevice::startAdvertising();
-    }
+    // Aquí NO se vuelve a anunciar: el Bluetooth todavía está cerrando el
+    // enlace y el arranque puede fallar sin aviso (el lector quedaba
+    // invisible hasta desconectarlo). Lo hace el loop medio segundo después
+    // (cuidarAnuncioBle), y no mientras se prueba el WiFi.
+    unsigned long ahora = millis();
+    bleDesconectadoEn = ahora == 0 ? 1 : ahora;
   }
 };
 
@@ -424,6 +467,7 @@ class ServidorCallbacks : public BLEServerCallbacks {
 // valor: nada de WiFi ni delay() aquí dentro, o se congela la pila BLE.
 class EscrituraCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *c) override {
+    ultimaActividadBle = millis();
     String valor = c->getValue();
     String uuid = c->getUUID().toString();
 
@@ -459,8 +503,10 @@ void setup() {
     .idle_core_mask = (1 << 0),
     .trigger_panic = true
   };
-  if (esp_task_wdt_init(&wdt_config) != ESP_OK) {
-    esp_task_wdt_reconfigure(&wdt_config);
+  // El core ya arranca el watchdog: se reconfigura, y solo si no estaba se
+  // inicia (al revés imprimía "TWDT already initialized" en cada arranque).
+  if (esp_task_wdt_reconfigure(&wdt_config) != ESP_OK) {
+    esp_task_wdt_init(&wdt_config);
   }
   esp_task_wdt_add(NULL);
 
@@ -534,9 +580,22 @@ void setup() {
   // Rutas HTTP: se registran UNA sola vez.
   setupServerRoutes();
 
+  // "Cambiar WiFi" desde la app: se pidió antes de reiniciar. Se usa una
+  // sola vez.
+  prefs.begin("gymone", false);
+  bool configPedida = prefs.getBool("abrir_config", false);
+  if (configPedida) prefs.remove("abrir_config");
+  prefs.end();
+
   if (wifiSsid.length() == 0) {
     // Recién salido de la caja (o formateado): directo a configuración.
     entrarModoConfig(CONFIG_SIN_RED_GUARDADA);
+  } else if (configPedida) {
+    // El Bluetooth primero, como un lector nuevo. La red guardada se retoma
+    // sola (revisarWifi) en cuanto no haya un teléfono conectado ni una
+    // búsqueda de redes en marcha.
+    entrarModoConfig(CONFIG_PEDIDO_APP, CONFIG_PEDIDA_DURACION_MS);
+    desconectadoDesde = millis();
   } else {
     iniciarWifiGuardado();
     desconectadoDesde = millis();
@@ -757,6 +816,8 @@ void entrarModoConfig(MotivoConfig motivo, unsigned long duracionMs) {
   modoConfig = true;
   motivoConfig = motivo;
   modoConfigHasta = duracionMs > 0 ? millis() + duracionMs : 0;
+  ultimaActividadBle = millis();
+  ultimoRefrescoAnuncio = millis();
 
   iniciarBle();
   publicarEstado("listo");
@@ -867,6 +928,64 @@ void atenderModoConfig(unsigned long ahora) {
       ahora > modoConfigHasta) {
     Serial.println("[CONFIG] Se acabó el tiempo sin cambios. Reiniciando...");
     reinicioPendienteEn = millis() + 500;
+  }
+
+  cuidarAnuncioBle(ahora);
+}
+
+// Que el lector siga visible por Bluetooth mientras espera que lo configuren.
+//
+// Sin esto, si el anuncio se caía (un arranque fallido justo tras una
+// desconexión, por ejemplo) ya no volvía: los teléfonos no lo encontraban
+// hasta desconectarlo de la corriente.
+void cuidarAnuncioBle(unsigned long ahora) {
+  if (!bleIniciado) return;
+
+  if (clienteBleConectado) {
+    // Un teléfono conectado que no manda nada (la app se cerró a medias, o
+    // se quedó en otra pantalla): se le suelta para volver a anunciarse. No
+    // mientras se buscan redes o se prueba el WiFi, que tardan.
+    if (faseConexion == CONEXION_INACTIVA && !escaneando &&
+        ahora - ultimaActividadBle >= SOLTAR_CLIENTE_INACTIVO_MS &&
+        servidorBle != nullptr) {
+      Serial.println("[BLE] Teléfono conectado sin actividad: soltándolo");
+      ultimaActividadBle = ahora;
+      servidorBle->disconnect(servidorBle->getConnId());
+    }
+    return;
+  }
+  // Probando el WiFi el Bluetooth está en pausa a propósito; con la red nueva
+  // funcionando, o con un reinicio en camino, no hay nada que cuidar.
+  if (faseConexion != CONEXION_INACTIVA || okDesde != 0 ||
+      reinicioPendienteEn != 0) {
+    return;
+  }
+
+  // Una app se acaba de ir: se vuelve a anunciar medio segundo después, ya
+  // con el enlace cerrado.
+  unsigned long desconectado = bleDesconectadoEn;
+  if (desconectado != 0) {
+    if (ahora - desconectado < REANUNCIAR_TRAS_DESCONEXION_MS) return;
+    bleDesconectadoEn = 0;
+    Serial.println("[BLE] Anunciando de nuevo tras la desconexión");
+    BLEDevice::startAdvertising();
+    ultimoRefrescoAnuncio = ahora;
+    return;
+  }
+
+  // Cada 30 s sin nadie conectado, se reinicia el anuncio por si se cayó.
+  if (ahora - ultimoRefrescoAnuncio >= REFRESCAR_ANUNCIO_MS) {
+    ultimoRefrescoAnuncio = ahora;
+    BLEDevice::stopAdvertising();
+    BLEDevice::startAdvertising();
+  }
+
+  // Último recurso: 10 min sin que nadie se conecte. Reiniciarse deja el
+  // Bluetooth como recién encendido, que es lo que hacía desconectarlo.
+  if (ahora - ultimaActividadBle >= REINICIO_SIN_USO_CONFIG_MS) {
+    Serial.println("[BLE] 10 min sin que nadie se conecte: reiniciando para "
+                   "refrescar el Bluetooth");
+    reinicioPendienteEn = millis() + 200;
   }
 }
 
@@ -1159,6 +1278,10 @@ void terminarIntentoFallido(const char *veredicto) {
   WiFi.disconnect(false, false);
 
   publicarEstado(veredicto);
+  // La desconexión de la app ya pasó hace rato (se fue al mandar la orden):
+  // se anuncia aquí, en el loop, y el guardián no lo repite.
+  bleDesconectadoEn = 0;
+  ultimoRefrescoAnuncio = millis();
   BLEDevice::startAdvertising();
 
   // Se vuelve a la red de antes, si había una.
@@ -1399,12 +1522,28 @@ void handleConfigurar() {
     return;
   }
 
-  server.send(200, "application/json", "{\"ok\":true}");
-  if (!modoConfig) {
-    entrarModoConfig(CONFIG_PEDIDO_APP, CONFIG_PEDIDA_DURACION_MS);
-  } else if (motivoConfig == CONFIG_PEDIDO_APP) {
-    modoConfigHasta = millis() + CONFIG_PEDIDA_DURACION_MS;
+  if (modoConfig) {
+    // Ya se está ofreciendo por Bluetooth: solo se alarga el plazo.
+    if (motivoConfig == CONFIG_PEDIDO_APP) {
+      modoConfigHasta = millis() + CONFIG_PEDIDA_DURACION_MS;
+    }
+    server.send(200, "application/json", "{\"ok\":true}");
+    return;
   }
+
+  // No se enciende el Bluetooth aquí, encima del WiFi, el servidor y el mDNS:
+  // podía quedarse sin memoria y no anunciarse. Se anota el pedido y se
+  // reinicia: al arrancar entra en modo configuración antes que nada.
+  prefs.begin("gymone", false);
+  prefs.putBool("abrir_config", true);
+  prefs.end();
+
+  Serial.println("[CONFIG] Cambio de WiFi pedido: reiniciando en modo "
+                 "configuración...");
+  server.sendHeader("Connection", "close");
+  server.send(200, "application/json", "{\"ok\":true,\"reboot_in_ms\":800}");
+  // Nunca se reinicia dentro del handler: la respuesta tiene que salir.
+  reinicioPendienteEn = millis() + 800;
 }
 
 // =================== BOTÓN DE RESET DE FÁBRICA ===================

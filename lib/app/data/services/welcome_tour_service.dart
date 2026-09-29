@@ -175,8 +175,14 @@ class WelcomeTourService extends GetxService {
       enableAutoScroll: true,
       disableBarrierInteraction: true,
       // `onStart` solo se dispara cuando el paso tiene un widget de verdad al
-      // que apuntar; es la señal de que el recorrido llegó a verse.
-      onStart: (_, __) => _activeTourShown = true,
+      // que apuntar; es la señal de que el recorrido llegó a verse. Solo
+      // entonces se fija la pantalla: si se fijara al pedir el recorrido y
+      // este no llegara a mostrarse, la pantalla quedaría sin responder a
+      // los toques sin que se viera por qué.
+      onStart: (_, __) {
+        _activeTourShown = true;
+        recorridoEnCurso.value = true;
+      },
       onFinish: _onFinish,
       onDismiss: (_) => _onDismiss(),
     );
@@ -270,7 +276,6 @@ class WelcomeTourService extends GetxService {
       _activeTour = tourId;
       _rolDelTour = _sesion().rol;
       _activeTourShown = false;
-      recorridoEnCurso.value = true;
       // Un respiro para que la transición de ruta termine de asentarse antes
       // de pintar el resaltado.
       showcaseView.startShowCase(

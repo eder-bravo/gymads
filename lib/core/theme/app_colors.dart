@@ -42,6 +42,8 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
     required this.cabeceraDesde,
     required this.cabeceraHasta,
     required this.fondoAcceso,
+    required this.tarjetaAcceso,
+    required this.sombra,
   });
 
   /// El fondo de las pantallas.
@@ -84,6 +86,14 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
   /// de staff).
   final LinearGradient fondoAcceso;
 
+  /// La tarjeta de las pantallas de acceso: translúcida sobre el degradado
+  /// oscuro, blanca y sólida en claro (translúcida, la sombra se veía a
+  /// través y la volvía gris).
+  final Color tarjetaAcceso;
+
+  /// Sombra de tarjetas: en claro, mucho más suave.
+  final Color sombra;
+
   /// El de siempre: los valores con los que se diseñó la app.
   static const oscuro = ColoresTema(
     backgroundColor: Color.fromARGB(255, 27, 27, 27),
@@ -105,6 +115,8 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
       end: Alignment.bottomRight,
       colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Color(0xFF0f3460)],
     ),
+    tarjetaAcceso: Color(0x0DFFFFFF), // blanco 5 %
+    sombra: Color(0x33000000), // negro 20 %
   );
 
   /// Fondo gris muy claro con tarjetas blancas; el naranja de la marca se
@@ -130,6 +142,8 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
       end: Alignment.bottomRight,
       colors: [Color(0xFFFFFFFF), Color(0xFFF1F4F9), Color(0xFFE3EBF5)],
     ),
+    tarjetaAcceso: Color(0xFFFFFFFF),
+    sombra: Color(0x14000000), // negro 8 %
   );
 
   @override
@@ -149,6 +163,8 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
     Color? cabeceraDesde,
     Color? cabeceraHasta,
     LinearGradient? fondoAcceso,
+    Color? tarjetaAcceso,
+    Color? sombra,
   }) {
     return ColoresTema(
       backgroundColor: backgroundColor ?? this.backgroundColor,
@@ -166,6 +182,8 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
       cabeceraDesde: cabeceraDesde ?? this.cabeceraDesde,
       cabeceraHasta: cabeceraHasta ?? this.cabeceraHasta,
       fondoAcceso: fondoAcceso ?? this.fondoAcceso,
+      tarjetaAcceso: tarjetaAcceso ?? this.tarjetaAcceso,
+      sombra: sombra ?? this.sombra,
     );
   }
 
@@ -191,6 +209,8 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
       cabeceraDesde: mezcla(cabeceraDesde, other.cabeceraDesde),
       cabeceraHasta: mezcla(cabeceraHasta, other.cabeceraHasta),
       fondoAcceso: LinearGradient.lerp(fondoAcceso, other.fondoAcceso, t)!,
+      tarjetaAcceso: mezcla(tarjetaAcceso, other.tarjetaAcceso),
+      sombra: mezcla(sombra, other.sombra),
     );
   }
 }

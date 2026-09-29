@@ -164,6 +164,8 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
     final formulario = Form(
       key: _formKey,
       child: ListView(
+        // Deslizar cierra el teclado.
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           PhotoCaptureWidget(

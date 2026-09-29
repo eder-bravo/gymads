@@ -72,6 +72,18 @@ class AgregarLectorController extends GetxController {
 
   String? get nombreLector => _lector?.nombre;
 
+  /// El último paso antes de [PasoAgregar.fallo]: la animación marca en rojo
+  /// el Bluetooth o el WiFi según dónde se cayó.
+  PasoAgregar? pasoAntesDelFallo;
+
+  @override
+  void onInit() {
+    super.onInit();
+    ever<PasoAgregar>(paso, (p) {
+      if (p != PasoAgregar.fallo) pasoAntesDelFallo = p;
+    });
+  }
+
   @override
   void onReady() {
     super.onReady();
@@ -145,11 +157,18 @@ class AgregarLectorController extends GetxController {
       mensaje.value = 'No se pudo hablar con el lector. Acerca el teléfono y '
           'reintenta.';
       paso.value = PasoAgregar.fallo;
+    } finally {
+      // Con las redes en mano (o si falló) se suelta el Bluetooth: mientras
+      // se elige la red y se escribe la contraseña no hace falta, y con el
+      // teléfono conectado el lector no se anuncia (ningún otro lo veía
+      // hasta desconectarlo de la corriente). "Conectar" lo retoma.
+      await _ble.desconectar();
     }
   }
 
-  Future<void> cargarRedes() async {
-    final vistas = await _ble.leerRedes();
+  /// Lee las redes que ve el lector. [buscarDeNuevo] le pide otra búsqueda.
+  Future<void> cargarRedes({bool buscarDeNuevo = false}) async {
+    final vistas = await _ble.leerRedes(buscarDeNuevo: buscarDeNuevo);
     redes.assignAll(vistas);
   }
 
@@ -210,13 +229,14 @@ class AgregarLectorController extends GetxController {
     buscandoRedes.value = true;
     mensaje.value = null;
     try {
-      await cargarRedes();
+      await cargarRedes(buscarDeNuevo: true);
     } on LectorBleException catch (e) {
       mensaje.value = e.mensaje;
     } catch (_) {
       mensaje.value = 'No se pudieron buscar las redes. Acerca el teléfono al '
           'lector y vuelve a intentar.';
     } finally {
+      await _ble.desconectar();
       buscandoRedes.value = false;
     }
   }
@@ -260,6 +280,7 @@ class AgregarLectorController extends GetxController {
         gymId: gymId,
       );
     } on LectorBleException catch (e) {
+      await _ble.desconectar();
       mensaje.value = e.mensaje;
       paso.value = PasoAgregar.escribirClave;
       return;
@@ -272,6 +293,9 @@ class AgregarLectorController extends GetxController {
     }
 
     final resultado = await _esperarResultado(gymId, _ssid);
+    // Si falló, el resultado se leyó reconectándose: se suelta otra vez para
+    // que el lector siga visible mientras se corrige la contraseña.
+    await _ble.desconectar();
     if (isClosed) return;
 
     if (resultado is LectorEnRed) {

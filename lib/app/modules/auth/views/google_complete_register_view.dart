@@ -100,13 +100,13 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                     constraints: const BoxConstraints(maxWidth: 450),
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: c.contraste.withOpacity(0.05),
+                      color: c.tarjetaAcceso,
                       borderRadius: BorderRadius.circular(20),
                       border:
                           Border.all(color: c.contraste.withOpacity(0.1)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: c.sombra,
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -117,8 +117,8 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.store, color: AppColors.accent, size: 22),
-                            SizedBox(width: 10),
+                            const Icon(Icons.store, color: AppColors.accent, size: 22),
+                            const SizedBox(width: 10),
                             Text(
                               'Tu Gimnasio',
                               style: TextStyle(

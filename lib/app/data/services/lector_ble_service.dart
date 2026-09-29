@@ -361,19 +361,55 @@ class LectorBleService {
     }
   }
 
-  /// Pide al lector que busque redes y devuelve lo que vio.
-  Future<List<RedWifi>> leerRedes() async {
+  /// Las redes que ve el lector.
+  ///
+  /// El lector busca redes solo al entrar en modo configuración, así que al
+  /// conectarse normalmente ya las tiene (o las está buscando): se leen sin
+  /// pedir otra búsqueda. Pedirla mientras buscaba no servía (el lector la
+  /// descartaba) y la app se quedaba esperando hasta agotar el tiempo y
+  /// reintentar, una y otra vez. [buscarDeNuevo] ("Buscar de nuevo") sí pide
+  /// una búsqueda nueva.
+  Future<List<RedWifi>> leerRedes({bool buscarDeNuevo = false}) async {
+    await asegurarConexion();
     return _conReintento(() async {
-      await _escribir(_chOrden, 'escanear');
-      // El escaneo del lector tarda ~3-5 s.
-      await _esperarEstado(
-        (e) => e.fase != FaseConfig.buscandoRedes,
-        timeout: const Duration(seconds: 15),
-        ignorarPrimero: true,
-      );
-      final bytes = await _chRedes!.read(timeout: 10);
-      return parsearRedes(utf8.decode(bytes, allowMalformed: true));
+      final actual = await _leerEstado();
+      if (actual.fase == FaseConfig.buscandoRedes) {
+        await _esperarFinDeBusqueda();
+      } else if (buscarDeNuevo) {
+        await _pedirBusqueda();
+      }
+
+      var redes = await _leerListaDeRedes();
+      // Sin nada guardado todavía (o la búsqueda no vio redes): una más.
+      if (redes.isEmpty && !buscarDeNuevo) {
+        await _pedirBusqueda();
+        redes = await _leerListaDeRedes();
+      }
+      return redes;
     });
+  }
+
+  Future<EstadoConfig> _leerEstado() async {
+    final bytes = await _chEstado!.read(timeout: 5);
+    return EstadoConfig.parse(utf8.decode(bytes, allowMalformed: true));
+  }
+
+  /// La búsqueda de redes del lector tarda ~3-5 s.
+  Future<void> _esperarFinDeBusqueda({bool ignorarPrimero = false}) =>
+      _esperarEstado(
+        (e) => e.fase != FaseConfig.buscandoRedes,
+        timeout: const Duration(seconds: 20),
+        ignorarPrimero: ignorarPrimero,
+      );
+
+  Future<void> _pedirBusqueda() async {
+    await _escribir(_chOrden, 'escanear');
+    await _esperarFinDeBusqueda(ignorarPrimero: true);
+  }
+
+  Future<List<RedWifi>> _leerListaDeRedes() async {
+    final bytes = await _chRedes!.read(timeout: 10);
+    return parsearRedes(utf8.decode(bytes, allowMalformed: true));
   }
 
   /// Manda el WiFi y el gimnasio y SUELTA el Bluetooth.
@@ -471,6 +507,12 @@ class LectorBleService {
     return null;
   }
 
+  /// Suelta el Bluetooth (se recuerda cuál es el lector, para volver a
+  /// conectarse con [asegurarConexion]).
+  ///
+  /// Hay que soltarlo en cuanto no se está hablando con él: mientras un
+  /// teléfono está conectado, el lector no se anuncia y ningún otro lo
+  /// encuentra.
   Future<void> desconectar() async {
     try {
       await _dispositivo?.disconnect();

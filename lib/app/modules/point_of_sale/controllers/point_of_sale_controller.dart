@@ -9,12 +9,9 @@ import '../../../data/models/product_model.dart';
 import '../../../data/models/sale_model.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/sale_repository.dart';
-import 'dart:io';
 
-import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 
-import '../../../data/services/ocr_referencia_service.dart';
+import '../../../core/utils/referencia_de_pago.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../ingresos/controllers/ingresos_controller.dart';
@@ -22,7 +19,7 @@ import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
 
 class PointOfSaleController extends GetxController
-    with ScreenTourMixin, RecargaEnVivoMixin {
+    with ScreenTourMixin, RecargaEnVivoMixin, ReferenciaDePago {
   final ProductRepository _productRepository = ProductRepository();
   final SaleRepository _saleRepository = SaleRepository();
 
@@ -39,7 +36,6 @@ class PointOfSaleController extends GetxController
   final RxString _selectedPaymentMethod = 'efectivo'.obs;
   final RxDouble _receivedAmount = 0.0.obs;
   final RxDouble _changeAmount = 0.0.obs;
-  final RxString _referenciaPago = ''.obs;
 
   // Lista de productos disponibles
   final RxList<Product> _availableProducts = <Product>[].obs;
@@ -73,7 +69,7 @@ class PointOfSaleController extends GetxController
   String get selectedPaymentMethod => _selectedPaymentMethod.value;
   double get receivedAmount => _receivedAmount.value;
   double get changeAmount => _changeAmount.value;
-  String get referenciaPago => _referenciaPago.value;
+  String get referenciaPago => referenciaTexto.value;
 
   List<Product> get availableProducts => _availableProducts;
   List<Product> get filteredProducts {
@@ -161,25 +157,12 @@ class PointOfSaleController extends GetxController
   List<ProductCategory> get categories => _categories;
   String? get selectedCategoryId => _selectedCategoryId.value;
 
-  // Métodos de pago disponibles
-  final List<String> paymentMethods = [
-    'efectivo',
-    'tarjeta_debito',
-    'tarjeta_credito',
-    'transferencia',
-    'mixto'
-  ];
-
-  // Métodos que admiten folio / referencia de la operación
-  static const List<String> _metodosConReferencia = [
-    'tarjeta_debito',
-    'tarjeta_credito',
-    'transferencia',
-  ];
+  // Métodos de pago disponibles (los mismos que en Abonar, más mixto).
+  final List<String> paymentMethods = [...metodosDePago, 'mixto'];
 
   /// Si el método de pago seleccionado admite folio / referencia
   bool get usaReferenciaPago =>
-      _metodosConReferencia.contains(_selectedPaymentMethod.value);
+      metodosConReferencia.contains(_selectedPaymentMethod.value);
 
   // ─── Tour de bienvenida ───
   final keyBuscar = GlobalKey();
@@ -193,12 +176,6 @@ class PointOfSaleController extends GetxController
   @override
   List<GlobalKey> get tourSteps =>
       [keyBuscar, keyCategorias, keyProductos, keyCarrito];
-
-  @override
-  void onClose() {
-    referenciaCtrl.dispose();
-    super.onClose();
-  }
 
   @override
   void onInit() {
@@ -450,114 +427,13 @@ class PointOfSaleController extends GetxController
     _changeAmount.value = 0.0;
     // La referencia pertenece a la operación con tarjeta/transferencia
     // concreta, tampoco debe sobrevivir al cambiar de método.
-    _limpiarReferencia();
+    limpiarReferencia();
   }
 
   /// Establecer monto recibido
   void setReceivedAmount(double amount) {
     _receivedAmount.value = amount;
     _changeAmount.value = amount - _finalAmount.value;
-  }
-
-  /// Establecer folio / referencia de la operación
-  void setReferenciaPago(String value) {
-    _referenciaPago.value = value;
-  }
-
-  // =================== REFERENCIA POR FOTO ===================
-
-  /// Referencias que el OCR encontró en la foto, para que la persona elija.
-  /// Se sugieren, nunca se dan por buenas: el campo sigue siendo editable.
-  final RxList<String> referenciasSugeridas = <String>[].obs;
-
-  final RxBool leyendoReferencia = false.obs;
-
-  /// Si ya se leyó una foto. Distingue "no se reconoció nada" de "aún no se
-  /// ha intentado".
-  final RxBool referenciaEscaneada = false.obs;
-
-  /// El campo de texto de la referencia. Vive en el controlador porque el
-  /// OCR necesita poder escribir en él, y la vista es un StatelessWidget que
-  /// se reconstruye: un controller creado ahí perdería el texto.
-  final TextEditingController referenciaCtrl = TextEditingController();
-
-  /// Toma o elige la foto del comprobante y le busca la referencia.
-  ///
-  /// La foto solo sirve para leerla: no se sube ni se guarda. Lo que queda
-  /// registrado es la referencia, igual que si se hubiera tecleado.
-  ///
-  /// La galería entra a propósito: muchos comprobantes llegan por mensajería
-  /// y nunca pasan por la cámara.
-  Future<void> escanearReferencia({required bool desdeCamara}) async {
-    File? foto;
-    try {
-      final elegida = await ImagePicker().pickImage(
-        source: desdeCamara ? ImageSource.camera : ImageSource.gallery,
-        preferredCameraDevice: CameraDevice.rear,
-        // Sin comprimir de más: la referencia suele ir en letra pequeña y
-        // una imagen agresivamente reducida deja al OCR sin nada que leer.
-        maxWidth: 1600,
-        imageQuality: 90,
-        // Solo se lee la referencia: sin pedir los metadatos, iPhone no
-        // pregunta por el acceso a Fotos (los permisos se piden todos juntos
-        // al entrar, y este no hace falta).
-        requestFullMetadata: false,
-      );
-      if (elegida == null) return;
-
-      foto = File(elegida.path);
-
-      leyendoReferencia.value = true;
-      final candidatos = await OcrReferenciaService.extraerCandidatos(foto);
-      referenciasSugeridas.assignAll(candidatos);
-      referenciaEscaneada.value = true;
-
-      // Si solo hay una lectura clara, se propone ya escrita para ahorrar un
-      // toque. Sigue pudiendo corregirse.
-      if (candidatos.length == 1 && _referenciaPago.value.trim().isEmpty) {
-        usarReferenciaSugerida(candidatos.first);
-      }
-    } catch (e) {
-      AppLogger.error(
-          'PointOfSaleController', 'Error al leer la referencia', e);
-      SnackbarHelper.error('Error', 'No se pudo usar esa imagen.');
-    } finally {
-      leyendoReferencia.value = false;
-      if (foto != null) await _borrarFotoTemporal(foto);
-    }
-  }
-
-  /// Borra la copia que image_picker dejó en la caché de la app.
-  ///
-  /// Solo si está dentro del directorio temporal: image_picker siempre
-  /// entrega una copia ahí, pero si algún día devolviera el original de la
-  /// galería, no se debe tocar la foto de la persona.
-  Future<void> _borrarFotoTemporal(File foto) async {
-    try {
-      final temporal = await getTemporaryDirectory();
-      if (foto.path.startsWith(temporal.path) && await foto.exists()) {
-        await foto.delete();
-      }
-    } catch (_) {
-      AppLogger.warning('PointOfSaleController',
-          'No se pudo borrar la foto temporal de la referencia');
-    }
-  }
-
-  /// Pone en el campo una de las referencias que leyó el OCR.
-  void usarReferenciaSugerida(String referencia) {
-    _referenciaPago.value = referencia;
-    referenciaCtrl.text = referencia;
-    referenciaCtrl.selection =
-        TextSelection.collapsed(offset: referencia.length);
-  }
-
-  /// Vacía el campo de referencia y lo que leyó el OCR.
-  void _limpiarReferencia() {
-    _referenciaPago.value = '';
-    referenciaCtrl.clear();
-    referenciasSugeridas.clear();
-    referenciaEscaneada.value = false;
   }
 
   /// Aplicar descuento
@@ -611,9 +487,7 @@ class PointOfSaleController extends GetxController
         cambio: _changeAmount.value,
         ventaTipo: 'producto',
         subtotal: _totalAmount.value,
-        referenciaPago: _referenciaPago.value.trim().isEmpty
-            ? null
-            : _referenciaPago.value.trim(),
+        referenciaPago: referenciaParaGuardar,
       );
 
       // Procesar venta en el repositorio
@@ -637,7 +511,7 @@ class PointOfSaleController extends GetxController
         // Limpiar carrito y estado
         clearCart();
         _selectedPaymentMethod.value = 'efectivo';
-        _limpiarReferencia();
+        limpiarReferencia();
 
         // Recargar productos para actualizar stock
         await loadProducts();

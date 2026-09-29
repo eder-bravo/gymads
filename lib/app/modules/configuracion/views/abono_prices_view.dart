@@ -35,6 +35,7 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
           }
 
           return SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

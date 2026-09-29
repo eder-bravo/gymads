@@ -82,6 +82,11 @@ class BotonGuardar extends StatelessWidget {
 
 /// El botón fijo al pie de un formulario de pantalla completa
 /// (`Scaffold.bottomNavigationBar`), con su margen y la zona segura.
+///
+/// Sube con el teclado: el `bottomNavigationBar` de un Scaffold se queda
+/// abajo, y el botón quedaba escondido detrás del teclado (el numérico del
+/// iPhone ni siquiera tiene tecla para cerrarse), así que no había cómo
+/// guardar.
 class PieDeFormulario extends StatelessWidget {
   const PieDeFormulario({super.key, required this.child});
 
@@ -90,6 +95,14 @@ class PieDeFormulario extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
+    final teclado = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: teclado),
+      child: _pie(c),
+    );
+  }
+
+  Widget _pie(ColoresTema c) {
     return Container(
       decoration: BoxDecoration(
         color: c.backgroundColor,

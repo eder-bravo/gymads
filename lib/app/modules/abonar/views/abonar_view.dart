@@ -12,6 +12,7 @@ import '../controllers/abonar_controller.dart';
 import '../../../core/widgets/centrado_desplazable.dart';
 import '../../../core/widgets/cabecera_con_lista.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
+import 'package:gymads/app/core/widgets/metodo_de_pago.dart';
 
 class AbonarView extends GetView<AbonarController> {
   const AbonarView({super.key});
@@ -266,22 +267,24 @@ class AbonarView extends GetView<AbonarController> {
             }),
             const SizedBox(height: 20),
 
-            // Metodo de pago
-            Obx(() => DropdownButtonFormField<String>(
-                  value: controller.paymentMethod.value,
-                  decoration: const InputDecoration(
-                    labelText: 'Método de pago',
-                    prefixIcon: Icon(Icons.payments_outlined),
-                  ),
-                  dropdownColor: c.cardBackground,
-                  style: TextStyle(color: c.textPrimary),
-                  items: controller.paymentMethods.map((method) {
-                    return DropdownMenuItem(value: method, child: Text(method));
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) controller.paymentMethod.value = val;
-                  },
+            // Método de pago: débito y crédito por separado; con tarjeta o
+            // transferencia, el folio escrito o escaneado del comprobante.
+            Text(
+              'Método de pago',
+              style: TextStyle(color: c.textSecondary, fontSize: 14),
+            ),
+            const SizedBox(height: 10),
+            Obx(() => SelectorMetodoPago(
+                  metodos: controller.paymentMethods,
+                  elegido: controller.paymentMethod.value,
+                  onElegir: controller.setPaymentMethod,
                 )),
+            Obx(() => controller.usaReferenciaPago
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: CampoReferenciaPago(controlador: controller),
+                  )
+                : const SizedBox.shrink()),
             const SizedBox(height: 30),
 
             // Proyección de Fecha

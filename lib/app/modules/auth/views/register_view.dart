@@ -54,7 +54,7 @@ class RegisterView extends GetView<RegisterController> {
                     color: c.contraste,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Configura tu gimnasio en minutos',
                   style: TextStyle(
@@ -297,12 +297,12 @@ class RegisterView extends GetView<RegisterController> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: c.contraste.withOpacity(0.05),
+        color: c.tarjetaAcceso,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: c.contraste.withOpacity(0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: c.sombra,
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),

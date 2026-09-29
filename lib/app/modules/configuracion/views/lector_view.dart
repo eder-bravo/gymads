@@ -8,7 +8,20 @@ import '../../../data/services/background_rfid_service.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
 import 'agregar_lector_view.dart';
+import '../widgets/ilustracion_lector.dart';
 import '../../../core/widgets/formulario.dart';
+import '../../../core/utils/snackbar_helper.dart';
+
+/// Lo que dice la tarjeta de estado: solo el título. Sin explicaciones ni el
+/// nombre técnico del aparato (GymOne-AB12); los detalles van en el manual
+/// impreso.
+String tituloDelEstado(EstadoLector estado) => switch (estado) {
+      EstadoLector.mio => 'Lector conectado',
+      EstadoLector.libre => 'Lector sin vincular',
+      EstadoLector.deOtroGimnasio => 'Es de otro gimnasio',
+      EstadoLector.sinConexion => 'Tu lector no aparece',
+      EstadoLector.sinConfigurar => 'Sin lector',
+    };
 
 /// El lector de tarjetas de este gimnasio.
 ///
@@ -81,8 +94,6 @@ class _LectorViewState extends State<LectorView> {
                 const SizedBox(height: 12),
                 _interruptorAvisosAqui(),
               ],
-              const SizedBox(height: 16),
-              _ayuda(),
             ],
           ),
         ),
@@ -94,100 +105,13 @@ class _LectorViewState extends State<LectorView> {
   // Estado actual
   // ─────────────────────────────────────────────────────────
 
+  /// El lector dibujado: de un vistazo, si está conectado o no.
   Widget _tarjetaEstado() {
-    final c = context.colores;
     final estado = controller.estadoLector.value;
-
-    late final IconData icono;
-    late final Color color;
-    late final String titulo;
-    late final String detalle;
-
-    switch (estado) {
-      case EstadoLector.mio:
-        icono = Icons.verified_user;
-        color = AppColors.success;
-        titulo = RfidConfig.nombreLector == null
-            ? 'Vinculado a tu gimnasio'
-            : '${RfidConfig.nombreLector} · vinculado a tu gimnasio';
-        detalle = 'Este lector solo atiende a tu gimnasio. '
-            'Ningún otro puede leer tus tarjetas.';
-        break;
-      case EstadoLector.libre:
-        icono = Icons.lock_open;
-        color = AppColors.warning;
-        titulo = controller.lectorEncontrado.value == null
-            ? 'Lector sin vincular'
-            : '${controller.lectorEncontrado.value!.nombre} · sin vincular';
-        detalle = 'Encontré este lector en tu red y todavía no pertenece a '
-            'ningún gimnasio. Vincúlalo para que solo responda al tuyo.';
-        break;
-      case EstadoLector.deOtroGimnasio:
-        icono = Icons.block;
-        color = AppColors.error;
-        titulo = 'Es de otro gimnasio';
-        detalle = 'Este lector ya fue vinculado por otro gimnasio y no va a '
-            'responder al tuyo. Si el aparato es tuyo, puedes formatearlo '
-            'para dejarlo libre y vincularlo de nuevo.';
-        break;
-      case EstadoLector.sinConexion:
-        icono = Icons.wifi_off;
-        color = AppColors.error;
-        titulo = RfidConfig.nombreLector == null
-            ? 'Tu lector no aparece'
-            : '${RfidConfig.nombreLector} no aparece';
-        detalle = 'Tu gimnasio tiene un lector, pero no está en la red de este '
-            'teléfono. Si está apagado, enciéndelo. Si su luz parpadea '
-            'rápido, perdió su WiFi o lo reiniciaron: toca "Configurar el '
-            'lector".';
-        break;
-      case EstadoLector.sinConfigurar:
-        icono = Icons.nfc;
-        color = c.textSecondary;
-        titulo = 'Sin lector';
-        detalle = 'Agrega tu lector: la app lo configura por Bluetooth, sin '
-            'escribir direcciones.';
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.35)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icono, color: color, size: 26),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  titulo,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  detalle,
-                  style: TextStyle(
-                    color: c.textSecondary.withOpacity(0.9),
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return IlustracionLector(
+      estado: estado,
+      titulo: tituloDelEstado(estado),
+      comprobando: controller.comprobandoLector.value,
     );
   }
 
@@ -196,14 +120,8 @@ class _LectorViewState extends State<LectorView> {
   // ─────────────────────────────────────────────────────────
 
   Widget _acciones() {
-    if (controller.comprobandoLector.value) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
-          child: CircularProgressIndicator(color: AppColors.accent),
-        ),
-      );
-    }
+    // Mientras lo busca, el dibujo ya lo dice: los botones salen al terminar.
+    if (controller.comprobandoLector.value) return const SizedBox.shrink();
 
     final estado = controller.estadoLector.value;
 
@@ -219,7 +137,7 @@ class _LectorViewState extends State<LectorView> {
           ),
           const SizedBox(height: 10),
           _botonSecundario(
-            texto: 'Ya tengo uno funcionando: buscarlo',
+            texto: 'Buscar mi lector en la red',
             icono: Icons.wifi_find,
             onTap: controller.buscarLectorEnRed,
           ),
@@ -297,9 +215,17 @@ class _LectorViewState extends State<LectorView> {
   /// Si el lector contesta, se le pide que se ofrezca por Bluetooth unos
   /// minutos. Si no contesta (perdió el WiFi, lo reiniciaron), ya se está
   /// ofreciendo solo: se abre el asistente directamente.
+  ///
+  /// El lector se reinicia para ofrecerse (firmware 6.4.2+): tarda unos
+  /// segundos, que el asistente cubre buscándolo. Si no aceptó el pedido, no
+  /// se abre el asistente: solo diría "no apareció ningún lector".
   Future<void> _cambiarWifi() async {
     final conectado = controller.estadoLector.value == EstadoLector.mio;
-    if (conectado) await RfidConfig.abrirModoConfiguracion();
+    if (conectado && !await RfidConfig.abrirModoConfiguracion()) {
+      SnackbarHelper.error('No se pudo',
+          'El lector no respondió. Revisa que esté encendido e intenta de nuevo.');
+      return;
+    }
     await _abrirAsistente(cambiarWifi: conectado);
   }
 
@@ -350,19 +276,15 @@ class _LectorViewState extends State<LectorView> {
   }
 
   Future<void> _confirmarDesvincular() async {
-    final c = context.colores;
     final confirmado = await Get.dialog<bool>(
       AlertDialog(
         scrollable: true,
-        backgroundColor: c.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Desvincular el lector',
-            style: TextStyle(color: c.textPrimary)),
-        content: Text(
-          'El lector olvidará tu gimnasio y tu WiFi, y se reiniciará. Quedará '
-          'listo para agregarse en cualquier lugar (su luz parpadea rápido).\n\n'
-          'Para volver a usarlo aquí, agrégalo de nuevo con "Agregar lector".',
-          style: TextStyle(color: c.textSecondary, height: 1.35),
+        title: const Text('Desvincular el lector'),
+        content: const Text(
+          'Olvidará tu gimnasio y tu WiFi. Para volver a usarlo, agrégalo de '
+          'nuevo.',
+          style: TextStyle(height: 1.35),
         ),
         actions: [
           BotonCancelar(onPressed: () => Get.back(result: false)),
@@ -380,21 +302,15 @@ class _LectorViewState extends State<LectorView> {
   }
 
   Future<void> _confirmarFormateo() async {
-    final c = context.colores;
     final confirmado = await Get.dialog<bool>(
       AlertDialog(
         scrollable: true,
-        backgroundColor: c.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Formatear el lector',
-            style: TextStyle(color: c.textPrimary)),
-        content: Text(
-          'Este lector pertenece a otro gimnasio. Al formatearlo dejará de '
-          'funcionarle a ese gimnasio de inmediato, y quedará libre para que '
-          'lo vincules al tuyo.\n\n'
-          'El lector pitará mientras se formatea. Hazlo solo si el aparato es '
-          'tuyo.',
-          style: TextStyle(color: c.textSecondary, height: 1.35),
+        title: const Text('Formatear el lector'),
+        content: const Text(
+          'Dejará de funcionarle al otro gimnasio y quedará libre para el '
+          'tuyo. Hazlo solo si el aparato es tuyo.',
+          style: TextStyle(height: 1.35),
         ),
         actions: [
           BotonCancelar(onPressed: () => Get.back(result: false)),
@@ -432,12 +348,6 @@ class _LectorViewState extends State<LectorView> {
                     color: c.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600)),
-            subtitle: Text(
-              controller.connectionStatusMessage.value,
-              style: TextStyle(
-                  color: c.textSecondary.withOpacity(0.8),
-                  fontSize: 13),
-            ),
             onChanged: (activar) {
               if (activar) {
                 controller.testRfidConnection();
@@ -461,20 +371,6 @@ class _LectorViewState extends State<LectorView> {
 
     return Obx(() {
       final activo = servicio.recibirAvisosAqui.value;
-      final atiende = servicio.atiendeLector.value;
-      final motivo = servicio.motivoSinAvisos.value;
-
-      final String detalle;
-      if (atiende && activo) {
-        detalle = 'Este teléfono recibe los avisos del lector. Si el '
-            'mostrador también tiene la app abierta, el aviso sale en los '
-            'dos; la entrada se registra una sola vez.';
-      } else if (atiende) {
-        detalle = 'Este teléfono ya recibe los avisos del lector.';
-      } else {
-        detalle = '${motivo ?? 'Este teléfono no recibe los avisos.'} '
-            'Actívalo para recibirlos aquí también.';
-      }
 
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -491,47 +387,9 @@ class _LectorViewState extends State<LectorView> {
                   color: c.textPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w600)),
-          subtitle: Text(
-            detalle,
-            style: TextStyle(
-                color: c.textSecondary.withOpacity(0.8), fontSize: 13),
-          ),
           onChanged: servicio.setRecibirAvisosAqui,
         ),
       );
     });
-  }
-
-  Widget _ayuda() {
-    final c = context.colores;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: c.containerBackground,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_outline,
-              color: c.textSecondary, size: 18),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Para dejar el lector como nuevo: desconéctalo, vuelve a '
-              'conectarlo y, en los primeros 10 segundos, mantén pulsado el '
-              'botón BOOT unos 3 segundos. Suena un pitido corto al empezar '
-              'y uno largo al confirmar. Olvida el WiFi y el gimnasio, y su '
-              'luz parpadea rápido: ya se puede agregar de nuevo.',
-              style: TextStyle(
-                color: c.textSecondary.withOpacity(0.9),
-                fontSize: 12.5,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

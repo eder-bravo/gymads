@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../../core/theme/siempre_oscuro.dart';
+import '../utils/recorte_circulo.dart';
 
 class CircularCameraView extends StatefulWidget {
   final Function(File) onPhotoTaken;
@@ -32,6 +34,10 @@ class _CircularCameraViewState extends State<CircularCameraView>
   /// La foto recién tomada, a la espera de "Usar foto" o "Repetir". Antes se
   /// usaba en cuanto se disparaba, sin poder verla.
   File? _fotoTomada;
+
+  /// El tamaño de la pantalla de la cámara: con él se sabe dónde estaba el
+  /// círculo guía para recortar la foto.
+  Size? _vista;
 
   @override
   void initState() {
@@ -139,6 +145,17 @@ class _CircularCameraViewState extends State<CircularCameraView>
       final File resultFile = File(targetPath);
       await File(photoFile.path).copy(targetPath);
 
+      // Se guarda solo lo que se veía dentro del círculo: la foto completa
+      // salía alejada y descentrada respecto a lo que se encuadró.
+      final vista = _vista;
+      if (vista != null) {
+        await recortarFotoAlCirculo(
+          targetPath,
+          vista: vista,
+          aspectoVistaPrevia: _aspectoVistaPrevia(),
+        );
+      }
+
       if (await resultFile.exists() && mounted) {
         // Limpiar archivo temporal original
         try {
@@ -213,7 +230,9 @@ class _CircularCameraViewState extends State<CircularCameraView>
                 width: lado,
                 height: lado,
                 clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                // El aro encima de la foto, para que no la tape.
+                foregroundDecoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 4),
                 ),
@@ -267,6 +286,15 @@ class _CircularCameraViewState extends State<CircularCameraView>
     );
   }
 
+  /// La proporción (ancho/alto) con que `CameraPreview` dibuja la cámara.
+  double _aspectoVistaPrevia() {
+    final valor = _controller!.value;
+    final giro = valor.lockedCaptureOrientation ?? valor.deviceOrientation;
+    final deLado = giro == DeviceOrientation.landscapeLeft ||
+        giro == DeviceOrientation.landscapeRight;
+    return deLado ? valor.aspectRatio : 1 / valor.aspectRatio;
+  }
+
   Widget _buildBody() {
     if (_errorMessage != null) {
       return _buildErrorWidget();
@@ -291,6 +319,13 @@ class _CircularCameraViewState extends State<CircularCameraView>
       );
     }
 
+    return LayoutBuilder(builder: (context, espacio) {
+      _vista = espacio.biggest;
+      return _camara();
+    });
+  }
+
+  Widget _camara() {
     return Stack(
       children: [
         // Vista previa de la cámara que llena toda la pantalla
@@ -454,14 +489,11 @@ class _CircularCameraViewState extends State<CircularCameraView>
 class CircularMaskPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final double centerX = size.width / 2;
-    // Ajustar el centro vertical para mejor posicionamiento
-    final double centerY =
-        size.height * 0.45; // Ligeramente más arriba del centro
-
-    // Calcular el radio basado en la altura de la pantalla para mejor precisión
-    // Usar un factor que tenga más relación con la captura real
-    final double radius = (size.height * 0.25).clamp(120.0, 200.0);
+    // El mismo círculo con que se recorta la foto (recorte_circulo.dart).
+    final guia = circuloGuia(size);
+    final double centerX = guia.center.dx;
+    final double centerY = guia.center.dy;
+    final double radius = guia.width / 2;
 
     // Crear path para el círculo
     final Path circlePath = Path()

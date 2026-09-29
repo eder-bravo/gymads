@@ -11,6 +11,7 @@ import '../../../core/widgets/cabecera_con_lista.dart';
 import '../../../core/widgets/refrescable.dart';
 import '../../../global_widgets/app_header.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
+import 'package:gymads/app/core/widgets/metodo_de_pago.dart';
 
 class PointOfSaleView extends GetView<PointOfSaleController> {
   const PointOfSaleView({super.key});
@@ -646,47 +647,14 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 return const SizedBox.shrink();
               }),
 
-              // Campo folio / referencia (tarjeta y transferencia)
-              Obx(() {
-                if (!controller.usaReferenciaPago) {
-                  return const SizedBox.shrink();
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Folio o referencia (opcional)',
-                      style: TextStyle(
-                        color: c.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      // El controlador vive en PointOfSaleController para que
-                      // el OCR pueda escribir aquí la referencia que leyó.
-                      controller: controller.referenciaCtrl,
-                      style: TextStyle(color: c.textPrimary),
-                      textCapitalization: TextCapitalization.characters,
-                      inputFormatters: [
-                        LengthLimitingTextInputFormatter(50),
-                      ],
-                      decoration: _decoracionCampoCobro(hintText: 'Ej: 004521')
-                          .copyWith(
-                        prefixIcon: const Icon(
-                          Icons.receipt_long,
-                          color: AppColors.accent,
-                          size: 20,
-                        ),
-                      ),
-                      onChanged: controller.setReferenciaPago,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildEscanearReferencia(context),
-                    const SizedBox(height: 16),
-                  ],
-                );
-              }),
+              // Folio / referencia (tarjeta y transferencia): escrita o
+              // escaneada del comprobante.
+              Obx(() => controller.usaReferenciaPago
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: CampoReferenciaPago(controlador: controller),
+                    )
+                  : const SizedBox.shrink()),
 
               // Botón procesar
               Obx(() => BotonGuardar(
@@ -708,68 +676,11 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   }
 
   Widget _buildPaymentMethodChips(BuildContext context) {
-    final c = context.colores;
-    return Obx(() => Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: controller.paymentMethods.map((method) {
-            final selected = controller.selectedPaymentMethod == method;
-            return GestureDetector(
-              onTap: () => controller.setPaymentMethod(method),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.accent : c.cardBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: selected
-                        ? AppColors.accent
-                        : AppColors.accent.withOpacity(0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _iconForPaymentMethod(method),
-                      size: 16,
-                      color: selected ? Colors.white : c.textSecondary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _getPaymentMethodName(method),
-                      style: TextStyle(
-                        color:
-                            selected ? Colors.white : c.textSecondary,
-                        fontWeight:
-                            selected ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
+    return Obx(() => SelectorMetodoPago(
+          metodos: controller.paymentMethods,
+          elegido: controller.selectedPaymentMethod,
+          onElegir: controller.setPaymentMethod,
         ));
-  }
-
-  IconData _iconForPaymentMethod(String method) {
-    switch (method) {
-      case 'efectivo':
-        return Icons.payments_outlined;
-      case 'tarjeta_debito':
-      case 'tarjeta_credito':
-        return Icons.credit_card;
-      case 'transferencia':
-        return Icons.account_balance_outlined;
-      case 'mixto':
-        return Icons.call_split;
-      default:
-        return Icons.payment;
-    }
   }
 
   Widget _buildSummaryRow(BuildContext context, String label, String value, {bool isBold = false}) {
@@ -795,117 +706,6 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         ),
       ],
     );
-  }
-
-  String _getPaymentMethodName(String method) {
-    switch (method) {
-      case 'efectivo':
-        return 'Efectivo';
-      case 'tarjeta_debito':
-        return 'Tarjeta de Débito';
-      case 'tarjeta_credito':
-        return 'Tarjeta de Crédito';
-      case 'transferencia':
-        return 'Transferencia';
-      case 'mixto':
-        return 'Mixto';
-      default:
-        return method;
-    }
-  }
-
-  /// Leer la referencia de la foto del comprobante.
-  ///
-  /// La foto solo se usa para leerla y no se guarda. Lo que se muestra son
-  /// SUGERENCIAS: el campo de arriba sigue mandando, porque el
-  /// reconocimiento falla a veces.
-  Widget _buildEscanearReferencia(BuildContext context) {
-    final c = context.colores;
-    return Obx(() {
-      if (controller.leyendoReferencia.value) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            children: [
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.accent),
-              ),
-              const SizedBox(width: 12),
-              Text('Leyendo la referencia...',
-                  style: TextStyle(color: c.textSecondary)),
-            ],
-          ),
-        );
-      }
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () =>
-                      controller.escanearReferencia(desdeCamara: true),
-                  icon: const Icon(Icons.document_scanner_outlined, size: 18),
-                  label: const Text('Escanear referencia'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.accent,
-                    side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // La galería no es un extra: muchos comprobantes llegan por
-              // mensajería y nunca pasan por la cámara.
-              IconButton(
-                onPressed: () =>
-                    controller.escanearReferencia(desdeCamara: false),
-                icon: const Icon(Icons.photo_library_outlined),
-                color: AppColors.accent,
-                tooltip: 'Elegir de la galería',
-              ),
-            ],
-          ),
-          if (controller.referenciasSugeridas.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text('Referencias encontradas — toca la correcta:',
-                style:
-                    TextStyle(color: c.textSecondary, fontSize: 12.5)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: controller.referenciasSugeridas
-                  .map((referencia) => ActionChip(
-                        label: Text(referencia,
-                            style: const TextStyle(
-                                fontFamily: 'monospace', fontSize: 12.5)),
-                        backgroundColor: c.containerBackground,
-                        labelStyle:
-                            TextStyle(color: c.textPrimary),
-                        onPressed: () =>
-                            controller.usarReferenciaSugerida(referencia),
-                      ))
-                  .toList(),
-            ),
-          ] else if (controller.referenciaEscaneada.value) ...[
-            const SizedBox(height: 8),
-            Text(
-              'No se reconoció ninguna referencia en la foto. '
-              'Escríbela arriba.',
-              style: TextStyle(
-                  color: c.textSecondary.withOpacity(0.8),
-                  fontSize: 12.5),
-            ),
-          ],
-        ],
-      );
-    });
   }
 
   void _processSale(BuildContext context) async {

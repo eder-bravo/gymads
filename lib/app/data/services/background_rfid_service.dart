@@ -21,6 +21,7 @@ import '../../routes/app_pages.dart';
 import '../../modules/clientes/controllers/clientes_controller.dart';
 import '../config/rfid_config.dart';
 import 'permisos_app.dart';
+import 'fotos_de_clientes.dart';
 
 /// Servicio global para escaneo RFID en segundo plano
 /// Se ejecuta continuamente y maneja las detecciones de tarjetas
@@ -580,6 +581,13 @@ class BackgroundRfidService extends GetxService {
       if (user == null) {
         await _handleUserNotFound(uid);
         return;
+      }
+
+      // La foto lista antes de que salga el aviso: sin esto aparecía un
+      // instante sin ella (o bajándose) en los teléfonos donde no se registró
+      // al cliente. Nunca frena el aviso más de 0.7 s.
+      if (!_appEnSegundoPlano) {
+        await FotosDeClientes.to?.prepararParaMostrar(user.photoUrl);
       }
 
       // Membresía inactiva o vencida → acceso denegado

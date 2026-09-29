@@ -141,6 +141,17 @@ class FotosDeClientes extends GetxService {
     for (var i = 0; i < fotos.length; i += 4) {
       await Future.wait(fotos.skip(i).take(4).map(_asegurar));
     }
+
+    // Las de clientes que ya no existen (o fotos que se cambiaron) se quitan
+    // de este teléfono.
+    final vigentes = {
+      for (final f in fotos) StorageService.instance.stableKey(f),
+    };
+    for (final clave in _archivos.keys.toList()) {
+      if (vigentes.contains(clave)) continue;
+      _archivos.remove(clave);
+      unawaited(_cache.removeFile(clave));
+    }
   }
 
   /// Que [guardada] esté en disco: la busca en el caché y, si no está (o es

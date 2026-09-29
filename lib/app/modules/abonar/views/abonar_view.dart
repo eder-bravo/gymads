@@ -81,7 +81,9 @@ class AbonarView extends GetView<AbonarController> {
               title: 'Cobra su membresía',
               description: 'Aquí están todos tus clientes en orden '
                   'alfabético. Toca a uno para elegir el periodo, el monto y '
-                  'registrar el pago.',
+                  'el método de pago (efectivo, tarjeta de débito o de '
+                  'crédito, o transferencia con su referencia) y registrar '
+                  'el pago.',
               isLastStep: true,
               child: Obx(() {
                 if (controller.isLoadingClients.value) {

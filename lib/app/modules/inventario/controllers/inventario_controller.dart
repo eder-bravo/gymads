@@ -82,6 +82,7 @@ class InventarioController extends GetxController
   final TextEditingController priceController = TextEditingController();
 
   // ─── Tour de bienvenida ───
+  final keyEscanear = GlobalKey();
   final keyAgregar = GlobalKey();
   final keyCategorias = GlobalKey();
   final keyBuscar = GlobalKey();
@@ -101,6 +102,7 @@ class InventarioController extends GetxController
   /// antes que Agregar, y al revés el recorrido saltaba hacia atrás.
   @override
   List<GlobalKey> get tourSteps => [
+        if (can(Permission.ajustarStock)) keyEscanear,
         if (can(Permission.gestionarCategorias)) keyCategorias,
         if (can(Permission.gestionarProductos)) keyAgregar,
         keyBuscar,

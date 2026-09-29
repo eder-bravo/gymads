@@ -82,6 +82,68 @@ class StorageService {
     }
   }
 
+  /// `{bucket, path}` del objeto al que apunta [stored] (URL pública, firmada o
+  /// path crudo), o null si no apunta a ninguno.
+  ({String bucket, String path})? objeto(String? stored, {String? bucket}) =>
+      _parse(stored, bucket ?? SupabaseConfig.bucketName);
+
+  /// Borra del almacenamiento los objetos a los que apuntan [guardadas].
+  ///
+  /// Antes se cortaba la URL por "users/" y, como el path también empieza con
+  /// `users/` (…/public/users/users/foto.jpg), quedaba una ruta vacía: no se
+  /// borraba nada y las fotos se acumulaban. Aquí se usa el mismo lector de
+  /// rutas que para mostrarlas.
+  ///
+  /// Devuelve false si falló (red, permisos): quien llama decide si eso
+  /// detiene lo que estaba haciendo.
+  Future<bool> borrar(Iterable<String?> guardadas, {String? bucket}) async {
+    final porBucket = <String, Set<String>>{};
+    for (final g in guardadas) {
+      final o = _parse(g, bucket ?? SupabaseConfig.bucketName);
+      if (o != null) (porBucket[o.bucket] ??= {}).add(o.path);
+    }
+    try {
+      for (final e in porBucket.entries) {
+        final rutas = e.value.toList();
+        // De 100 en 100: la petición lleva todas las rutas.
+        for (var i = 0; i < rutas.length; i += 100) {
+          await _client.storage
+              .from(e.key)
+              .remove(rutas.skip(i).take(100).toList());
+        }
+        for (final r in rutas) {
+          _cache.remove('${e.key}/$r');
+        }
+      }
+      return true;
+    } catch (e) {
+      AppLogger.error('StorageService', 'No se pudieron borrar los archivos', e);
+      return false;
+    }
+  }
+
+  /// Borra del almacenamiento las fotos de todos los clientes de un gimnasio.
+  /// Devuelve false si algo no se pudo borrar (se puede volver a llamar: lo ya
+  /// borrado no estorba).
+  ///
+  /// Hay que llamarla ANTES de borrar el gimnasio: después ya no se sabe qué
+  /// fotos eran suyas (las fotos no llevan el gimnasio en el nombre) y la
+  /// sesión del dueño ya no existe para poder borrarlas.
+  Future<bool> borrarFotosDelGimnasio(String gymId) async {
+    try {
+      final filas = await _client
+          .from('users')
+          .select('photo_url')
+          .eq('gym_id', gymId)
+          .not('photo_url', 'is', null);
+      return borrar([for (final f in filas) f['photo_url'] as String?]);
+    } catch (e) {
+      AppLogger.error('StorageService',
+          'No se pudieron borrar las fotos del gimnasio', e);
+      return false;
+    }
+  }
+
   /// Invalida la URL firmada cacheada de [stored] (p. ej. tras re-subir la foto).
   void invalidate(String? stored, {String? bucket}) {
     final k = stableKey(stored, bucket: bucket);

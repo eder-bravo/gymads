@@ -165,6 +165,7 @@ class PointOfSaleController extends GetxController
       metodosConReferencia.contains(_selectedPaymentMethod.value);
 
   // ─── Tour de bienvenida ───
+  final keyEscanear = GlobalKey();
   final keyBuscar = GlobalKey();
   final keyCategorias = GlobalKey();
   final keyProductos = GlobalKey();
@@ -175,7 +176,7 @@ class PointOfSaleController extends GetxController
 
   @override
   List<GlobalKey> get tourSteps =>
-      [keyBuscar, keyCategorias, keyProductos, keyCarrito];
+      [keyEscanear, keyBuscar, keyCategorias, keyProductos, keyCarrito];
 
   @override
   void onInit() {

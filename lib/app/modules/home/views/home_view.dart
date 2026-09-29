@@ -318,8 +318,9 @@ class HomeView extends GetView<HomeController> {
         color: const Color(0xFFB0BEC5),
         onTap: () => Get.toNamed(Routes.CONFIGURACION),
         showcaseKey: controller.keyConfiguracion,
-        tourDescription: 'Ajusta tu cuenta, los precios de abonos, las '
-            'categorías de productos y el lector de tarjetas.',
+        tourDescription: 'Ajusta tu cuenta, cómo se ve la app (clara u '
+            'oscura), los precios de abonos, las categorías, el lector de '
+            'tarjetas y los permisos.',
       ));
 
     return Padding(

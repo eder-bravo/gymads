@@ -29,8 +29,9 @@ class ClientesView extends GetView<ClientesController> {
           TourStep(
             tourKey: controller.keyAgregar,
             title: 'Agregar cliente',
-            description: 'Da de alta a un miembro nuevo: nombre, teléfono, '
-                'foto y su tarjeta de acceso.',
+            description: 'Da de alta a un miembro nuevo: su foto (es '
+                'obligatoria), nombre, teléfono y su tarjeta de acceso, que '
+                'registras pasándola por el lector.',
             borderRadius: 24,
             isFirstStep: true,
             child: IconButton(
@@ -91,7 +92,8 @@ class ClientesView extends GetView<ClientesController> {
                   tourKey: controller.keyLista,
                   title: 'Tus clientes',
                   description: 'Toca a cualquiera para ver su ficha, editar '
-                      'sus datos o revisar cuándo vence su abono.',
+                      'sus datos o revisar cuándo vence su abono. En la '
+                      'ficha, toca su foto para verla en grande.',
                   isLastStep: true,
                   child: Obx(() {
                     final filteredClientes = controller.filteredClientes;

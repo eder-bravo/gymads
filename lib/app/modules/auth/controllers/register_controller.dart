@@ -11,6 +11,7 @@ import '../../../data/providers/staff_profile_provider.dart';
 import '../../../data/services/google_play_services.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
+import 'package:gymads/app/core/utils/correo_valido.dart';
 
 /// Controller for registration (creating a new gym account)
 ///
@@ -104,14 +105,22 @@ class RegisterController extends GetxController {
     return null;
   }
 
-  String? validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'El correo es requerido';
-    }
-    if (!GetUtils.isEmail(value)) {
-      return 'Ingresa un correo válido';
-    }
-    return null;
+  /// Que tenga forma de correo y sea de un proveedor real (correo_valido.dart).
+  String? validateEmail(String? value) => validarCorreoDeRegistro(value);
+
+  /// "¿Quisiste decir juan@gmail.com?" mientras se escribe el correo.
+  final sugerenciaCorreo = RxnString();
+
+  void revisarCorreo(String valor) =>
+      sugerenciaCorreo.value = sugerenciaDeCorreo(valor);
+
+  void usarSugerenciaCorreo() {
+    final sugerida = sugerenciaCorreo.value;
+    if (sugerida == null) return;
+    emailController.text = sugerida;
+    emailController.selection =
+        TextSelection.collapsed(offset: sugerida.length);
+    sugerenciaCorreo.value = null;
   }
 
   String? validatePassword(String? value) {
@@ -413,6 +422,11 @@ class RegisterController extends GetxController {
       AppLogger.error('RegisterController', 'Fallo de autenticación', e);
       if (e.message.contains('already registered')) {
         errorMessage.value = 'Este correo ya está registrado';
+      } else if (e.message.contains('correo_no_permitido') ||
+          e.message.contains('Database error saving new user')) {
+        // La base de datos lo rechazó (la misma regla, por si la cuenta se
+        // intentó crear sin pasar por la validación de la pantalla).
+        errorMessage.value = mensajeCorreoNoPermitido;
       } else {
         errorMessage.value = 'Error: ${e.message}';
       }

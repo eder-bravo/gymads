@@ -108,7 +108,25 @@ class RegisterView extends GetView<RegisterController> {
               icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
+              onChanged: controller.revisarCorreo,
             ),
+            // Un error de dedo en el dominio (gmial.com): se sugiere, no se
+            // impide.
+            Obx(() {
+              final sugerida = controller.sugerenciaCorreo.value;
+              if (sugerida == null) return const SizedBox.shrink();
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: controller.usarSugerenciaCorreo,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  child: Text('¿Quisiste decir $sugerida?'),
+                ),
+              );
+            }),
             const SizedBox(height: 14),
             Obx(() => _buildTextField(context,
                   controller: controller.passwordController,
@@ -341,6 +359,7 @@ class RegisterView extends GetView<RegisterController> {
     bool obscureText = false,
     Widget? suffixIcon,
     String? hint,
+    ValueChanged<String>? onChanged,
   }) {
     final c = context.colores;
     return TextField(
@@ -358,7 +377,10 @@ class RegisterView extends GetView<RegisterController> {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      onChanged: (_) => this.controller.clearError(),
+      onChanged: (valor) {
+        this.controller.clearError();
+        onChanged?.call(valor);
+      },
     );
   }
 

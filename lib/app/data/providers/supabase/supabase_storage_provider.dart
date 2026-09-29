@@ -3,6 +3,7 @@ import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/supabase_config.dart';
+import '../../services/storage_service.dart';
 import '../../services/supabase_service.dart';
 import '../../../core/services/image_compression_service.dart';
 
@@ -125,34 +126,16 @@ class SupabaseStorageProvider {
   /// @param url URL completa del archivo a eliminar
   /// @return true si la eliminación fue exitosa, false en caso contrario
   Future<bool> deleteFile(String url) async {
-    try {
-      // Extraer la ruta relativa del archivo desde la URL
-      final segments = url.split('${SupabaseConfig.bucketName}/');
-      if (segments.length < 2) {
-        if (kDebugMode && SupabaseConfig.debugMode) {
-          AppLogger.error('SupabaseStorageProvider', 'Formato de URL inválido');
-        }
-        return false;
-      }
-      
-      final filePath = segments[1];
-      
-      // Eliminar el archivo
-      await SupabaseService.client.storage.from(SupabaseConfig.bucketName).remove([filePath]);
-      
-      if (kDebugMode && SupabaseConfig.debugMode) {
-        AppLogger.info('SupabaseStorageProvider', 'Archivo eliminado correctamente');
-      }
-      
-      return true;
-    } catch (e) {
-      if (kDebugMode && SupabaseConfig.debugMode) {
-        AppLogger.error('SupabaseStorageProvider', 'Error al eliminar archivo', e);
-      }
+    // Con el mismo lector de rutas que usa la app para mostrar las fotos: el
+    // corte por texto que había aquí dejaba una ruta vacía y no borraba nada.
+    if (StorageService.instance.objeto(url) == null) {
+      AppLogger.warning(
+          'SupabaseStorageProvider', 'No se reconoce el archivo a eliminar');
       return false;
     }
+    return StorageService.instance.borrar([url]);
   }
-  
+
   /// Elimina una foto de usuario
   /// 
   /// @param photoUrl URL completa de la foto a eliminar

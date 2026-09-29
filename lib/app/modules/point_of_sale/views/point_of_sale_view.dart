@@ -24,10 +24,18 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       appBar: GymAppBar(
         title: 'Punto de Venta',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            onPressed: controller.escanearAlCarrito,
-            tooltip: 'Escanear productos',
+          TourStep(
+            tourKey: controller.keyEscanear,
+            isFirstStep: true,
+            title: 'Escanear productos',
+            description: 'Apunta la cámara al código de barras de cada '
+                'producto y se agrega solo al carrito, uno tras otro.',
+            borderRadius: 24,
+            child: IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              onPressed: controller.escanearAlCarrito,
+              tooltip: 'Escanear productos',
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -49,9 +57,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       tourKey: controller.keyBuscar,
                       title: 'Buscador',
                       description:
-                          'Encuentra un producto por su nombre sin tener '
-                          'que recorrer toda la lista.',
-                      isFirstStep: true,
+                          'Encuentra un producto por su nombre o su código sin '
+                          'tener que recorrer toda la lista.',
                       child: AppSearchField(
                         hintText: 'Buscar productos...',
                         onChanged: controller.searchProducts,
@@ -148,7 +155,9 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               tourKey: controller.keyCarrito,
               title: 'Carrito y cobro',
               description: 'Aquí ves el total de la venta y cobras eligiendo '
-                  'el método de pago.',
+                  'el método: efectivo, tarjeta de débito, tarjeta de crédito '
+                  'o transferencia. Con tarjeta o transferencia puedes anotar '
+                  'la referencia o escanearla del comprobante.',
               isLastStep: true,
               child: _buildCartPanel(context),
             ),

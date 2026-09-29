@@ -68,6 +68,15 @@ class CuentaView extends GetView<ConfiguracionController> {
                   ),
                   const SizedBox(height: 8),
                 ],
+                if (controller.tieneContrasena) ...[
+                  _buildInfoTile(context,
+                    icon: Icons.lock_outline,
+                    label: 'Contraseña',
+                    value: '••••••••',
+                    onEdit: controller.abrirCambiarContrasena,
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 _buildInfoTile(context,
                   icon: Icons.badge_outlined,
                   label: 'Rol',
@@ -318,6 +327,8 @@ class CuentaView extends GetView<ConfiguracionController> {
                 onPressed: onEdit,
               )
             : null,
+        // Toda la fila abre la edición, no solo el lápiz.
+        onTap: editable ? onEdit : null,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
     );

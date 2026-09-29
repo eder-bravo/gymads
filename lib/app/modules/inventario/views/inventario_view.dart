@@ -24,14 +24,31 @@ class InventarioView extends GetView<InventarioController> {
       appBar: GymAppBar(
         title: 'Inventario',
         actions: [
-          // Va bajo `ajustarStock` y no `gestionarProductos`: escanear para
-          // mover existencias es justo lo que hace el personal de almacén,
-          // que no puede editar productos ni tocar precios.
+          // Va bajo `ajustarStock` y no `gestionarProductos`: mover existencias
+          // también lo hace el staff de sucursal, que no puede dar de alta
+          // productos ni tocar precios. El almacén sí puede (tiene ambos).
           if (controller.can(Permission.ajustarStock))
-            IconButton(
-              icon: const Icon(Icons.qr_code_scanner),
-              tooltip: 'Escanear código',
-              onPressed: () => _escanearParaAjustar(context),
+            TourStep(
+              tourKey: controller.keyEscanear,
+              isFirstStep:
+                  controller.esPrimerPasoDelTour(controller.keyEscanear),
+              title: 'Escanear código',
+              // Con un código que ya existe ajusta su stock; con uno nuevo
+              // ofrece darlo de alta, pero eso solo quien puede agregar
+              // productos: a los demás no se les promete.
+              description: controller.can(Permission.gestionarProductos)
+                  ? 'Apunta la cámara al código de barras de un producto '
+                      'para sumarle o restarle existencias, o para darlo de '
+                      'alta si todavía no está registrado.'
+                  : 'Apunta la cámara al código de barras de un producto '
+                      'para sumarle o restarle existencias sin buscarlo en '
+                      'la lista.',
+              borderRadius: 24,
+              child: IconButton(
+                icon: const Icon(Icons.qr_code_scanner),
+                tooltip: 'Escanear código',
+                onPressed: () => _escanearParaAjustar(context),
+              ),
             ),
           IconButton(
             icon: const Icon(Icons.refresh),

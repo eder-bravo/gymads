@@ -85,7 +85,8 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         TourStep(
           tourKey: controller.keyCuenta,
           title: 'Cuenta',
-          description: 'Tus datos personales y el nombre del gimnasio.',
+          description: 'Tus datos personales, el nombre del gimnasio y tu '
+              'contraseña.',
           borderRadius: 12,
           isFirstStep: true,
           isLastStep: controller.esUltimoPasoDelTour(controller.keyCuenta),
@@ -103,16 +104,24 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         // ve cualquier rol. Sin paso de tour: no vuelve a mostrar el tour a
         // quien ya lo vio.
         const SizedBox(height: 12),
-        _buildOptionTile(
-          context,
-          icon: Icons.brightness_6_outlined,
-          iconColor: AppColors.accent,
+        TourStep(
+          tourKey: controller.keyApariencia,
           title: 'Apariencia',
-          subtitle: _HojaApariencia.nombre(TemaService.to.modo.value),
-          onTap: () => showModalBottomSheet<void>(
-            context: context,
-            showDragHandle: true,
-            builder: (_) => const _HojaApariencia(),
+          description: 'Elige cómo se ve la app: clara, oscura o como tu '
+              'teléfono. Se guarda en este teléfono.',
+          borderRadius: 12,
+          isLastStep: controller.esUltimoPasoDelTour(controller.keyApariencia),
+          child: _buildOptionTile(
+            context,
+            icon: Icons.brightness_6_outlined,
+            iconColor: AppColors.accent,
+            title: 'Apariencia',
+            subtitle: _HojaApariencia.nombre(TemaService.to.modo.value),
+            onTap: () => showModalBottomSheet<void>(
+              context: context,
+              showDragHandle: true,
+              builder: (_) => const _HojaApariencia(),
+            ),
           ),
         ),
 
@@ -231,14 +240,22 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         // Los permisos se piden todos al entrar la primera vez; aquí se ve
         // cómo quedaron y se corrigen.
         const SizedBox(height: 12),
-        _buildOptionTile(context,
-          icon: Icons.verified_user_outlined,
-          iconColor: AppColors.info,
+        TourStep(
+          tourKey: controller.keyPermisos,
           title: 'Permisos de la app',
-          subtitle: 'Cámara, notificaciones y lector de tarjetas',
-          onTap: () => controller.openPermisos(),
-          trailing: Icon(Icons.arrow_forward_ios,
-              size: 16, color: c.textSecondary),
+          description: 'Aquí ves si la cámara, las notificaciones y el '
+              'Bluetooth están activados, y los corriges si hace falta.',
+          borderRadius: 12,
+          isLastStep: controller.esUltimoPasoDelTour(controller.keyPermisos),
+          child: _buildOptionTile(context,
+            icon: Icons.verified_user_outlined,
+            iconColor: AppColors.info,
+            title: 'Permisos de la app',
+            subtitle: 'Cámara, notificaciones y lector de tarjetas',
+            onTap: () => controller.openPermisos(),
+            trailing: Icon(Icons.arrow_forward_ios,
+                size: 16, color: c.textSecondary),
+          ),
         ),
 
         const SizedBox(height: 24),

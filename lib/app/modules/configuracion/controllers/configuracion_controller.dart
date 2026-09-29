@@ -10,6 +10,7 @@ import '../../../core/permissions/staff_role.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/rfid_reader_service.dart';
 import '../../../data/services/background_rfid_service.dart';
+import '../../../data/services/storage_service.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../../data/services/image_cache_service.dart';
@@ -22,6 +23,8 @@ import '../../../core/utils/snackbar_helper.dart';
 import '../../../routes/app_pages.dart';
 import '../../../data/services/lector_red_service.dart';
 import '../../../core/widgets/formulario.dart';
+import '../../../core/utils/fallo_al_guardar.dart';
+import '../views/cambiar_contrasena_view.dart';
 
 class ConfiguracionController extends GetxController with ScreenTourMixin {
   // Variables observables para la configuración
@@ -267,11 +270,13 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
 
   // ─── Tour de bienvenida ───
   final keyCuenta = GlobalKey();
+  final keyApariencia = GlobalKey();
   final keyPrecios = GlobalKey();
   final keyCategorias = GlobalKey();
   final keyAccesos = GlobalKey();
   final keyControlAccesos = GlobalKey();
   final keyLector = GlobalKey();
+  final keyPermisos = GlobalKey();
 
   /// Las opciones de administración solo existen para el dueño.
   ///
@@ -291,11 +296,13 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   @override
   List<GlobalKey> get tourSteps => [
         keyCuenta,
+        keyApariencia,
         if (can(Permission.gestionarPreciosAbonos)) keyPrecios,
         if (can(Permission.gestionarCategorias)) keyCategorias,
         if (can(Permission.gestionarAccesosStaff)) keyAccesos,
         if (can(Permission.gestionarControlAccesos)) keyControlAccesos,
         if (can(Permission.gestionarControlAccesos)) keyLector,
+        keyPermisos,
       ];
 
   @override
@@ -787,6 +794,67 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   Future<void> setHoraCierre(HoraDelDia hora) =>
       _guardarAccesos(accesosSettings.value.copyWith(horaCierre: hora));
 
+  // =================== CONTRASEÑA ===================
+
+  /// Si la cuenta entra con correo y contraseña. Las de Google no tienen
+  /// contraseña, y el staff entra con código.
+  bool get tieneContrasena {
+    final usuario = Supabase.instance.client.auth.currentUser;
+    if (usuario == null || (usuario.email ?? '').isEmpty) return false;
+    final proveedores = usuario.appMetadata['providers'];
+    if (proveedores is List) return proveedores.contains('email');
+    return usuario.appMetadata['provider'] == 'email';
+  }
+
+  /// Cambia la contraseña. Devuelve el error para mostrar, o null si salió
+  /// bien.
+  ///
+  /// Primero vuelve a entrar con la actual: confirma que es la persona y deja
+  /// la sesión reciente, por si Supabase la exige para cambiarla.
+  Future<String?> cambiarContrasena(String actual, String nueva) async {
+    const generico = 'No se pudo cambiar la contraseña. Intenta de nuevo.';
+    final auth = Supabase.instance.client.auth;
+    final correo = auth.currentUser?.email;
+    if (correo == null || correo.isEmpty) {
+      return 'Esta cuenta no usa contraseña.';
+    }
+
+    try {
+      await auth
+          .signInWithPassword(email: correo, password: actual)
+          .timeout(limiteAlGuardar);
+    } on AuthException catch (e) {
+      if (e.statusCode == '400' || e.code == 'invalid_credentials') {
+        return 'La contraseña actual no es correcta';
+      }
+      return generico;
+    } catch (e) {
+      return mensajeDeFallo(e, generico: generico);
+    }
+
+    try {
+      await auth
+          .updateUser(UserAttributes(password: nueva))
+          .timeout(limiteAlGuardar);
+      return null;
+    } on AuthException catch (e) {
+      AppLogger.warning('ConfiguracionController',
+          'No se cambió la contraseña: ${e.code} ${e.message}');
+      return switch (e.code) {
+        'same_password' => 'La nueva debe ser distinta',
+        'weak_password' =>
+          'Esa contraseña es muy fácil de adivinar. Elige otra.',
+        _ => generico,
+      };
+    } catch (e) {
+      return mensajeDeFallo(e, generico: generico);
+    }
+  }
+
+  void abrirCambiarContrasena() {
+    Get.to(() => CambiarContrasenaView(cambiar: cambiarContrasena));
+  }
+
   // =================== LOGOUT ===================
 
   /// Cerrar sesión con confirmación
@@ -893,6 +961,16 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     // Execute deletion
     try {
       isLoading.value = true;
+
+      // Primero las fotos de los clientes: después de
+      // borrar el gimnasio ya no se sabe cuáles eran (las fotos no llevan el
+      // gimnasio en el nombre) y la sesión ya no puede borrarlas. Si algo no
+      // se borra, se corta aquí, con todo lo demás intacto, para reintentar.
+      if (!await StorageService.instance.borrarFotosDelGimnasio(gymId)) {
+        SnackbarHelper.error('Error',
+            'No se pudieron borrar las fotos. Revisa tu conexión e inténtalo de nuevo.');
+        return;
+      }
 
       await Supabase.instance.client
           .rpc('delete_gym_cascade', params: {'p_gym_id': gymId});

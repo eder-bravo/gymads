@@ -69,22 +69,11 @@ class LoginView extends GetView<AuthController> {
     return Column(
       children: [
         // App Icon
-        Container(
+        Image.asset(
+          'assets/images/logo_app.png',
           width: 100,
           height: 100,
-          decoration: BoxDecoration(
-            color: c.contraste.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(25),
-            border: Border.all(
-              color: c.contraste.withOpacity(0.2),
-              width: 2,
-            ),
-          ),
-          child: Icon(
-            Icons.fitness_center,
-            size: 50,
-            color: c.contraste,
-          ),
+          filterQuality: FilterQuality.medium,
         ),
         const SizedBox(height: 24),
 

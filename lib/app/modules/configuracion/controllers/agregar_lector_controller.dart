@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
@@ -10,6 +11,7 @@ import '../../../data/services/lector_ble_service.dart';
 import '../../../data/services/lector_red_service.dart';
 import '../../../data/services/espera_configuracion_lector.dart';
 import '../../../data/services/estado_configuracion_lector.dart';
+import '../../../data/services/registro_busqueda_lector.dart';
 import 'configuracion_controller.dart';
 
 /// Los pasos del asistente, en orden.
@@ -68,6 +70,7 @@ class AgregarLectorController extends GetxController {
   final guardandoLector = false.obs;
   final avisoFinal = RxnString();
   final lectorOcupado = false.obs;
+  final falloAlBuscar = false.obs;
 
   /// Mensaje para la persona en el paso actual. Null si todo va bien.
   final mensaje = RxnString();
@@ -77,6 +80,10 @@ class AgregarLectorController extends GetxController {
 
   LectorCercano? _lector;
   StreamSubscription<List<LectorCercano>>? _busqueda;
+  Timer? _reintentoBusqueda;
+  int _generacionBusqueda = 0;
+  bool _iniciandoBusqueda = false;
+  bool _cerrado = false;
   Completer<void>? _cancelarRed;
 
   String? get nombreLector => _lector?.nombre;
@@ -101,6 +108,9 @@ class AgregarLectorController extends GetxController {
 
   @override
   void onClose() {
+    _cerrado = true;
+    _generacionBusqueda++;
+    _reintentoBusqueda?.cancel();
     if (_cancelarRed?.isCompleted == false) _cancelarRed!.complete();
     _busqueda?.cancel();
     _ble.detenerBusqueda();
@@ -112,16 +122,33 @@ class AgregarLectorController extends GetxController {
 
   /// Paso 1: encontrar el lector por Bluetooth.
   Future<void> buscar() async {
-    await _busqueda?.cancel();
-    await _ble.liberarSesion();
-    _lector = null;
-    lectores.clear();
-    mensaje.value = null;
-    lectorOcupado.value = false;
-    paso.value = PasoAgregar.buscando;
+    if (_cerrado || _iniciandoBusqueda) return;
+    _iniciandoBusqueda = true;
+    final generacion = ++_generacionBusqueda;
+    _reintentoBusqueda?.cancel();
+    try {
+      await _busqueda?.cancel();
+      await _ble.detenerBusqueda();
+      await _ble.liberarSesion();
+      if (_cerrado || generacion != _generacionBusqueda) return;
+      _lector = null;
+      lectores.clear();
+      mensaje.value = null;
+      lectorOcupado.value = false;
+      falloAlBuscar.value = false;
+      paso.value = PasoAgregar.buscando;
+      _escucharBusqueda(generacion, reintento: false);
+    } finally {
+      _iniciandoBusqueda = false;
+    }
+  }
 
+  void _escucharBusqueda(int generacion, {required bool reintento}) {
+    bool vigente() => !_cerrado && generacion == _generacionBusqueda;
     _busqueda = _ble.buscar().listen(
       (encontrados) {
+        if (!vigente()) return;
+        mensaje.value = null;
         lectores.assignAll(encontrados);
         // Lo normal es un solo lector: se toma el primero que aparece, sin
         // hacer elegir. Si hay varios, la pantalla deja escoger.
@@ -130,17 +157,37 @@ class AgregarLectorController extends GetxController {
         }
       },
       onError: (Object e) {
+        if (!vigente()) return;
+        if (!reintento && e is FalloBusquedaBle && e.reintentable) {
+          mensaje.value = 'El Bluetooth del teléfono no respondió. '
+              'Intentando una vez más…';
+          unawaited(_ble.registroBusqueda.registrar(
+              EventoBusquedaLector.reintento,
+              categoria: e.tipo.name));
+          _reintentoBusqueda = Timer(const Duration(milliseconds: 700), () {
+            if (vigente() && paso.value == PasoAgregar.buscando) {
+              _escucharBusqueda(generacion, reintento: true);
+            }
+          });
+          return;
+        }
         mensaje.value = e is LectorBleException
             ? e.mensaje
-            : 'No se pudo buscar por Bluetooth.';
+            : 'No se pudo buscar por Bluetooth. Apágalo, espera 5 segundos '
+                'y vuelve a encenderlo antes de intentar de nuevo.';
+        falloAlBuscar.value = true;
         paso.value = PasoAgregar.fallo;
       },
       onDone: () {
+        if (!vigente()) return;
         if (_lector == null && paso.value == PasoAgregar.buscando) {
           if (lectores.isEmpty) {
             mensaje.value = 'No apareció ningún lector. Revisa que esté '
                 'conectado a la corriente y que su luz parpadee rápido. '
-                'Si otro dispositivo lo está configurando, espera a que termine.';
+                'Si otro dispositivo lo está configurando, espera a que termine. '
+                'Si sigue sin aparecer, apaga el Bluetooth del teléfono, '
+                'espera 5 segundos y vuelve a encenderlo.';
+            falloAlBuscar.value = true;
             paso.value = PasoAgregar.fallo;
           }
           // Con varios, se quedan en pantalla para elegir.
@@ -150,30 +197,50 @@ class AgregarLectorController extends GetxController {
     );
   }
 
+  Future<bool> copiarDiagnosticoBusqueda() async {
+    try {
+      final texto = await _ble.registroBusqueda.exportar();
+      await Clipboard.setData(ClipboardData(text: texto));
+      return true;
+    } catch (e) {
+      AppLogger.error('AgregarLectorController', 'Al copiar diagnóstico', e);
+      return false;
+    }
+  }
+
   /// Paso 2: conectarse al lector y pedirle las redes que ve.
   Future<void> elegirLector(LectorCercano lector) async {
-    if (paso.value == PasoAgregar.preparando ||
+    if (_cerrado ||
+        paso.value == PasoAgregar.preparando ||
         paso.value == PasoAgregar.conectando ||
         paso.value == PasoAgregar.comprobando) {
       return;
     }
+    final generacion = _generacionBusqueda;
+    bool vigente() => !_cerrado && generacion == _generacionBusqueda;
     _lector = lector;
     mensaje.value = null;
     lectorOcupado.value = false;
     paso.value = PasoAgregar.preparando;
     await _busqueda?.cancel();
+    if (!vigente()) return;
 
     try {
       if (lector.ocupado) throw const LectorOcupadoException();
       await _ble.conectar(lector);
+      if (!vigente()) return;
       await cargarRedes();
+      if (!vigente()) return;
       paso.value = PasoAgregar.elegirRed;
     } on LectorOcupadoException {
+      if (!vigente()) return;
       _mostrarOcupado();
     } on LectorBleException catch (e) {
+      if (!vigente()) return;
       mensaje.value = e.mensaje;
       paso.value = PasoAgregar.fallo;
     } catch (e) {
+      if (!vigente()) return;
       AppLogger.error('AgregarLectorController', 'Al preparar el lector', e);
       mensaje.value = 'No se pudo hablar con el lector. Acerca el teléfono y '
           'reintenta.';
@@ -181,7 +248,9 @@ class AgregarLectorController extends GetxController {
     } finally {
       // El firmware nuevo anuncia «ocupado» y conserva la sesión mientras
       // se escribe. Con el anterior se sigue soltando como antes.
-      if (!_ble.sesionExclusiva || paso.value == PasoAgregar.fallo) {
+      if (!vigente()) {
+        await _ble.liberarSesion();
+      } else if (!_ble.sesionExclusiva || paso.value == PasoAgregar.fallo) {
         await _ble.desconectar();
       }
     }
@@ -189,7 +258,9 @@ class AgregarLectorController extends GetxController {
 
   /// Lee las redes que ve el lector. [buscarDeNuevo] le pide otra búsqueda.
   Future<void> cargarRedes({bool buscarDeNuevo = false}) async {
+    final generacion = _generacionBusqueda;
     final vistas = await _ble.leerRedes(buscarDeNuevo: buscarDeNuevo);
+    if (_cerrado || generacion != _generacionBusqueda) return;
     redes.assignAll(vistas);
   }
 

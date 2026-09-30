@@ -153,10 +153,11 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           titulo: varios ? '¿Cuál es tu lector?' : 'Buscando el lector...',
           texto: varios
               ? 'Hay más de un lector cerca. Elige el tuyo.'
-              : cambiarWifi
-                  ? 'Mantén el teléfono cerca del lector.'
-                  : 'Conecta el lector a la corriente y deja el teléfono '
-                      'cerca.',
+              : controller.mensaje.value ??
+                  (cambiarWifi
+                      ? 'Mantén el teléfono cerca del lector.'
+                      : 'Conecta el lector a la corriente y deja el teléfono '
+                          'cerca.'),
         ),
         if (varios) const SizedBox(height: 16),
         for (final lector in controller.lectores)
@@ -394,6 +395,26 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                 : 'Intentar de nuevo',
             Icons.refresh,
             controller.buscar),
+        if (controller.falloAlBuscar.value) ...[
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () async {
+              final copiado = await controller.copiarDiagnosticoBusqueda();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(copiado
+                    ? 'Diagnóstico copiado. Puedes pegarlo para revisar el problema.'
+                    : 'No se pudo copiar. Vuelve a intentar.'),
+              ));
+            },
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('Copiar diagnóstico'),
+            style: TextButton.styleFrom(
+              foregroundColor: context.colores.textSecondary,
+              minimumSize: const Size(0, 48),
+            ),
+          ),
+        ],
       ],
     );
   }

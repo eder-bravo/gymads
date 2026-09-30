@@ -24,6 +24,31 @@ Firmware: `esp32_rfid_wifi_setup_fixed/` (v6.7.0). App: `LectorBleService`,
 
 El trabajo diario (leer tarjetas) es por WiFi/HTTP, igual que antes.
 
+### Búsqueda Bluetooth y diagnóstico del teléfono
+
+La app busca hasta 15 s por el UUID del lector. En Android usa escaneo legacy,
+compatible con el anuncio del ESP32. Cada búsqueda detiene la anterior antes
+de escuchar resultados y limpia sus suscripciones al terminar, fallar o salir.
+La adquisición del único escáner de FlutterBluePlus está serializada: varias
+búsquedas simultáneas no comparten resultados ni se cancelan entre sí por error.
+
+Un error nativo del escáner se distingue de una búsqueda vacía. Los fallos
+temporales provocan un único reintento a los 700 ms, con un aviso visible;
+los permisos, ubicación apagada o Bluetooth apagado muestran instrucciones
+directas. Android tiene un límite preventivo global de cinco inicios por 30 s,
+medido con reloj monotónico. No se reinicia el Bluetooth del teléfono por la app.
+Salir durante una conexión o lectura pendiente libera la reserva al completarse
+y evita que el controlador cerrado avance a la siguiente pantalla.
+
+En un fallo de búsqueda aparece **Copiar diagnóstico**. El historial funciona
+también en producción, se guarda localmente en SharedPreferences y conserva los
+últimos 60 eventos. Incluye fecha UTC, tipo de error, código nativo, cantidades,
+duración y fabricante/modelo/versión/SDK del teléfono. No guarda mensajes crudos,
+direcciones de lectores, nombres de redes, contraseñas, tarjetas ni tokens; no
+se envía automáticamente a ningún servicio. El registro es auxiliar y no retrasa
+la búsqueda. El escáner se prueba con la plataforma simulada del plugin real;
+los casos específicos de un teléfono requieren además una prueba física.
+
 ### Sonidos de configuración
 
 | Momento confirmado por el lector | Sonido |

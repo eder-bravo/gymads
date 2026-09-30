@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/utils/app_logger.dart';
 import 'estado_configuracion_lector.dart';
+import 'registro_busqueda_lector.dart';
 
 // UUIDs del firmware 6.0 (arduino/esp32_rfid_wifi_setup_fixed). Si cambian
 // allá, cambian aquí. No cambiaron con el nombre GymOne (v6.4.0): con ellos
@@ -208,6 +210,128 @@ class LectorBleException implements Exception {
   String toString() => mensaje;
 }
 
+enum TipoFalloBusquedaBle {
+  ubicacion,
+  permisoUbicacion,
+  permisoBluetooth,
+  bluetoothApagado,
+  bluetoothNoListo,
+  inicioFallido,
+  interno,
+  demasiadosIntentos,
+  sinCompatibilidad,
+  desconocido,
+}
+
+/// Un fallo del teléfono al buscar, distinto de una búsqueda sin lectores.
+class FalloBusquedaBle extends LectorBleException {
+  const FalloBusquedaBle(super.mensaje, this.tipo, {this.codigo});
+
+  final TipoFalloBusquedaBle tipo;
+  final int? codigo;
+  bool get reintentable =>
+      tipo == TipoFalloBusquedaBle.interno ||
+      tipo == TipoFalloBusquedaBle.inicioFallido ||
+      tipo == TipoFalloBusquedaBle.bluetoothNoListo;
+}
+
+FalloBusquedaBle explicarFalloBusquedaBle(Object error) {
+  if (error is FalloBusquedaBle) return error;
+  final String descripcion;
+  int? codigo;
+  if (error is FlutterBluePlusException) {
+    descripcion = error.description?.toLowerCase() ?? '';
+    if (error.platform == ErrorPlatform.android && error.function == 'scan') {
+      codigo = error.code;
+    }
+  } else if (error is PlatformException) {
+    descripcion = error.message?.toLowerCase() ?? '';
+  } else {
+    descripcion = '';
+  }
+  if (descripcion.contains('location services')) {
+    return const FalloBusquedaBle(
+      'Activa «Ubicación» en los ajustes rápidos del teléfono y vuelve a '
+      'intentar. Este teléfono la necesita para buscar el lector por Bluetooth.',
+      TipoFalloBusquedaBle.ubicacion,
+    );
+  }
+  if (descripcion.contains('permission') ||
+      descripcion.contains('unauthorized')) {
+    final ubicacion = descripcion.contains('location');
+    return FalloBusquedaBle(
+      ubicacion
+          ? 'Permite a GymOne acceder a la ubicación en Ajustes > '
+              'Aplicaciones > GymOne > Permisos y vuelve a intentar.'
+          : 'Permite a GymOne usar Bluetooth o «Dispositivos cercanos» en '
+              'Ajustes > Aplicaciones > GymOne > Permisos y vuelve a intentar.',
+      ubicacion
+          ? TipoFalloBusquedaBle.permisoUbicacion
+          : TipoFalloBusquedaBle.permisoBluetooth,
+    );
+  }
+  if (descripcion.contains('must be turned on')) {
+    return const FalloBusquedaBle(
+      'Enciende el Bluetooth del teléfono y pulsa «Intentar de nuevo».',
+      TipoFalloBusquedaBle.bluetoothApagado,
+    );
+  }
+  if (codigo == 6) {
+    return const FalloBusquedaBle(
+      'El teléfono necesita una pausa entre búsquedas. Espera 30 segundos '
+      'y pulsa «Intentar de nuevo».',
+      TipoFalloBusquedaBle.demasiadosIntentos,
+      codigo: 6,
+    );
+  }
+  if (codigo == 4) {
+    return const FalloBusquedaBle(
+      'El teléfono no pudo iniciar la búsqueda Bluetooth. Apaga Bluetooth, '
+      'espera 5 segundos y vuelve a encenderlo antes de intentar de nuevo.',
+      TipoFalloBusquedaBle.sinCompatibilidad,
+      codigo: 4,
+    );
+  }
+  return FalloBusquedaBle(
+    'El teléfono no pudo buscar por Bluetooth. Apágalo, espera 5 segundos, '
+    'vuelve a encenderlo y pulsa «Intentar de nuevo».',
+    codigo == 1
+        ? TipoFalloBusquedaBle.inicioFallido
+        : codigo != null || descripcion.contains('getbluetoothlescanner')
+            ? TipoFalloBusquedaBle.interno
+            : TipoFalloBusquedaBle.desconocido,
+    codigo: codigo,
+  );
+}
+
+class _BusquedaBle {
+  final cancelacion = Completer<void>();
+  late final StreamController<List<LectorCercano>> salida;
+  bool cancelada = false;
+  bool terminada = false;
+  Future<void>? detencion;
+}
+
+/// Cinco inicios por ventana de 30 s, compartidos entre asistentes. Usa un
+/// reloj monotónico para que ajustar la hora del teléfono no cambie la pausa.
+class LimiteBusquedasBle {
+  LimiteBusquedasBle({Duration Function()? tiempo}) {
+    final reloj = Stopwatch()..start();
+    _tiempo = tiempo ?? (() => reloj.elapsed);
+  }
+
+  late final Duration Function() _tiempo;
+  final _inicios = <Duration>[];
+
+  bool reservarInicio() {
+    final ahora = _tiempo();
+    _inicios.removeWhere((t) => ahora - t >= const Duration(seconds: 30));
+    if (_inicios.length >= 5) return false;
+    _inicios.add(ahora);
+    return true;
+  }
+}
+
 /// Configura el WiFi del lector por Bluetooth.
 ///
 /// El Bluetooth es SOLO para esto: una sesión corta (~30 s) y se cierra. El
@@ -222,6 +346,16 @@ class LectorBleException implements Exception {
 /// - Si la conexión se corta antes del resultado, se reconecta una vez y se
 ///   relee el estado. El lector no pierde el avance: vive en su loop.
 class LectorBleService {
+  LectorBleService({RegistroBusquedaLector? registro})
+      : registroBusqueda = registro ?? RegistroBusquedaLector.instance;
+
+  final RegistroBusquedaLector registroBusqueda;
+  _BusquedaBle? _busqueda;
+  // FlutterBluePlus tiene un único escáner por aplicación. El intento viejo
+  // debe terminar antes de instalar los listeners del siguiente.
+  static _BusquedaBle? _duenoEscaneo;
+  static Future<void> _colaDueno = Future<void>.value();
+  static final _limiteAndroid = LimiteBusquedasBle();
   BluetoothDevice? _dispositivo;
   BluetoothCharacteristic? _chRedes;
   BluetoothCharacteristic? _chSsid;
@@ -242,8 +376,9 @@ class LectorBleService {
   /// Deja el Bluetooth listo para buscar, o explica por qué no se puede.
   Future<void> prepararBluetooth() async {
     if (!await FlutterBluePlus.isSupported) {
-      throw const LectorBleException(
-          'Este teléfono no tiene Bluetooth compatible.');
+      throw const FalloBusquedaBle(
+          'Este teléfono no tiene Bluetooth compatible.',
+          TipoFalloBusquedaBle.sinCompatibilidad);
     }
 
     var estado = await FlutterBluePlus.adapterState
@@ -255,18 +390,29 @@ class LectorBleService {
     if (estado == BluetoothAdapterState.off && Platform.isAndroid) {
       try {
         await FlutterBluePlus.turnOn();
-        estado = BluetoothAdapterState.on;
+        estado = await FlutterBluePlus.adapterState
+            .where((s) => s == BluetoothAdapterState.on)
+            .first
+            .timeout(const Duration(seconds: 5),
+                onTimeout: () => BluetoothAdapterState.unknown);
       } catch (_) {}
     }
 
     if (estado == BluetoothAdapterState.unauthorized) {
-      throw const LectorBleException(
+      throw const FalloBusquedaBle(
           'La app no tiene permiso para usar Bluetooth. Actívalo en los '
-          'ajustes del teléfono.');
+          'ajustes del teléfono.',
+          TipoFalloBusquedaBle.permisoBluetooth);
     }
     if (estado != BluetoothAdapterState.on) {
-      throw const LectorBleException(
-          'Enciende el Bluetooth del teléfono para encontrar el lector.');
+      throw FalloBusquedaBle(
+          estado == BluetoothAdapterState.off
+              ? 'Enciende el Bluetooth del teléfono para encontrar el lector.'
+              : 'El Bluetooth del teléfono aún no está listo. Espera un '
+                  'momento y vuelve a intentar.',
+          estado == BluetoothAdapterState.off
+              ? TipoFalloBusquedaBle.bluetoothApagado
+              : TipoFalloBusquedaBle.bluetoothNoListo);
     }
   }
 
@@ -275,46 +421,184 @@ class LectorBleService {
   /// Emite la lista cada vez que aparece uno nuevo, ordenada por cercanía.
   Stream<List<LectorCercano>> buscar({
     Duration duracion = const Duration(seconds: 15),
-  }) async* {
-    await prepararBluetooth();
-
-    final encontrados = <String, LectorCercano>{};
-    final controlador = StreamController<List<LectorCercano>>();
-
-    final sub = FlutterBluePlus.onScanResults.listen((resultados) {
-      for (final r in resultados) {
-        final nombre = r.advertisementData.advName.isNotEmpty
-            ? r.advertisementData.advName
-            : (r.device.platformName.isNotEmpty
-                ? r.device.platformName
-                : 'Lector GymOne');
-        encontrados[r.device.remoteId.str] = LectorCercano(
-            r.device, nombre, r.rssi,
-            ocupado:
-                lectorOcupadoEnAnuncio(r.advertisementData.manufacturerData));
-      }
-      final lista = encontrados.values.toList()
-        ..sort((a, b) => b.rssi.compareTo(a.rssi));
-      controlador.add(lista);
-    });
-
-    FlutterBluePlus.cancelWhenScanComplete(sub);
-
-    unawaited(FlutterBluePlus.isScanning
-        .where((escaneando) => !escaneando)
-        .skip(1)
-        .first
-        .then((_) => controlador.close()));
-
-    await FlutterBluePlus.startScan(
-      withServices: [_servicioUuid],
-      timeout: duracion,
+  }) {
+    final busqueda = _BusquedaBle();
+    busqueda.salida = StreamController<List<LectorCercano>>(
+      onListen: () => unawaited(_buscar(busqueda, duracion)),
+      onCancel: () => _cancelarBusqueda(busqueda),
     );
-
-    yield* controlador.stream;
+    return busqueda.salida.stream;
   }
 
-  Future<void> detenerBusqueda() => FlutterBluePlus.stopScan();
+  Future<void> _buscar(_BusquedaBle busqueda, Duration duracion) async {
+    _busqueda = busqueda;
+    final reloj = Stopwatch()..start();
+    unawaited(registroBusqueda.registrar(EventoBusquedaLector.inicio));
+    final encontrados = <String, LectorCercano>{};
+    final fin = Completer<void>();
+    Object? fallo;
+    bool comenzo = false;
+    StreamSubscription<List<ScanResult>>? resultadosSub;
+    StreamSubscription<bool>? escaneoSub;
+    StreamSubscription<BluetoothAdapterState>? adaptadorSub;
+    void terminar([Object? error]) {
+      fallo ??= error;
+      if (!fin.isCompleted) fin.complete();
+    }
+
+    try {
+      await _tomarEscaner(busqueda);
+      if (busqueda.cancelada) return;
+      await prepararBluetooth();
+      if (busqueda.cancelada) return;
+      await FlutterBluePlus.stopScan();
+      if (busqueda.cancelada) return;
+
+      // Android limita los inicios frecuentes: no provocar otro bloqueo al
+      // pulsar varias veces ni al hacer el único reintento automático.
+      if (Platform.isAndroid) {
+        if (!_limiteAndroid.reservarInicio()) {
+          throw const FalloBusquedaBle(
+              'El teléfono necesita una pausa entre búsquedas. Espera 30 '
+              'segundos y pulsa «Intentar de nuevo».',
+              TipoFalloBusquedaBle.demasiadosIntentos);
+        }
+      }
+
+      resultadosSub = FlutterBluePlus.onScanResults.listen((resultados) {
+        if (busqueda.cancelada || busqueda.terminada) return;
+        final cantidadAnterior = encontrados.length;
+        for (final r in resultados) {
+          // Además del filtro nativo, no aceptar resultados almacenados de
+          // otro servicio o búsqueda por nombre.
+          if (!r.advertisementData.serviceUuids.contains(_servicioUuid)) {
+            continue;
+          }
+          final nombre = r.advertisementData.advName.isNotEmpty
+              ? r.advertisementData.advName
+              : (r.device.platformName.isNotEmpty
+                  ? r.device.platformName
+                  : 'Lector GymOne');
+          encontrados[r.device.remoteId.str] = LectorCercano(
+              r.device, nombre, r.rssi,
+              ocupado:
+                  lectorOcupadoEnAnuncio(r.advertisementData.manufacturerData));
+        }
+        if (encontrados.isEmpty) return;
+        if (encontrados.length != cantidadAnterior) {
+          unawaited(registroBusqueda.registrar(EventoBusquedaLector.encontrados,
+              lectores: encontrados.length));
+        }
+        final lista = encontrados.values.toList()
+          ..sort((a, b) => b.rssi.compareTo(a.rssi));
+        busqueda.salida.add(lista);
+      }, onError: (Object error, StackTrace _) => terminar(error));
+      escaneoSub = FlutterBluePlus.isScanning.listen((escaneando) {
+        if (escaneando) comenzo = true;
+        if (!escaneando && comenzo) {
+          // El plugin publica false y el error/estado del adaptador en el
+          // mismo turno. Dejar que llegue el motivo antes de cerrar vacío.
+          unawaited(Future<void>.delayed(Duration.zero, terminar));
+        }
+      });
+      adaptadorSub = FlutterBluePlus.adapterState.listen((estado) {
+        if (estado == BluetoothAdapterState.off ||
+            estado == BluetoothAdapterState.turningOff) {
+          terminar(const FalloBusquedaBle(
+              'Se apagó el Bluetooth del teléfono. Enciéndelo y pulsa '
+              '«Intentar de nuevo».',
+              TipoFalloBusquedaBle.bluetoothApagado));
+        } else if (estado == BluetoothAdapterState.unauthorized) {
+          terminar(const FalloBusquedaBle(
+              'La app perdió el permiso de Bluetooth. Actívalo en Ajustes > '
+              'Aplicaciones > GymOne > Permisos y vuelve a intentar.',
+              TipoFalloBusquedaBle.permisoBluetooth));
+        }
+      });
+      await FlutterBluePlus.startScan(
+        withServices: [_servicioUuid],
+        timeout: duracion,
+        // El firmware anuncia paquetes BLE clásicos. Buscar solo esos
+        // evita depender de los modos extendidos de cada teléfono Android.
+        androidLegacy: true,
+      );
+      unawaited(
+          registroBusqueda.registrar(EventoBusquedaLector.escaneoIniciado));
+      await Future.any([fin.future, busqueda.cancelacion.future]).timeout(
+          duracion + const Duration(seconds: 2),
+          onTimeout: () => terminar(const FalloBusquedaBle(
+              'El teléfono no terminó la búsqueda Bluetooth. Apaga Bluetooth, '
+              'espera 5 segundos y vuelve a encenderlo para intentar de nuevo.',
+              TipoFalloBusquedaBle.interno)));
+      if (fallo != null) throw fallo!;
+      if (!busqueda.cancelada) {
+        unawaited(registroBusqueda.registrar(
+            encontrados.isEmpty
+                ? EventoBusquedaLector.sinLectores
+                : EventoBusquedaLector.completada,
+            lectores: encontrados.length,
+            milisegundos: reloj.elapsedMilliseconds));
+      }
+    } catch (error) {
+      if (!busqueda.cancelada) {
+        final explicado = explicarFalloBusquedaBle(error);
+        unawaited(registroBusqueda.registrar(EventoBusquedaLector.fallo,
+            categoria: explicado.tipo.name,
+            codigo: explicado.codigo,
+            milisegundos: reloj.elapsedMilliseconds));
+        busqueda.salida.addError(explicado);
+      }
+    } finally {
+      busqueda.terminada = true;
+      await resultadosSub?.cancel();
+      await escaneoSub?.cancel();
+      await adaptadorSub?.cancel();
+      if (identical(_duenoEscaneo, busqueda)) {
+        await _detenerEscaneoNativo();
+        if (identical(_duenoEscaneo, busqueda)) _duenoEscaneo = null;
+      }
+      if (identical(_busqueda, busqueda)) _busqueda = null;
+      unawaited(busqueda.salida.close());
+    }
+  }
+
+  Future<void> _tomarEscaner(_BusquedaBle busqueda) {
+    final turno = _colaDueno.then((_) async {
+      if (busqueda.cancelada) return;
+      final anterior = _duenoEscaneo;
+      if (anterior != null) await _cancelarBusqueda(anterior);
+      if (!busqueda.cancelada) _duenoEscaneo = busqueda;
+    });
+    _colaDueno = turno.then((_) {}, onError: (Object _, StackTrace __) {});
+    return turno;
+  }
+
+  Future<void> _cancelarBusqueda(_BusquedaBle busqueda) {
+    if (busqueda.detencion != null) return busqueda.detencion!;
+    if (busqueda.terminada) return Future<void>.value();
+    busqueda.cancelada = true;
+    busqueda.cancelacion.complete();
+    unawaited(registroBusqueda.registrar(EventoBusquedaLector.cancelada));
+    return busqueda.detencion = identical(_duenoEscaneo, busqueda)
+        ? _detenerEscaneoNativo()
+        : Future<void>.value();
+  }
+
+  Future<void> _detenerEscaneoNativo() async {
+    try {
+      await FlutterBluePlus.stopScan();
+    } catch (error) {
+      AppLogger.error('LectorBleService', 'Al detener la búsqueda', error);
+      final explicado = explicarFalloBusquedaBle(error);
+      unawaited(registroBusqueda.registrar(EventoBusquedaLector.fallo,
+          categoria: explicado.tipo.name, codigo: explicado.codigo));
+    }
+  }
+
+  Future<void> detenerBusqueda() async {
+    final busqueda = _busqueda;
+    if (busqueda != null) await _cancelarBusqueda(busqueda);
+  }
 
   /// Se conecta al [lector] y localiza sus características.
   Future<void> conectar(LectorCercano lector) async {

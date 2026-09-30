@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/utils/app_logger.dart';
+import 'estado_configuracion_lector.dart';
 
 // UUIDs del firmware 6.0 (arduino/esp32_rfid_wifi_setup_fixed). Si cambian
 // allá, cambian aquí. No cambiaron con el nombre GymOne (v6.4.0): con ellos
@@ -16,6 +18,7 @@ final Guid _claveUuid = Guid('6b1a0004-5c1e-4f7a-9d2e-47796d416473');
 final Guid _gymUuid = Guid('6b1a0005-5c1e-4f7a-9d2e-47796d416473');
 final Guid _ordenUuid = Guid('6b1a0006-5c1e-4f7a-9d2e-47796d416473');
 final Guid _estadoUuid = Guid('6b1a0007-5c1e-4f7a-9d2e-47796d416473');
+final Guid _sesionUuid = Guid('6b1a0008-5c1e-4f7a-9d2e-47796d416473');
 
 /// En qué va el lector mientras se configura.
 enum FaseConfig {
@@ -36,6 +39,7 @@ enum FaseConfig {
   errorNoConecta,
   errorDatos,
   errorOtroGimnasio,
+  ocupado,
   desconocido;
 
   bool get esFinal =>
@@ -46,7 +50,8 @@ enum FaseConfig {
       this == errorSeguridad ||
       this == errorNoConecta ||
       this == errorDatos ||
-      this == errorOtroGimnasio;
+      this == errorOtroGimnasio ||
+      this == ocupado;
 }
 
 /// Lo que dice la característica `estado` del lector.
@@ -77,6 +82,7 @@ class EstadoConfig {
       'error:seguridad' => FaseConfig.errorSeguridad,
       'error:datos' => FaseConfig.errorDatos,
       'error:otro_gimnasio' => FaseConfig.errorOtroGimnasio,
+      'ocupado' => FaseConfig.ocupado,
       _ => FaseConfig.desconocido,
     });
   }
@@ -94,6 +100,7 @@ class EstadoConfig {
         FaseConfig.errorNoConecta => 'error:no_conecta',
         FaseConfig.errorDatos => 'error:datos',
         FaseConfig.errorOtroGimnasio => 'error:otro_gimnasio',
+        FaseConfig.ocupado => 'ocupado',
         FaseConfig.desconocido => '',
       };
 
@@ -181,13 +188,15 @@ List<RedWifi> parsearRedes(String texto) {
 
 /// Un lector que se está ofreciendo por Bluetooth para configurarlo.
 class LectorCercano {
-  LectorCercano(this.dispositivo, this.nombre, this.rssi);
+  LectorCercano(this.dispositivo, this.nombre, this.rssi,
+      {this.ocupado = false});
 
   final BluetoothDevice dispositivo;
 
   /// `GymOne-XXXX`: los 4 últimos caracteres de su MAC, como en la etiqueta.
   final String nombre;
   final int rssi;
+  final bool ocupado;
 }
 
 /// Un problema que la pantalla le puede explicar a la persona tal cual.
@@ -220,6 +229,15 @@ class LectorBleService {
   BluetoothCharacteristic? _chGym;
   BluetoothCharacteristic? _chOrden;
   BluetoothCharacteristic? _chEstado;
+  BluetoothCharacteristic? _chSesion;
+  final String _tokenSesion = const Uuid().v4();
+  Timer? _renovarSesion;
+  bool _soportaSesiones = false;
+  String? get tokenSesion => _soportaSesiones ? _tokenSesion : null;
+
+  /// Firmware 6.7+: mantiene la reserva mientras se elige y escribe. El
+  /// anuncio sigue visible para que otros dispositivos vean «ocupado».
+  bool get sesionExclusiva => _chSesion != null;
 
   /// Deja el Bluetooth listo para buscar, o explica por qué no se puede.
   Future<void> prepararBluetooth() async {
@@ -270,8 +288,10 @@ class LectorBleService {
             : (r.device.platformName.isNotEmpty
                 ? r.device.platformName
                 : 'Lector GymOne');
-        encontrados[r.device.remoteId.str] =
-            LectorCercano(r.device, nombre, r.rssi);
+        encontrados[r.device.remoteId.str] = LectorCercano(
+            r.device, nombre, r.rssi,
+            ocupado:
+                lectorOcupadoEnAnuncio(r.advertisementData.manufacturerData));
       }
       final lista = encontrados.values.toList()
         ..sort((a, b) => b.rssi.compareTo(a.rssi));
@@ -298,6 +318,7 @@ class LectorBleService {
 
   /// Se conecta al [lector] y localiza sus características.
   Future<void> conectar(LectorCercano lector) async {
+    if (lector.ocupado) throw const LectorOcupadoException();
     await detenerBusqueda();
     _dispositivo = lector.dispositivo;
     await _conectarDispositivo();
@@ -309,7 +330,10 @@ class LectorBleService {
   /// Vuelve a conectarse al lector elegido (p. ej. para reintentar tras un
   /// error, después de haber soltado el Bluetooth).
   Future<void> asegurarConexion() async {
-    if (conectado) return;
+    if (conectado) {
+      await _tomarSesion();
+      return;
+    }
     await _conectarDispositivo();
   }
 
@@ -318,8 +342,11 @@ class LectorBleService {
     if (d == null) throw const LectorBleException('No hay lector elegido.');
 
     try {
-      await d.connect(timeout: const Duration(seconds: 15));
+      await d.connect(timeout: const Duration(seconds: 8));
       await _prepararCaracteristicas(d);
+    } on LectorOcupadoException {
+      await desconectar();
+      rethrow;
     } on LectorBleException {
       await desconectar();
       rethrow;
@@ -351,6 +378,23 @@ class LectorBleService {
     _chGym = ch(_gymUuid);
     _chOrden = ch(_ordenUuid);
     _chEstado = ch(_estadoUuid);
+    _chSesion = servicio.characteristics
+        .where((c) => c.uuid == _sesionUuid)
+        .firstOrNull;
+    _soportaSesiones = _chSesion != null;
+    await _tomarSesion();
+
+    _renovarSesion?.cancel();
+    if (_chSesion != null) {
+      _renovarSesion = Timer.periodic(const Duration(seconds: 20), (_) async {
+        final sesion = _chSesion;
+        if (sesion == null || !d.isConnected) return;
+        try {
+          // Leer renueva solo la reserva de esta conexión, nunca la ajena.
+          await sesion.read(timeout: 3);
+        } catch (_) {}
+      });
+    }
 
     // Las notificaciones son un extra: si fallan, la relectura periódica
     // de `estado` basta.
@@ -359,6 +403,26 @@ class LectorBleService {
     } catch (e) {
       AppLogger.warning('LectorBleService', 'Sin notificaciones: $e');
     }
+  }
+
+  Future<void> _tomarSesion() async {
+    final sesion = _chSesion;
+    if (sesion == null) return; // Firmware anterior, sin reserva explícita.
+    await sesion.write(utf8.encode('tomar:$_tokenSesion'), timeout: 3);
+    final estado = utf8.decode(await sesion.read(timeout: 3));
+    if (estado != 'tuya') throw const LectorOcupadoException();
+  }
+
+  /// Al cerrar el asistente se libera la reserva, sin esperar su vencimiento.
+  Future<void> liberarSesion() async {
+    _renovarSesion?.cancel();
+    final sesion = _chSesion;
+    if (sesion != null && (_dispositivo?.isConnected ?? false)) {
+      try {
+        await sesion.write(utf8.encode('soltar:$_tokenSesion'), timeout: 2);
+      } catch (_) {}
+    }
+    await desconectar();
   }
 
   /// Las redes que ve el lector.
@@ -455,6 +519,12 @@ class LectorBleService {
       // Sin respuesta clara: el resultado se sabrá al reconectar.
     }
 
+    if (respuesta != null &&
+        respuesta.fase.esFinal &&
+        respuesta.fase != FaseConfig.ok &&
+        sesionExclusiva) {
+      return respuesta;
+    }
     // Se suelta el Bluetooth para que el lector pruebe el WiFi sin él.
     await desconectar();
 
@@ -465,7 +535,7 @@ class LectorBleService {
   /// Espera el resultado del intento después de [enviarWifi].
   ///
   /// Si el lector falla, vuelve a anunciarse por Bluetooth: se reconecta y
-  /// se lee el error. Si lo logra, se reinicia sin Bluetooth y no vuelve a
+  /// se lee el error. Si lo logra, apaga Bluetooth y no vuelve a
   /// aparecer aquí: eso lo detecta quien lo busque en la red. Por eso esto
   /// devuelve null si llega [hasta] o [cancelado] sin saber nada.
   Future<EstadoConfig?> esperarResultado({
@@ -474,9 +544,6 @@ class LectorBleService {
   }) async {
     final d = _dispositivo;
     if (d == null) return null;
-
-    // El intento dura hasta ~30 s: no tiene caso intentar antes.
-    await Future<void>.delayed(const Duration(seconds: 5));
 
     while (!cancelado() && DateTime.now().isBefore(hasta)) {
       final restante = hasta.difference(DateTime.now());
@@ -498,11 +565,13 @@ class LectorBleService {
         if (e.fase.esFinal) return e;
         // Seguía probando: se suelta otra vez y se espera.
         await desconectar();
+      } on LectorOcupadoException {
+        return const EstadoConfig(FaseConfig.ocupado);
       } catch (_) {
         // No se anunció todavía (sigue probando, o ya se conectó y reinició).
       }
       if (cancelado()) break;
-      await Future<void>.delayed(const Duration(seconds: 2));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
     }
     return null;
   }
@@ -510,14 +579,17 @@ class LectorBleService {
   /// Suelta el Bluetooth (se recuerda cuál es el lector, para volver a
   /// conectarse con [asegurarConexion]).
   ///
-  /// Hay que soltarlo en cuanto no se está hablando con él: mientras un
-  /// teléfono está conectado, el lector no se anuncia y ningún otro lo
-  /// encuentra.
+  /// Al probar WiFi se suelta el enlace, conservando la reserva. Al salir
+  /// del asistente se usa [liberarSesion], que también libera esa reserva.
   Future<void> desconectar() async {
+    _renovarSesion?.cancel();
     try {
-      await _dispositivo?.disconnect();
+      // Cancela una reconexión pendiente; en la cola podía esperar hasta
+      // 15 s aunque la búsqueda por WiFi ya hubiera confirmado el lector.
+      await _dispositivo?.disconnect(queue: false, timeout: 3);
     } catch (_) {}
     _chRedes = _chSsid = _chClave = _chGym = _chOrden = _chEstado = null;
+    _chSesion = null;
   }
 
   // ─────────────────────────────────────────────────────────
@@ -532,6 +604,8 @@ class LectorBleService {
   Future<T> _conReintento<T>(Future<T> Function() accion) async {
     try {
       return await accion();
+    } on LectorOcupadoException {
+      rethrow;
     } on LectorBleException {
       rethrow;
     } catch (e) {

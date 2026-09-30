@@ -5,10 +5,12 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../core/permissions/permissions.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/background_rfid_service.dart';
+import '../../../data/services/estado_configuracion_lector.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
 import 'agregar_lector_view.dart';
 import '../widgets/ilustracion_lector.dart';
+import '../widgets/prueba_lector_dialog.dart';
 import '../../../core/widgets/formulario.dart';
 import '../../../core/utils/snackbar_helper.dart';
 
@@ -190,6 +192,13 @@ class _LectorViewState extends State<LectorView> {
           ),
 
         if (estado == EstadoLector.mio) ...[
+          _boton(
+            texto: 'Probar lector',
+            icono: Icons.contactless,
+            color: AppColors.accent,
+            onTap: () => abrirPruebaLector(context),
+          ),
+          const SizedBox(height: 10),
           _botonSecundario(
             texto: 'Cambiar WiFi del lector',
             icono: Icons.wifi,
@@ -236,12 +245,16 @@ class _LectorViewState extends State<LectorView> {
   /// apareció ningún lector".
   Future<void> _cambiarWifi() async {
     final conectado = controller.estadoLector.value == EstadoLector.mio;
-    if (conectado && !await controller.pedirModoConfiguracion()) {
-      SnackbarHelper.error('No se pudo',
-          'El lector no respondió. Revisa que esté encendido e intenta de nuevo.');
-      return;
+    try {
+      if (conectado && !await controller.pedirModoConfiguracion()) {
+        SnackbarHelper.error('No se pudo',
+            'El lector no respondió. Revisa que esté encendido e intenta de nuevo.');
+        return;
+      }
+      await _abrirAsistente(cambiarWifi: conectado);
+    } on LectorOcupadoException {
+      SnackbarHelper.error('Lector ocupado', mensajeLectorOcupado);
     }
-    await _abrirAsistente(cambiarWifi: conectado);
   }
 
   Widget _botonSecundario({

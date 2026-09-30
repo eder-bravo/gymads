@@ -15,6 +15,7 @@ class LectorEnRed {
     this.claimed = false,
     this.mine = false,
     this.modoConfig = false,
+    this.configOcupada = false,
     this.version,
     this.ssid,
   });
@@ -30,6 +31,7 @@ class LectorEnRed {
 
   /// Si está ofreciéndose por Bluetooth para que le cambien el WiFi.
   final bool modoConfig;
+  final bool configOcupada;
 
   final String? version;
 
@@ -61,16 +63,19 @@ class LectorEnRed {
       claimed: json['claimed'] == true,
       mine: json['mine'] == true,
       modoConfig: json['modo_config'] == true,
+      configOcupada: json['config_ocupada'] == true,
       version: json['version'] as String?,
       ssid: json['ssid'] as String?,
     );
   }
 }
 
+enum ConfirmacionLector { confirmada, sinSoporte, sinRespuesta }
+
 /// Encuentra el lector en la red sin que nadie tenga que saber su IP.
 ///
 /// El router le da la IP que quiere (DHCP) y puede cambiarla al reiniciarse.
-/// Dos caminos, del más rápido al más seguro:
+/// Dos caminos en paralelo; devuelve el primero que confirma el lector:
 ///
 /// 1. mDNS: el lector se anuncia como `_gymone._tcp`. Contesta en ~1 s, pero
 ///    algunos routers bloquean el multicast.
@@ -96,16 +101,85 @@ class LectorRedService {
   Future<LectorEnRed?> buscarMio({
     String? id,
     Duration tiempoMdns = const Duration(seconds: 4),
+    bool Function(LectorEnRed)? aceptar,
   }) async {
     bool esMio(LectorEnRed l) =>
-        l.mine && (id == null || l.id == null || l.id == id);
+        l.mine &&
+        (id == null || l.id == null || l.id == id) &&
+        (aceptar == null || aceptar(l));
 
-    for (final ip in await ipsPorMdns(tiempo: tiempoMdns)) {
-      final lector = await consultar(ip);
-      if (lector != null && esMio(lector)) return lector;
+    final resultado = Completer<LectorEnRed?>();
+    void recibir(LectorEnRed? lector) {
+      if (!resultado.isCompleted && lector != null && esMio(lector)) {
+        resultado.complete(lector);
+      }
     }
 
-    return barrerSubred(parar: esMio);
+    final consultas = <Future<void>>[];
+    final vistas = <String>{};
+    Future<void> porMdns() async {
+      await ipsPorMdns(
+        tiempo: tiempoMdns,
+        cancelar: resultado.future.then((_) {}),
+        alEncontrar: (ip) {
+          if (!resultado.isCompleted && vistas.add(ip)) {
+            consultas.add(consultar(ip).then(recibir));
+          }
+        },
+      );
+      await Future.wait(consultas);
+    }
+
+    // Se pregunta desde que mDNS resuelve una dirección, sin esperar a
+    // juntar la lista. El barrido comienza a la vez, por si no hay multicast.
+    unawaited(Future.wait([
+      porMdns(),
+      barrerSubred(parar: esMio).then(recibir),
+    ]).then((_) {
+      if (!resultado.isCompleted) resultado.complete(null);
+    }, onError: (Object error, StackTrace traza) {
+      if (!resultado.isCompleted) resultado.completeError(error, traza);
+    }));
+    return resultado.future;
+  }
+
+  /// La app ya guardó el lector y está por mostrar 100%. El mismo token en
+  /// los reintentos evita repetir la melodía si solo se perdió la respuesta.
+  Future<ConfirmacionLector> confirmarConfiguracion(
+    LectorEnRed lector, {
+    required String intento,
+    String? sesion,
+  }) async {
+    for (var vuelta = 0; vuelta < 2; vuelta++) {
+      try {
+        final respuesta = await _cliente
+            .post(
+              Uri.parse('${lector.baseUrl}/confirmar_config'),
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode({
+                'gym_id': gymId,
+                'intento': intento,
+                if (sesion != null) 'sesion': sesion,
+              }),
+            )
+            .timeout(const Duration(milliseconds: 1200));
+        if (respuesta.statusCode == 200) {
+          final datos = json.decode(respuesta.body);
+          if (datos is Map && datos['ok'] == true) {
+            return ConfirmacionLector.confirmada;
+          }
+        }
+        if (respuesta.statusCode == 404) {
+          return ConfirmacionLector.sinSoporte;
+        }
+        if (respuesta.statusCode == 403) {
+          return ConfirmacionLector.sinRespuesta;
+        }
+      } catch (_) {
+        // Puede haberse perdido la respuesta: se repite con el mismo token.
+      }
+    }
+    return ConfirmacionLector.sinRespuesta;
   }
 
   /// Todos los lectores que contestan en la red: el propio, los libres y los
@@ -159,14 +233,18 @@ class LectorRedService {
   /// [_tiposServicio] (se buscan a la vez).
   Future<List<String>> ipsPorMdns({
     Duration tiempo = const Duration(seconds: 4),
+    void Function(String ip)? alEncontrar,
+    Future<void>? cancelar,
   }) async {
     final porTipo = await Future.wait([
-      for (final tipo in _tiposServicio) _ipsPorMdns(tipo, tiempo),
+      for (final tipo in _tiposServicio)
+        _ipsPorMdns(tipo, tiempo, alEncontrar, cancelar),
     ]);
     return {for (final ips in porTipo) ...ips}.toList();
   }
 
-  Future<List<String>> _ipsPorMdns(String tipo, Duration tiempo) async {
+  Future<List<String>> _ipsPorMdns(String tipo, Duration tiempo,
+      void Function(String ip)? alEncontrar, Future<void>? cancelar) async {
     final ips = <String>{};
     BonsoirDiscovery? descubrimiento;
     StreamSubscription<BonsoirDiscoveryEvent>? sub;
@@ -180,14 +258,19 @@ class LectorRedService {
           case BonsoirDiscoveryServiceFoundEvent(:final service):
             service.resolve(descubrimiento!.serviceResolver);
           case BonsoirDiscoveryServiceResolvedEvent(:final service):
-            ips.addAll(service.hostAddresses.where(_esIpv4));
+            for (final ip in service.hostAddresses.where(_esIpv4)) {
+              if (ips.add(ip)) alEncontrar?.call(ip);
+            }
           default:
             break;
         }
       });
 
       await descubrimiento.start();
-      await Future<void>.delayed(tiempo);
+      await Future.any([
+        Future<void>.delayed(tiempo),
+        if (cancelar != null) cancelar,
+      ]);
     } catch (e) {
       // Sin mDNS (permiso negado, router que lo bloquea) queda el barrido.
       AppLogger.warning('LectorRedService', 'mDNS no disponible: $e');
@@ -217,20 +300,30 @@ class LectorRedService {
     if (candidatas.isEmpty) return null;
 
     LectorEnRed? encontrado;
+    final terminado = Completer<LectorEnRed?>();
     var siguiente = 0;
 
     Future<void> trabajador() async {
       while (encontrado == null && siguiente < candidatas.length) {
         final ip = candidatas[siguiente++];
         final lector = await consultar(ip, timeout: timeoutPorIp);
+        if (encontrado != null) return;
         if (lector == null) continue;
         alEncontrar?.call(lector);
-        if (parar != null && parar(lector)) encontrado ??= lector;
+        if (parar != null && parar(lector)) {
+          encontrado ??= lector;
+          if (!terminado.isCompleted) terminado.complete(encontrado);
+        }
       }
     }
 
-    await Future.wait(List.generate(concurrencia, (_) => trabajador()));
-    return encontrado;
+    unawaited(
+        Future.wait(List.generate(concurrencia, (_) => trabajador())).then((_) {
+      if (!terminado.isCompleted) terminado.complete(null);
+    }, onError: (Object error, StackTrace traza) {
+      if (!terminado.isCompleted) terminado.completeError(error, traza);
+    }));
+    return terminado.future;
   }
 
   /// Las 254 direcciones de la red /24 del teléfono, sin la suya.

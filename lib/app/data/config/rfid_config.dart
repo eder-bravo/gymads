@@ -8,6 +8,8 @@ import '../services/lector_red_service.dart';
 import '../services/tenant_context_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
+import '../services/estado_configuracion_lector.dart';
 
 /// Configuración del lector RFID ESP32.
 ///
@@ -38,6 +40,8 @@ class RfidConfig {
   /// pruebas por uno con un cliente HTTP falso.
   static LectorRedService Function(String gymId) servicioRed =
       (gymId) => LectorRedService(gymId: gymId);
+
+  static LectorRepository Function() repositorio = LectorRepository.new;
 
   static String? _gymIdDeLaSesion() {
     if (!Get.isRegistered<TenantContextService>()) return null;
@@ -281,7 +285,8 @@ class RfidConfig {
 
   /// Deja [lector] como el de este gimnasio: en este teléfono y en el
   /// servidor, para que los demás teléfonos del gimnasio lo sepan.
-  static Future<void> guardarLector(LectorEnRed lector) async {
+  static Future<void> guardarLector(LectorEnRed lector,
+      {bool esperarRegistro = true}) async {
     _alinearConGimnasio();
     final gymId = gymIdActual();
     if (gymId == null) return;
@@ -295,7 +300,12 @@ class RfidConfig {
       await prefs.setString(_idKeyDe(gymId)!, lector.id!);
     }
 
-    await _sincronizarRegistro(lector, gymId);
+    final registro = _sincronizarRegistro(lector, gymId);
+    if (esperarRegistro) {
+      await registro;
+    } else {
+      unawaited(registro);
+    }
   }
 
   /// Registra el lector en el servidor si es nuevo o cambió de IP. Si ya
@@ -308,11 +318,13 @@ class RfidConfig {
         _registrados.any((r) => r.id == id && r.ultimaIp == lector.ip);
     if (igual) return;
 
-    await LectorRepository().registrar(
+    await repositorio().registrar(
       lector,
       gymId: gymId,
       puedeDarDeAlta: puedeGestionar(),
     );
+    // El registro puede terminar después de cambiar de cuenta o de lector.
+    if (gymIdActual() != gymId || _currentUrl != lector.baseUrl) return;
     _registrados = [
       LectorRegistrado(id: id, ultimaIp: lector.ip, version: lector.version),
       ..._registrados.where((r) => r.id != id),
@@ -356,7 +368,10 @@ class RfidConfig {
             body: json.encode({'gym_id': gymId}),
           )
           .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 409) throw const LectorOcupadoException();
       return response.statusCode == 200;
+    } on LectorOcupadoException {
+      rethrow;
     } catch (e) {
       AppLogger.warning('RfidConfig', 'El lector no aceptó configurarse: $e');
       return false;
@@ -385,7 +400,8 @@ class RfidConfig {
       final datos = json.decode(response.body);
       return datos is Map && datos['reinicia'] == true;
     } catch (e) {
-      AppLogger.warning('RfidConfig', 'El lector no cerró la configuración: $e');
+      AppLogger.warning(
+          'RfidConfig', 'El lector no cerró la configuración: $e');
       return null;
     }
   }

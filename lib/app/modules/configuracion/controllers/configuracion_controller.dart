@@ -22,6 +22,7 @@ import '../../../core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../routes/app_pages.dart';
 import '../../../data/services/lector_red_service.dart';
+import '../../../data/services/estado_configuracion_lector.dart';
 import '../../../data/services/regreso_del_lector.dart';
 import '../../../core/widgets/formulario.dart';
 import '../../../core/utils/fallo_al_guardar.dart';
@@ -155,6 +156,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     try {
       if (await RfidConfig.abrirModoConfiguracion()) return true;
       final lector = await RfidConfig.consultarGuardado();
+      if (lector?.configOcupada == true) throw const LectorOcupadoException();
       return lector?.modoConfig ?? _lectorSeOfrecia;
     } finally {
       preparandoLector.value = false;
@@ -319,7 +321,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   /// Tras configurar un lector por Bluetooth: lo deja como el de este
   /// gimnasio y arranca el escaneo.
   Future<void> lectorAgregado(LectorEnRed lector) async {
-    await RfidConfig.guardarLector(lector);
+    await RfidConfig.guardarLector(lector, esperarRegistro: false);
     lectorEncontrado.value = null;
     esp32IpAddress.value = lector.ip;
     estadoLector.value = EstadoLector.mio;

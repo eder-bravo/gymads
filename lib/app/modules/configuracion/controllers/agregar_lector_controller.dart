@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/utils/app_logger.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/lector_ble_service.dart';
 import '../../../data/services/lector_red_service.dart';
-import '../../../data/services/tenant_context_service.dart';
+import '../../../data/services/espera_configuracion_lector.dart';
+import '../../../data/services/estado_configuracion_lector.dart';
 import 'configuracion_controller.dart';
 
 /// Los pasos del asistente, en orden.
@@ -40,7 +42,7 @@ enum PasoAgregar {
 /// Asistente para agregar un lector, o cambiarle el WiFi, sin tocar IPs.
 ///
 /// Por Bluetooth le manda el WiFi y el gimnasio; el lector se conecta, se
-/// reinicia con el Bluetooth apagado y a partir de ahí trabaja por WiFi.
+/// apaga el Bluetooth y a partir de ahí trabaja por WiFi.
 class AgregarLectorController extends GetxController {
   AgregarLectorController({LectorBleService? ble})
       : _ble = ble ?? LectorBleService();
@@ -61,6 +63,12 @@ class AgregarLectorController extends GetxController {
   /// "Buscar de nuevo" en marcha: el lector tarda unos segundos en escanear.
   final buscandoRedes = false.obs;
 
+  /// Separa el envío de los datos de la espera real de respuesta.
+  final esperandoRespuesta = false.obs;
+  final guardandoLector = false.obs;
+  final avisoFinal = RxnString();
+  final lectorOcupado = false.obs;
+
   /// Mensaje para la persona en el paso actual. Null si todo va bien.
   final mensaje = RxnString();
 
@@ -69,6 +77,7 @@ class AgregarLectorController extends GetxController {
 
   LectorCercano? _lector;
   StreamSubscription<List<LectorCercano>>? _busqueda;
+  Completer<void>? _cancelarRed;
 
   String? get nombreLector => _lector?.nombre;
 
@@ -92,9 +101,10 @@ class AgregarLectorController extends GetxController {
 
   @override
   void onClose() {
+    if (_cancelarRed?.isCompleted == false) _cancelarRed!.complete();
     _busqueda?.cancel();
     _ble.detenerBusqueda();
-    _ble.desconectar();
+    unawaited(_ble.liberarSesion());
     claveCtrl.dispose();
     otraRedCtrl.dispose();
     super.onClose();
@@ -103,10 +113,11 @@ class AgregarLectorController extends GetxController {
   /// Paso 1: encontrar el lector por Bluetooth.
   Future<void> buscar() async {
     await _busqueda?.cancel();
-    await _ble.desconectar();
+    await _ble.liberarSesion();
     _lector = null;
     lectores.clear();
     mensaje.value = null;
+    lectorOcupado.value = false;
     paso.value = PasoAgregar.buscando;
 
     _busqueda = _ble.buscar().listen(
@@ -128,7 +139,8 @@ class AgregarLectorController extends GetxController {
         if (_lector == null && paso.value == PasoAgregar.buscando) {
           if (lectores.isEmpty) {
             mensaje.value = 'No apareció ningún lector. Revisa que esté '
-                'conectado a la corriente y que su luz parpadee rápido.';
+                'conectado a la corriente y que su luz parpadee rápido. '
+                'Si otro dispositivo lo está configurando, espera a que termine.';
             paso.value = PasoAgregar.fallo;
           }
           // Con varios, se quedan en pantalla para elegir.
@@ -140,15 +152,24 @@ class AgregarLectorController extends GetxController {
 
   /// Paso 2: conectarse al lector y pedirle las redes que ve.
   Future<void> elegirLector(LectorCercano lector) async {
+    if (paso.value == PasoAgregar.preparando ||
+        paso.value == PasoAgregar.conectando ||
+        paso.value == PasoAgregar.comprobando) {
+      return;
+    }
     _lector = lector;
-    await _busqueda?.cancel();
     mensaje.value = null;
+    lectorOcupado.value = false;
     paso.value = PasoAgregar.preparando;
+    await _busqueda?.cancel();
 
     try {
+      if (lector.ocupado) throw const LectorOcupadoException();
       await _ble.conectar(lector);
       await cargarRedes();
       paso.value = PasoAgregar.elegirRed;
+    } on LectorOcupadoException {
+      _mostrarOcupado();
     } on LectorBleException catch (e) {
       mensaje.value = e.mensaje;
       paso.value = PasoAgregar.fallo;
@@ -158,11 +179,11 @@ class AgregarLectorController extends GetxController {
           'reintenta.';
       paso.value = PasoAgregar.fallo;
     } finally {
-      // Con las redes en mano (o si falló) se suelta el Bluetooth: mientras
-      // se elige la red y se escribe la contraseña no hace falta, y con el
-      // teléfono conectado el lector no se anuncia (ningún otro lo veía
-      // hasta desconectarlo de la corriente). "Conectar" lo retoma.
-      await _ble.desconectar();
+      // El firmware nuevo anuncia «ocupado» y conserva la sesión mientras
+      // se escribe. Con el anterior se sigue soltando como antes.
+      if (!_ble.sesionExclusiva || paso.value == PasoAgregar.fallo) {
+        await _ble.desconectar();
+      }
     }
   }
 
@@ -230,13 +251,15 @@ class AgregarLectorController extends GetxController {
     mensaje.value = null;
     try {
       await cargarRedes(buscarDeNuevo: true);
+    } on LectorOcupadoException {
+      _mostrarOcupado();
     } on LectorBleException catch (e) {
       mensaje.value = e.mensaje;
     } catch (_) {
       mensaje.value = 'No se pudieron buscar las redes. Acerca el teléfono al '
           'lector y vuelve a intentar.';
     } finally {
-      await _ble.desconectar();
+      if (!_ble.sesionExclusiva) await _ble.desconectar();
       buscandoRedes.value = false;
     }
   }
@@ -257,7 +280,11 @@ class AgregarLectorController extends GetxController {
   /// lados a la vez: si funcionó, el lector aparece en la red; si falló,
   /// vuelve a anunciarse por Bluetooth y se lee el motivo.
   Future<void> conectar() async {
-    final gymId = TenantContextService.to.currentGymId;
+    if (paso.value == PasoAgregar.conectando ||
+        paso.value == PasoAgregar.comprobando) {
+      return;
+    }
+    final gymId = RfidConfig.gymIdActual();
     if (gymId == null || gymId.isEmpty) {
       mensaje.value = 'No hay un gimnasio en esta sesión.';
       return;
@@ -270,6 +297,9 @@ class AgregarLectorController extends GetxController {
     }
 
     mensaje.value = null;
+    avisoFinal.value = null;
+    esperandoRespuesta.value = false;
+    guardandoLector.value = false;
     paso.value = PasoAgregar.conectando;
 
     EstadoConfig? rechazo;
@@ -279,6 +309,9 @@ class AgregarLectorController extends GetxController {
         clave: pideClave ? claveCtrl.text : '',
         gymId: gymId,
       );
+    } on LectorOcupadoException {
+      _mostrarOcupado();
+      return;
     } on LectorBleException catch (e) {
       await _ble.desconectar();
       mensaje.value = e.mensaje;
@@ -292,11 +325,16 @@ class AgregarLectorController extends GetxController {
       return;
     }
 
-    final resultado = await _esperarResultado(gymId, _ssid);
-    // Si falló, el resultado se leyó reconectándose: se suelta otra vez para
-    // que el lector siga visible mientras se corrige la contraseña.
-    await _ble.desconectar();
     if (isClosed) return;
+    esperandoRespuesta.value = true;
+    final resultado = await _esperarResultado(gymId, _ssid);
+    // Con reserva se conserva la sesión si hay que corregir la contraseña.
+    if (resultado is! EstadoConfig ||
+        resultado.fase == FaseConfig.ok ||
+        !_ble.sesionExclusiva) {
+      await _ble.desconectar();
+    }
+    if (isClosed || RfidConfig.gymIdActual() != gymId) return;
 
     if (resultado is LectorEnRed) {
       await _terminar(resultado);
@@ -325,20 +363,8 @@ class AgregarLectorController extends GetxController {
     // conectarse si funcionó.
     final hasta = DateTime.now().add(const Duration(seconds: 75));
     var cancelado = false;
-    final red = LectorRedService(gymId: gymId);
-
-    Future<LectorEnRed?> porRed() async {
-      await Future<void>.delayed(const Duration(seconds: 8));
-      while (!cancelado && DateTime.now().isBefore(hasta)) {
-        final lector =
-            await red.buscarMio(tiempoMdns: const Duration(seconds: 3));
-        if (lector != null && (lector.ssid == null || lector.ssid == ssid)) {
-          return lector;
-        }
-        await Future<void>.delayed(const Duration(seconds: 2));
-      }
-      return null;
-    }
+    final cancelarRed = _cancelarRed = Completer<void>();
+    final red = RfidConfig.servicioRed(gymId);
 
     final ganador = Completer<Object?>();
     void llegar(Object? valor) {
@@ -346,9 +372,17 @@ class AgregarLectorController extends GetxController {
     }
 
     final futuros = [
-      porRed().then(llegar),
+      esperarLectorConfigurado(
+        red: red,
+        ssid: ssid,
+        nombre: nombreLector,
+        ip: RfidConfig.getCurrentIP(),
+        seguir: () => !isClosed && !cancelado,
+        cancelar: cancelarRed.future,
+      ).then(llegar),
       _ble
-          .esperarResultado(hasta: hasta, cancelado: () => cancelado)
+          .esperarResultado(
+              hasta: hasta, cancelado: () => cancelado || isClosed)
           .then(llegar),
     ];
     unawaited(Future.wait(futuros).then((_) {
@@ -357,6 +391,8 @@ class AgregarLectorController extends GetxController {
 
     final resultado = await ganador.future;
     cancelado = true;
+    if (!cancelarRed.isCompleted) cancelarRed.complete();
+    _cancelarRed = null;
     return resultado;
   }
 
@@ -364,6 +400,8 @@ class AgregarLectorController extends GetxController {
   /// elegida, para corregirla sin tener que buscarla otra vez en la lista.
   void _mostrarFallo(FaseConfig fase) {
     switch (fase) {
+      case FaseConfig.ocupado:
+        _mostrarOcupado();
       case FaseConfig.errorClave:
         mensaje.value = 'El módem rechazó la contraseña. Revisa mayúsculas, '
             'minúsculas y números, y que sea la de la red elegida.';
@@ -405,23 +443,20 @@ class AgregarLectorController extends GetxController {
     paso.value = PasoAgregar.comprobando;
     await _ble.desconectar();
 
-    final red = LectorRedService(gymId: TenantContextService.to.currentGymId);
-    LectorEnRed? lector;
-
-    // Tarda ~5-10 s en reiniciar y conectarse.
-    final limite = DateTime.now().add(const Duration(seconds: 35));
-    while (lector == null && DateTime.now().isBefore(limite)) {
-      await Future<void>.delayed(const Duration(seconds: 2));
-      if (isClosed) return;
-      if (ip != null) {
-        final l = await red.consultar(ip);
-        if (l != null && l.mine) lector = l;
-      }
-    }
-
-    // Sin IP, o el router le dio otra: se barre la red.
-    lector ??= await red.buscarMio();
-    if (isClosed) return;
+    final gymId = RfidConfig.gymIdActual();
+    if (gymId == null) return;
+    final cancelarRed = _cancelarRed = Completer<void>();
+    final lector = await esperarLectorConfigurado(
+      red: RfidConfig.servicioRed(gymId),
+      ssid: _ssid,
+      nombre: nombreLector,
+      ip: ip,
+      seguir: () => !isClosed,
+      cancelar: cancelarRed.future,
+      limite: const Duration(seconds: 35),
+    );
+    _cancelarRed = null;
+    if (isClosed || RfidConfig.gymIdActual() != gymId) return;
 
     if (lector != null) {
       await _terminar(lector);
@@ -433,12 +468,49 @@ class AgregarLectorController extends GetxController {
     paso.value = PasoAgregar.fallo;
   }
 
+  void _mostrarOcupado() {
+    lectorOcupado.value = true;
+    mensaje.value = mensajeLectorOcupado;
+    paso.value = PasoAgregar.fallo;
+    unawaited(_ble.desconectar());
+  }
+
   Future<void> _terminar(LectorEnRed lector) async {
-    if (Get.isRegistered<ConfiguracionController>()) {
-      await Get.find<ConfiguracionController>().lectorAgregado(lector);
-    } else {
-      await RfidConfig.guardarLector(lector);
+    if (isClosed) return;
+    final gymId = RfidConfig.gymIdActual();
+    if (gymId == null) return;
+    paso.value = PasoAgregar.comprobando;
+    guardandoLector.value = true;
+    try {
+      if (Get.isRegistered<ConfiguracionController>()) {
+        await Get.find<ConfiguracionController>().lectorAgregado(lector);
+      } else {
+        await RfidConfig.guardarLector(lector, esperarRegistro: false);
+      }
+      if (isClosed) return;
+      if (RfidConfig.gymIdActual() != gymId) return;
+      final confirmacion = await RfidConfig.servicioRed(gymId)
+          .confirmarConfiguracion(lector,
+              intento: const Uuid().v4(), sesion: _ble.tokenSesion);
+      if (isClosed || RfidConfig.gymIdActual() != gymId) return;
+      avisoFinal.value = switch (confirmacion) {
+        ConfirmacionLector.confirmada => null,
+        ConfirmacionLector.sinSoporte =>
+          'El lector quedó configurado. Actualiza el lector para escuchar '
+              'el aviso al terminar.',
+        ConfirmacionLector.sinRespuesta =>
+          'El lector quedó configurado, pero no confirmó el aviso sonoro. '
+              'Puedes comprobarlo con «Probar lector».',
+      };
+      paso.value = PasoAgregar.listo;
+    } catch (e) {
+      AppLogger.error('AgregarLectorController', 'Al guardar el lector', e);
+      if (isClosed) return;
+      mensaje.value = 'El lector respondió, pero no se pudo guardar la '
+          'configuración. Vuelve a intentar.';
+      paso.value = PasoAgregar.fallo;
+    } finally {
+      guardandoLector.value = false;
     }
-    paso.value = PasoAgregar.listo;
   }
 }

@@ -1,6 +1,6 @@
 # Lector GymOne: Bluetooth solo para configurar
 
-Firmware: `esp32_rfid_wifi_setup_fixed/` (v6.4.0). App: `LectorBleService`,
+Firmware: `esp32_rfid_wifi_setup_fixed/` (v6.7.0). App: `LectorBleService`,
 `LectorRedService`, `LectorRepository` y el asistente `AgregarLectorView`.
 
 ## Cómo funciona
@@ -13,7 +13,8 @@ Firmware: `esp32_rfid_wifi_setup_fixed/` (v6.4.0). App: `LectorBleService`,
 3. La app manda la orden y **suelta el Bluetooth**. El lector prueba la red con
    el Bluetooth en pausa (comparten antena: con el teléfono conectado, la
    negociación de la contraseña fallaba y parecía contraseña incorrecta).
-   - Si conecta: guarda WiFi + gimnasio y se **reinicia** sin Bluetooth.
+   - Si conecta: guarda WiFi + gimnasio y **apaga Bluetooth conservando
+     la conexión WiFi**, sin reiniciar ni pedir otra IP al módem.
    - Si falla: vuelve a anunciarse; la app se reconecta y lee el motivo.
 4. La app espera las dos cosas a la vez: el lector en la red (mDNS
    `_gymone._tcp`, o barriendo la subred) o su respuesta por Bluetooth.
@@ -22,6 +23,65 @@ Firmware: `esp32_rfid_wifi_setup_fixed/` (v6.4.0). App: `LectorBleService`,
    encuentra aunque el router le cambie la IP.
 
 El trabajo diario (leer tarjetas) es por WiFi/HTTP, igual que antes.
+
+### Sonidos de configuración
+
+| Momento confirmado por el lector | Sonido |
+|---|---|
+| Se ofrece para configurar por Bluetooth | Dos notas cortas que suben de tono |
+| Terminó de buscar y encontró redes WiFi | Dos pitidos agudos cortos |
+| Recibió y aceptó los datos para conectar | Tres pitidos cortos |
+| Se conectó y guardó el WiFi | Dos notas ascendentes breves |
+| La app confirmó y guardó el lector (100%), o quedó vinculado por HTTP | Melodía de tres notas ascendentes, con final más largo |
+| Falló la configuración o no encontró redes | Tres notas descendentes, más largas |
+
+Las señales se emiten una vez por hito, sin bloquear el proceso ni sonar por
+cada porcentaje estimado de la app. El pitido de tarjeta (3000 Hz, 120 ms) y
+los avisos de reset conservan su tono y duración y tienen prioridad. El éxito
+final se pide con `POST /api/confirmar_config {"gym_id": "...", "intento":
+"token único"}` después de guardar en el teléfono. Solo lo acepta el dueño
+cuando el lector ya trabaja normal. Repetir el token no repite la melodía.
+La app muestra 100% al recibir esa confirmación; si el firmware es anterior,
+avisa que se debe actualizar para escuchar el sonido final.
+
+La búsqueda empieza sin la espera fija de 8 s y consulta la IP conocida en
+paralelo con mDNS/subred. mDNS confirma desde que resuelve la dirección y el
+barrido empieza a la vez. Cancelar la reconexión Bluetooth usa `queue:false`:
+no espera un intento pendiente de hasta 15 s. El registro en el servidor continúa en segundo
+plano: no retrasa la confirmación del lector conectado por la red local.
+
+### Un dispositivo configura a la vez
+
+El primero que abre una conexión obtiene la reserva; detectarlo en un
+escaneo no lo reserva. La app 6.7+ conserva el enlace mientras se elige red
+y escribe la contraseña. El anuncio sigue visible, con una bandera «ocupado»
+en los datos de fabricante (`0xFFFF`, firma `GO`, formato 1). El segundo
+dispositivo recibe «Otro dispositivo está configurando este lector».
+
+La característica nueva `6b1a0008-5c1e-4f7a-9d2e-47796d416473` acepta
+`tomar:token` y `soltar:token`; al leer responde `tuya`, `ocupado` o `libre`.
+El token aleatorio no sale en lecturas ni anuncios. La app lo incluye como
+`sesion` al pedir `/api/confirmar_config`: la reserva termina con el 100% de
+esa misma app, no solo al apagar BLE. Todas las escrituras de
+WiFi se autorizan por conexión, bajo el mismo mutex: dos dispositivos no
+pueden mezclar nombre de red, contraseña y gimnasio. La reserva sobrevive
+a la pausa de Bluetooth al probar WiFi y a un fallo para corregir la clave.
+
+Salir mientras se elige o escribe libera la reserva. Leer la sesión cada 20 s la renueva;
+sin actividad se libera a los 2 min, salvo durante la prueba de WiFi. Así
+una persona puede escribir despacio y una app que desapareció, incluso
+después de mandar la orden de conexión, no bloquea
+el lector para siempre. `/api/discover` solo informa `config_ocupada`;
+`/api/configurar` y `/api/terminar_config` devuelven 409 mientras hay reserva,
+para que otro dispositivo no cierre ni modifique una configuración activa.
+Durante la prueba de WiFi el anuncio Bluetooth está en pausa para dejar la
+antena libre. Si otro dispositivo entra justo ahí sin haber detectado el
+lector, la búsqueda explica que también puede estar siendo configurado.
+
+Con firmware anterior, la app conserva el flujo sin reserva explícita.
+Para el aviso y la protección completos se deben actualizar app y firmware.
+El apagado de BLE se ejecuta desde `loop()` con `BLEDevice::deinit(false)`
+(core ESP32 3.3.12), que permite volver a inicializarlo al cambiar de red.
 
 ### Cuándo se ofrece por Bluetooth (LED parpadeando rápido)
 - **Sin WiFi guardado:** nuevo, reset con BOOT o desvinculado. Sale al

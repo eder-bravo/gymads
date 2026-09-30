@@ -2,12 +2,28 @@
  * GYMONE - ESP32 RFID Reader con WiFi
  * LECTOR RFID CON CONEXIÓN WIFI AUTOMÁTICA PARA GYMONE
  *
- * Versión 6.5.2 - WiFi para trabajar, Bluetooth solo para configurar
+ * Versión 6.7.0 - WiFi para trabajar, Bluetooth solo para configurar
  * Dispositivo: ESP32 (clásico, con BLE)
  *
  * Compilar con una partición grande: WiFi + BLE + servidor no caben en la
  * de 1.2 MB que trae por defecto.
  *   arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app
+ *
+ * CAMBIOS v6.7.0:
+ * - Sale del modo configuración apagando BLE sin reiniciar el WiFi.
+ * - Una sesión reserva el lector para un dispositivo; los demás ven
+ *   ocupado en el anuncio y no pueden mezclar ni sobrescribir los datos.
+ *
+ * CAMBIOS v6.6.1:
+ * - La melodía final se pide por /api/confirmar_config, solo por el dueño,
+ *   cuando la app termina y muestra 100%. Reintentar no la repite.
+ * - Un aviso corto confirma el WiFi guardado antes del reinicio. Durante
+ *   las melodías se pospone la consulta al chip para respetar las pausas.
+ *
+ * CAMBIOS v6.6.0:
+ * - Sonidos propios para inicio, redes encontradas, datos recibidos,
+ *   configuración correcta y errores. Las melodías avanzan desde loop(),
+ *   sin detener la conexión ni alterar los pitidos de tarjetas y reset.
  *
  * CAMBIOS v6.5.2:
  * - Con la red de antes guardada pero ya fuera de alcance (lo cambiaron de
@@ -223,8 +239,10 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include "sonidos_configuracion.h"
+#include "sesion_configuracion.h"
 
-#define FIRMWARE_VERSION "6.5.2"
+#define FIRMWARE_VERSION "6.7.0"
 
 
 // =================== CONFIGURACIÓN DEL BUZZER ===================
@@ -284,6 +302,7 @@
 #define CHAR_GYM_UUID        "6b1a0005-5c1e-4f7a-9d2e-47796d416473"
 #define CHAR_ORDEN_UUID      "6b1a0006-5c1e-4f7a-9d2e-47796d416473"
 #define CHAR_ESTADO_UUID     "6b1a0007-5c1e-4f7a-9d2e-47796d416473"
+#define CHAR_SESION_UUID     "6b1a0008-5c1e-4f7a-9d2e-47796d416473"
 
 #define MAX_REDES 15
 
@@ -292,6 +311,9 @@
 #define PN532_SCL     27
 #define LED_WIFI      2    // LED integrado del ESP32
 #define BUZZER_PIN    25
+
+void tocarNotaConfig(unsigned int hz, unsigned long duracionMs);
+SonidosConfiguracion sonidosConfig(tocarNotaConfig);
 
 // Botón BOOT de la placa, para el reset de fábrica.
 //
@@ -422,6 +444,12 @@ unsigned long terminarPedidoEn = 0;  // 0 = no se pidió
 BLEServer *servidorBle = nullptr;
 BLECharacteristic *chRedes = nullptr;
 BLECharacteristic *chEstado = nullptr;
+BLECharacteristic *chSesion = nullptr;
+String estadoConfigActual = "listo";
+SesionConfiguracion sesionConfig;
+bool anuncioOcupado = false;
+volatile bool refrescarAnuncio = false;
+bool cerrarBlePendiente = false;
 
 // Lo que escribe la app. Los callbacks de BLE corren en otra tarea: solo
 // copian el valor y levantan una bandera; el loop hace el trabajo.
@@ -471,6 +499,7 @@ unsigned long reintentarEn = 0;
 
 // Tras un "ok" ya no se aceptan más órdenes: el lector se reinicia.
 unsigned long okDesde = 0;
+String ultimaConfirmacionConfig = "";
 
 bool escaneando = false;
 
@@ -493,6 +522,7 @@ void handleUnclaim();
 void handleReset();
 void handleConfigurar();
 void handleTerminarConfig();
+void handleConfirmarConfig();
 void anotarPeticion();
 const char *motivoDeArranque();
 bool peticionAutorizada();
@@ -500,6 +530,10 @@ void responderNoAutorizado();
 String gymIdDeLaPeticion();
 void entrarModoConfig(MotivoConfig motivo, unsigned long duracionMs = 0);
 void iniciarBle();
+void actualizarAnuncioBle();
+void desconectarClientesBle();
+void salirModoConfig();
+bool configuracionOcupada();
 void publicarEstado(const String &estado);
 void atenderModoConfig(unsigned long ahora);
 void cuidarAnuncioBle(unsigned long ahora);
@@ -513,6 +547,8 @@ const char *tipoSeguridad(wifi_auth_mode_t modo);
 void revisarBotonReset();
 void handleStatusLeds();
 void beepLectura();
+void sonarAvisoActual(unsigned long duracionMs);
+void sonarConfiguracion(SonidoConfig sonido);
 void pruebaVolumenBuzzer();
 void leerTarjetas();
 bool iniciarPn532();
@@ -542,6 +578,16 @@ class ServidorCallbacks : public BLEServerCallbacks {
     clienteBleConectado = true;
     bleDesconectadoEn = 0;
     ultimaActividadBle = millis();
+    if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) == pdTRUE) {
+      bool estabaOcupada = sesionConfig.ocupada(millis());
+      if (sesionConfig.conectar(param->connect.conn_id, millis()) &&
+          !estabaOcupada) {
+        bleSsid = bleClave = bleGym = "";
+        pedidoEscanear = pedidoConectar = false;
+      }
+      xSemaphoreGive(candadoBle);
+    }
+    refrescarAnuncio = true;
     Serial.println("[BLE] App conectada");
     // Intervalo de conexión más holgado (60-120 ms en vez de los ~30 ms de
     // iOS): el Bluetooth ocupa menos la antena mientras el WiFi busca redes.
@@ -549,8 +595,10 @@ class ServidorCallbacks : public BLEServerCallbacks {
     servidor->updateConnParams(param->connect.remote_bda, 48, 96, 0, 400);
   }
 
-  void onDisconnect(BLEServer *servidor) override {
-    clienteBleConectado = false;
+  void onDisconnect(BLEServer *servidor,
+                    esp_ble_gatts_cb_param_t *param) override {
+    // El SDK actualiza el contador después del callback.
+    clienteBleConectado = servidor->getConnectedCount() > 1;
     ultimaActividadBle = millis();
     Serial.println("[BLE] App desconectada");
     // Aquí NO se vuelve a anunciar: el Bluetooth todavía está cerrando el
@@ -558,19 +606,27 @@ class ServidorCallbacks : public BLEServerCallbacks {
     // invisible hasta desconectarlo). Lo hace el loop medio segundo después
     // (cuidarAnuncioBle), y no mientras se prueba el WiFi.
     unsigned long ahora = millis();
-    bleDesconectadoEn = ahora == 0 ? 1 : ahora;
+    if (!clienteBleConectado) bleDesconectadoEn = ahora == 0 ? 1 : ahora;
+    if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) == pdTRUE) {
+      sesionConfig.desconectar(param->disconnect.conn_id, ahora);
+      xSemaphoreGive(candadoBle);
+    }
   }
 };
 
 // Un solo callback para las características que se escriben. Solo copia el
 // valor: nada de WiFi ni delay() aquí dentro, o se congela la pila BLE.
 class EscrituraCallbacks : public BLECharacteristicCallbacks {
-  void onWrite(BLECharacteristic *c) override {
+  void onWrite(BLECharacteristic *c, esp_ble_gatts_cb_param_t *param) override {
     ultimaActividadBle = millis();
     String valor = c->getValue();
     String uuid = c->getUUID().toString();
 
     if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) != pdTRUE) return;
+    if (!sesionConfig.permite(param->write.conn_id, millis())) {
+      xSemaphoreGive(candadoBle);
+      return;
+    }
     if (uuid == CHAR_SSID_UUID) {
       bleSsid = valor;
     } else if (uuid == CHAR_CLAVE_UUID) {
@@ -579,8 +635,51 @@ class EscrituraCallbacks : public BLECharacteristicCallbacks {
       bleGym = valor;
     } else if (uuid == CHAR_ORDEN_UUID) {
       if (valor == "escanear") pedidoEscanear = true;
-      if (valor == "conectar") pedidoConectar = true;
+      if (valor == "conectar") {
+        pedidoConectar = true;
+        // Protege también el hueco entre este callback y la vuelta del loop.
+        sesionConfig.probar(true, millis());
+      }
     }
+    xSemaphoreGive(candadoBle);
+  }
+};
+
+class SesionCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *c, esp_ble_gatts_cb_param_t *param) override {
+    String valor = c->getValue();
+    if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) != pdTRUE) return;
+    if (valor.startsWith("tomar:")) {
+      sesionConfig.tomar(valor.substring(6).c_str(), param->write.conn_id, millis());
+    } else if (valor.startsWith("soltar:")) {
+      if (sesionConfig.soltar(valor.substring(7).c_str(),
+                             param->write.conn_id, millis())) {
+        bleSsid = bleClave = bleGym = "";
+        refrescarAnuncio = true;
+      }
+    }
+    xSemaphoreGive(candadoBle);
+  }
+
+  void onRead(BLECharacteristic *c, esp_ble_gatts_cb_param_t *param) override {
+    if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) != pdTRUE) {
+      c->setValue("ocupado");
+      return;
+    }
+    bool propia = sesionConfig.permite(param->read.conn_id, millis());
+    if (propia) ultimaActividadBle = millis();
+    bool ocupada = sesionConfig.ocupada(millis());
+    c->setValue(propia ? "tuya" : (ocupada ? "ocupado" : "libre"));
+    xSemaphoreGive(candadoBle);
+  }
+};
+
+class EstadoCallbacks : public BLECharacteristicCallbacks {
+  void onRead(BLECharacteristic *c, esp_ble_gatts_cb_param_t *param) override {
+    if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) != pdTRUE) return;
+    bool propia = sesionConfig.permite(param->read.conn_id, millis());
+    if (propia) ultimaActividadBle = millis();
+    c->setValue(propia ? estadoConfigActual : "ocupado");
     xSemaphoreGive(candadoBle);
   }
 };
@@ -708,6 +807,8 @@ void setup() {
 void loop() {
   esp_task_wdt_reset();
   unsigned long ahora = millis();
+  sonidosConfig.actualizar(ahora);
+  if (cerrarBlePendiente) salirModoConfig();
 
   if (ahora - lastMemoryCheck >= MEMORY_CHECK_INTERVAL) {
     lastMemoryCheck = ahora;
@@ -735,7 +836,10 @@ void loop() {
   handleStatusLeds();
   revisarBotonReset();
 
-  if (reinicioPendienteEn != 0 && millis() >= reinicioPendienteEn) {
+  // Completar el aviso de éxito o reset antes de reiniciar. La lectura del
+  // chip de tarjetas puede demorar una vuelta del secuenciador.
+  if (reinicioPendienteEn != 0 && millis() >= reinicioPendienteEn &&
+      !sonidosConfig.enCurso()) {
     if (borrarWifiAlReiniciar) {
       // La copia que pudo dejar una versión anterior del firmware en la
       // memoria permanente del driver (antes de WiFi.persistent(false)).
@@ -746,10 +850,10 @@ void loop() {
     ESP.restart();
   }
 
-  if (wifiConnected && serverRunning) {
+  if (wifiConnected && serverRunning && !sonidosConfig.configuracionEnCurso()) {
     leerTarjetas();
   }
-  revisarPn532(ahora);
+  if (!sonidosConfig.configuracionEnCurso()) revisarPn532(ahora);
 
   if (modoConfig) {
     atenderModoConfig(ahora);
@@ -940,8 +1044,13 @@ void entrarModoConfig(MotivoConfig motivo, unsigned long duracionMs) {
   modoConfigHasta = duracionMs > 0 ? millis() + duracionMs : 0;
   ultimaActividadBle = millis();
   ultimoRefrescoAnuncio = millis();
+  if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) == pdTRUE) {
+    sesionConfig.liberar();
+    xSemaphoreGive(candadoBle);
+  }
 
   iniciarBle();
+  sonarConfiguracion(SonidoConfig::inicio);
   publicarEstado("listo");
   empezarEscaneo();
 }
@@ -963,23 +1072,24 @@ void iniciarBle() {
   BLEDevice::setMTU(247);
 
   BLEServer *servidor = BLEDevice::createServer();
-  servidor->setCallbacks(new ServidorCallbacks());
+  static ServidorCallbacks callbacksServidor;
+  servidor->setCallbacks(&callbacksServidor);
   servidorBle = servidor;
 
-  // 7 características: cada una ocupa ~3 handles, más el servicio.
+  // 8 características: cada una ocupa ~3 handles, más el servicio.
   BLEService *servicio = servidor->createService(BLEUUID(GYMONE_SERVICE_UUID), 30);
 
   chRedes = servicio->createCharacteristic(
       CHAR_REDES_UUID, BLECharacteristic::PROPERTY_READ);
   chRedes->setValue("");
 
-  EscrituraCallbacks *escritura = new EscrituraCallbacks();
+  static EscrituraCallbacks escritura;
   const char *escribibles[] = {CHAR_SSID_UUID, CHAR_CLAVE_UUID, CHAR_GYM_UUID,
                                CHAR_ORDEN_UUID};
   for (const char *uuid : escribibles) {
     BLECharacteristic *c = servicio->createCharacteristic(
         uuid, BLECharacteristic::PROPERTY_WRITE);
-    c->setCallbacks(escritura);
+    c->setCallbacks(&escritura);
   }
 
   chEstado = servicio->createCharacteristic(
@@ -988,6 +1098,14 @@ void iniciarBle() {
   // Bluedroid no crea solo el descriptor que habilita las notificaciones.
   chEstado->addDescriptor(new BLE2902());
   chEstado->setValue("listo");
+  static EstadoCallbacks callbacksEstado;
+  chEstado->setCallbacks(&callbacksEstado);
+  chSesion = servicio->createCharacteristic(
+      CHAR_SESION_UUID, BLECharacteristic::PROPERTY_READ |
+                           BLECharacteristic::PROPERTY_WRITE);
+  static SesionCallbacks callbacksSesion;
+  chSesion->setCallbacks(&callbacksSesion);
+  chSesion->setValue("libre");
 
   servicio->start();
 
@@ -998,6 +1116,8 @@ void iniciarBle() {
   BLEAdvertisementData datos;
   datos.setFlags(0x06);  // general discoverable, sin BR/EDR
   datos.setCompleteServices(BLEUUID(GYMONE_SERVICE_UUID));
+  std::string fabricante("\xff\xffGO\x01\x00", 6);
+  datos.setManufacturerData(String(fabricante.c_str(), fabricante.size()));
   anuncio->setAdvertisementData(datos);
 
   BLEAdvertisementData respuesta;
@@ -1017,7 +1137,74 @@ void iniciarBle() {
   Serial.println("[BLE] Anunciando como " + nombre);
 }
 
+bool configuracionOcupada() {
+  if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) != pdTRUE) return true;
+  bool ocupada = sesionConfig.ocupada(millis());
+  xSemaphoreGive(candadoBle);
+  return ocupada;
+}
+
+void actualizarAnuncioBle() {
+  anuncioOcupado = configuracionOcupada();
+  BLEAdvertisementData datos;
+  datos.setFlags(0x06);
+  datos.setCompleteServices(BLEUUID(GYMONE_SERVICE_UUID));
+  std::string fabricante("\xff\xffGO\x01\x00", 6);
+  fabricante[5] = anuncioOcupado ? 1 : 0;
+  datos.setManufacturerData(String(fabricante.c_str(), fabricante.size()));
+  BLEDevice::getAdvertising()->setAdvertisementData(datos);
+  refrescarAnuncio = false;
+}
+
+void desconectarClientesBle() {
+  if (servidorBle == nullptr) return;
+  for (const auto &cliente : servidorBle->getPeerDevices(false)) {
+    servidorBle->disconnect(cliente.first);
+  }
+}
+
+// Corre solo desde loop(), nunca desde un callback. El core 3.3.12 permite
+// deinit(false) y volver a inicializar BLE si luego se cambia otra vez de red.
+// Se conserva la conexión WiFi que ya pasó todas las comprobaciones.
+void salirModoConfig() {
+  if (!cerrarBlePendiente) return;
+  if (bleIniciado) {
+    BLEDevice::stopAdvertising();
+    if (servidorBle != nullptr && servidorBle->getConnectedCount() > 0) {
+      desconectarClientesBle();
+      return;
+    }
+    BLEDevice::deinit(false);
+  }
+  servidorBle = nullptr;
+  chRedes = chEstado = chSesion = nullptr;
+  bleIniciado = clienteBleConectado = false;
+  modoConfig = cerrarBlePendiente = false;
+  okDesde = terminarPedidoEn = bleDesconectadoEn = 0;
+  if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) == pdTRUE) {
+    // La reserva termina cuando esta misma app confirma el 100%. Si la app
+    // desapareció, vence sola; mientras tanto otro teléfono no cambia el WiFi.
+    sesionConfig.probar(false, millis());
+    bleSsid = bleClave = bleGym = "";
+    xSemaphoreGive(candadoBle);
+  }
+  WiFi.setAutoReconnect(true);
+  WiFi.setSleep(false);
+  Serial.println("[CONFIG] Listo para trabajar: Bluetooth apagado, WiFi conservado");
+}
+
 void publicarEstado(const String &estado) {
+  if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) == pdTRUE) {
+    estadoConfigActual = estado;
+    xSemaphoreGive(candadoBle);
+  }
+  if (estado == "conectando") {
+    sonarConfiguracion(SonidoConfig::conectando);
+  } else if (estado.startsWith("ok:")) {
+    sonarConfiguracion(SonidoConfig::wifiGuardado);
+  } else if (estado.startsWith("error:")) {
+    sonarConfiguracion(SonidoConfig::error);
+  }
   if (chEstado == nullptr) return;
   chEstado->setValue(estado.c_str());
   if (clienteBleConectado) chEstado->notify();
@@ -1074,6 +1261,17 @@ void atenderModoConfig(unsigned long ahora) {
 // hasta desconectarlo de la corriente.
 void cuidarAnuncioBle(unsigned long ahora) {
   if (!bleIniciado) return;
+  if (cerrarBlePendiente || faseConexion != CONEXION_INACTIVA || okDesde != 0) {
+    return;
+  }
+
+  if (refrescarAnuncio || anuncioOcupado != configuracionOcupada()) {
+    if (clienteBleConectado || bleDesconectadoEn == 0 ||
+        msDesde(bleDesconectadoEn) >= REANUNCIAR_TRAS_DESCONEXION_MS) {
+      actualizarAnuncioBle();
+      BLEDevice::startAdvertising();
+    }
+  }
 
   if (clienteBleConectado) {
     // Un teléfono conectado que no manda nada (la app se cerró a medias, o
@@ -1084,7 +1282,7 @@ void cuidarAnuncioBle(unsigned long ahora) {
         servidorBle != nullptr) {
       Serial.println("[BLE] Teléfono conectado sin actividad: soltándolo");
       ultimaActividadBle = millis();
-      servidorBle->disconnect(servidorBle->getConnId());
+      desconectarClientesBle();
     }
     return;
   }
@@ -1157,6 +1355,7 @@ void empezarEscaneo() {
 
   if (WiFi.scanNetworks(true) == WIFI_SCAN_FAILED) {
     Serial.println("[CONFIG] No se pudo iniciar el escaneo de redes");
+    sonarConfiguracion(SonidoConfig::error);
     return;
   }
   escaneando = true;
@@ -1206,6 +1405,8 @@ void revisarEscaneo() {
 
   if (chRedes != nullptr) chRedes->setValue(lista.c_str());
   Serial.printf("[CONFIG] %d redes encontradas\n", agregadas);
+  sonarConfiguracion(agregadas > 0 ? SonidoConfig::redesListas
+                                 : SonidoConfig::error);
   publicarEstado("listo");
 
   // Si no está la app y hay red guardada, se sigue intentando reconectar.
@@ -1294,6 +1495,10 @@ void empezarConexionNueva() {
   nuevoGym.trim();
 
   if (nuevoSsid.length() == 0 || nuevoGym.length() == 0) {
+    if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) == pdTRUE) {
+      sesionConfig.probar(false, millis());
+      xSemaphoreGive(candadoBle);
+    }
     publicarEstado("error:datos");
     return;
   }
@@ -1301,6 +1506,10 @@ void empezarConexionNueva() {
   // Un lector con dueño no se deja reconfigurar por otro gimnasio: la salida
   // legítima es que el dueño lo formatee, o el reset con el botón.
   if (gymIdVinculado.length() > 0 && nuevoGym != gymIdVinculado) {
+    if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) == pdTRUE) {
+      sesionConfig.probar(false, millis());
+      xSemaphoreGive(candadoBle);
+    }
     publicarEstado("error:otro_gimnasio");
     return;
   }
@@ -1319,7 +1528,7 @@ void revisarConexionNueva(unsigned long ahora) {
     // versión vieja), se le corta a los 3 s.
     if (clienteBleConectado && msDesde(faseDesde) < 3000) return;
     if (clienteBleConectado && servidorBle != nullptr) {
-      servidorBle->disconnect(servidorBle->getConnId());
+      desconectarClientesBle();
     }
     BLEDevice::stopAdvertising();
 
@@ -1390,15 +1599,12 @@ void revisarConexionNueva(unsigned long ahora) {
     gymIdVinculado = nuevoGym;
 
     alConectarWifi();
-    beepLectura();
     okDesde = millis();
     publicarEstado("ok:" + WiFi.localIP().toString());
 
-    // La app no está conectada (soltó el Bluetooth para el intento): lo
-    // encontrará en la red. Se reinicia para arrancar con el Bluetooth
-    // apagado.
-    Serial.println("[CONFIG] Listo. Reiniciando para apagar el Bluetooth...");
-    reinicioPendienteEn = millis() + 2000;
+    // Ya está en la red correcta. Apagar BLE conserva esa conexión: no
+    // necesita reiniciar, negociar la clave y obtener DHCP por segunda vez.
+    cerrarBlePendiente = true;
     return;
   }
 
@@ -1456,6 +1662,10 @@ void revisarConexionNueva(unsigned long ahora) {
 // Deja el WiFi como estaba y vuelve a ofrecerse por Bluetooth para que la
 // app lea el resultado y se pueda reintentar.
 void terminarIntentoFallido(const char *veredicto) {
+  if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) == pdTRUE) {
+    sesionConfig.probar(false, millis());
+    xSemaphoreGive(candadoBle);
+  }
   Serial.printf("[CONFIG] Sin conexión. Clave: %u, sin red: %u, seguridad: %u, "
                 "otros: %u, se asoció: %s\n",
                 fallosClave, fallosSinRed, fallosSeguridad, fallosOtros,
@@ -1495,6 +1705,7 @@ void setupServerRoutes() {
   server.on("/api/reset", HTTP_POST, handleReset);
   server.on("/api/configurar", HTTP_POST, handleConfigurar);
   server.on("/api/terminar_config", HTTP_POST, handleTerminarConfig);
+  server.on("/api/confirmar_config", HTTP_POST, handleConfirmarConfig);
 
   server.enableCORS(true);
 }
@@ -1580,6 +1791,7 @@ void handleDiscover() {
   doc["claimed"] = gymIdVinculado.length() > 0;
   doc["mine"] = peticionAutorizada();
   doc["modo_config"] = modoConfig;
+  doc["config_ocupada"] = configuracionOcupada();
   doc["rfid_reader"] = "PN532";
   doc["manufacturer"] = "GYMONE";
   doc["wifi_connected"] = wifiConnected;
@@ -1671,7 +1883,7 @@ void handleClaim() {
   gymIdVinculado = gymId;
 
   Serial.println("[VINCULACION] Lector vinculado correctamente.");
-  beepLectura();
+  sonarConfiguracion(SonidoConfig::completado);
   server.send(200, "application/json", "{\"ok\":true}");
 
   // Estaba ofreciéndose por Bluetooth por no tener dueño: se reinicia para
@@ -1705,7 +1917,7 @@ void handleUnclaim() {
 
   Serial.println("[VINCULACION] Desvinculado: olvidando gimnasio y WiFi. "
                  "Reiniciando...");
-  tone(BUZZER_PIN, BUZZER_BEEP_HZ, 600);
+  sonarAvisoActual(600);
   server.sendHeader("Connection", "close");
   server.send(200, "application/json", "{\"ok\":true,\"reboot_in_ms\":1500}");
 
@@ -1731,7 +1943,7 @@ void handleReset() {
   gymIdVinculado = "";
 
   Serial.println("[RESET] Lector formateado desde la red: queda sin dueño.");
-  tone(BUZZER_PIN, BUZZER_BEEP_HZ, 2000);
+  sonarAvisoActual(2000);
   server.send(200, "application/json", "{\"ok\":true}");
 }
 
@@ -1744,6 +1956,11 @@ void handleConfigurar() {
 
   if (!peticionAutorizada()) {
     responderNoAutorizado();
+    return;
+  }
+
+  if (configuracionOcupada()) {
+    server.send(409, "application/json", "{\"error\":\"config_ocupada\"}");
     return;
   }
 
@@ -1797,6 +2014,12 @@ void handleTerminarConfig() {
     return;
   }
 
+  // Salir del asistente de otro teléfono no puede cerrar la sesión activa.
+  if (modoConfig && configuracionOcupada()) {
+    server.send(409, "application/json", "{\"error\":\"config_ocupada\"}");
+    return;
+  }
+
   bool reinicia = modoConfig && motivoConfig == CONFIG_PEDIDO_APP &&
                   faseConexion == CONEXION_INACTIVA && okDesde == 0 &&
                   reinicioPendienteEn == 0;
@@ -1823,6 +2046,48 @@ void handleTerminarConfig() {
   reinicioPendienteEn = millis() + 500;
 }
 
+// La app confirmó la red y guardó el lector. Solo el dueño puede pedir el
+// aviso de 100%, y solamente con el lector trabajando normal con BLE apagado.
+void handleConfirmarConfig() {
+  anotarPeticion();
+  server.sendHeader("Connection", "close");
+  if (!peticionAutorizada()) {
+    responderNoAutorizado();
+    return;
+  }
+  if (modoConfig || !wifiConnected || reinicioPendienteEn != 0) {
+    server.send(409, "application/json", "{\"error\":\"lector_no_listo\"}");
+    return;
+  }
+  StaticJsonDocument<256> datos;
+  if (deserializeJson(datos, server.arg("plain")) ||
+      !datos["intento"].is<const char *>()) {
+    server.send(400, "application/json", "{\"error\":\"falta_intento\"}");
+    return;
+  }
+  String intento = datos["intento"].as<String>();
+  if (intento.length() == 0 || intento.length() > 80) {
+    server.send(400, "application/json", "{\"error\":\"intento_invalido\"}");
+    return;
+  }
+  if (intento != ultimaConfirmacionConfig) {
+    if (xSemaphoreTake(candadoBle, pdMS_TO_TICKS(200)) != pdTRUE) {
+      server.send(409, "application/json", "{\"error\":\"config_ocupada\"}");
+      return;
+    }
+    bool propia = sesionConfig.confirmar(datos["sesion"] | "", millis());
+    xSemaphoreGive(candadoBle);
+    if (!propia) {
+      server.send(409, "application/json", "{\"error\":\"config_ocupada\"}");
+      return;
+    }
+    ultimaConfirmacionConfig = intento;
+    sonarConfiguracion(SonidoConfig::completado);
+    Serial.println("[CONFIG] App confirmó la configuración: aviso final");
+  }
+  server.send(200, "application/json", "{\"ok\":true}");
+}
+
 // =================== BOTÓN DE RESET DE FÁBRICA ===================
 
 // Mantener BOOT 3 s dentro de los primeros 10 s tras encender. Borra el
@@ -1842,7 +2107,7 @@ void revisarBotonReset() {
 
   if (botonPulsadoDesde == 0) {
     botonPulsadoDesde = millis();
-    tone(BUZZER_PIN, BUZZER_BEEP_HZ, 80);  // "te estoy oyendo"
+    sonarAvisoActual(80);  // "te estoy oyendo"
     return;
   }
 
@@ -1852,7 +2117,7 @@ void revisarBotonReset() {
     prefs.clear();
     prefs.end();
 
-    tone(BUZZER_PIN, BUZZER_BEEP_HZ, 600);
+    sonarAvisoActual(600);
     borrarWifiAlReiniciar = true;
     reinicioPendienteEn = millis() + 800;
     botonPulsadoDesde = 0;
@@ -2013,8 +2278,22 @@ void handleLecturas() {
 
 // =================== SONIDO ===================
 
+void tocarNotaConfig(unsigned int hz, unsigned long duracionMs) {
+  tone(BUZZER_PIN, hz, duracionMs);
+}
+
 void beepLectura() {
-  tone(BUZZER_PIN, BUZZER_BEEP_HZ, BUZZER_BEEP_MS);
+  sonarAvisoActual(BUZZER_BEEP_MS);
+}
+
+void sonarAvisoActual(unsigned long duracionMs) {
+  sonidosConfig.reservarAvisoActual(millis(), duracionMs);
+  tone(BUZZER_PIN, BUZZER_BEEP_HZ, duracionMs);
+}
+
+void sonarConfiguracion(SonidoConfig sonido) {
+  sonidosConfig.iniciar(sonido);
+  sonidosConfig.actualizar(millis());
 }
 
 #if BUZZER_MODO_PRUEBA

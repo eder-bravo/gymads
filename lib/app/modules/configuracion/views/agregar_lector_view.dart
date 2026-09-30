@@ -7,6 +7,8 @@ import '../../../data/services/lector_ble_service.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/agregar_lector_controller.dart';
 import '../widgets/escena_conexion_lector.dart';
+import '../widgets/progreso_configuracion_lector.dart';
+import '../widgets/prueba_lector_dialog.dart';
 
 /// Abre el asistente. [cambiarWifi] solo cambia los textos: el camino es el
 /// mismo para un lector nuevo que para uno al que se le cambia la red.
@@ -72,6 +74,12 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
   }
 
   Widget _progreso() {
+    if (controller.lectorOcupado.value) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Icon(Icons.lock_clock, color: AppColors.warning, size: 64),
+      );
+    }
     final paso = controller.paso.value;
     final etapa = etapaDe(paso, controller.pasoAntesDelFallo);
     // Más baja mientras se escribe: con el teclado abierto falta espacio.
@@ -82,6 +90,11 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
         EscenaConexion(etapa: etapa, alto: escribiendo ? 96 : 120),
         const SizedBox(height: 12),
         PasosConexion(etapa: etapa),
+        ProgresoConfiguracionLector(
+          paso: paso,
+          esperandoRespuesta: controller.esperandoRespuesta.value,
+          guardando: controller.guardandoLector.value,
+        ),
       ],
     );
   }
@@ -91,23 +104,34 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
       case PasoAgregar.buscando:
         return _buscando(context);
       case PasoAgregar.preparando:
-        return _encabezado(context,
+        return _encabezado(
+          context,
           titulo: 'Lector encontrado',
-          texto: 'Conectándose por Bluetooth...',
+          texto: 'Preparando las redes WiFi que puedes elegir. '
+              'Mantén el teléfono cerca del lector.',
         );
       case PasoAgregar.elegirRed:
         return _elegirRed(context);
       case PasoAgregar.escribirClave:
         return _escribirClave(context);
       case PasoAgregar.conectando:
-        return _encabezado(context,
-          titulo: 'Conectando al WiFi...',
-          texto: 'Puede tardar un minuto. No cierres esta pantalla.',
+        return _encabezado(
+          context,
+          titulo: controller.esperandoRespuesta.value
+              ? 'Esperando la respuesta del lector…'
+              : 'Enviando la red al lector…',
+          texto: controller.esperandoRespuesta.value
+              ? 'El lector está conectándose al WiFi. En cuanto responda, '
+                  'terminará la configuración. Mantén el lector encendido.'
+              : 'Mantén el teléfono cerca y el lector encendido.',
         );
       case PasoAgregar.comprobando:
-        return _encabezado(context,
+        return _encabezado(
+          context,
           titulo: 'Casi listo',
-          texto: 'Buscando el lector en tu WiFi...',
+          texto: controller.guardandoLector.value
+              ? 'El lector respondió. Terminando la configuración…'
+              : 'El lector se conectó. Confirmando que responda en tu WiFi…',
         );
       case PasoAgregar.listo:
         return _listo(context);
@@ -124,7 +148,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(context,
+        _encabezado(
+          context,
           titulo: varios ? '¿Cuál es tu lector?' : 'Buscando el lector...',
           texto: varios
               ? 'Hay más de un lector cerca. Elige el tuyo.'
@@ -142,16 +167,17 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                   borderRadius: BorderRadius.circular(12)),
               child: ListTile(
                 leading: const Icon(Icons.nfc, color: AppColors.accent),
-                title: Text(lector.nombre,
-                    style: TextStyle(color: c.textPrimary)),
+                title:
+                    Text(lector.nombre, style: TextStyle(color: c.textPrimary)),
                 subtitle: Text(
-                  _esDeEsteGimnasio(lector.nombre)
-                      ? 'Es el lector de tu gimnasio'
-                      : (lector.rssi > -60 ? 'Muy cerca' : 'Cerca'),
+                  lector.ocupado
+                      ? 'Otro dispositivo lo está configurando'
+                      : _esDeEsteGimnasio(lector.nombre)
+                          ? 'Es el lector de tu gimnasio'
+                          : (lector.rssi > -60 ? 'Muy cerca' : 'Cerca'),
                   style: TextStyle(color: c.textSecondary),
                 ),
-                trailing: Icon(Icons.chevron_right,
-                    color: c.textSecondary),
+                trailing: Icon(Icons.chevron_right, color: c.textSecondary),
                 onTap: () => controller.elegirLector(lector),
               ),
             ),
@@ -166,7 +192,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(context,
+        _encabezado(
+          context,
           titulo: '¿A qué WiFi se conecta?',
           texto: redes.isEmpty
               ? 'El lector no vio ninguna red. Acércalo al módem y busca de '
@@ -195,8 +222,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                   : controller.actualizarRedes,
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Buscar de nuevo'),
-              style: TextButton.styleFrom(
-                  foregroundColor: c.textSecondary),
+              style: TextButton.styleFrom(foregroundColor: c.textSecondary),
             ),
             const Spacer(),
             TextButton(
@@ -225,7 +251,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(context,
+        _encabezado(
+          context,
           titulo: otraRed ? 'Otra red' : (red?.ssid ?? 'Red elegida'),
           texto: otraRed
               ? 'Escribe el nombre de la red tal como aparece en el teléfono, '
@@ -240,7 +267,9 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           const SizedBox(height: 16),
         ],
         if (red?.senalDebil == true) ...[
-          _aviso(context, 'La señal de esta red es débil donde está el lector. Si no '
+          _aviso(
+              context,
+              'La señal de esta red es débil donde está el lector. Si no '
               'conecta, acércalo al módem.'),
           const SizedBox(height: 16),
         ],
@@ -297,8 +326,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
             child: Text(
               'Distingue mayúsculas y minúsculas.',
               style: TextStyle(
-                  color: c.textSecondary.withOpacity(0.8),
-                  fontSize: 12),
+                  color: c.textSecondary.withOpacity(0.8), fontSize: 12),
             ),
           ),
         ],
@@ -319,15 +347,32 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(context,
-          titulo: '¡Listo!',
+        _encabezado(
+          context,
+          titulo: '¡Lector configurado!',
           texto: cambiarWifi
-              ? 'El lector ya está en la red nueva.'
-              : 'El lector ya es de tu gimnasio. Pasa una tarjeta para '
-                  'probarlo.',
+              ? 'El lector respondió en la red nueva. Puedes probarlo '
+                  'con una tarjeta.'
+              : 'El lector ya está conectado a tu gimnasio. Puedes probarlo '
+                  'con una tarjeta.',
         ),
+        if (controller.avisoFinal.value != null) ...[
+          const SizedBox(height: 16),
+          _aviso(context, controller.avisoFinal.value!),
+        ],
         const SizedBox(height: 24),
-        _botonPrincipal('Terminar', Icons.done, () => Get.back()),
+        _botonPrincipal('Probar lector', Icons.contactless,
+            () => abrirPruebaLector(context)),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => Get.back(),
+          icon: const Icon(Icons.done),
+          label: const Text('Terminar'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 52),
+            foregroundColor: AppColors.accent,
+          ),
+        ),
       ],
     );
   }
@@ -336,12 +381,19 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(context,
-          titulo: 'No se pudo',
+        _encabezado(
+          context,
+          titulo:
+              controller.lectorOcupado.value ? 'Lector ocupado' : 'No se pudo',
           texto: controller.mensaje.value ?? 'Algo salió mal.',
         ),
         const SizedBox(height: 24),
-        _botonPrincipal('Intentar de nuevo', Icons.refresh, controller.buscar),
+        _botonPrincipal(
+            controller.lectorOcupado.value
+                ? 'Volver a buscar'
+                : 'Intentar de nuevo',
+            Icons.refresh,
+            controller.buscar),
       ],
     );
   }
@@ -350,7 +402,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
 
   /// El título y una frase de lo que toca hacer. El dibujo de arriba
   /// ([EscenaConexion]) ya muestra en qué va el proceso.
-  Widget _encabezado(BuildContext context, {
+  Widget _encabezado(
+    BuildContext context, {
     required String titulo,
     required String texto,
   }) {
@@ -372,7 +425,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           textAlign: TextAlign.center,
           style: TextStyle(
             color: c.textSecondary.withOpacity(0.9),
-            fontSize: 14,
+            fontSize: 16,
             height: 1.4,
           ),
         ),
@@ -397,8 +450,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           Expanded(
             child: Text(
               texto,
-              style: TextStyle(
-                  color: c.textPrimary, fontSize: 13, height: 1.35),
+              style:
+                  TextStyle(color: c.textPrimary, fontSize: 13, height: 1.35),
             ),
           ),
         ],
@@ -416,8 +469,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
       Icons.network_wifi_2_bar,
       Icons.signal_wifi_4_bar,
     ];
-    final color =
-        red.compatible ? c.textPrimary : c.textSecondary;
+    final color = red.compatible ? c.textPrimary : c.textSecondary;
 
     return Material(
       color: Colors.transparent,
@@ -443,8 +495,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                 Padding(
                   padding: const EdgeInsets.only(left: 6),
                   child: Text('No compatible',
-                      style: TextStyle(
-                          color: c.textSecondary, fontSize: 11)),
+                      style: TextStyle(color: c.textSecondary, fontSize: 11)),
                 ),
               if (red.pideClave)
                 Padding(
@@ -453,8 +504,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                       size: 16, color: c.textSecondary),
                 ),
               const SizedBox(width: 4),
-              Icon(Icons.chevron_right,
-                  size: 20, color: c.textSecondary),
+              Icon(Icons.chevron_right, size: 20, color: c.textSecondary),
             ],
           ),
         ),

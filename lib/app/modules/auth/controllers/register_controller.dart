@@ -263,6 +263,7 @@ class RegisterController extends GetxController {
     final success = await _supabase.auth.signInWithOAuth(
       OAuthProvider.google,
       redirectTo: AuthConfig.oauthRedirectUrl,
+      queryParams: const {'prompt': 'select_account'},
     );
 
     if (!success) {

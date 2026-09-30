@@ -33,61 +33,50 @@ class UserRepository {
     }
   }
 
-  /// Obtiene un usuario por su tarjeta RFID
+  /// El cliente con la tarjeta [rfidUid], o null si ninguno la tiene.
+  ///
+  /// Si no se pudo preguntar (sin internet, el servidor no contestó) lanza
+  /// [ErrorAlBuscarTarjeta]: antes devolvía null igual que "no existe", y el
+  /// aviso decía "Tarjeta no registrada" a un cliente que sí lo estaba.
   Future<UserModel?> getUserByRfid(String rfidUid) async {
-    try {
-      // Verificar si el provider es SupabaseApiProvider para usar el método específico
-      Map<String, dynamic> response;
-      
-      if (_apiProvider.runtimeType.toString().contains('SupabaseApiProvider')) {
-        final supabaseProvider = _apiProvider as dynamic;
-        response = await supabaseProvider.getUserByRfid(rfidUid);
-      } else {
-        // Fallback para otros providers: buscar en toda la lista
-        response = await _apiProvider.getAll();
+    // Verificar si el provider es SupabaseApiProvider para usar el método específico
+    final Map<String, dynamic> response;
 
-        if (response['error'] == true || response['data'] == null) {
-          AppLogger.error('UserRepository', 'Respuesta inválida al buscar por RFID');
-          return null;
+    if (_apiProvider.runtimeType.toString().contains('SupabaseApiProvider')) {
+      final supabaseProvider = _apiProvider as dynamic;
+      response = await supabaseProvider.getUserByRfid(rfidUid);
+    } else {
+      // Fallback para otros providers: buscar en toda la lista
+      response = await _apiProvider.getAll();
+
+      if (response['error'] == true || response['data'] is! List) {
+        AppLogger.error('UserRepository', 'Respuesta inválida al buscar por RFID');
+        throw const ErrorAlBuscarTarjeta();
+      }
+
+      // Buscar el usuario que coincida con el rfid_card
+      for (final item in response['data'] as List) {
+        if (item is Map<String, dynamic> && item['rfid_card'] == rfidUid) {
+          return UserModel.fromJson(item);
         }
-
-        final data = response['data'];
-        if (data is! List) {
-          AppLogger.error('UserRepository', 'Formato de datos inesperado al buscar por RFID');
-          return null;
-        }
-
-        // Buscar el usuario que coincida con el rfid_card
-        for (var item in data) {
-          if (item is Map<String, dynamic> && item['rfid_card'] == rfidUid) {
-            return UserModel.fromJson(item);
-          }
-        }
-
-        return null;
       }
-
-      // Procesar respuesta del método específico
-      if (response['error'] == true) {
-        AppLogger.error('UserRepository', 'Fallo al buscar usuario por RFID');
-        return null;
-      }
-
-      if (response['data'] == null) {
-        return null;
-      }
-
-      final userData = response['data'];
-      if (userData is Map<String, dynamic>) {
-        return UserModel.fromJson(userData);
-      }
-
-      AppLogger.error('UserRepository', 'Formato de datos inesperado al buscar por RFID');
-      return null;
-    } catch (e) {
-      AppLogger.error('UserRepository', 'Fallo al buscar usuario por RFID', e);
       return null;
     }
+
+    // Procesar respuesta del método específico
+    if (response['error'] == true) {
+      AppLogger.error('UserRepository', 'Fallo al buscar usuario por RFID');
+      throw const ErrorAlBuscarTarjeta();
+    }
+
+    final userData = response['data'];
+    if (userData == null) return null;
+    if (userData is Map<String, dynamic>) {
+      return UserModel.fromJson(userData);
+    }
+
+    AppLogger.error('UserRepository', 'Formato de datos inesperado al buscar por RFID');
+    throw const ErrorAlBuscarTarjeta();
   }
 
   /// Obtiene un usuario por su número de usuario (userNumber)
@@ -432,4 +421,13 @@ bool esElMismoAlta(UserModel existente, UserModel nuevo) {
   String limpio(String? t) => (t ?? '').trim().toLowerCase();
   return limpio(existente.name) == limpio(nuevo.name) &&
       limpio(existente.phone) == limpio(nuevo.phone);
+}
+
+/// No se pudo saber de quién es una tarjeta (sin internet, o el servidor no
+/// contestó). No es lo mismo que una tarjeta sin registrar.
+class ErrorAlBuscarTarjeta implements Exception {
+  const ErrorAlBuscarTarjeta();
+
+  @override
+  String toString() => 'No se pudo buscar la tarjeta';
 }

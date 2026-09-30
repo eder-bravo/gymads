@@ -22,6 +22,7 @@ import '../../../core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../routes/app_pages.dart';
 import '../../../data/services/lector_red_service.dart';
+import '../../../data/services/regreso_del_lector.dart';
 import '../../../core/widgets/formulario.dart';
 import '../../../core/utils/fallo_al_guardar.dart';
 import '../views/cambiar_contrasena_view.dart';
@@ -56,6 +57,16 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   final Rx<EstadoLector> estadoLector = EstadoLector.sinConfigurar.obs;
   final RxBool comprobandoLector = false.obs;
 
+  /// Esperando a que el lector vuelva a su WiFi tras salir de "Cambiar WiFi"
+  /// sin cambiarlo (ver [esperarRegresoDelLector]).
+  final RxBool reconectandoLector = false.obs;
+
+  /// Pidiéndole al lector que se ofrezca por Bluetooth ("Cambiar WiFi").
+  final RxBool preparandoLector = false.obs;
+
+  /// Si la última vez que contestó se estaba ofreciendo por Bluetooth.
+  bool _lectorSeOfrecia = false;
+
   /// El lector que encontró la última búsqueda en la red cuando no es el de
   /// este gimnasio (libre, o de otro): sobre él actúan "Vincular" y
   /// "Formatear".
@@ -79,6 +90,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
 
       final bool vinculado = info['claimed'] == true;
       final bool esMio = info['mine'] == true;
+      _lectorSeOfrecia = info['modo_config'] == true;
 
       if (!vinculado) {
         estadoLector.value = EstadoLector.libre;
@@ -91,6 +103,61 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
         esp32StatusMessage.value = 'Este lector es de otro gimnasio';
       }
     } finally {
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// Tras salir de "Cambiar WiFi" sin cambiarlo: el lector se está
+  /// reconectando a su red. Se dice eso en pantalla (no "no aparece") y se
+  /// le espera; en cuanto aparece se le pide volver a trabajar normal.
+  Future<void> esperarRegresoDelLectorEnRed() async {
+    reconectandoLector.value = true;
+    comprobandoLector.value = true;
+    try {
+      final lector = await esperarRegresoDelLector(
+        // La IP de siempre (el router casi siempre le devuelve la misma) y,
+        // cada tanto, toda la red por si le dio otra.
+        buscar: (intento) => intento % 4 == 3
+            ? RfidConfig.buscarEnRed()
+            : RfidConfig.consultarGuardado(),
+        terminar: RfidConfig.terminarModoConfiguracion,
+        seguir: () => !isClosed,
+      );
+      if (isClosed) return;
+
+      if (lector == null) {
+        estadoLector.value = EstadoLector.sinConexion;
+        return;
+      }
+      if (lector.baseUrl != RfidConfig.baseUrl) {
+        await RfidConfig.guardarLector(lector);
+      }
+      _lectorSeOfrecia = lector.modoConfig;
+      esp32IpAddress.value = lector.ip;
+      estadoLector.value = EstadoLector.mio;
+    } finally {
+      reconectandoLector.value = false;
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// "Cambiar WiFi": le pide al lector que se ofrezca por Bluetooth. False
+  /// si no se pudo (entonces no tiene caso abrir el asistente).
+  ///
+  /// Si no contesta al pedido pero ya se estaba ofreciendo (quedó así de un
+  /// "Cambiar WiFi" anterior), se sigue igual: el asistente lo encuentra por
+  /// Bluetooth. Ofreciéndose, su WiFi contesta a medias, y antes eso acababa
+  /// en "El lector no respondió" con el lector esperando justo a que lo
+  /// configuraran.
+  Future<bool> pedirModoConfiguracion() async {
+    preparandoLector.value = true;
+    comprobandoLector.value = true;
+    try {
+      if (await RfidConfig.abrirModoConfiguracion()) return true;
+      final lector = await RfidConfig.consultarGuardado();
+      return lector?.modoConfig ?? _lectorSeOfrecia;
+    } finally {
+      preparandoLector.value = false;
       comprobandoLector.value = false;
     }
   }
@@ -210,6 +277,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
 
       if (mio != null) {
         await RfidConfig.guardarLector(mio);
+        _lectorSeOfrecia = mio.modoConfig;
         lectorEncontrado.value = null;
         esp32IpAddress.value = mio.ip;
         estadoLector.value = EstadoLector.mio;

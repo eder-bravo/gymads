@@ -17,6 +17,8 @@ class IlustracionLector extends StatefulWidget {
     required this.estado,
     required this.titulo,
     this.comprobando = false,
+    this.textoComprobando,
+    this.detalle,
   });
 
   final EstadoLector estado;
@@ -26,6 +28,12 @@ class IlustracionLector extends StatefulWidget {
 
   /// Buscándolo en la red: ondas grises en lugar del resultado.
   final bool comprobando;
+
+  /// Lo que dice mientras [comprobando]. Por defecto "Buscando tu lector…".
+  final String? textoComprobando;
+
+  /// Una línea bajo el título, solo si hace falta ("Tarda unos segundos").
+  final String? detalle;
 
   @override
   State<IlustracionLector> createState() => _IlustracionLectorState();
@@ -76,6 +84,9 @@ class _IlustracionLectorState extends State<IlustracionLector>
     final c = context.colores;
     final comprobando = widget.comprobando;
     final estado = widget.estado;
+    final titulo = comprobando
+        ? widget.textoComprobando ?? 'Buscando tu lector…'
+        : widget.titulo;
 
     final color = comprobando
         ? c.textSecondary
@@ -171,8 +182,8 @@ class _IlustracionLectorState extends State<IlustracionLector>
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
           child: Text(
-            comprobando ? 'Buscando tu lector…' : widget.titulo,
-            key: ValueKey(comprobando ? '' : widget.titulo),
+            titulo,
+            key: ValueKey(titulo),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: comprobando || silueta ? c.textPrimary : color,
@@ -181,6 +192,14 @@ class _IlustracionLectorState extends State<IlustracionLector>
             ),
           ),
         ),
+        if (widget.detalle != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            widget.detalle!,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: c.textSecondary, fontSize: 14),
+          ),
+        ],
       ],
     );
   }

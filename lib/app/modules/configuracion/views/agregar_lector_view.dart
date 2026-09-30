@@ -10,13 +10,18 @@ import '../widgets/escena_conexion_lector.dart';
 
 /// Abre el asistente. [cambiarWifi] solo cambia los textos: el camino es el
 /// mismo para un lector nuevo que para uno al que se le cambia la red.
-Future<void> abrirAgregarLector({bool cambiarWifi = false}) async {
+///
+/// Devuelve si se terminó (el lector quedó en la red). False si la persona
+/// salió antes, o si falló.
+Future<bool> abrirAgregarLector({bool cambiarWifi = false}) async {
+  final asistente = AgregarLectorController();
   await Get.to<void>(
     () => AgregarLectorView(cambiarWifi: cambiarWifi),
     binding: BindingsBuilder(() {
-      Get.put(AgregarLectorController());
+      Get.put(asistente);
     }),
   );
+  return asistente.paso.value == PasoAgregar.listo;
 }
 
 /// Agregar un lector (o cambiarle el WiFi) sin escribir ninguna IP.

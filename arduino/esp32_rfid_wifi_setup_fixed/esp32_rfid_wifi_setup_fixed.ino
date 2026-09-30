@@ -2,12 +2,57 @@
  * GYMONE - ESP32 RFID Reader con WiFi
  * LECTOR RFID CON CONEXIÓN WIFI AUTOMÁTICA PARA GYMONE
  *
- * Versión 6.4.2 - WiFi para trabajar, Bluetooth solo para configurar
+ * Versión 6.5.2 - WiFi para trabajar, Bluetooth solo para configurar
  * Dispositivo: ESP32 (clásico, con BLE)
  *
  * Compilar con una partición grande: WiFi + BLE + servidor no caben en la
  * de 1.2 MB que trae por defecto.
  *   arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app
+ *
+ * CAMBIOS v6.5.2:
+ * - Con la red de antes guardada pero ya fuera de alcance (lo cambiaron de
+ *   lugar), la red nueva nunca conectaba: "la red está lejos" una y otra
+ *   vez, hasta borrarlo con BOOT. El WiFi seguía buscando la vieja y no
+ *   aceptaba la nueva mientras tanto. Ahora primero se corta ese intento, se
+ *   comprueba que la nueva quedó puesta, y solo entonces cuentan los fallos.
+ * - En modo configuración la red guardada ya no se busca en bucle (solo el
+ *   reintento cada 30 s): el bucle ocupaba la antena que usa el Bluetooth.
+ *
+ * CAMBIOS v6.5.1:
+ * - Soltaba al teléfono en el mismo instante en que se conectaba por
+ *   Bluetooth ("sin actividad") y la app decía "No se pudo conectar con el
+ *   lector". Los tiempos anotados por el Bluetooth, el WiFi o una petición a
+ *   media vuelta del loop quedaban "en el futuro" y la resta daba 49 días
+ *   (ver msDesde). Lo mismo reconectaba el WiFi "por silencio" justo después
+ *   de contestar, y podía dar "sin_ip" al instante de conectar.
+ * - Anuncio por Bluetooth cada 100-150 ms (antes 20-40 ms): en su red y
+ *   ofreciéndose a la vez, al WiFi casi no le tocaba la antena y no
+ *   contestaba a la app ("El lector no respondió", "Tu lector no aparece").
+ * - /api/terminar_config con el teléfono aún soltando el Bluetooth: se
+ *   reinicia en cuanto lo suelta (antes no hacía nada y se quedaba 5 min más
+ *   ofreciéndose).
+ * - Sin WiFi revisa la conexión cada medio segundo (antes cada 5 s): tras
+ *   reiniciarse abre el servidor en cuanto hay red y la app lo encuentra
+ *   antes.
+ *
+ * CAMBIOS v6.5.0:
+ * - Salir de "Cambiar WiFi" sin cambiarlo ya no deja el lector "perdido":
+ *     - en cuanto la app suelta el Bluetooth vuelve a su red de siempre
+ *       (antes esperaba hasta 30 s), y sigue pasando tarjetas;
+ *     - nuevo POST /api/terminar_config (solo el dueño): la app lo manda al
+ *       salir y el lector se reinicia normal en unos segundos, sin esperar
+ *       los 5 min del modo configuración.
+ * - El chip de tarjetas (PN532) se revisa cada 10 s. Si deja de contestar
+ *   se reinicia su conexión, y si no vuelve, el lector completo. Antes el
+ *   lector seguía en la red pero ya no leía tarjetas hasta desconectarlo de
+ *   la corriente.
+ * - Sin el ahorro de energía del WiFi mientras el Bluetooth está apagado
+ *   (el trabajo normal): contesta más rápido y no se pierde los mensajes con
+ *   que la app lo busca en la red.
+ * - Conectado pero sin que nadie le pregunte nada en 5 min: se reconecta al
+ *   WiFi, por si quedó conectado solo en apariencia.
+ * - Se reinicia también si la memoria queda muy fragmentada (no solo si
+ *   queda poca), y /api/status dice por qué arrancó la última vez.
  *
  * CAMBIOS v6.4.2:
  * - "Cambiar WiFi" (POST /api/configurar) ya no enciende el Bluetooth
@@ -179,7 +224,7 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
-#define FIRMWARE_VERSION "6.4.2"
+#define FIRMWARE_VERSION "6.5.2"
 
 
 // =================== CONFIGURACIÓN DEL BUZZER ===================
@@ -195,10 +240,24 @@
 // =================== CONFIGURACIÓN DE WATCHDOG Y RECOVERY ===================
 #define WDT_TIMEOUT_SECONDS 30          // Reiniciar si no hay actividad por 30 segundos
 #define WIFI_RECONNECT_INTERVAL 5000    // Verificar WiFi cada 5 segundos
+#define WIFI_CHECK_SIN_RED 500          // ...y cada medio segundo mientras no hay
 #define SERVER_RESTART_INTERVAL 300000  // Reiniciar servidor HTTP cada 5 minutos
 #define HEARTBEAT_INTERVAL 1000         // Parpadeo de heartbeat cada 1 segundo
 #define MEMORY_CHECK_INTERVAL 60000     // Verificar memoria cada 60 segundos
 #define MIN_FREE_HEAP 10000             // Reiniciar si la memoria libre es menor a 10KB
+// Aunque sobre memoria, si el bloque libre más grande es menor que esto ya no
+// caben las respuestas ni los paquetes de red (memoria fragmentada).
+#define MIN_BLOQUE_LIBRE 6000
+
+// Conectado, pero nadie le pregunta nada en este tiempo. Con la app abierta
+// pregunta cada segundo; tanto silencio puede ser que el WiFi quedó
+// conectado solo en apariencia (el lector no se entera de que el módem ya
+// no le pasa nada). Reconectarse cuesta unos segundos y lo arregla.
+#define SILENCIO_ANTES_DE_RECONECTAR_MS 300000  // 5 min
+
+// Revisión del chip de tarjetas (PN532), ver revisarPn532().
+#define REVISAR_PN532_CADA_MS 10000
+#define PN532_FALLOS_ANTES_DE_REINICIAR 3
 
 // =================== MODO CONFIGURACIÓN (BLUETOOTH) ===================
 // Sin WiFi durante este tiempo, el lector vuelve a ofrecerse por Bluetooth
@@ -276,6 +335,17 @@ bool wifiConnected = false;
 bool serverRunning = false;
 bool mdnsActivo = false;
 unsigned long desconectadoDesde = 0;  // 0 = conectado (o nunca intentó)
+// Último empujón a la red guardada (ver revisarWifi).
+unsigned long ultimoReintentoWifi = 0;
+// La última vez que alguien le preguntó algo por la red.
+unsigned long ultimaPeticionEn = 0;
+
+// Chip de tarjetas: si contesta, y si llegó a funcionar desde que encendió
+// (sin eso, un chip desconectado reiniciaría el lector en bucle).
+bool pn532Ok = false;
+bool pn532FuncionoDesdeArranque = false;
+uint8_t fallosPn532 = 0;
+unsigned long ultimaRevisionPn532 = 0;
 
 // Motivo de la última desconexión, lo llena el evento de WiFi.
 volatile uint8_t ultimaRazonDesconexion = 0;
@@ -342,6 +412,13 @@ volatile unsigned long bleDesconectadoEn = 0;
 volatile unsigned long ultimaActividadBle = 0;
 unsigned long ultimoRefrescoAnuncio = 0;
 
+// /api/terminar_config llegó con un teléfono todavía conectado por
+// Bluetooth: casi siempre el mismo que acaba de salir, que aún lo está
+// soltando. Si lo suelta en este plazo, se reinicia (ver cuidarAnuncioBle);
+// si sigue conectado más, es que alguien lo está configurando.
+#define TERMINAR_AL_SOLTAR_MS 10000
+unsigned long terminarPedidoEn = 0;  // 0 = no se pidió
+
 BLEServer *servidorBle = nullptr;
 BLECharacteristic *chRedes = nullptr;
 BLECharacteristic *chEstado = nullptr;
@@ -371,6 +448,7 @@ bool conectarPendiente = false;  // llegó "conectar" con un escaneo en curso
 enum FaseConexion {
   CONEXION_INACTIVA,
   CONEXION_ESPERANDO_BLE,  // esperando a que la app suelte el Bluetooth
+  CONEXION_SOLTANDO_WIFI,  // cortando el intento con la red vieja (ver abajo)
   CONEXION_PROBANDO,       // probando el WiFi con el Bluetooth en pausa
 };
 FaseConexion faseConexion = CONEXION_INACTIVA;
@@ -414,6 +492,9 @@ void handleClaim();
 void handleUnclaim();
 void handleReset();
 void handleConfigurar();
+void handleTerminarConfig();
+void anotarPeticion();
+const char *motivoDeArranque();
 bool peticionAutorizada();
 void responderNoAutorizado();
 String gymIdDeLaPeticion();
@@ -434,7 +515,25 @@ void handleStatusLeds();
 void beepLectura();
 void pruebaVolumenBuzzer();
 void leerTarjetas();
+bool iniciarPn532();
+void revisarPn532(unsigned long ahora);
 String getCardUID(uint8_t *uid, uint8_t uidLength);
+
+// =================== TIEMPOS ===================
+
+// Milisegundos desde [momento], con millis() leído DESPUÉS de [momento].
+//
+// No se resta del `ahora` que el loop toma al principio de cada vuelta:
+// varios momentos los anota otra tarea (los callbacks de Bluetooth y de WiFi
+// corren en el otro núcleo) o un handler HTTP a media vuelta, y quedaban
+// "en el futuro". La resta sin signo daba la vuelta y parecía que habían
+// pasado 49 días: el lector soltaba al teléfono en el mismo instante en que
+// se conectaba ("sin actividad"), o se reconectaba al WiFi "por silencio"
+// justo después de contestar. Un momento en el futuro cuenta como 0.
+unsigned long msDesde(unsigned long momento) {
+  long transcurrido = (long)(millis() - momento);
+  return transcurrido < 0 ? 0 : (unsigned long)transcurrido;
+}
 
 // =================== CALLBACKS DE BLUETOOTH ===================
 
@@ -493,6 +592,7 @@ void setup() {
   delay(1000);
 
   Serial.println("=== GYMONE v" FIRMWARE_VERSION " ===");
+  Serial.printf("Arranque por: %s\n", motivoDeArranque());
 
   esp_task_wdt_config_t wdt_config = {
     .timeout_ms = WDT_TIMEOUT_SECONDS * 1000,
@@ -528,25 +628,16 @@ void setup() {
   delay(500);
   pn532i2c = new PN532_I2C(Wire);
   nfc = new PN532(*pn532i2c);
-  nfc->begin();
-  delay(500);
-
-  uint32_t versiondata = nfc->getFirmwareVersion();
-  if (!versiondata) {
-    Serial.println("ERROR: PN532 no encontrado");
+  if (iniciarPn532()) {
+    pn532FuncionoDesdeArranque = true;
   } else {
-    Serial.print("PN532 OK - FW v");
-    Serial.print((versiondata >> 16) & 0xFF);
-    Serial.print(".");
-    Serial.println((versiondata >> 8) & 0xFF);
-    nfc->SAMConfig();
-    // Reintentos MUY bajos para no bloquear el loop
-    nfc->setPassiveActivationRetries(0x01);
+    Serial.println("ERROR: PN532 no encontrado");
   }
+  ultimaRevisionPn532 = millis();
 
-  // WiFi en modo estación. El ahorro de energía del módem se deja activo
-  // (es el predeterminado): el core lo exige cuando WiFi y Bluetooth
-  // conviven.
+  // WiFi en modo estación. El ahorro de energía del módem arranca activo (es
+  // el predeterminado): el core lo exige mientras WiFi y Bluetooth conviven.
+  // Trabajando normal, sin Bluetooth, se apaga al conectar (alConectarWifi).
   // El WiFi se guarda SOLO en nuestras preferencias ("gymone"), que se borran
   // al desvincular o con el reset. Si el driver guardara su propia copia, la
   // contraseña del gimnasio viajaría dentro del aparato aunque se lo lleven.
@@ -621,10 +712,16 @@ void loop() {
   if (ahora - lastMemoryCheck >= MEMORY_CHECK_INTERVAL) {
     lastMemoryCheck = ahora;
     uint32_t freeHeap = ESP.getFreeHeap();
-    Serial.printf("[STATUS] Uptime: %lus, Heap: %u, WiFi: %s, Config: %s\n",
-                  (ahora - systemUptime) / 1000, freeHeap,
-                  wifiConnected ? "OK" : "NO", modoConfig ? "SI" : "NO");
-    if (freeHeap < MIN_FREE_HEAP) {
+    uint32_t bloque = ESP.getMaxAllocHeap();
+    Serial.printf("[STATUS] Uptime: %lus, Heap: %u (bloque %u), WiFi: %s "
+                  "(%d dBm), Config: %s, Tarjetas: %s, Última petición: "
+                  "hace %lus\n",
+                  (ahora - systemUptime) / 1000, freeHeap, bloque,
+                  wifiConnected ? "OK" : "NO",
+                  wifiConnected ? WiFi.RSSI() : 0, modoConfig ? "SI" : "NO",
+                  pn532Ok ? "OK" : "NO",
+                  ultimaPeticionEn == 0 ? 0 : msDesde(ultimaPeticionEn) / 1000);
+    if (freeHeap < MIN_FREE_HEAP || bloque < MIN_BLOQUE_LIBRE) {
       Serial.println("[WARNING] Memoria baja - Reiniciando...");
       delay(500);
       ESP.restart();
@@ -652,12 +749,17 @@ void loop() {
   if (wifiConnected && serverRunning) {
     leerTarjetas();
   }
+  revisarPn532(ahora);
 
   if (modoConfig) {
     atenderModoConfig(ahora);
   }
 
-  if (ahora - lastWiFiCheck >= WIFI_RECONNECT_INTERVAL) {
+  // Sin red se revisa más seguido: al arrancar (o al volver de un corte) el
+  // servidor abre en cuanto hay WiFi, no hasta 5 s después.
+  unsigned long revisarCada =
+      wifiConnected ? WIFI_RECONNECT_INTERVAL : WIFI_CHECK_SIN_RED;
+  if (ahora - lastWiFiCheck >= revisarCada) {
     lastWiFiCheck = ahora;
     revisarWifi(ahora);
   }
@@ -691,7 +793,10 @@ void cargarConfiguracion() {
 void iniciarWifiGuardado() {
   if (wifiSsid.length() == 0) return;
   Serial.println("[WiFi] Conectando a " + wifiSsid + "...");
-  WiFi.setAutoReconnect(true);
+  // En modo configuración, sin reconexión automática: si la red ya no está
+  // (lo cambiaron de lugar), el WiFi la buscaba sin parar, ocupando la antena
+  // que necesita el Bluetooth. Ahí basta el reintento cada 30 s (revisarWifi).
+  WiFi.setAutoReconnect(!modoConfig);
   WiFi.begin(wifiSsid.c_str(), wifiClave.c_str());
 }
 
@@ -700,9 +805,15 @@ void alConectarWifi() {
   wifiConnected = true;
   yaConectoDesdeArranque = true;
   desconectadoDesde = 0;
+  ultimaPeticionEn = millis();
   digitalWrite(LED_WIFI, HIGH);
   Serial.print("[WiFi] Conectado - IP: ");
   Serial.println(WiFi.localIP());
+
+  // Sin Bluetooth, sin ahorro de energía: dormido a ratos, el WiFi tardaba en
+  // contestar y a veces no oía cuando la app lo buscaba en la red. Con el
+  // Bluetooth encendido no se puede: el core lo exige para que convivan.
+  if (!bleIniciado) WiFi.setSleep(false);
 
   iniciarServidor();
   iniciarMdns();
@@ -760,12 +871,24 @@ void revisarWifi(unsigned long ahora) {
       entrarModoConfig(CONFIG_SIN_DUENO);
     }
 
-    if (serverRunning && ahora - lastServerRestart >= SERVER_RESTART_INTERVAL) {
+    if (serverRunning && msDesde(lastServerRestart) >= SERVER_RESTART_INTERVAL) {
       // Reinicio preventivo. Las rutas ya están registradas: solo se
       // cierra y se abre el socket.
       server.close();
       server.begin();
-      lastServerRestart = ahora;
+      lastServerRestart = millis();
+    }
+
+    // Nadie le pregunta nada hace rato: se reconecta por si el WiFi quedó
+    // conectado solo en apariencia. No mientras se ofrece por Bluetooth (ahí
+    // la red la maneja el modo configuración).
+    if (!modoConfig && msDesde(ultimaPeticionEn) >= SILENCIO_ANTES_DE_RECONECTAR_MS) {
+      Serial.println("[WiFi] 5 min sin que nadie pregunte: reconectando por "
+                     "si quedó colgado");
+      ultimaPeticionEn = millis();
+      WiFi.disconnect(false, false);
+      iniciarWifiGuardado();
+      ultimoReintentoWifi = ahora;
     }
     return;
   }
@@ -788,7 +911,7 @@ void revisarWifi(unsigned long ahora) {
   // más probable es que lo hayan llevado a otro lugar.
   unsigned long espera = yaConectoDesdeArranque ? SIN_WIFI_ANTES_DE_CONFIG_MS
                                                 : SIN_WIFI_AL_ARRANCAR_MS;
-  if (!modoConfig && ahora - desconectadoDesde >= espera) {
+  if (!modoConfig && msDesde(desconectadoDesde) >= espera) {
     entrarModoConfig(CONFIG_SIN_CONEXION);
   }
 
@@ -798,10 +921,9 @@ void revisarWifi(unsigned long ahora) {
   //
   // Mientras la app está conectada por Bluetooth, o se están buscando redes,
   // no se reintenta: los intentos de conexión abortan el escaneo.
-  static unsigned long ultimoReintento = 0;
   if (!clienteBleConectado && !escaneando &&
-      ahora - ultimoReintento >= 30000) {
-    ultimoReintento = ahora;
+      msDesde(ultimoReintentoWifi) >= 30000) {
+    ultimoReintentoWifi = ahora;
     iniciarWifiGuardado();
   }
 }
@@ -829,6 +951,10 @@ void iniciarBle() {
     BLEDevice::startAdvertising();
     return;
   }
+
+  // Con el ahorro de energía del WiFi apagado (ver alConectarWifi) el core no
+  // deja convivir WiFi y Bluetooth: se vuelve a encender antes.
+  WiFi.setSleep(true);
 
   String nombre = "GymOne-" + nombreCorto;
   BLEDevice::init(nombre);
@@ -877,6 +1003,14 @@ void iniciarBle() {
   BLEAdvertisementData respuesta;
   respuesta.setName(nombre);
   anuncio->setScanResponseData(respuesta);
+
+  // Cada 100-150 ms y no cada 20-40 ms (lo predeterminado). WiFi y Bluetooth
+  // se turnan la antena: anunciando tan seguido, al WiFi casi no le tocaba,
+  // y con el lector en su red y ofreciéndose a la vez ("Cambiar WiFi") la
+  // app le preguntaba y no contestaba. El teléfono lo encuentra igual en un
+  // segundo. En pasos de 0,625 ms.
+  anuncio->setMinInterval(0xA0);  // 100 ms
+  anuncio->setMaxInterval(0xF0);  // 150 ms
 
   BLEDevice::startAdvertising();
   bleIniciado = true;
@@ -946,10 +1080,10 @@ void cuidarAnuncioBle(unsigned long ahora) {
     // se quedó en otra pantalla): se le suelta para volver a anunciarse. No
     // mientras se buscan redes o se prueba el WiFi, que tardan.
     if (faseConexion == CONEXION_INACTIVA && !escaneando &&
-        ahora - ultimaActividadBle >= SOLTAR_CLIENTE_INACTIVO_MS &&
+        msDesde(ultimaActividadBle) >= SOLTAR_CLIENTE_INACTIVO_MS &&
         servidorBle != nullptr) {
       Serial.println("[BLE] Teléfono conectado sin actividad: soltándolo");
-      ultimaActividadBle = ahora;
+      ultimaActividadBle = millis();
       servidorBle->disconnect(servidorBle->getConnId());
     }
     return;
@@ -965,24 +1099,47 @@ void cuidarAnuncioBle(unsigned long ahora) {
   // con el enlace cerrado.
   unsigned long desconectado = bleDesconectadoEn;
   if (desconectado != 0) {
-    if (ahora - desconectado < REANUNCIAR_TRAS_DESCONEXION_MS) return;
+    if (msDesde(desconectado) < REANUNCIAR_TRAS_DESCONEXION_MS) return;
     bleDesconectadoEn = 0;
+
+    // La app pidió terminar (/api/terminar_config) mientras soltaba el
+    // Bluetooth: ya lo soltó, se reinicia para trabajar normal.
+    if (terminarPedidoEn != 0 &&
+        msDesde(terminarPedidoEn) < TERMINAR_AL_SOLTAR_MS) {
+      terminarPedidoEn = 0;
+      Serial.println("[CONFIG] La app soltó el Bluetooth: reiniciando para "
+                     "trabajar normal");
+      reinicioPendienteEn = millis() + 200;
+      return;
+    }
+
     Serial.println("[BLE] Anunciando de nuevo tras la desconexión");
     BLEDevice::startAdvertising();
     ultimoRefrescoAnuncio = ahora;
+
+    // La app soltó el Bluetooth: ya tiene las redes (la persona está
+    // eligiendo) o salió sin cambiar nada. Se vuelve a la red de siempre YA,
+    // sin esperar el siguiente reintento (hasta 30 s): así sigue pasando
+    // tarjetas y la app lo encuentra en cuanto sale de "Cambiar WiFi". Si
+    // luego manda una red nueva, se prueba encima de esta.
+    if (!wifiConnected && wifiSsid.length() > 0 && !escaneando) {
+      Serial.println("[CONFIG] Volviendo a la red guardada mientras tanto");
+      iniciarWifiGuardado();
+      ultimoReintentoWifi = ahora;
+    }
     return;
   }
 
   // Cada 30 s sin nadie conectado, se reinicia el anuncio por si se cayó.
-  if (ahora - ultimoRefrescoAnuncio >= REFRESCAR_ANUNCIO_MS) {
-    ultimoRefrescoAnuncio = ahora;
+  if (msDesde(ultimoRefrescoAnuncio) >= REFRESCAR_ANUNCIO_MS) {
+    ultimoRefrescoAnuncio = millis();
     BLEDevice::stopAdvertising();
     BLEDevice::startAdvertising();
   }
 
   // Último recurso: 10 min sin que nadie se conecte. Reiniciarse deja el
   // Bluetooth como recién encendido, que es lo que hacía desconectarlo.
-  if (ahora - ultimaActividadBle >= REINICIO_SIN_USO_CONFIG_MS) {
+  if (msDesde(ultimaActividadBle) >= REINICIO_SIN_USO_CONFIG_MS) {
     Serial.println("[BLE] 10 min sin que nadie se conecte: reiniciando para "
                    "refrescar el Bluetooth");
     reinicioPendienteEn = millis() + 200;
@@ -1089,9 +1246,12 @@ void alEventoWifi(WiFiEvent_t evento, WiFiEventInfo_t info) {
   if (evento == ARDUINO_EVENT_WIFI_STA_CONNECTED) {
     // Llega DESPUÉS de negociar la contraseña con el módem: si hubo
     // asociación, la contraseña es correcta.
+    // La hora primero: el loop (en el otro núcleo) mira intentoAsociado y
+    // luego asociadoEn; al revés podía verla aún en 0 y dar "sin_ip" al
+    // instante.
     if (faseConexion == CONEXION_PROBANDO && !intentoAsociado) {
-      intentoAsociado = true;
       asociadoEn = millis();
+      intentoAsociado = true;
     }
     return;
   }
@@ -1157,11 +1317,47 @@ void revisarConexionNueva(unsigned long ahora) {
   if (faseConexion == CONEXION_ESPERANDO_BLE) {
     // La app se desconecta sola en cuanto manda la orden. Si no lo hace (una
     // versión vieja), se le corta a los 3 s.
-    if (clienteBleConectado && ahora - faseDesde < 3000) return;
+    if (clienteBleConectado && msDesde(faseDesde) < 3000) return;
     if (clienteBleConectado && servidorBle != nullptr) {
       servidorBle->disconnect(servidorBle->getConnId());
     }
     BLEDevice::stopAdvertising();
+
+    // Se corta lo que el WiFi esté haciendo con la red vieja. Si esa red ya
+    // no está (lo cambiaron de lugar), el WiFi la busca sin parar, y mientras
+    // busca NO acepta otra red: begin() con la nueva fallaba sin aviso, seguía
+    // buscando la vieja, y cada "no la encuentro" contaba contra la nueva. El
+    // lector decía "la red está lejos" una y otra vez, hasta borrarlo con BOOT.
+    WiFi.setAutoReconnect(false);
+    WiFi.disconnect(false, false);
+    wifiConnected = false;
+    serverRunning = false;
+    faseConexion = CONEXION_SOLTANDO_WIFI;
+    faseDesde = millis();
+    return;
+  }
+
+  // ── 2. Con el WiFi quieto, arrancar la red nueva ──
+  if (faseConexion == CONEXION_SOLTANDO_WIFI) {
+    // Medio segundo para que el WiFi termine de soltar el intento anterior.
+    if (msDesde(faseDesde) < 500) return;
+
+    // Con reconexión automática el propio WiFi reintenta ante fallos
+    // pasajeros (tiempo agotado, antena ocupada). No se le llama a begin()
+    // por encima: dos intentos a la vez se estorban y cada choque parece un
+    // fallo más.
+    WiFi.setAutoReconnect(true);
+    if (WiFi.begin(nuevoSsid.c_str(), nuevaClave.c_str()) == WL_CONNECT_FAILED) {
+      // Todavía no la aceptó. Se reintenta; a los 5 s se da por perdido.
+      if (msDesde(faseDesde) < 5000) {
+        WiFi.setAutoReconnect(false);
+        WiFi.disconnect(false, false);
+        return;
+      }
+      Serial.println("[CONFIG] El WiFi no aceptó la red nueva");
+      terminarIntentoFallido("error:no_conecta");
+      return;
+    }
 
     Serial.println("[CONFIG] Probando la red con el Bluetooth en pausa...");
     intentoAsociado = false;
@@ -1170,21 +1366,15 @@ void revisarConexionNueva(unsigned long ahora) {
     hayFalloNuevo = false;
     reintentosPropios = 0;
     reintentarEn = 0;
-    wifiConnected = false;
-    serverRunning = false;
 
+    // Solo desde aquí cuentan los fallos (ver alEventoWifi): los de la red
+    // vieja ya pasaron.
     faseConexion = CONEXION_PROBANDO;
-    faseDesde = ahora;
-    // Con la reconexión automática, el propio WiFi reintenta ante fallos
-    // pasajeros (tiempo agotado, antena ocupada). No se le llama a begin()
-    // por encima: dos intentos a la vez se estorban y cada choque parece un
-    // fallo más.
-    WiFi.setAutoReconnect(true);
-    WiFi.begin(nuevoSsid.c_str(), nuevaClave.c_str());
+    faseDesde = millis();
     return;
   }
 
-  // ── 2. Probando ──
+  // ── 3. Probando ──
   if (WiFi.status() == WL_CONNECTED) {
     faseConexion = CONEXION_INACTIVA;
 
@@ -1234,10 +1424,10 @@ void revisarConexionNueva(unsigned long ahora) {
 
   // Veredicto. Solo se culpa a la contraseña cuando la negociación falló
   // varias veces SIN Bluetooth de por medio y la red sí aparece.
-  unsigned long transcurrido = ahora - faseDesde;
+  unsigned long transcurrido = msDesde(faseDesde);
   const char *veredicto = nullptr;
 
-  if (intentoAsociado && ahora - asociadoEn >= 15000) {
+  if (intentoAsociado && msDesde(asociadoEn) >= 15000) {
     // La contraseña pasó, pero el módem no le dio dirección (DHCP).
     veredicto = "error:sin_ip";
   } else if (!intentoAsociado && fallosClave >= 3) {
@@ -1304,11 +1494,35 @@ void setupServerRoutes() {
   server.on("/api/unclaim", HTTP_POST, handleUnclaim);
   server.on("/api/reset", HTTP_POST, handleReset);
   server.on("/api/configurar", HTTP_POST, handleConfigurar);
+  server.on("/api/terminar_config", HTTP_POST, handleTerminarConfig);
 
   server.enableCORS(true);
 }
 
+// Cualquier petición que llega prueba que la red funciona (ver
+// SILENCIO_ANTES_DE_RECONECTAR_MS).
+void anotarPeticion() {
+  ultimaPeticionEn = millis();
+}
+
+// Por qué arrancó el lector la última vez: para saber, en el monitor serie
+// o en /api/status, si se reinició solo y por qué.
+const char *motivoDeArranque() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON: return "encendido";
+    case ESP_RST_SW: return "reinicio pedido";
+    case ESP_RST_PANIC: return "fallo del programa";
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT: return "watchdog (se trabó)";
+    case ESP_RST_BROWNOUT: return "bajón de corriente";
+    case ESP_RST_DEEPSLEEP: return "despertó";
+    default: return "otro";
+  }
+}
+
 void handleGetUid() {
+  anotarPeticion();
   if (!peticionAutorizada()) {
     responderNoAutorizado();
     return;
@@ -1319,6 +1533,7 @@ void handleGetUid() {
 }
 
 void handleGetUidOnly() {
+  anotarPeticion();
   if (!peticionAutorizada()) {
     responderNoAutorizado();
     return;
@@ -1327,6 +1542,7 @@ void handleGetUidOnly() {
 }
 
 void handleStatus() {
+  anotarPeticion();
   server.sendHeader("Connection", "close");
   server.sendHeader("Access-Control-Allow-Origin", "*");
 
@@ -1340,6 +1556,10 @@ void handleStatus() {
   doc["uptime_seconds"] = (millis() - systemUptime) / 1000;
   doc["free_heap"] = ESP.getFreeHeap();
   doc["server_running"] = serverRunning;
+  doc["version"] = FIRMWARE_VERSION;
+  doc["lector_tarjetas_ok"] = pn532Ok;
+  doc["arranque"] = motivoDeArranque();
+  doc["senal"] = WiFi.RSSI();
 
   String response;
   serializeJson(doc, response);
@@ -1347,6 +1567,7 @@ void handleStatus() {
 }
 
 void handleDiscover() {
+  anotarPeticion();
   DynamicJsonDocument doc(768);
   doc["device_id"] = "ESP32_RFID_GYMONE";
   doc["device_type"] = "RFID_READER";
@@ -1425,6 +1646,7 @@ void responderNoAutorizado() {
 
 // POST /api/claim {"gym_id": "..."} — reclamar un lector libre.
 void handleClaim() {
+  anotarPeticion();
   server.sendHeader("Access-Control-Allow-Origin", "*");
   String gymId = gymIdDeLaPeticion();
 
@@ -1461,6 +1683,7 @@ void handleClaim() {
 
 // POST /api/unclaim {"gym_id": "..."} — liberar el lector. Solo el dueño.
 void handleUnclaim() {
+  anotarPeticion();
   server.sendHeader("Access-Control-Allow-Origin", "*");
 
   if (!peticionAutorizada()) {
@@ -1499,6 +1722,7 @@ void handleUnclaim() {
 //
 // NO borra el WiFi: el lector sigue en la red y el nuevo dueño lo encuentra.
 void handleReset() {
+  anotarPeticion();
   server.sendHeader("Access-Control-Allow-Origin", "*");
 
   prefs.begin("gymone", false);
@@ -1515,6 +1739,7 @@ void handleReset() {
 // Bluetooth durante 5 min, para cambiarle el WiFi sin tocar el aparato.
 // Solo el dueño. El lector sigue funcionando mientras tanto.
 void handleConfigurar() {
+  anotarPeticion();
   server.sendHeader("Access-Control-Allow-Origin", "*");
 
   if (!peticionAutorizada()) {
@@ -1523,10 +1748,13 @@ void handleConfigurar() {
   }
 
   if (modoConfig) {
-    // Ya se está ofreciendo por Bluetooth: solo se alarga el plazo.
+    // Ya se está ofreciendo por Bluetooth: solo se alarga el plazo (y se
+    // olvida un "terminar" pendiente: la persona volvió a entrar).
     if (motivoConfig == CONFIG_PEDIDO_APP) {
       modoConfigHasta = millis() + CONFIG_PEDIDA_DURACION_MS;
     }
+    terminarPedidoEn = 0;
+    server.sendHeader("Connection", "close");
     server.send(200, "application/json", "{\"ok\":true}");
     return;
   }
@@ -1544,6 +1772,55 @@ void handleConfigurar() {
   server.send(200, "application/json", "{\"ok\":true,\"reboot_in_ms\":800}");
   // Nunca se reinicia dentro del handler: la respuesta tiene que salir.
   reinicioPendienteEn = millis() + 800;
+}
+
+// POST /api/terminar_config {"gym_id": "..."} — la persona salió de
+// "Cambiar WiFi" sin cambiarlo. El lector ya volvió a su red, pero seguía
+// ofreciéndose por Bluetooth hasta cumplir los 5 min, y ahí se reiniciaba de
+// sorpresa. Ahora se reinicia ya y vuelve a trabajar normal en unos
+// segundos. Solo el dueño.
+//
+// Solo cierra el modo que abrió la app: si se está ofreciendo porque perdió
+// su red o no tiene dueño, eso lo resuelve configurarlo. Tampoco probando
+// una red: alguien lo está configurando.
+//
+// Con un teléfono conectado por Bluetooth se reinicia en cuanto lo suelte,
+// si es pronto (TERMINAR_AL_SOLTAR_MS): casi siempre es el de la misma app,
+// que salió del asistente y aún lo está soltando. Antes contestaba que no y
+// se quedaba 5 min más ofreciéndose, con el WiFi a medias.
+void handleTerminarConfig() {
+  anotarPeticion();
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+
+  if (!peticionAutorizada()) {
+    responderNoAutorizado();
+    return;
+  }
+
+  bool reinicia = modoConfig && motivoConfig == CONFIG_PEDIDO_APP &&
+                  faseConexion == CONEXION_INACTIVA && okDesde == 0 &&
+                  reinicioPendienteEn == 0;
+
+  server.sendHeader("Connection", "close");
+  if (!reinicia) {
+    server.send(200, "application/json", "{\"ok\":true,\"reinicia\":false}");
+    return;
+  }
+
+  if (clienteBleConectado) {
+    Serial.println("[CONFIG] La app salió sin cambiar el WiFi: reinicio al "
+                   "soltar el Bluetooth");
+    unsigned long ahora = millis();
+    terminarPedidoEn = ahora == 0 ? 1 : ahora;
+    server.send(200, "application/json", "{\"ok\":true,\"reinicia\":true}");
+    return;
+  }
+
+  Serial.println("[CONFIG] La app salió sin cambiar el WiFi: reiniciando "
+                 "para trabajar normal");
+  server.send(200, "application/json",
+              "{\"ok\":true,\"reinicia\":true,\"reboot_in_ms\":500}");
+  reinicioPendienteEn = millis() + 500;
 }
 
 // =================== BOTÓN DE RESET DE FÁBRICA ===================
@@ -1616,6 +1893,73 @@ void leerTarjetas() {
   }
 }
 
+// Arranca el chip de tarjetas. False si no contesta.
+bool iniciarPn532() {
+  nfc->begin();  // espera medio segundo a que el chip despierte
+  delay(100);
+  uint32_t version = nfc->getFirmwareVersion();
+  if (!version) {
+    pn532Ok = false;
+    return false;
+  }
+  Serial.printf("PN532 OK - FW v%u.%u\n", (unsigned)((version >> 16) & 0xFF),
+                (unsigned)((version >> 8) & 0xFF));
+  nfc->SAMConfig();
+  // Reintentos MUY bajos para no bloquear el loop
+  nfc->setPassiveActivationRetries(0x01);
+  pn532Ok = true;
+  return true;
+}
+
+// Que el chip de tarjetas siga contestando.
+//
+// A veces deja de contestar (un bajón de corriente, ruido en los cables, el
+// bus I2C que se traba): el lector seguía en la red y la app lo veía
+// conectado, pero ya no leía ninguna tarjeta hasta desconectarlo de la
+// corriente. Cada 10 s sin tarjeta se le pide su versión (unos milisegundos);
+// si no contesta se reinicia el bus y el chip, y si tras varios intentos
+// sigue igual, el lector completo.
+void revisarPn532(unsigned long ahora) {
+  // Con una tarjeta apoyada no se le interrumpe.
+  if (lastScannedCard.length() > 0) return;
+  if (ahora - ultimaRevisionPn532 < REVISAR_PN532_CADA_MS) return;
+  ultimaRevisionPn532 = ahora;
+
+  if (nfc->getFirmwareVersion() != 0) {
+    if (!pn532Ok) Serial.println("[RFID] El chip de tarjetas volvió a contestar");
+    pn532Ok = true;
+    pn532FuncionoDesdeArranque = true;
+    fallosPn532 = 0;
+    return;
+  }
+
+  pn532Ok = false;
+  fallosPn532++;
+  Serial.printf("[RFID] El chip de tarjetas no contesta (intento %u): "
+                "reiniciándolo\n", fallosPn532);
+
+  // Solo si llegó a funcionar desde que encendió: con el chip desconectado
+  // o dañado, reiniciar no lo arregla y el lector se reiniciaría en bucle
+  // (y dejaría de verse en la red a ratos). Tampoco mientras se configura.
+  if (fallosPn532 >= PN532_FALLOS_ANTES_DE_REINICIAR &&
+      pn532FuncionoDesdeArranque && !modoConfig && reinicioPendienteEn == 0) {
+    Serial.println("[RFID] No se recuperó: reiniciando el lector");
+    reinicioPendienteEn = millis() + 200;
+    return;
+  }
+
+  // El bus I2C desde cero (si se trabó a medio mensaje, el chip se queda
+  // esperando) y el chip otra vez.
+  Wire.end();
+  Wire.begin(PN532_SDA, PN532_SCL);
+  Wire.setClock(100000);
+  if (iniciarPn532()) {
+    Serial.println("[RFID] Chip de tarjetas recuperado");
+    pn532FuncionoDesdeArranque = true;
+    fallosPn532 = 0;
+  }
+}
+
 void registrarLectura(const String &uid) {
   lecturaSeq++;
   Lectura &l = lecturas[lecturaSeq % LECTURAS_GUARDADAS];
@@ -1631,6 +1975,7 @@ void registrarLectura(const String &uid) {
 // "seq" es el último número dado: la app lo guarda para la siguiente vez. Si
 // es MENOR que el que tenía, el lector se reinició.
 void handleLecturas() {
+  anotarPeticion();
   if (!peticionAutorizada()) {
     responderNoAutorizado();
     return;

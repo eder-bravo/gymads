@@ -363,6 +363,42 @@ class RfidConfig {
     }
   }
 
+  /// Se salió de "Cambiar WiFi" sin cambiarlo: el lector deja de ofrecerse
+  /// por Bluetooth y se reinicia para trabajar normal (firmware 6.5+).
+  ///
+  /// True si se va a reiniciar. False si no hacía falta o si su firmware no
+  /// lo conoce: entonces cierra el modo solo, a los 5 min. Null si no
+  /// contestó (vale la pena volver a pedírselo).
+  static Future<bool?> terminarModoConfiguracion(LectorEnRed lector) async {
+    final gymId = gymIdActual();
+    if (gymId == null) return false;
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('${lector.baseUrl}/terminar_config'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'gym_id': gymId}),
+          )
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode != 200) return false;
+      final datos = json.decode(response.body);
+      return datos is Map && datos['reinicia'] == true;
+    } catch (e) {
+      AppLogger.warning('RfidConfig', 'El lector no cerró la configuración: $e');
+      return null;
+    }
+  }
+
+  /// Pregunta al lector en la IP guardada, sin buscarlo en la red. Null si
+  /// no contesta ahí.
+  static Future<LectorEnRed?> consultarGuardado() async {
+    final gymId = gymIdActual();
+    final ip = getCurrentIP();
+    if (gymId == null || ip == null) return null;
+    return servicioRed(gymId).consultar(ip);
+  }
+
   // Configurar IP manualmente
   static Future<bool> setManualIP(String ipAddress) async {
     if (ipAddress.isEmpty) {

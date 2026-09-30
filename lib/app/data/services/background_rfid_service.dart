@@ -87,6 +87,13 @@ class BackgroundRfidService extends GetxService {
   static const _duracionBienvenida = Duration(seconds: 4);
   static const _duracionRechazo = Duration(seconds: 6);
 
+  /// Lo más que se espera al internet en cada paso de un pase (buscar al
+  /// cliente, anotar su entrada). Sin límite, una consulta que se quedaba
+  /// colgada (el teléfono cambió de red, el módem se trabó) frenaba la cola
+  /// para siempre: ese pase y todos los siguientes se quedaban sin aviso, y
+  /// al destrabarse ya eran "atrasados" y se registraban sin avisar.
+  static const _limiteInternet = Duration(seconds: 8);
+
   /// Si a este dispositivo le tocan los avisos del lector.
   ///
   /// El aviso es del mostrador. Antes lo recibían TODOS los dispositivos a la
@@ -565,7 +572,15 @@ class BackgroundRfidService extends GetxService {
       AppLogger.info('BackgroundRfidService', 'Procesando tarjeta');
 
       // Buscar usuario por RFID
-      final user = await _userRepository.getUserByRfid(uid);
+      final UserModel? user;
+      try {
+        user = await _userRepository.getUserByRfid(uid).timeout(_limiteInternet);
+      } catch (e) {
+        AppLogger.error(
+            'BackgroundRfidService', 'No se pudo revisar la tarjeta', e);
+        if (!esPaseAtrasado(cuando)) _avisarSinInternet();
+        return;
+      }
 
       // Un pase de hace rato (la app estaba congelada en segundo plano) ya no
       // tiene a nadie en la puerta: se registra el acceso con su hora real,
@@ -601,6 +616,20 @@ class BackgroundRfidService extends GetxService {
     } catch (e) {
       AppLogger.error('BackgroundRfidService', 'Error procesando tarjeta', e);
     }
+  }
+
+  /// Sin internet no se sabe de quién es la tarjeta: se dice eso (antes
+  /// salía "Tarjeta no registrada", o nada si la consulta se colgaba) y se
+  /// pide pasarla otra vez.
+  void _avisarSinInternet() {
+    if (_appEnSegundoPlano) return;
+    AudioService.playDeniedSound();
+    _showSnackbarSafe(
+      'Sin internet',
+      'No se pudo revisar la tarjeta. Pásala otra vez.',
+      isError: true,
+      duracion: const Duration(seconds: 4),
+    );
   }
 
   /// Manejar usuario no encontrado
@@ -784,18 +813,21 @@ class BackgroundRfidService extends GetxService {
       final staffUser = AuthUtils.getStaffIdentifier();
 
       // El servicio decide si toca entrada o salida según lo que tenga
-      // configurado el gimnasio.
-      final ajustes = await GymSettingsService.current();
-
-      final tipo = await AccessLogService.registerAccess(
-        userId: user.id!,
-        userName: user.name,
-        userNumber: user.userNumber,
-        method: 'rfid_background',
-        staffUser: staffUser,
-        registrarSalidas: ajustes.registrarSalidas,
-        cuando: cuando,
-      );
+      // configurado el gimnasio. Con límite: la bienvenida no espera a un
+      // internet colgado (el registro puede llegar después).
+      final tipo = await () async {
+        final ajustes = await GymSettingsService.current();
+        return AccessLogService.registerAccess(
+          userId: user.id!,
+          userName: user.name,
+          userNumber: user.userNumber,
+          method: 'rfid_background',
+          staffUser: staffUser,
+          registrarSalidas: ajustes.registrarSalidas,
+          cuando: cuando,
+        );
+      }()
+          .timeout(_limiteInternet);
 
       AppLogger.info('BackgroundRfidService',
           tipo == null ? 'Acceso no registrado' : 'Acceso registrado: $tipo');

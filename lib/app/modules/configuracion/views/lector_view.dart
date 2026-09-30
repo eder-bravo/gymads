@@ -108,10 +108,18 @@ class _LectorViewState extends State<LectorView> {
   /// El lector dibujado: de un vistazo, si está conectado o no.
   Widget _tarjetaEstado() {
     final estado = controller.estadoLector.value;
+    final reconectando = controller.reconectandoLector.value;
     return IlustracionLector(
       estado: estado,
       titulo: tituloDelEstado(estado),
       comprobando: controller.comprobandoLector.value,
+      // Que nadie lo desconecte de la corriente: se está arreglando solo.
+      textoComprobando: reconectando
+          ? 'Reconectando el lector…'
+          : controller.preparandoLector.value
+              ? 'Preparando el lector…'
+              : null,
+      detalle: reconectando ? 'Tarda unos segundos. No lo desconectes.' : null,
     );
   }
 
@@ -204,10 +212,16 @@ class _LectorViewState extends State<LectorView> {
   String get _ipObjetivo =>
       controller.lectorEncontrado.value?.ip ?? RfidConfig.getCurrentIP() ?? '';
 
+  /// Con [cambiarWifi], el lector se reinició para ofrecerse por Bluetooth.
+  /// Si se sale sin cambiarlo, tarda unos segundos en volver a su red: se
+  /// dice "Reconectando" y se le espera, en vez de buscarlo una vez justo en
+  /// ese hueco y decir que no aparece.
   Future<void> _abrirAsistente({required bool cambiarWifi}) async {
-    await abrirAgregarLector(cambiarWifi: cambiarWifi);
+    final terminado = await abrirAgregarLector(cambiarWifi: cambiarWifi);
     if (!mounted) return;
-    if (RfidConfig.isConfigured) {
+    if (cambiarWifi && !terminado) {
+      await controller.esperarRegresoDelLectorEnRed();
+    } else if (RfidConfig.isConfigured) {
       await controller.comprobarLector();
     }
   }
@@ -217,11 +231,12 @@ class _LectorViewState extends State<LectorView> {
   /// ofreciendo solo: se abre el asistente directamente.
   ///
   /// El lector se reinicia para ofrecerse (firmware 6.4.2+): tarda unos
-  /// segundos, que el asistente cubre buscándolo. Si no aceptó el pedido, no
-  /// se abre el asistente: solo diría "no apareció ningún lector".
+  /// segundos, que el asistente cubre buscándolo. Si no aceptó el pedido (y
+  /// no se estaba ofreciendo ya), no se abre el asistente: solo diría "no
+  /// apareció ningún lector".
   Future<void> _cambiarWifi() async {
     final conectado = controller.estadoLector.value == EstadoLector.mio;
-    if (conectado && !await RfidConfig.abrirModoConfiguracion()) {
+    if (conectado && !await controller.pedirModoConfiguracion()) {
       SnackbarHelper.error('No se pudo',
           'El lector no respondió. Revisa que esté encendido e intenta de nuevo.');
       return;

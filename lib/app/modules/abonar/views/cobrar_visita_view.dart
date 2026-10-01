@@ -169,9 +169,8 @@ class CobrarVisitaView extends GetView<CobrarVisitaController> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
                 const TituloSeccion(
-                  'Para quien viene a probar',
-                  detalle: 'Se cobra el día sin registrarlo como cliente. '
-                      'Su entrada queda anotada.',
+                  'Visita de un día',
+                  detalle: 'No se registra como cliente.',
                 ),
                 TextField(
                   controller: controller.nombreCtrl,

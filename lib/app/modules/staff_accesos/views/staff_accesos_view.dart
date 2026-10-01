@@ -62,7 +62,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
 
   /// Cambia el rol sin regenerar el código: si la persona ya está trabajando,
   /// su perfil cambia con el acceso y no tiene que volver a entrar.
-  Future<void> _cambiarRol(BuildContext context, StaffAccesoModel acceso) async {
+  Future<void> _cambiarRol(
+      BuildContext context, StaffAccesoModel acceso) async {
     final c = context.colores;
     final elegido = await Get.dialog<StaffRole>(
       SimpleDialog(
@@ -130,7 +131,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
   }
 
   Future<void> _regenerar(BuildContext context, StaffAccesoModel acceso) async {
-    final confirmado = await _confirmar(context,
+    final confirmado = await _confirmar(
+      context,
       titulo: 'Generar código nuevo',
       mensaje: acceso.estaActivo
           ? '${acceso.nombre} dejará de tener acceso en el dispositivo donde '
@@ -153,7 +155,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
   }
 
   Future<void> _revocar(BuildContext context, StaffAccesoModel acceso) async {
-    final confirmado = await _confirmar(context,
+    final confirmado = await _confirmar(
+      context,
       titulo: 'Revocar acceso',
       mensaje: '${acceso.nombre} perderá el acceso a la app. Podrás volver a '
           'darle uno generando un código nuevo.',
@@ -164,7 +167,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
   }
 
   Future<void> _eliminar(BuildContext context, StaffAccesoModel acceso) async {
-    final confirmado = await _confirmar(context,
+    final confirmado = await _confirmar(
+      context,
       titulo: 'Eliminar acceso',
       mensaje: 'Se borrará el acceso de ${acceso.nombre} por completo. '
           'Esta acción no se puede deshacer.',
@@ -174,7 +178,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
     if (confirmado) await controller.eliminar(acceso);
   }
 
-  Future<bool> _confirmar(BuildContext context, {
+  Future<bool> _confirmar(
+    BuildContext context, {
     required String titulo,
     required String mensaje,
     required String textoConfirmar,
@@ -238,8 +243,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Crea un acceso y comparte el código. Tu empleado entra sin '
-              'correo ni contraseña, y no verá la configuración del gimnasio.',
+              'Crea un acceso y comparte el código con tu empleado.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: c.textSecondary.withOpacity(0.8),
@@ -279,7 +283,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
         itemCount: controller.accesos.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (context, index) => _buildTile(context, controller.accesos[index]),
+        itemBuilder: (context, index) =>
+            _buildTile(context, controller.accesos[index]),
       ),
     );
   }
@@ -355,8 +360,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
             ? null
             : PopupMenuButton<String>(
                 color: c.cardBackground,
-                icon:
-                    Icon(Icons.more_vert, color: c.textSecondary),
+                icon: Icon(Icons.more_vert, color: c.textSecondary),
                 onSelected: (value) {
                   switch (value) {
                     case 'renombrar':

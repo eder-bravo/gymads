@@ -85,12 +85,12 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         TourStep(
           tourKey: controller.keyCuenta,
           title: 'Cuenta',
-          description: 'Tus datos personales, el nombre del gimnasio y tu '
-              'contraseña.',
+          description: 'Tus datos, el gimnasio y tu contraseña.',
           borderRadius: 12,
           isFirstStep: true,
           isLastStep: controller.esUltimoPasoDelTour(controller.keyCuenta),
-          child: _buildOptionTile(context,
+          child: _buildOptionTile(
+            context,
             icon: Icons.account_circle,
             iconColor: AppColors.info,
             title: 'Cuenta',
@@ -107,8 +107,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         TourStep(
           tourKey: controller.keyApariencia,
           title: 'Apariencia',
-          description: 'Elige cómo se ve la app: clara, oscura o como tu '
-              'teléfono. Se guarda en este teléfono.',
+          description: 'Clara, oscura o como tu teléfono.',
           borderRadius: 12,
           isLastStep: controller.esUltimoPasoDelTour(controller.keyApariencia),
           child: _buildOptionTile(
@@ -131,11 +130,11 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           TourStep(
             tourKey: controller.keyPrecios,
             title: 'Precios de abonos',
-            description: 'Define cuánto cuesta un día, una semana, un mes o un '
-                'año. Al cobrar, el monto se calcula solo.',
+            description: 'Cuánto cuesta un día, una semana, un mes o un año.',
             borderRadius: 12,
             isLastStep: controller.esUltimoPasoDelTour(controller.keyPrecios),
-            child: _buildOptionTile(context,
+            child: _buildOptionTile(
+              context,
               icon: Icons.attach_money,
               iconColor: AppColors.success,
               title: 'Precios de Abonos',
@@ -149,24 +148,25 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
 
         // Categorías de productos (inventario y punto de venta)
         if (controller.can(Permission.gestionarCategorias)) ...[
-        const SizedBox(height: 12),
-        TourStep(
-          tourKey: controller.keyCategorias,
-          title: 'Categorías de productos',
-          description: 'Los grupos con los que ordenas tus productos en el '
-              'inventario y en el punto de venta.',
-          borderRadius: 12,
-          isLastStep: controller.esUltimoPasoDelTour(controller.keyCategorias),
-          child: _buildOptionTile(context,
-            icon: Icons.category,
-            iconColor: AppColors.accent,
+          const SizedBox(height: 12),
+          TourStep(
+            tourKey: controller.keyCategorias,
             title: 'Categorías de productos',
-            subtitle: 'Organiza el inventario y el punto de venta',
-            onTap: () => controller.openCategorias(),
-            trailing: Icon(Icons.arrow_forward_ios,
-                size: 16, color: c.textSecondary),
+            description: 'Para agrupar tus productos.',
+            borderRadius: 12,
+            isLastStep:
+                controller.esUltimoPasoDelTour(controller.keyCategorias),
+            child: _buildOptionTile(
+              context,
+              icon: Icons.category,
+              iconColor: AppColors.accent,
+              title: 'Categorías de productos',
+              subtitle: 'Organiza el inventario y el punto de venta',
+              onTap: () => controller.openCategorias(),
+              trailing: Icon(Icons.arrow_forward_ios,
+                  size: 16, color: c.textSecondary),
+            ),
           ),
-        ),
         ],
 
         // Accesos del personal: el dueño y el encargado, cada uno solo sobre
@@ -176,11 +176,12 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           TourStep(
             tourKey: controller.keyAccesos,
             title: 'Accesos del personal',
-            description: 'Da acceso a tus empleados con un código. Entran sin '
-                'correo ni contraseña y no ven esta configuración.',
+            description:
+                'Tus empleados entran con un código, sin correo ni contraseña.',
             borderRadius: 12,
             isLastStep: controller.esUltimoPasoDelTour(controller.keyAccesos),
-            child: _buildOptionTile(context,
+            child: _buildOptionTile(
+              context,
               icon: Icons.badge,
               iconColor: AppColors.brand,
               title: 'Accesos del personal',
@@ -198,12 +199,12 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           TourStep(
             tourKey: controller.keyControlAccesos,
             title: 'Control de accesos',
-            description: 'Decide si además de la entrada quieres marcar la '
-                'salida de tus clientes, y en qué horario abres.',
+            description: 'Si se marca la salida y en qué horario abres.',
             borderRadius: 12,
             isLastStep:
                 controller.esUltimoPasoDelTour(controller.keyControlAccesos),
-            child: _buildOptionTile(context,
+            child: _buildOptionTile(
+              context,
               icon: Icons.door_front_door_outlined,
               iconColor: AppColors.info,
               title: 'Control de accesos',
@@ -221,11 +222,11 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           TourStep(
             tourKey: controller.keyLector,
             title: 'Lector de tarjetas',
-            description: 'Vincula el lector a tu gimnasio para que solo '
-                'responda al tuyo, aunque haya otros en la misma red.',
+            description: 'Conecta y vincula el lector a tu gimnasio.',
             borderRadius: 12,
             isLastStep: controller.esUltimoPasoDelTour(controller.keyLector),
-            child: _buildOptionTile(context,
+            child: _buildOptionTile(
+              context,
               icon: Icons.nfc,
               iconColor: AppColors.brand,
               title: 'Lector de tarjetas',
@@ -243,18 +244,18 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         TourStep(
           tourKey: controller.keyPermisos,
           title: 'Permisos de la app',
-          description: 'Aquí ves si la cámara, las notificaciones y el '
-              'Bluetooth están activados, y los corriges si hace falta.',
+          description: 'Cámara, notificaciones y Bluetooth.',
           borderRadius: 12,
           isLastStep: controller.esUltimoPasoDelTour(controller.keyPermisos),
-          child: _buildOptionTile(context,
+          child: _buildOptionTile(
+            context,
             icon: Icons.verified_user_outlined,
             iconColor: AppColors.info,
             title: 'Permisos de la app',
             subtitle: 'Cámara, notificaciones y lector de tarjetas',
             onTap: () => controller.openPermisos(),
-            trailing: Icon(Icons.arrow_forward_ios,
-                size: 16, color: c.textSecondary),
+            trailing:
+                Icon(Icons.arrow_forward_ios, size: 16, color: c.textSecondary),
           ),
         ),
 
@@ -266,7 +267,8 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
     );
   }
 
-  Widget _buildOptionTile(BuildContext context, {
+  Widget _buildOptionTile(
+    BuildContext context, {
     required IconData icon,
     required Color iconColor,
     required String title,

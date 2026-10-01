@@ -137,8 +137,7 @@ class _CodigoGeneradoDialog extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Guárdalo ahora: por seguridad no se puede volver a ver. '
-                      'Si se pierde, genera uno nuevo desde la lista.',
+                      'Guárdalo ahora: no se podrá volver a ver.',
                       style: TextStyle(
                         color: c.textSecondary.withOpacity(0.9),
                         fontSize: 12.5,
@@ -157,17 +156,15 @@ class _CodigoGeneradoDialog extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: _copiar,
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(
-                          color: c.textSecondary.withOpacity(0.4)),
+                      side: BorderSide(color: c.textSecondary.withOpacity(0.4)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: Icon(Icons.copy,
-                        size: 18, color: c.textPrimary),
-                    label: Text('Copiar',
-                        style: TextStyle(color: c.textPrimary)),
+                    icon: Icon(Icons.copy, size: 18, color: c.textPrimary),
+                    label:
+                        Text('Copiar', style: TextStyle(color: c.textPrimary)),
                   ),
                 ),
                 const SizedBox(width: 10),

@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../core/utils/hora_formato.dart';
@@ -15,11 +16,29 @@ import 'tenant_context_service.dart';
 class PdfReportService {
   // Paleta equivalente a AppColors, en PdfColor. El PDF se imprime en blanco,
   // así que aquí los textos son oscuros aunque la app sea de tema oscuro.
-  static const PdfColor accent = PdfColor.fromInt(0xFFFF6F00);
+  static const PdfColor accent = PdfColor.fromInt(0xFF1764F5);
   static const PdfColor textPrimary = PdfColor.fromInt(0xFF1A1A1A);
   static const PdfColor textSecondary = PdfColor.fromInt(0xFF6B6B6B);
   static const PdfColor separador = PdfColor.fromInt(0xFFE0E0E0);
   static const PdfColor fondoSuave = PdfColor.fromInt(0xFFF5F5F5);
+
+  /// Letra de los reportes. La Helvetica que trae el PDF solo tiene los
+  /// caracteres de Latin-1: guiones como "–" o "—" (las franjas horarias, el
+  /// "sin dato") y nombres con letras de fuera salían como cuadros. Roboto va
+  /// dentro de la app y los tiene todos.
+  static pw.ThemeData? _tema;
+
+  /// Carga la letra de los reportes; se llama antes de armar un documento.
+  /// Solo lee los archivos la primera vez.
+  static Future<void> prepararFuentes() async {
+    if (_tema != null) return;
+    final normal = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+    final negrita = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+    _tema = pw.ThemeData.withFont(
+      base: pw.Font.ttf(normal),
+      bold: pw.Font.ttf(negrita),
+    );
+  }
 
   /// Documento en blanco con márgenes y pie de página ya puestos.
   ///
@@ -35,6 +54,7 @@ class PdfReportService {
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
+        theme: _tema,
         margin: const pw.EdgeInsets.fromLTRB(32, 32, 32, 40),
         header: (context) => context.pageNumber == 1
             ? _encabezado(titulo, periodo)

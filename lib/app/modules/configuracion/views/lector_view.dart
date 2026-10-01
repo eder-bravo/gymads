@@ -370,7 +370,6 @@ class _LectorViewState extends State<LectorView> {
           child: SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: controller.rfidEnabled.value,
-            activeColor: AppColors.accent,
             title: Text('Usar el lector de tarjetas',
                 style: TextStyle(
                     color: c.textPrimary,
@@ -409,7 +408,6 @@ class _LectorViewState extends State<LectorView> {
         child: SwitchListTile(
           contentPadding: EdgeInsets.zero,
           value: activo,
-          activeColor: AppColors.accent,
           title: Text('Recibir avisos en este teléfono',
               style: TextStyle(
                   color: c.textPrimary,

@@ -35,9 +35,7 @@ class PermisosView extends GetView<PermisosController> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Para que todo funcione, GymOne te pedirá estos permisos. '
-                  'Se preguntan ahora, todos juntos, para no interrumpirte '
-                  'después.',
+                  'GymOne necesita estos permisos para funcionar.',
                   style: TextStyle(
                     fontSize: 14,
                     color: c.textSecondary,
@@ -267,8 +265,7 @@ String _motivo(PermisoApp permiso) => switch (permiso) {
           'códigos de barras y referencias de pago.',
       // En Android el aviso del sistema lo llama "Dispositivos cercanos".
       PermisoApp.bluetooth => defaultTargetPlatform == TargetPlatform.android
-          ? 'Para configurar el WiFi del lector de tarjetas. Android lo '
-              'llama "Dispositivos cercanos".'
+          ? 'Para configurar el WiFi del lector. Android lo llama "Dispositivos cercanos".'
           : 'Para configurar el WiFi del lector de tarjetas.',
       PermisoApp.redLocal =>
         'Para hablar con el lector de tarjetas en el WiFi del gimnasio.',

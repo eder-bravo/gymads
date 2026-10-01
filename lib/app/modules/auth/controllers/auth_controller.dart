@@ -12,6 +12,7 @@ import '../../../data/models/staff_profile_model.dart';
 import '../../../data/providers/staff_profile_provider.dart';
 import '../../../core/permissions/staff_role.dart';
 import '../../../core/utils/snackbar_helper.dart';
+import '../../../core/utils/nombre_completo.dart';
 import '../../../data/services/cambio_de_perfil.dart';
 import '../../../data/services/cambios_en_vivo_service.dart';
 import '../../../data/services/google_play_services.dart';
@@ -412,12 +413,9 @@ class AuthController extends GetxController {
       AppLogger.info(
           'AuthController', 'New user, navigating to GOOGLE_COMPLETE');
       final registerCtrl = Get.put(RegisterController());
-      final gName = displayName ?? '';
-      final nameParts = gName.split(' ');
-      registerCtrl.firstNameController.text =
-          nameParts.isNotEmpty ? nameParts.first : '';
-      registerCtrl.lastNameController.text =
-          nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      final nombre = separarNombreCompleto(displayName);
+      registerCtrl.firstNameController.text = nombre.nombres;
+      registerCtrl.lastNameController.text = nombre.apellidos;
       registerCtrl.emailController.text = email ?? '';
       registerCtrl.isGoogleUser.value = true;
       registerCtrl.googleUserId = userId;

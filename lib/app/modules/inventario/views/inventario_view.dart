@@ -37,12 +37,8 @@ class InventarioView extends GetView<InventarioController> {
               // ofrece darlo de alta, pero eso solo quien puede agregar
               // productos: a los demás no se les promete.
               description: controller.can(Permission.gestionarProductos)
-                  ? 'Apunta la cámara al código de barras de un producto '
-                      'para sumarle o restarle existencias, o para darlo de '
-                      'alta si todavía no está registrado.'
-                  : 'Apunta la cámara al código de barras de un producto '
-                      'para sumarle o restarle existencias sin buscarlo en '
-                      'la lista.',
+                  ? 'Escanea un producto para ajustar su stock o darlo de alta.'
+                  : 'Escanea un producto para ajustar su stock.',
               borderRadius: 24,
               child: IconButton(
                 icon: const Icon(Icons.qr_code_scanner),
@@ -61,8 +57,7 @@ class InventarioView extends GetView<InventarioController> {
               isFirstStep:
                   controller.esPrimerPasoDelTour(controller.keyCategorias),
               title: 'Categorías',
-              description: 'Crea y ordena las categorías con las que agrupas '
-                  'tus productos aquí y en el punto de venta.',
+              description: 'Agrupa tus productos por categoría.',
               borderRadius: 24,
               child: IconButton(
                 icon: const Icon(Icons.category_outlined),
@@ -80,8 +75,7 @@ class InventarioView extends GetView<InventarioController> {
             TourStep(
               tourKey: controller.keyAgregar,
               title: 'Agregar producto',
-              description: 'Registra un producto nuevo con su precio, su stock '
-                  'y la categoría a la que pertenece.',
+              description: 'Agrega un producto con su precio y stock.',
               borderRadius: 24,
               isFirstStep:
                   controller.esPrimerPasoDelTour(controller.keyAgregar),
@@ -113,8 +107,7 @@ class InventarioView extends GetView<InventarioController> {
           lista: TourStep(
             tourKey: controller.keyLista,
             title: 'Tus productos',
-            description: 'Toca un producto para ver su detalle, editarlo '
-                'o registrar entradas y salidas de stock.',
+            description: 'Toca un producto para editarlo o ajustar su stock.',
             isLastStep: controller.esUltimoPasoDelTour(controller.keyLista),
             child: _buildProductList(context),
           ),
@@ -132,7 +125,7 @@ class InventarioView extends GetView<InventarioController> {
     final codigo = await controller.escanearCodigo(
       instruccion: 'Apunta al código del producto para ajustar su stock',
     );
-    if (codigo == null) return;  // canceló
+    if (codigo == null) return; // canceló
 
     final producto = controller.productoPorBarcode(codigo);
 
@@ -159,13 +152,9 @@ class InventarioView extends GetView<InventarioController> {
             style: TextStyle(color: c.textPrimary)),
         content: Text(
           puedeAgregar
-              ? 'Ningún producto tiene este código. ¿Quieres agregarlo como '
-                  'producto nuevo?\n\n'
-                  'Si el producto ya existe, edítalo y escanea ahí su código.'
-              : 'Ningún producto tiene este código. Pide a un encargado que '
-                  'lo dé de alta o que se lo asigne al producto.',
-          style: TextStyle(
-              color: c.textSecondary, height: 1.35),
+              ? 'Ningún producto tiene este código. ¿Lo agregas como nuevo?\n\nSi ya existe, edítalo y escanea ahí el código.'
+              : 'Ningún producto tiene este código. Pide a un encargado que lo agregue.',
+          style: TextStyle(color: c.textSecondary, height: 1.35),
         ),
         actions: puedeAgregar
             ? [
@@ -564,8 +553,7 @@ class InventarioView extends GetView<InventarioController> {
                   children: [
                     const Icon(Icons.edit, color: AppColors.accent, size: 20),
                     const SizedBox(width: 12),
-                    Text('Editar',
-                        style: TextStyle(color: c.textPrimary)),
+                    Text('Editar', style: TextStyle(color: c.textPrimary)),
                   ],
                 ),
               ),
@@ -592,8 +580,7 @@ class InventarioView extends GetView<InventarioController> {
                     const Icon(Icons.visibility_off,
                         color: AppColors.warning, size: 20),
                     const SizedBox(width: 12),
-                    Text('Desactivar',
-                        style: TextStyle(color: c.textPrimary)),
+                    Text('Desactivar', style: TextStyle(color: c.textPrimary)),
                   ],
                 ),
               ),

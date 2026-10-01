@@ -22,6 +22,7 @@ import '../../modules/clientes/controllers/clientes_controller.dart';
 import '../config/rfid_config.dart';
 import 'permisos_app.dart';
 import 'fotos_de_clientes.dart';
+import 'captura_de_tarjeta.dart';
 
 /// Servicio global para escaneo RFID en segundo plano
 /// Se ejecuta continuamente y maneja las detecciones de tarjetas
@@ -101,6 +102,11 @@ class BackgroundRfidService extends GetxService {
   /// al leerlo, así que cada app sonaba, mostraba el diálogo y además escribía
   /// su propia fila en `access_logs` por un único pase de tarjeta.
   final atiendeLector = false.obs;
+
+  /// Si ahora mismo este teléfono está escuchando el lector y procesando sus
+  /// pases. Si no, el formulario de cliente lee el lector por su cuenta.
+  bool get atiendeAhora =>
+      isScanning.value && atiendeLector.value && !isPaused.value;
 
   /// Por qué este dispositivo no atiende el lector, para decírselo a la
   /// persona en la pantalla del lector. Null si sí lo atiende.
@@ -592,6 +598,11 @@ class BackgroundRfidService extends GetxService {
         }
         return;
       }
+
+      // Con el formulario de cliente abierto, una tarjeta libre es la que se
+      // le está asignando: se la queda el formulario y no es "no registrada".
+      // La de un cliente sigue de largo y se registra su entrada.
+      if (CapturaDeTarjeta.ofrecer(uid, user)) return;
 
       if (user == null) {
         await _handleUserNotFound(uid);

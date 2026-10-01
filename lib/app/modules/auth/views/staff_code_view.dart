@@ -115,8 +115,7 @@ class StaffCodeView extends GetView<StaffCodeController> {
           _buildEnterButton(),
           const SizedBox(height: 20),
           Text(
-            'El código solo sirve una vez. Después de entrar, esta app '
-            'recordará tu sesión.',
+            'El código solo sirve una vez.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: c.contraste.withOpacity(0.5),

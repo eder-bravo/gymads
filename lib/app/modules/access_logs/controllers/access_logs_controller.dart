@@ -104,14 +104,14 @@ class AccessLogsController extends GetxController
         if (silencioso) return;
         errorMessage.value = 'No se pudieron cargar los registros';
         accessLogs.clear();
-        AppLogger.error('AccessLogsController', 'Error: no se pudieron cargar los logs');
+        AppLogger.error(
+            'AccessLogsController', 'Error: no se pudieron cargar los logs');
         return;
       }
 
       accessLogs.value = logs;
       calculateStatistics();
-      AppLogger.info(
-          'AccessLogsController', '${logs.length} accesos cargados');
+      AppLogger.info('AccessLogsController', '${logs.length} accesos cargados');
     } catch (e) {
       AppLogger.error('AccessLogsController', 'Excepción al cargar logs', e);
       if (silencioso) return;
@@ -228,7 +228,6 @@ class AccessLogsController extends GetxController
     return valores.reduce((a, b) => a > b ? a : b);
   }
 
-
   // ══════════════════════════════════════════════════════════
   // REPORTE EN PDF
   // ══════════════════════════════════════════════════════════
@@ -239,6 +238,7 @@ class AccessLogsController extends GetxController
     try {
       isExportando.value = true;
 
+      await PdfReportService.prepararFuentes();
       final doc = EntradasPdfBuilder.construir(
         periodoLabel: periodoLabel,
         sufijoPeriodo: periodoSufijo,

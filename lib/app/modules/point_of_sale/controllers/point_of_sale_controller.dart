@@ -10,7 +10,6 @@ import '../../../data/models/sale_model.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/sale_repository.dart';
 
-
 import '../../../core/utils/referencia_de_pago.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
@@ -59,6 +58,9 @@ class PointOfSaleController extends GetxController
 
   // Getters
   List<SaleItem> get cartItems => _cartItems;
+
+  /// Piezas en la venta: dos aguas y una barra son 3, no 2 renglones.
+  int get totalUnidades => _cartItems.fold(0, (s, i) => s + i.quantity);
   double get totalAmount => _totalAmount.value;
   double get taxAmount => _taxAmount.value;
   double get discountAmount => _discountAmount.value;
@@ -82,8 +84,7 @@ class PointOfSaleController extends GetxController
 
       // La búsqueda también mira el nombre de la categoría, como antes; ahora
       // hay que resolverlo por el mapa porque el producto solo guarda el id.
-      final categoryName =
-          (byId[product.categoryId]?.name ?? '').toLowerCase();
+      final categoryName = (byId[product.categoryId]?.name ?? '').toLowerCase();
 
       // El código de barras entra para poder teclearlo cuando el escáner no
       // lo lee (envase arrugado, poca luz).
@@ -289,19 +290,19 @@ class PointOfSaleController extends GetxController
   /// Cuánto quedará el stock de un producto si se cobra el carrito tal como
   /// está. Negativo significa faltante: unidades que salen sin existencias.
   int stockProyectado(String productId) {
-    final product = _availableProducts.firstWhereOrNull((p) => p.id == productId);
+    final product =
+        _availableProducts.firstWhereOrNull((p) => p.id == productId);
     if (product == null) return 0;
     final enCarrito = _cartItems
-        .firstWhereOrNull((item) => item.productId == productId)
-        ?.quantity ??
+            .firstWhereOrNull((item) => item.productId == productId)
+            ?.quantity ??
         0;
     return product.stock - enCarrito;
   }
 
   /// Productos del carrito que dejarán el stock en negativo al cobrar.
-  List<SaleItem> get itemsSinExistencias => _cartItems
-      .where((item) => stockProyectado(item.productId) < 0)
-      .toList();
+  List<SaleItem> get itemsSinExistencias =>
+      _cartItems.where((item) => stockProyectado(item.productId) < 0).toList();
 
   /// Agregar producto al carrito
   ///
@@ -367,12 +368,8 @@ class PointOfSaleController extends GetxController
             title: const Text('Sin existencias'),
             content: Text(
               product.stock > 0
-                  ? 'Solo quedan ${product.stock} de ${product.name}.\n\n'
-                      'Puedes venderlo igual: el stock quedará en ${-restante} '
-                      'unidades faltantes y se descontarán solas cuando repongas.'
-                  : 'No hay existencias de ${product.name}.\n\n'
-                      'Puedes venderlo igual: el stock quedará en ${-restante} '
-                      'unidades faltantes y se descontarán solas cuando repongas.',
+                  ? 'Solo quedan ${product.stock} de ${product.name}.\n\nPuedes venderlo igual y quedará en negativo hasta que repongas.'
+                  : 'No hay existencias de ${product.name}.\n\nPuedes venderlo igual y quedará en negativo hasta que repongas.',
             ),
             actions: [
               BotonCancelar(onPressed: () => Get.back(result: false)),

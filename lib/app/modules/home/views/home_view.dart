@@ -231,8 +231,7 @@ class HomeView extends GetView<HomeController> {
         gradient: const [Color(0xFF667eea), Color(0xFF764ba2)],
         onTap: controller.goToClientes,
         showcaseKey: controller.keyClientes,
-        tourDescription: 'Da de alta a tus miembros, edita sus datos y '
-            'consulta cuándo vence su abono.',
+        tourDescription: 'Tus miembros y cuándo vence su abono.',
       ),
       _ModuleItem(
         icon: Icons.payments_outlined,
@@ -241,8 +240,7 @@ class HomeView extends GetView<HomeController> {
         gradient: const [Color(0xFFf093fb), Color(0xFFf5576c)],
         onTap: controller.goToAbonar,
         showcaseKey: controller.keyAbonar,
-        tourDescription: 'Cobra y renueva membresías: eliges el periodo y '
-            'registras el pago.',
+        tourDescription: 'Cobra y renueva membresías.',
       ),
       _ModuleItem(
         icon: Icons.storefront_outlined,
@@ -251,8 +249,7 @@ class HomeView extends GetView<HomeController> {
         gradient: const [Color(0xFF4facfe), Color(0xFF00f2fe)],
         onTap: controller.goToPointOfSale,
         showcaseKey: controller.keyVender,
-        tourDescription: 'Punto de venta para cobrar productos: bebidas, '
-            'suplementos y lo que ofrezcas.',
+        tourDescription: 'Vende bebidas, suplementos y demás productos.',
       ),
       _ModuleItem(
         icon: Icons.inventory_2_outlined,
@@ -306,7 +303,7 @@ class HomeView extends GetView<HomeController> {
         icon: Icons.receipt_long_outlined,
         label: 'Ingresos',
         subtitle: 'Historial de pagos',
-        color: const Color(0xFFFFB74D),
+        color: context.colores.titleColor,
         onTap: controller.goToPaymentRegistration,
         showcaseKey: controller.keyIngresos,
         tourDescription:
@@ -329,12 +326,12 @@ class HomeView extends GetView<HomeController> {
         icon: Icons.settings_outlined,
         label: 'Configuración',
         subtitle: 'Cuenta, precios y lector',
-        color: const Color(0xFFB0BEC5),
+        color: Theme.of(context).brightness == Brightness.light
+            ? const Color(0xFF546E7A)
+            : const Color(0xFFB0BEC5),
         onTap: () => Get.toNamed(Routes.CONFIGURACION),
         showcaseKey: controller.keyConfiguracion,
-        tourDescription: 'Ajusta tu cuenta, cómo se ve la app (clara u '
-            'oscura), los precios de abonos, las categorías, el lector de '
-            'tarjetas y los permisos.',
+        tourDescription: 'Tu cuenta, precios, categorías, lector y permisos.',
       ));
 
     return Padding(

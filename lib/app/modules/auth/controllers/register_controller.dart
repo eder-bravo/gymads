@@ -12,6 +12,7 @@ import '../../../data/services/google_play_services.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
 import 'package:gymads/app/core/utils/correo_valido.dart';
+import 'package:gymads/app/core/utils/nombre_completo.dart';
 
 /// Controller for registration (creating a new gym account)
 ///
@@ -295,11 +296,9 @@ class RegisterController extends GetxController {
       await TenantContextService.to.setProfile(staffProfile);
       Get.offAllNamed(Routes.HOME);
     } else {
-      final gName = displayName ?? '';
-      final nameParts = gName.split(' ');
-      firstNameController.text = nameParts.isNotEmpty ? nameParts.first : '';
-      lastNameController.text =
-          nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      final nombre = separarNombreCompleto(displayName);
+      firstNameController.text = nombre.nombres;
+      lastNameController.text = nombre.apellidos;
       emailController.text = email ?? '';
 
       isGoogleUser.value = true;

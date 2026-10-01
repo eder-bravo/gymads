@@ -49,8 +49,7 @@ class IngresosView extends GetView<IngresosController> {
             TourStep(
               tourKey: controller.keyPeriodo,
               title: 'Periodo',
-              description: 'Elige si quieres ver el día, la semana o el mes, '
-                  'o define tu propio rango de fechas.',
+              description: 'Día, semana, mes o las fechas que elijas.',
               borderRadius: 20,
               isFirstStep: true,
               child: PeriodoSelector(controller: controller),
@@ -60,8 +59,7 @@ class IngresosView extends GetView<IngresosController> {
             TourStep(
               tourKey: controller.keyTotal,
               title: 'Total del periodo',
-              description: 'La suma de todo lo cobrado en el periodo que '
-                  'tengas seleccionado: abonos y ventas.',
+              description: 'Todo lo cobrado en el periodo: abonos y ventas.',
               borderRadius: 20,
               child: _buildMonthTotal(context),
             ),
@@ -107,8 +105,7 @@ class IngresosView extends GetView<IngresosController> {
           lista: TourStep(
             tourKey: controller.keyLista,
             title: 'Transacciones',
-            description: 'Cada cobro registrado, con su fecha, su monto y '
-                'de dónde vino.',
+            description: 'Cada cobro con su fecha y monto.',
             isLastStep: true,
             child: _buildTransactionsList(context),
           ),
@@ -217,8 +214,7 @@ class IngresosView extends GetView<IngresosController> {
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
               const SizedBox(height: 80),
-              Icon(Icons.receipt_long,
-                  size: 64, color: c.textSecondary),
+              Icon(Icons.receipt_long, size: 64, color: c.textSecondary),
               const SizedBox(height: 16),
               Center(
                 child: Text(

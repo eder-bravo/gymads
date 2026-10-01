@@ -85,7 +85,9 @@ class AppTheme {
           const ProgressIndicatorThemeData(color: AppColors.accent),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((estados) =>
-            estados.contains(WidgetState.selected) ? Colors.white : null),
+            estados.contains(WidgetState.selected)
+                ? Colors.white
+                : c.textSecondary),
         trackColor: WidgetStateProperty.resolveWith((estados) =>
             estados.contains(WidgetState.selected) ? AppColors.accent : null),
       ),
@@ -124,7 +126,7 @@ class AppTheme {
   }
 
   /// Un solo estilo de campo para toda la app: relleno sutil, borde tenue,
-  /// foco naranja y la etiqueta en el color de texto secundario del modo
+  /// foco azul y la etiqueta en el color de texto secundario del modo
   /// (con el tema de Flutter por defecto salía casi invisible).
   static InputDecorationTheme campos(ColoresTema c) => InputDecorationTheme(
         filled: true,
@@ -159,8 +161,8 @@ class AppTheme {
         ),
         hintStyle: TextStyle(color: c.textHint.withOpacity(0.6)),
         labelStyle: TextStyle(color: c.textSecondary),
-        floatingLabelStyle: const TextStyle(
-          color: AppColors.accent,
+        floatingLabelStyle: TextStyle(
+          color: c.titleColor,
           fontWeight: FontWeight.w600,
         ),
         prefixIconColor: c.textSecondary,

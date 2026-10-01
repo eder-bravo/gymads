@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
+import 'package:gymads/app/data/models/user_model.dart';
+import 'package:gymads/app/data/services/captura_de_tarjeta.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/core/theme/app_theme.dart';
@@ -11,12 +13,13 @@ void main() {
   late int guardados;
 
   Future<void> abrir(WidgetTester tester,
-      {bool editar = false, ThemeData? tema}) async {
+      {bool editar = false, ThemeData? tema, String? tarjetaOriginal}) async {
     tester.view.physicalSize = const Size(390, 1400) * 3;
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
     c = List.generate(6, (_) => TextEditingController());
+    c[5].text = tarjetaOriginal ?? '';
     guardados = 0;
     await tester.pumpWidget(GetMaterialApp(
       theme: tema ?? AppTheme.oscuro,
@@ -28,6 +31,7 @@ void main() {
         userNumberController: c[4],
         rfidController: c[5],
         isEditing: editar,
+        tarjetaOriginal: tarjetaOriginal,
         onSave: (_, __) => guardados++,
         fullScreen: true,
       ),
@@ -87,6 +91,97 @@ void main() {
     await cerrar(tester);
   });
 
+  // Un pase del lector, como lo entrega el servicio de entradas.
+  Future<bool> pasar(WidgetTester tester, String uid,
+      {UserModel? dueno}) async {
+    final seQuedo = CapturaDeTarjeta.ofrecer(uid, dueno);
+    await tester.pump();
+    return seQuedo;
+  }
+
+  UserModel cliente(String nombre, String tarjeta) => UserModel(
+        name: nombre,
+        phone: '+520000000000',
+        joinDate: DateTime(2026, 1, 1),
+        userNumber: '1',
+        rfidCard: tarjeta,
+      );
+
+  testWidgets('alta: pasar otra tarjeta la cambia y se ve que cambió',
+      (tester) async {
+    await abrir(tester);
+
+    expect(await pasar(tester, 'AAAA'), isTrue);
+    expect(find.text('Tarjeta lista'), findsOneWidget);
+
+    expect(await pasar(tester, 'BBBB'), isTrue);
+    expect(c[5].text, 'BBBB');
+    expect(find.text('Tarjeta cambiada'), findsOneWidget);
+    expect(find.text('Se usará la última que pasaste'), findsOneWidget);
+
+    await pasar(tester, 'BBBB');
+    expect(find.text('Es la misma tarjeta'), findsOneWidget);
+    expect(find.textContaining('BBBB'), findsNothing);
+
+    await cerrar(tester);
+  });
+
+  testWidgets(
+      'la tarjeta de un cliente que entra no se toma: se deja pasar para '
+      'registrar su entrada', (tester) async {
+    await abrir(tester);
+    await pasar(tester, 'AAAA');
+
+    final seQuedo =
+        await pasar(tester, 'CCCC', dueno: cliente('Juan Pérez', 'CCCC'));
+
+    expect(seQuedo, isFalse);
+    expect(c[5].text, 'AAAA');
+    expect(find.text('Tarjeta lista'), findsOneWidget);
+    expect(find.text('Es la tarjeta de Juan Pérez. No se cambió.'),
+        findsOneWidget);
+
+    await cerrar(tester);
+  });
+
+  testWidgets('editar: tarjeta nueva, deshacer y quitar', (tester) async {
+    await abrir(tester, editar: true, tarjetaOriginal: 'AAAA');
+    expect(find.text('Tiene tarjeta'), findsOneWidget);
+
+    // Su propia tarjeta es suya, no "de otro cliente".
+    expect(await pasar(tester, 'AAAA', dueno: cliente('Ana', 'AAAA')), isTrue);
+    expect(find.text('Es su tarjeta actual'), findsOneWidget);
+
+    await pasar(tester, 'BBBB');
+    expect(find.text('Tarjeta nueva'), findsOneWidget);
+    expect(find.text('Se cambiará al guardar'), findsOneWidget);
+
+    await tester.tap(find.text('Deshacer'));
+    await tester.pump();
+    expect(c[5].text, 'AAAA');
+    expect(find.text('Tiene tarjeta'), findsOneWidget);
+
+    await tester.tap(find.text('Quitar'));
+    await tester.pump();
+    expect(c[5].text, isEmpty);
+    expect(find.text('Sin tarjeta'), findsOneWidget);
+    expect(find.text('Se quitará al guardar'), findsOneWidget);
+
+    await tester.tap(find.text('Deshacer'));
+    await tester.pump();
+    expect(c[5].text, 'AAAA');
+
+    await cerrar(tester);
+  });
+
+  testWidgets('cerrado el formulario, ya no se queda con las tarjetas',
+      (tester) async {
+    await abrir(tester);
+    await cerrar(tester);
+
+    expect(CapturaDeTarjeta.ofrecer('AAAA', null), isFalse);
+  });
+
   testWidgets('sin foto no se guarda: se marca en rojo', (tester) async {
     await abrir(tester);
     await tester.enterText(
@@ -130,11 +225,11 @@ void main() {
       ('oscuro', AppTheme.oscuro, ColoresTema.oscuro),
       ('claro', AppTheme.claro, ColoresTema.claro),
     ]) {
-      test('$nombre: el foco y la etiqueta enfocada son naranjas', () {
+      test('$nombre: el foco y la etiqueta usan los azules del tema', () {
         final campos = tema.inputDecorationTheme;
         final foco = campos.focusedBorder as OutlineInputBorder;
         expect(foco.borderSide.color, AppColors.accent);
-        expect(campos.floatingLabelStyle?.color, AppColors.accent);
+        expect(campos.floatingLabelStyle?.color, colores.titleColor);
         expect(tema.textSelectionTheme.cursorColor, AppColors.accent);
         // La etiqueta, en el texto secundario del modo: se lee sobre su
         // fondo.

@@ -49,8 +49,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
             TourStep(
               tourKey: controller.keyPeriodo,
               title: 'Periodo',
-              description: 'Elige si quieres ver el día, la semana o el mes, '
-                  'o define tu propio rango de fechas.',
+              description: 'Día, semana, mes o las fechas que elijas.',
               borderRadius: 20,
               isFirstStep: true,
               child: PeriodoSelector(controller: controller),
@@ -60,8 +59,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
             TourStep(
               tourKey: controller.keyResumen,
               title: 'Resumen',
-              description: 'Cuántas personas entraron y a qué horas se llena '
-                  'más el gimnasio.',
+              description: 'Cuántos entraron y a qué hora hay más gente.',
               borderRadius: 20,
               child: Column(
                 children: [
@@ -76,8 +74,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
           lista: TourStep(
             tourKey: controller.keyLista,
             title: 'Historial de accesos',
-            description: 'Quién entró al gimnasio, a qué hora y quién lo '
-                'registró. Desliza hacia abajo para actualizar.',
+            description: 'Quién entró y a qué hora.',
             isLastStep: true,
             child: _buildLogsList(context),
           ),
@@ -92,19 +89,22 @@ class AccessLogsView extends GetView<AccessLogsController> {
       child: Obx(() {
         return Row(
           children: [
-            _buildStatCard(context,
+            _buildStatCard(
+              context,
               'Entradas',
               '${controller.totalEntries.value}',
               AppColors.success,
             ),
             // Solo tiene sentido si el gimnasio registra salidas.
             if (controller.muestraSalidas)
-              _buildStatCard(context,
+              _buildStatCard(
+                context,
                 'Salidas',
                 '${controller.totalExits.value}',
                 AppColors.warning,
               ),
-            _buildStatCard(context,
+            _buildStatCard(
+              context,
               'Hora pico',
               controller.franjaPicoLabel,
               AppColors.accent,
@@ -221,7 +221,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
     });
   }
 
-  Widget _buildStatCard(BuildContext context, String title, String value, Color color) {
+  Widget _buildStatCard(
+      BuildContext context, String title, String value, Color color) {
     final c = context.colores;
     return Expanded(
       child: Container(

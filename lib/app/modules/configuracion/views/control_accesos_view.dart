@@ -69,8 +69,7 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
-                  'El reporte de entradas usa este horario para mostrar las '
-                  'horas con más afluencia.',
+                  'Se usa en el reporte de entradas.',
                   style: TextStyle(
                     fontSize: 12,
                     color: c.textSecondary,
@@ -107,7 +106,6 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
       child: SwitchListTile(
         value: ajustes.registrarSalidas,
         onChanged: controller.setRegistrarSalidas,
-        activeColor: AppColors.accent,
         secondary: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -160,8 +158,7 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
             color: c.titleColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(Icons.schedule,
-              color: c.titleColor, size: 22),
+          child: Icon(Icons.schedule, color: c.titleColor, size: 22),
         ),
         title: Text(
           label,
@@ -182,8 +179,7 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
             ),
           ),
         ),
-        trailing: Icon(Icons.edit_outlined,
-            size: 20, color: c.titleColor),
+        trailing: Icon(Icons.edit_outlined, size: 20, color: c.titleColor),
         onTap: () => _elegirHora(context, hora, onSelect),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),

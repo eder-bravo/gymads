@@ -498,6 +498,7 @@ class ClienteDetailView extends GetView<ClientesController> {
         addressController: controller.addressController,
         userNumberController: controller.userNumberController,
         rfidController: controller.rfidController,
+        tarjetaOriginal: cliente.rfidCard,
         currentPhotoUrl: cliente.photoUrl,
         onSave: (updatedUser, photoFile) async {
           final user = updatedUser.copyWith(

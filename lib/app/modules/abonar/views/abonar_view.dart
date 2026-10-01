@@ -63,12 +63,11 @@ class AbonarView extends GetView<AbonarController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Quien viene a probar: se cobra el día sin registrarlo.
+          // Visita de un día: se cobra sin registrarlo como cliente.
           TourStep(
             tourKey: controller.keyVisita,
             title: 'Cobrar una visita',
-            description: 'Para quien viene a probar: cobras el día sin '
-                'registrarlo como cliente y su entrada queda anotada.',
+            description: 'Cobra un día a alguien que no es cliente.',
             isFirstStep: true,
             child: Obx(() {
               final precio = controller.prices.value?.priceDay;
@@ -94,8 +93,8 @@ class AbonarView extends GetView<AbonarController> {
           TourStep(
             tourKey: controller.keyBuscar,
             title: 'Busca al cliente',
-            description: 'Escribe su teléfono o su nombre para encontrarlo. '
-                'También puedes pasar su tarjeta por el lector.',
+            description:
+                'Busca por nombre o teléfono, o pasa su tarjeta por el lector.',
             child: AppSearchField(
               hintText: 'Buscar cliente...',
               controller: controller.searchController,
@@ -107,11 +106,7 @@ class AbonarView extends GetView<AbonarController> {
             child: TourStep(
               tourKey: controller.keyResultados,
               title: 'Cobra su membresía',
-              description: 'Aquí están todos tus clientes en orden '
-                  'alfabético. Toca a uno para elegir el periodo, el monto y '
-                  'el método de pago (efectivo, tarjeta de débito o de '
-                  'crédito, o transferencia con su referencia) y registrar '
-                  'el pago.',
+              description: 'Toca a un cliente para cobrarle.',
               isLastStep: true,
               child: Obx(() {
                 if (controller.isLoadingClients.value) {
@@ -158,8 +153,7 @@ class AbonarView extends GetView<AbonarController> {
                           ),
                           subtitle: Text(
                             'Tel: ${client.phone}',
-                            style:
-                                TextStyle(color: c.textSecondary),
+                            style: TextStyle(color: c.textSecondary),
                           ),
                           trailing: const Icon(Icons.arrow_forward_ios,
                               size: 16, color: AppColors.accent),
@@ -338,8 +332,8 @@ class AbonarView extends GetView<AbonarController> {
                         children: [
                           Text(
                             'Nueva Fecha de Expiración',
-                            style: TextStyle(
-                                color: c.textSecondary, fontSize: 12),
+                            style:
+                                TextStyle(color: c.textSecondary, fontSize: 12),
                           ),
                           Text(
                             formattedDate,
@@ -392,7 +386,8 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
-  Widget _modoButton(BuildContext context, String label, bool value, bool fijoActivo) {
+  Widget _modoButton(
+      BuildContext context, String label, bool value, bool fijoActivo) {
     final c = context.colores;
     final seleccionado = fijoActivo == value;
     return Expanded(
@@ -472,8 +467,8 @@ class AbonarView extends GetView<AbonarController> {
               child: Obx(() => DropdownButtonFormField<String>(
                     value: controller.durationType.value,
                     decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 18),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 18),
                     ),
                     dropdownColor: c.cardBackground,
                     style: TextStyle(color: c.textPrimary),
@@ -511,8 +506,7 @@ class AbonarView extends GetView<AbonarController> {
               errorText:
                   sinPrecio ? 'Sin precio configurado para este periodo' : null,
               suffixIcon: fijo
-                  ? Icon(Icons.lock_outline,
-                      size: 18, color: c.textSecondary)
+                  ? Icon(Icons.lock_outline, size: 18, color: c.textSecondary)
                   : null,
               prefixText: '\$ ',
               prefixStyle: const TextStyle(
@@ -560,8 +554,7 @@ class AbonarView extends GetView<AbonarController> {
             Text(
               'Se registró el abono para ${client.name} correctamente.',
               textAlign: TextAlign.center,
-              style:
-                  TextStyle(fontSize: 16, color: c.textSecondary),
+              style: TextStyle(fontSize: 16, color: c.textSecondary),
             ),
             const SizedBox(height: 40),
             BotonGuardar(

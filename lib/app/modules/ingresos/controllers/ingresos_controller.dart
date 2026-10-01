@@ -10,6 +10,7 @@ import 'package:gymads/app/data/services/pdf_report_service.dart';
 import 'package:gymads/app/modules/ingresos/services/ingresos_pdf_builder.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 
 class IngresosController extends GetxController
     with ScreenTourMixin, PeriodoFiltroMixin, RecargaEnVivoMixin {
@@ -95,7 +96,8 @@ class IngresosController extends GetxController
         errorMessage.value = '';
       }
 
-      AppLogger.info('IngresosController', 'Obteniendo estadísticas de ingresos');
+      AppLogger.info(
+          'IngresosController', 'Obteniendo estadísticas de ingresos');
 
       final stats = await ingresoService.getEstadisticas(
         fechaInicio: fechaInicio.value,
@@ -128,7 +130,8 @@ class IngresosController extends GetxController
       );
 
       ingresos.assignAll(listaIngresos);
-      AppLogger.info('IngresosController', '${listaIngresos.length} ingresos obtenidos');
+      AppLogger.info(
+          'IngresosController', '${listaIngresos.length} ingresos obtenidos');
     } catch (e) {
       AppLogger.error('IngresosController', 'Error al obtener ingresos', e);
       errorMessage.value = 'Error al cargar ingresos: $e';
@@ -139,14 +142,17 @@ class IngresosController extends GetxController
   Future<void> fetchTodasLasTransacciones() async {
     try {
       isLoadingTodas.value = true;
-      AppLogger.info('IngresosController', 'Obteniendo TODAS las transacciones');
+      AppLogger.info(
+          'IngresosController', 'Obteniendo TODAS las transacciones');
 
       final lista = await ingresoService.getIngresos(limit: 1000);
 
       todasTransacciones.assignAll(lista);
-      AppLogger.info('IngresosController', '${lista.length} transacciones (todas) obtenidas');
+      AppLogger.info('IngresosController',
+          '${lista.length} transacciones (todas) obtenidas');
     } catch (e) {
-      AppLogger.error('IngresosController', 'Error al obtener todas las transacciones', e);
+      AppLogger.error(
+          'IngresosController', 'Error al obtener todas las transacciones', e);
       SnackbarHelper.error(
           'Error', 'No se pudieron cargar todas las transacciones');
     } finally {
@@ -165,7 +171,8 @@ class IngresosController extends GetxController
       );
       productosVendidos.assignAll(resumirProductosVendidos(ventas));
     } catch (e) {
-      AppLogger.error('IngresosController', 'Error al obtener productos vendidos', e);
+      AppLogger.error(
+          'IngresosController', 'Error al obtener productos vendidos', e);
     } finally {
       isLoadingProductos.value = false;
     }
@@ -184,9 +191,11 @@ class IngresosController extends GetxController
       );
 
       datosGrafica.assignAll(datos);
-      AppLogger.info('IngresosController', 'Datos de gráfica obtenidos: puntos');
+      AppLogger.info(
+          'IngresosController', 'Datos de gráfica obtenidos: puntos');
     } catch (e) {
-      AppLogger.error('IngresosController', 'Error al obtener datos de gráfica', e);
+      AppLogger.error(
+          'IngresosController', 'Error al obtener datos de gráfica', e);
     }
   }
 
@@ -207,7 +216,8 @@ class IngresosController extends GetxController
       selectedMetodoPago.value = metodoPago;
       fetchIngresos();
     } catch (e) {
-      AppLogger.error('IngresosController', 'Error al cambiar método de pago', e);
+      AppLogger.error(
+          'IngresosController', 'Error al cambiar método de pago', e);
       SnackbarHelper.error('Error', 'Error al aplicar filtro: $e');
     }
   }
@@ -220,20 +230,24 @@ class IngresosController extends GetxController
     try {
       await Future.wait([
         fetchEstadisticas().catchError((e) {
-          AppLogger.error('IngresosController', 'Error al refrescar estadísticas', e);
+          AppLogger.error(
+              'IngresosController', 'Error al refrescar estadísticas', e);
           return null;
         }),
         fetchIngresos().catchError((e) {
-          AppLogger.error('IngresosController', 'Error al refrescar ingresos', e);
+          AppLogger.error(
+              'IngresosController', 'Error al refrescar ingresos', e);
           return null;
         }),
         fetchDatosGrafica().catchError((e) {
-          AppLogger.error('IngresosController', 'Error al refrescar datos de gráfica', e);
+          AppLogger.error(
+              'IngresosController', 'Error al refrescar datos de gráfica', e);
           return null;
         }),
       ]);
     } catch (e) {
-      AppLogger.error('IngresosController', 'Error general al refrescar datos', e);
+      AppLogger.error(
+          'IngresosController', 'Error general al refrescar datos', e);
       errorMessage.value = 'Error al actualizar datos: $e';
 
       SnackbarHelper.error(
@@ -246,19 +260,24 @@ class IngresosController extends GetxController
   /// Método público para refrescar datos desde otros módulos
   static Future<void> refreshIngresosGlobally() async {
     try {
-      AppLogger.info('IngresosController', 'Iniciando refresh global de ingresos');
+      AppLogger.info(
+          'IngresosController', 'Iniciando refresh global de ingresos');
 
       // Verificar si el controlador ya está registrado
       if (Get.isRegistered<IngresosController>()) {
         final controller = Get.find<IngresosController>();
-        AppLogger.info('IngresosController', 'Controlador de ingresos encontrado, refrescando datos');
+        AppLogger.info('IngresosController',
+            'Controlador de ingresos encontrado, refrescando datos');
         await controller.refreshData();
-        AppLogger.info('IngresosController', 'Datos de ingresos actualizados globalmente');
+        AppLogger.info(
+            'IngresosController', 'Datos de ingresos actualizados globalmente');
       } else {
-        AppLogger.warning('IngresosController', 'IngresosController no está registrado aún. Los datos se actualizarán cuando se navegue a la pantalla de ingresos');
+        AppLogger.warning('IngresosController',
+            'IngresosController no está registrado aún. Los datos se actualizarán cuando se navegue a la pantalla de ingresos');
       }
     } catch (e) {
-      AppLogger.warning('IngresosController', 'No se pudo actualizar el controlador de ingresos');
+      AppLogger.warning('IngresosController',
+          'No se pudo actualizar el controlador de ingresos');
       AppLogger.info('IngresosController', 'Error tipo: ${e.runtimeType}');
       // No lanzar excepción para no interrumpir el flujo principal
     }
@@ -294,6 +313,7 @@ class IngresosController extends GetxController
         limit: 1000,
       );
 
+      await PdfReportService.prepararFuentes();
       final doc = IngresosPdfBuilder.construir(
         periodoLabel: periodoLabel,
         totalLabel: periodoTotalLabel,
@@ -322,7 +342,7 @@ class IngresosController extends GetxController
       case 'renovacion':
         return Colors.blue;
       case 'registro':
-        return Colors.orange;
+        return Colors.indigo;
       case 'visita':
         return Colors.teal;
       default:
@@ -352,7 +372,8 @@ class IngresosController extends GetxController
       selectedChartType.value = chartType;
       // No es necesario recargar datos, sólo cambiar la visualización
     } catch (e) {
-      AppLogger.error('IngresosController', 'Error al cambiar tipo de gráfica', e);
+      AppLogger.error(
+          'IngresosController', 'Error al cambiar tipo de gráfica', e);
       SnackbarHelper.error('Error', 'Error al cambiar tipo de gráfica: $e');
     }
   }
@@ -392,7 +413,8 @@ class IngresosController extends GetxController
 
       return datosFormateados;
     } catch (e) {
-      AppLogger.error('IngresosController', 'Error al obtener datos para gráfica pie', e);
+      AppLogger.error(
+          'IngresosController', 'Error al obtener datos para gráfica pie', e);
       return {};
     }
   }
@@ -403,7 +425,8 @@ class IngresosController extends GetxController
       // Para la gráfica de línea usamos los mismos datos que las barras
       return datosGrafica;
     } catch (e) {
-      AppLogger.error('IngresosController', 'Error al obtener datos para gráfica línea', e);
+      AppLogger.error(
+          'IngresosController', 'Error al obtener datos para gráfica línea', e);
       return {};
     }
   }
@@ -411,13 +434,13 @@ class IngresosController extends GetxController
   /// Obtiene los colores para la gráfica de pastel
   List<Color> getColoresPastel() {
     return [
-      Colors.orange.shade600,
+      AppColors.brand,
       Colors.blue.shade600,
       Colors.green.shade600,
       Colors.purple.shade600,
       Colors.red.shade600,
       Colors.teal.shade600,
-      Colors.amber.shade700,
+      Colors.cyan.shade200,
       Colors.indigo.shade600,
       Colors.pink.shade600,
       Colors.cyan.shade600,

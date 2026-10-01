@@ -40,8 +40,7 @@ class PaymentModeView extends GetView<OnboardingController> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Elige cómo quieres que funcione el cobro de membresías. '
-                  'Puedes cambiarlo después desde Configuración.',
+                  'Elige cómo cobrar las membresías. Puedes cambiarlo después.',
                   style: TextStyle(
                     fontSize: isTablet ? 15 : 14,
                     color: c.textSecondary.withOpacity(0.8),
@@ -52,9 +51,7 @@ class PaymentModeView extends GetView<OnboardingController> {
                 Obx(() => _ChoiceCard(
                       icon: Icons.price_check,
                       title: 'Abonos fijos',
-                      description:
-                          'Defines un precio por día, semana, mes y año. '
-                          'Al cobrar, el precio se llena solo.',
+                      description: 'Un precio fijo por día, semana, mes y año.',
                       gradient: const [Color(0xFF667eea), Color(0xFF764ba2)],
                       isTablet: isTablet,
                       enabled: !controller.isSaving.value,
@@ -64,9 +61,7 @@ class PaymentModeView extends GetView<OnboardingController> {
                 Obx(() => _ChoiceCard(
                       icon: Icons.tune,
                       title: 'Abonos libres',
-                      description:
-                          'Escribes el precio en cada cobro. Ideal si tus '
-                          'tarifas cambian según el cliente.',
+                      description: 'Escribes el precio en cada cobro.',
                       gradient: const [Color(0xFF4facfe), Color(0xFF00f2fe)],
                       isTablet: isTablet,
                       enabled: !controller.isSaving.value,

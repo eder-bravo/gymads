@@ -22,7 +22,7 @@ double contraste(Color a, Color b) {
 
 void main() {
   group('Colores', () {
-    test('el modo oscuro conserva los colores de siempre', () {
+    test('el modo oscuro conserva los fondos y usa títulos azules', () {
       const o = ColoresTema.oscuro;
       expect(o.backgroundColor, const Color.fromARGB(255, 27, 27, 27));
       expect(o.cardBackground, const Color.fromARGB(255, 18, 18, 18));
@@ -30,7 +30,7 @@ void main() {
       expect(o.textPrimary, const Color.fromARGB(255, 210, 210, 210));
       expect(o.textSecondary, const Color.fromARGB(255, 192, 192, 192));
       expect(o.textHint, const Color(0xFFBDBDBD));
-      expect(o.titleColor, const Color.fromARGB(255, 255, 145, 90));
+      expect(o.titleColor, AppColors.accentLight);
       expect(o.contraste, Colors.white);
     });
 

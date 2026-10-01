@@ -94,8 +94,7 @@ class ProductFormView extends GetView<InventarioController> {
                       decoration: const InputDecoration(
                         labelText: 'Nombre del producto *',
                         hintText: 'Ej: Proteína Whey 1kg',
-                        prefixIcon:
-                            Icon(Icons.shopping_bag),
+                        prefixIcon: Icon(Icons.shopping_bag),
                       ),
                       textCapitalization: TextCapitalization.words,
                       inputFormatters: [
@@ -121,11 +120,10 @@ class ProductFormView extends GetView<InventarioController> {
                         labelText: 'Descripción',
                         hintText:
                             'Describe las características del producto...',
-                        prefixIcon:
-                            const Icon(Icons.description),
+                        prefixIcon: const Icon(Icons.description),
                         helperText: 'Opcional - Máximo 500 caracteres',
-                        helperStyle: TextStyle(
-                            fontSize: 11, color: c.textSecondary),
+                        helperStyle:
+                            TextStyle(fontSize: 11, color: c.textSecondary),
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
@@ -165,8 +163,7 @@ class ProductFormView extends GetView<InventarioController> {
                                 const SizedBox(width: 10),
                                 Text(
                                   category.name,
-                                  style: TextStyle(
-                                      color: c.textPrimary),
+                                  style: TextStyle(color: c.textPrimary),
                                 ),
                               ],
                             ),
@@ -215,8 +212,8 @@ class ProductFormView extends GetView<InventarioController> {
                             fontSize: 22,
                             fontWeight: FontWeight.bold),
                         helperText: 'Precio unitario en MXN',
-                        helperStyle: TextStyle(
-                            fontSize: 11, color: c.textSecondary),
+                        helperStyle:
+                            TextStyle(fontSize: 11, color: c.textSecondary),
                       ),
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
@@ -270,16 +267,6 @@ class ProductFormView extends GetView<InventarioController> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Sin código el producto funciona igual; solo hay que '
-                      'buscarlo por nombre para moverle el stock.',
-                      style: TextStyle(
-                        color: c.textSecondary.withOpacity(0.75),
-                        fontSize: 12,
-                        height: 1.35,
-                      ),
-                    ),
                   ],
                 ),
 
@@ -309,11 +296,11 @@ class ProductFormView extends GetView<InventarioController> {
                           hintText: '0',
                           prefixIcon: const Icon(Icons.inventory),
                           suffixText: 'unidades',
-                          suffixStyle: TextStyle(
-                              color: c.textSecondary, fontSize: 14),
+                          suffixStyle:
+                              TextStyle(color: c.textSecondary, fontSize: 14),
                           helperText: 'Unidades en existencia',
-                          helperStyle: TextStyle(
-                              fontSize: 11, color: c.textSecondary),
+                          helperStyle:
+                              TextStyle(fontSize: 11, color: c.textSecondary),
                         ),
                         keyboardType: TextInputType.number,
                         inputFormatters: [
@@ -370,8 +357,7 @@ class ProductFormView extends GetView<InventarioController> {
                           ? 'Faltan ${-product.stock}'
                           : '${product.stock}',
                       style: TextStyle(
-                        color:
-                            faltante ? AppColors.error : c.textPrimary,
+                        color: faltante ? AppColors.error : c.textPrimary,
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
                       ),

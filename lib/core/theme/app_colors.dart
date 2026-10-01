@@ -7,9 +7,9 @@ class AppColors {
   /// Color de acento de la marca (header de Inicio)
   static const Color brand = Color(0xFF10D5E8);
 
-  /// El naranja de la marca: botones, foco de los campos, selección.
-  static const Color accent = Color(0xFFFF6F00);
-  static const Color accentLight = Color(0xFFFFB74D);
+  /// Azul del logo: botones, foco de los campos, selección.
+  static const Color accent = Color(0xFF1764F5);
+  static const Color accentLight = Color(0xFF64B5FF);
 
   /// Colores para estados (éxito, error, advertencia, info)
   static const Color success = Color(0xFF4CAF50);
@@ -59,7 +59,7 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
   final Color textSecondary;
   final Color textHint;
 
-  /// Títulos destacados (naranja).
+  /// Títulos destacados en azul, con contraste según el fondo.
   final Color titleColor;
 
   /// Elementos deshabilitados, líneas y bordes tenues.
@@ -102,7 +102,7 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
     textPrimary: Color.fromARGB(255, 210, 210, 210),
     textSecondary: Color.fromARGB(255, 192, 192, 192),
     textHint: Color(0xFFBDBDBD),
-    titleColor: Color.fromARGB(255, 255, 145, 90),
+    titleColor: AppColors.accentLight,
     disabled: Color.fromARGB(255, 21, 14, 14),
     contraste: Colors.white,
     superficie: Color(0x0FFFFFFF), // blanco 6 %
@@ -119,9 +119,7 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
     sombra: Color(0x33000000), // negro 20 %
   );
 
-  /// Fondo gris muy claro con tarjetas blancas; el naranja de la marca se
-  /// mantiene y los títulos van en un naranja más oscuro para leerse sobre
-  /// blanco.
+  /// Fondo gris muy claro con tarjetas blancas y azul intenso para los títulos.
   static const claro = ColoresTema(
     backgroundColor: Color(0xFFF4F4F5),
     cardBackground: Color(0xFFFFFFFF),
@@ -129,7 +127,7 @@ class ColoresTema extends ThemeExtension<ColoresTema> {
     textPrimary: Color(0xFF1C1C1E),
     textSecondary: Color(0xFF5F6368),
     textHint: Color(0xFF8A8A8E),
-    titleColor: Color(0xFFD84315),
+    titleColor: AppColors.accent,
     disabled: Color(0xFFE0E0E0),
     contraste: Color(0xFF111111),
     superficie: Color(0x0A000000), // negro 4 %

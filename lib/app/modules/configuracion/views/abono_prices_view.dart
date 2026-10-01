@@ -21,7 +21,8 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
           ? const SizedBox.shrink()
           : PieDeFormulario(
               child: BotonGuardar(
-                texto: controller.isOnboarding ? 'Continuar' : 'Guardar precios',
+                texto:
+                    controller.isOnboarding ? 'Continuar' : 'Guardar precios',
                 guardando: controller.isSaving.value,
                 onPressed: () => controller.savePrices(),
               ),
@@ -53,8 +54,7 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Al registrar un abono el precio se llena solo según '
-                          'el periodo elegido y el total se calcula automáticamente.',
+                          'Al cobrar, el precio se llena solo según el periodo.',
                           style: TextStyle(
                             color: c.textSecondary,
                             fontSize: 13,
@@ -67,25 +67,29 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                 const SizedBox(height: 24),
                 const TituloSeccion('Precio por periodo',
                     detalle: 'Deja vacío el periodo que no ofrezcas.'),
-                _priceField(context,
+                _priceField(
+                  context,
                   controller: controller.dayController,
                   label: 'Precio por día',
                   icon: Icons.today,
                 ),
                 const SizedBox(height: 16),
-                _priceField(context,
+                _priceField(
+                  context,
                   controller: controller.weekController,
                   label: 'Precio por semana',
                   icon: Icons.date_range,
                 ),
                 const SizedBox(height: 16),
-                _priceField(context,
+                _priceField(
+                  context,
                   controller: controller.monthController,
                   label: 'Precio por mes',
                   icon: Icons.calendar_month,
                 ),
                 const SizedBox(height: 16),
-                _priceField(context,
+                _priceField(
+                  context,
                   controller: controller.yearController,
                   label: 'Precio por año',
                   icon: Icons.event_repeat,
@@ -98,7 +102,8 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
     );
   }
 
-  Widget _priceField(BuildContext context, {
+  Widget _priceField(
+    BuildContext context, {
     required TextEditingController controller,
     required String label,
     required IconData icon,

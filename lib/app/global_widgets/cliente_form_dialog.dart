@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/config/rfid_config.dart';
 import 'package:gymads/app/data/models/user_model.dart';
+import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
+import 'package:gymads/app/data/services/captura_de_tarjeta.dart';
 import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
@@ -13,6 +16,7 @@ import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import '../core/widgets/formulario.dart';
 import '../modules/shared/widgets/photo_capture_widget.dart';
 import 'app_header.dart';
+import 'tarjeta_del_formulario.dart';
 
 /// Alta y edición de un cliente.
 ///
@@ -38,6 +42,14 @@ class ClienteFormDialog extends StatefulWidget {
   /// para que no se vuelva a picar (cada toque mandaba otro guardado).
   final RxBool? guardando;
 
+  /// La tarjeta que tenía el cliente al abrir la edición, para mostrar si se
+  /// cambió o se quitó. Null en un alta.
+  final String? tarjetaOriginal;
+
+  /// Busca qué cliente tiene una tarjeta, cuando el formulario lee el lector
+  /// por su cuenta. Por defecto, en la base de datos.
+  final Future<UserModel?> Function(String uid)? buscarDueno;
+
   const ClienteFormDialog({
     super.key,
     required this.nombreController,
@@ -51,6 +63,8 @@ class ClienteFormDialog extends StatefulWidget {
     this.currentPhotoUrl,
     this.fullScreen = false,
     this.guardando,
+    this.tarjetaOriginal,
+    this.buscarDueno,
   });
 
   @override
@@ -75,7 +89,30 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
   late final RxBool _guardando = widget.guardando ?? false.obs;
 
   /// El teléfono se arma con la lada del país que se elija.
-  late final PhoneNumber _telefonoInicial = _telefonoDe(widget.phoneController.text);
+  late final PhoneNumber _telefonoInicial =
+      _telefonoDe(widget.phoneController.text);
+
+  late final TarjetaDelFormulario _tarjeta = TarjetaDelFormulario(
+    widget.rfidController,
+    original: widget.tarjetaOriginal,
+  );
+
+  /// Suelta las tarjetas del lector al cerrar el formulario.
+  VoidCallback? _soltarCaptura;
+
+  /// Aviso pasajero bajo la tarjeta ("Es la misma tarjeta", "Es la tarjeta
+  /// de…").
+  String? _nota;
+  Timer? _quitarNota;
+
+  /// El borde se resalta un momento cuando la tarjeta cambia.
+  bool _destello = false;
+  Timer? _apagarDestello;
+
+  /// Al leer el lector por su cuenta, `/uid_only` repite la última tarjeta
+  /// en varias consultas: un mismo pase no cuenta dos veces.
+  String? _ultimoUid;
+  DateTime? _ultimoUidEn;
 
   @override
   void initState() {
@@ -83,22 +120,26 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
     _rfidService = Get.isRegistered<BackgroundRfidService>()
         ? Get.find<BackgroundRfidService>()
         : null;
+    // El servicio de entradas sigue escuchando: si pasa un cliente mientras
+    // se registra a otro, se registra su entrada. Las tarjetas libres nos las
+    // pasa a nosotros.
+    _soltarCaptura = CapturaDeTarjeta.tomar(_alPasarTarjeta);
     _startSilentPolling();
   }
 
+  /// Respaldo: si este teléfono no está escuchando el lector (no le tocan
+  /// los avisos, o el escaneo está apagado), el formulario lo lee él mismo.
   void _startSilentPolling() {
-    _rfidService?.pauseScanning();
     _pollTimer =
         Timer.periodic(const Duration(milliseconds: 500), (timer) async {
       if (_consultandoLector) return;
+      if (_rfidService?.atiendeAhora ?? false) return;
       _consultandoLector = true;
       try {
         final uid = await RfidReaderService.checkForCardSilent();
-        if (uid != null && uid.isNotEmpty && uid != 'NO_CARD') {
-          if (widget.rfidController.text != uid) {
-            widget.rfidController.text = uid;
-          }
-        }
+        if (uid == null || uid.isEmpty || uid == 'NO_CARD') return;
+        if (_mismoPase(uid) || !mounted) return;
+        _alPasarTarjeta(uid, await _dueno(uid));
       } catch (e) {
         // Ignorar
       } finally {
@@ -107,10 +148,76 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
     });
   }
 
+  bool _mismoPase(String uid) {
+    final ahora = DateTime.now();
+    final repetido = uid == _ultimoUid &&
+        _ultimoUidEn != null &&
+        ahora.difference(_ultimoUidEn!) < const Duration(seconds: 3);
+    _ultimoUid = uid;
+    _ultimoUidEn = ahora;
+    return repetido;
+  }
+
+  /// Sin internet no se sabe de quién es: se toma como libre y, si era de
+  /// otro cliente, el guardado lo rechaza.
+  Future<UserModel?> _dueno(String uid) async {
+    try {
+      final buscar = widget.buscarDueno ??
+          (uid) => Get.find<UserRepository>().getUserByRfid(uid);
+      return await buscar(uid);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Una tarjeta pasó por el lector. Si es libre (o la que el cliente ya
+  /// tenía) se la queda el formulario; si es de otro cliente no la toca y
+  /// devuelve false, para que se registre su entrada.
+  bool _alPasarTarjeta(String uid, UserModel? dueno) {
+    if (!mounted) return false;
+    if (dueno != null && !_tarjeta.esLaOriginal(uid)) {
+      _mostrarNota('Es la tarjeta de ${dueno.name}. No se cambió.');
+      return false;
+    }
+    switch (_tarjeta.pasar(uid)) {
+      case ResultadoPase.misma:
+        _mostrarNota(_tarjeta.estado == EstadoTarjeta.sinCambio
+            ? 'Es su tarjeta actual'
+            : 'Es la misma tarjeta');
+      case ResultadoPase.asignada:
+      case ResultadoPase.cambiada:
+        _alCambiarTarjeta();
+    }
+    return true;
+  }
+
+  void _alCambiarTarjeta() {
+    HapticFeedback.mediumImpact();
+    _quitarNota?.cancel();
+    _apagarDestello?.cancel();
+    setState(() {
+      _nota = null;
+      _destello = true;
+    });
+    _apagarDestello = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _destello = false);
+    });
+  }
+
+  void _mostrarNota(String texto) {
+    _quitarNota?.cancel();
+    setState(() => _nota = texto);
+    _quitarNota = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _nota = null);
+    });
+  }
+
   @override
   void dispose() {
     _pollTimer?.cancel();
-    _rfidService?.resumeScanning();
+    _quitarNota?.cancel();
+    _apagarDestello?.cancel();
+    _soltarCaptura?.call();
     super.dispose();
   }
 
@@ -150,8 +257,9 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
           : widget.addressController.text.trim(),
       joinDate: DateTime.now(),
       userNumber: widget.userNumberController.text,
-      rfidCard:
-          widget.rfidController.text.isEmpty ? null : widget.rfidController.text,
+      rfidCard: widget.rfidController.text.isEmpty
+          ? null
+          : widget.rfidController.text,
     );
     widget.onSave(user, _foto);
   }
@@ -183,7 +291,7 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
           const SizedBox(height: 14),
           _campoTelefono(),
           const SizedBox(height: 14),
-          _tarjeta(),
+          _recuadroTarjeta(),
           const SizedBox(height: 8),
           _masDatos(),
         ],
@@ -201,14 +309,12 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
         backgroundColor: c.cardBackground,
         surfaceTintColor: Colors.transparent,
         contentPadding: EdgeInsets.zero,
-        title: Text(_titulo,
-            style: TextStyle(color: c.textPrimary)),
+        title: Text(_titulo, style: TextStyle(color: c.textPrimary)),
         content: SizedBox(width: 420, height: 560, child: formulario),
         actions: [
           Obx(() => BotonCancelar(
-              onPressed: _guardando.value
-                  ? null
-                  : () => Navigator.of(context).pop())),
+              onPressed:
+                  _guardando.value ? null : () => Navigator.of(context).pop())),
           boton,
         ],
       );
@@ -267,68 +373,132 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
         leadingPadding: 12,
         trailingSpace: false,
       ),
-      selectorTextStyle:
-          TextStyle(color: c.textPrimary, fontSize: 16),
+      selectorTextStyle: TextStyle(color: c.textPrimary, fontSize: 16),
       textStyle: TextStyle(color: c.textPrimary, fontSize: 16),
       keyboardType: TextInputType.phone,
       inputDecoration: const InputDecoration(labelText: 'Teléfono *'),
       errorMessage: 'Escribe un teléfono válido',
-      validator: (valor) =>
-          (valor == null || valor.trim().isEmpty) ? 'Escribe el teléfono' : null,
+      validator: (valor) => (valor == null || valor.trim().isEmpty)
+          ? 'Escribe el teléfono'
+          : null,
     );
   }
 
   /// La tarjeta del lector: se asigna pasándola; nunca se muestra su número.
-  Widget _tarjeta() {
+  /// Lo que sí se ve es si cambió: "Tarjeta cambiada", "Tarjeta nueva · Se
+  /// cambiará al guardar", con un destello del borde y una vibración.
+  Widget _recuadroTarjeta() {
     final c = context.colores;
     final hayLector = RfidConfig.isConfigured || RfidConfig.tieneLector;
     return AnimatedBuilder(
       animation: widget.rfidController,
       builder: (context, _) {
-        final lista = widget.rfidController.text.isNotEmpty;
-        final texto = lista
-            ? 'Tarjeta lista'
-            : hayLector
-                ? 'Pasa la tarjeta por el lector'
-                : 'Sin lector de tarjetas';
+        final quitar = (
+          'Quitar',
+          () {
+            _tarjeta.quitar();
+            _alCambiarTarjeta();
+          }
+        );
+        final deshacer = (
+          'Deshacer',
+          () {
+            _tarjeta.deshacer();
+            _alCambiarTarjeta();
+          }
+        );
 
-        return Container(
+        final (titulo, detalle, icono, color, accion) =
+            switch (_tarjeta.estado) {
+          EstadoTarjeta.vacia => (
+              hayLector
+                  ? 'Pasa la tarjeta por el lector'
+                  : 'Sin lector de tarjetas',
+              null,
+              Icons.contactless_outlined,
+              null,
+              null,
+            ),
+          EstadoTarjeta.lista => (
+              'Tarjeta lista',
+              null,
+              Icons.check_circle,
+              AppColors.success,
+              quitar,
+            ),
+          EstadoTarjeta.cambiada => (
+              'Tarjeta cambiada',
+              'Se usará la última que pasaste',
+              Icons.check_circle,
+              AppColors.success,
+              quitar,
+            ),
+          EstadoTarjeta.sinCambio => (
+              'Tiene tarjeta',
+              null,
+              Icons.check_circle,
+              AppColors.success,
+              quitar,
+            ),
+          EstadoTarjeta.nueva => (
+              'Tarjeta nueva',
+              'Se cambiará al guardar',
+              Icons.autorenew,
+              AppColors.accent,
+              deshacer,
+            ),
+          EstadoTarjeta.quitada => (
+              'Sin tarjeta',
+              'Se quitará al guardar',
+              Icons.credit_card_off_outlined,
+              AppColors.warning,
+              deshacer,
+            ),
+        };
+        final linea = _nota ?? detalle;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
           constraints: const BoxConstraints(minHeight: 56),
-          padding: const EdgeInsets.only(left: 14, right: 6),
+          padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
           decoration: BoxDecoration(
-            color: lista
-                ? AppColors.success.withOpacity(0.10)
-                : c.superficie,
+            color: color?.withOpacity(_destello ? 0.22 : 0.10) ?? c.superficie,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: lista
-                  ? AppColors.success.withOpacity(0.6)
-                  : c.borde,
+              color: color?.withOpacity(_destello ? 1 : 0.6) ?? c.borde,
+              width: _destello ? 2.5 : 1,
             ),
           ),
           child: Row(
             children: [
-              Icon(
-                lista ? Icons.check_circle : Icons.contactless_outlined,
-                color: lista ? AppColors.success : c.textSecondary,
-              ),
+              Icon(icono, color: color ?? c.textSecondary),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  texto,
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 16,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      titulo,
+                      style: TextStyle(color: c.textPrimary, fontSize: 16),
+                    ),
+                    if (linea != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        linea,
+                        style: TextStyle(color: c.textSecondary, fontSize: 13),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              if (lista)
+              if (accion != null)
                 TextButton(
-                  onPressed: () => widget.rfidController.clear(),
+                  onPressed: accion.$2,
                   style: TextButton.styleFrom(
                     foregroundColor: c.textSecondary,
                   ),
-                  child: const Text('Quitar'),
+                  child: Text(accion.$1),
                 ),
             ],
           ),

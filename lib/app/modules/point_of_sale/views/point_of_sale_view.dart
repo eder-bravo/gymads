@@ -12,6 +12,7 @@ import '../../../core/widgets/refrescable.dart';
 import '../../../global_widgets/app_header.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:gymads/app/core/widgets/metodo_de_pago.dart';
+import '../widgets/lista_carrito.dart';
 
 class PointOfSaleView extends GetView<PointOfSaleController> {
   const PointOfSaleView({super.key});
@@ -28,8 +29,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
             tourKey: controller.keyEscanear,
             isFirstStep: true,
             title: 'Escanear productos',
-            description: 'Apunta la cámara al código de barras de cada '
-                'producto y se agrega solo al carrito, uno tras otro.',
+            description: 'Escanea productos y se agregan solos al carrito.',
             borderRadius: 24,
             child: IconButton(
               icon: const Icon(Icons.qr_code_scanner),
@@ -56,9 +56,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     child: TourStep(
                       tourKey: controller.keyBuscar,
                       title: 'Buscador',
-                      description:
-                          'Encuentra un producto por su nombre o su código sin '
-                          'tener que recorrer toda la lista.',
+                      description: 'Busca por nombre o código.',
                       child: AppSearchField(
                         hintText: 'Buscar productos...',
                         onChanged: controller.searchProducts,
@@ -72,9 +70,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     child: TourStep(
                       tourKey: controller.keyCategorias,
                       title: 'Categorías',
-                      description:
-                          'Filtra los productos por categoría para llegar '
-                          'más rápido a lo que vendes a diario.',
+                      description: 'Filtra los productos por categoría.',
                       child: Obx(() => CategoryFilterChips(
                             categories: controller.activeCategories
                                 .map((c) => CategoryChipData(
@@ -93,9 +89,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 lista: TourStep(
                   tourKey: controller.keyProductos,
                   title: 'Tus productos',
-                  description: 'Toca un producto para agregarlo a la venta. '
-                      'Déjalo presionado para fijarlo arriba y tener a mano lo '
-                      'que más vendes.',
+                  description:
+                      'Toca un producto para agregarlo. Déjalo presionado para fijarlo arriba.',
                   child: Obx(() {
                     if (controller.isLoading) {
                       return const Center(
@@ -154,10 +149,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
             TourStep(
               tourKey: controller.keyCarrito,
               title: 'Carrito y cobro',
-              description: 'Aquí ves el total de la venta y cobras eligiendo '
-                  'el método: efectivo, tarjeta de débito, tarjeta de crédito '
-                  'o transferencia. Con tarjeta o transferencia puedes anotar '
-                  'la referencia o escanearla del comprobante.',
+              description:
+                  'El total de la venta. Aquí eliges cómo te pagan y cobras.',
               isLastStep: true,
               child: _buildCartPanel(context),
             ),
@@ -295,7 +288,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     );
   }
 
-  Widget _buildQuantityControl(BuildContext context, Product product, int quantity) {
+  Widget _buildQuantityControl(
+      BuildContext context, Product product, int quantity) {
     final c = context.colores;
     if (quantity == 0) {
       return SizedBox(
@@ -360,9 +354,9 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   Widget _buildCartPanel(BuildContext context) {
     final c = context.colores;
     return Obx(() {
-      final itemCount = controller.cartItems.length;
+      final unidades = controller.totalUnidades;
       final total = controller.finalAmount;
-      final isEmpty = itemCount == 0;
+      final isEmpty = controller.cartItems.isEmpty;
 
       return Container(
         padding:
@@ -383,8 +377,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               ? Center(
                   child: Text(
                     'Selecciona productos para cobrar',
-                    style:
-                        TextStyle(color: c.textSecondary, fontSize: 13),
+                    style: TextStyle(color: c.textSecondary, fontSize: 13),
                   ),
                 )
               : Row(
@@ -408,7 +401,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '$itemCount ${itemCount == 1 ? 'producto' : 'productos'}',
+                            '$unidades ${unidades == 1 ? 'producto' : 'productos'}',
                             style: TextStyle(
                               color: c.textSecondary,
                               fontSize: 13,
@@ -516,7 +509,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
 
               // Título
               Text(
-                'Confirmar Pago',
+                'Cobrar',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -563,25 +556,35 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 );
               }),
 
-              // Resumen rápido
+              // Lo que se está cobrando, para revisarlo antes de cobrar.
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
                 decoration: BoxDecoration(
                   color: c.containerBackground,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Obx(() => Column(
                       children: [
-                        _buildSummaryRow(context,
-                            '${controller.cartItems.length} productos',
-                            '\$${controller.totalAmount.toStringAsFixed(2)}'),
+                        ListaCarrito(
+                          items: controller.cartItems.toList(),
+                          onCambiarCantidad: (item, cantidad) async {
+                            await controller.updateCartItemQuantity(
+                                item.productId, cantidad);
+                            // Sin productos ya no hay nada que cobrar.
+                            if (controller.cartItems.isEmpty &&
+                                context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          },
+                        ),
                         if (controller.discountAmount > 0) ...[
                           const SizedBox(height: 8),
                           _buildSummaryRow(context, 'Descuento',
                               '-\$${controller.discountAmount.toStringAsFixed(2)}'),
                         ],
                         const Divider(height: 24),
-                        _buildSummaryRow(context,
+                        _buildSummaryRow(
+                          context,
                           'TOTAL',
                           '\$${controller.finalAmount.toStringAsFixed(2)}',
                           isBold: true,
@@ -624,8 +627,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                           FilteringTextInputFormatter.allow(
                               RegExp(r'^\d+\.?\d{0,2}')),
                         ],
-                        style: TextStyle(
-                            color: c.textPrimary, fontSize: 18),
+                        style: TextStyle(color: c.textPrimary, fontSize: 18),
                         decoration: _decoracionCampoCobro(
                           hintText: 'Cuánto te entregó',
                         ).copyWith(
@@ -692,7 +694,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         ));
   }
 
-  Widget _buildSummaryRow(BuildContext context, String label, String value, {bool isBold = false}) {
+  Widget _buildSummaryRow(BuildContext context, String label, String value,
+      {bool isBold = false}) {
     final c = context.colores;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -124,8 +124,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
                 size: 20,
-                color:
-                    seleccionado ? AppColors.accent : c.textSecondary,
+                color: seleccionado ? AppColors.accent : c.textSecondary,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -174,9 +173,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
-            _explicacion(
-                'Se generará un código para que esta persona entre. '
-                'No necesita correo ni contraseña.'),
+            _explicacion('Entrará con un código, sin correo ni contraseña.'),
             const SizedBox(height: 20),
             _campoNombre(),
             const SizedBox(height: 24),
@@ -185,7 +182,8 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
           ],
         ),
       ),
-      bottomNavigationBar: PieDeFormulario(child: _botonGuardar('Generar código')),
+      bottomNavigationBar:
+          PieDeFormulario(child: _botonGuardar('Generar código')),
     );
   }
 

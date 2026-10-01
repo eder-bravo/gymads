@@ -30,7 +30,7 @@ class HomeController extends GetxController {
 
   /// Pantallas que forman el asistente inicial.
   ///
-  /// "Abonos fijos" lleva a la de precios, que es su segundo paso, y hasta que
+  /// "Costos fijos" lleva a la de precios, que es su segundo paso, y hasta que
   /// no se confirman los precios el `payment_mode` sigue nulo. Sin tener las
   /// dos en cuenta, cualquier reconstrucción de Inicio (por ejemplo al abrirse
   /// el teclado) vuelve a empujar el asistente encima y le roba el foco al

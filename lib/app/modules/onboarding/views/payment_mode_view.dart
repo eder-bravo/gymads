@@ -50,7 +50,7 @@ class PaymentModeView extends GetView<OnboardingController> {
                 const SizedBox(height: 28),
                 Obx(() => _ChoiceCard(
                       icon: Icons.price_check,
-                      title: 'Abonos fijos',
+                      title: 'Costos fijos',
                       description: 'Un precio fijo por día, semana, mes y año.',
                       gradient: const [Color(0xFF667eea), Color(0xFF764ba2)],
                       isTablet: isTablet,

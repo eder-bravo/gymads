@@ -292,9 +292,9 @@ class ClientesController extends GetxController
     }
     guardandoCliente.value = true;
     try {
-      String userId;
+      UserModel guardado;
       try {
-        userId = await userRepository.crearCliente(
+        guardado = await userRepository.crearCliente(
           newClient,
           photoFile: photoFile,
         );
@@ -305,7 +305,7 @@ class ClientesController extends GetxController
         final numero = _nuevoNumeroDeCliente();
         userNumberController.text = numero;
         newClient = newClient.copyWith(userNumber: numero);
-        userId = await userRepository.crearCliente(
+        guardado = await userRepository.crearCliente(
           newClient,
           photoFile: photoFile,
         );
@@ -316,7 +316,8 @@ class ClientesController extends GetxController
       // el formulario abierto sin que pasara nada en pantalla.
       unawaited(fetchClientes(silencioso: true));
 
-      final clienteConId = newClient.copyWith(id: userId);
+      // El guardado trae la foto ya subida: sin ella, Abonar no la mostraba.
+      final clienteConId = guardado;
       // Navegar a la pantalla de Abono con el nuevo cliente seleccionado
       await Future.delayed(const Duration(milliseconds: 200));
       if (_registroDesdeLector) {

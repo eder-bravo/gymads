@@ -119,7 +119,10 @@ class TourStep extends StatelessWidget {
         gapBetweenContentAndAction: 14,
       ),
       tooltipActions: actions,
-      child: _bloqueoDuranteElTour(),
+      child: _DondeEstaElPaso(
+        paso: tourKey,
+        child: _bloqueoDuranteElTour(),
+      ),
     );
   }
 
@@ -148,4 +151,42 @@ class TourStep extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Le dice a [WelcomeTourService] en qué pantalla quedó el paso, para que no
+/// arranque su recorrido si hay otra pantalla encima.
+class _DondeEstaElPaso extends StatefulWidget {
+  const _DondeEstaElPaso({required this.paso, required this.child});
+
+  final GlobalKey paso;
+  final Widget child;
+
+  @override
+  State<_DondeEstaElPaso> createState() => _DondeEstaElPasoState();
+}
+
+class _DondeEstaElPasoState extends State<_DondeEstaElPaso> {
+  @override
+  void initState() {
+    super.initState();
+    WelcomeTourService.pasoMontado(widget.paso, context);
+  }
+
+  @override
+  void didUpdateWidget(_DondeEstaElPaso anterior) {
+    super.didUpdateWidget(anterior);
+    if (anterior.paso != widget.paso) {
+      WelcomeTourService.pasoDesmontado(anterior.paso, context);
+      WelcomeTourService.pasoMontado(widget.paso, context);
+    }
+  }
+
+  @override
+  void dispose() {
+    WelcomeTourService.pasoDesmontado(widget.paso, context);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

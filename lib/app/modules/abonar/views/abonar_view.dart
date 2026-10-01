@@ -5,15 +5,16 @@ import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/core/widgets/cached_user_image.dart';
 import 'package:gymads/app/core/widgets/tour_step.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/widgets/refrescable.dart';
 import '../controllers/abonar_controller.dart';
+import '../../../data/models/user_model.dart';
+import '../vigencia.dart';
 import 'cobrar_visita_view.dart';
 import '../../../core/widgets/centrado_desplazable.dart';
-import '../../../core/widgets/cabecera_con_lista.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:gymads/app/core/widgets/metodo_de_pago.dart';
+import 'package:gymads/app/core/utils/referencia_de_pago.dart';
 
 class AbonarView extends GetView<AbonarController> {
   const AbonarView({super.key});
@@ -53,6 +54,12 @@ class AbonarView extends GetView<AbonarController> {
           return _buildAbonarForm(context);
         }),
       ),
+      // El botón de cobrar, fijo abajo y con el monto: siempre a la vista.
+      bottomNavigationBar: Obx(() {
+        final cobrando = !controller.isSuccess.value &&
+            controller.selectedClient.value != null;
+        return cobrando ? _botonCobrar(context) : const SizedBox.shrink();
+      }),
     );
   }
 
@@ -76,7 +83,7 @@ class AbonarView extends GetView<AbonarController> {
                 icon: const Icon(Icons.confirmation_number_outlined, size: 20),
                 label: Text(precio == null
                     ? 'Cobrar visita'
-                    : 'Cobrar visita · \$${_montoCorto(precio)}'),
+                    : 'Cobrar visita · ${pesos(precio)}'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.accent,
                   side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
@@ -170,391 +177,589 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
+  /// El cobro en tres pasos, de arriba abajo: cuánto tiempo, cómo paga y el
+  /// resumen. Solo uno está abierto; los ya hechos se cierran y muestran lo
+  /// elegido, con "Cambiar" para volver. El botón de abajo ([_botonCobrar])
+  /// dice "Continuar" hasta el resumen, y ahí "Cobrar $…".
   Widget _buildAbonarForm(BuildContext context) {
-    final c = context.colores;
     final client = controller.selectedClient.value!;
+    return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        _cabeceraCliente(context, client),
+        const SizedBox(height: 20),
+        Obx(() => _seccionPaso(
+              context,
+              1,
+              '¿Cuánto tiempo paga?',
+              hecho: '${controller.periodoElegido} · '
+                  '${pesos(controller.totalAmount)}',
+              contenido: () => _pasoTiempo(context),
+            )),
+        Obx(() => _seccionPaso(
+              context,
+              2,
+              '¿Cómo paga?',
+              hecho: nombreMetodoDePago(controller.paymentMethod.value),
+              contenido: () => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SelectorMetodoPago(
+                    metodos: controller.paymentMethods,
+                    elegido: controller.paymentMethod.value,
+                    onElegir: controller.setPaymentMethod,
+                  ),
+                  if (controller.usaReferenciaPago)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: CampoReferenciaPago(controlador: controller),
+                    ),
+                ],
+              ),
+            )),
+        Obx(() => _seccionPaso(
+              context,
+              3,
+              'Resumen',
+              hecho: '',
+              contenido: () => _resumen(context),
+            )),
+      ],
+    );
+  }
 
-    // La cabecera del cliente deja de estar fija cuando falta altura
-    // (teléfono de lado, o el teclado abierto al escribir el monto).
-    return CabeceraConLista(
-      cabecera: [
-        // Cabecera Cliente
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: c.backgroundColor,
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(24),
-              bottomRight: Radius.circular(24),
+  /// Un paso del cobro. Ya hecho: cerrado, con palomita, lo elegido y
+  /// "Cambiar". Abierto: su título y su contenido. Por venir: solo el
+  /// título, apagado, para que se vea qué sigue.
+  Widget _seccionPaso(
+    BuildContext context,
+    int numero,
+    String titulo, {
+    required String hecho,
+    required Widget Function() contenido,
+  }) {
+    final c = context.colores;
+    final actual = controller.pasoActual.value;
+    final Widget cuerpo;
+
+    if (numero < actual) {
+      cuerpo = Material(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => controller.irAPaso(numero),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle,
+                    color: AppColors.success, size: 28),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        titulo,
+                        style: TextStyle(color: c.textSecondary, fontSize: 13),
+                      ),
+                      Text(
+                        hecho,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => controller.irAPaso(numero),
+                  child: const Text('Cambiar'),
+                ),
+              ],
             ),
           ),
-          child: Row(
+        ),
+      );
+    } else {
+      final abierto = numero == actual;
+      cuerpo = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _paso(context, numero, titulo, apagado: !abierto),
+          if (abierto) contenido(),
+        ],
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+        alignment: Alignment.topCenter,
+        child: cuerpo,
+      ),
+    );
+  }
+
+  /// Quién paga: foto grande, nombre y cómo está su membresía en palabras.
+  Widget _cabeceraCliente(BuildContext context, UserModel client) {
+    final c = context.colores;
+    final situacion = situacionDe(client, DateTime.now());
+    final color = situacion.vencido ? AppColors.error : c.textSecondary;
+    return Row(
+      children: [
+        UserThumbnail(
+          imageUrl: client.photoUrl,
+          userName: client.name,
+          size: 72,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              UserThumbnail(
-                imageUrl: client.photoUrl,
-                userName: client.name,
-                size: 60,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      client.name,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: c.titleColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      client.isActive && client.daysRemaining > 0
-                          ? 'Activo - Le quedan ${client.daysRemaining} días'
-                          : 'Inactivo o Vencido',
-                      style: TextStyle(
-                        color: client.isActive && client.daysRemaining > 0
-                            ? AppColors.success
-                            : AppColors.error,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+              Text(
+                client.name,
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.bold,
+                  color: c.titleColor,
                 ),
               ),
-              IconButton(
-                onPressed: controller.clearSelection,
-                icon: Icon(Icons.close, color: c.textSecondary),
-                tooltip: 'Cambiar cliente',
+              const SizedBox(height: 4),
+              Text(
+                situacion.texto,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 15,
+                  fontWeight:
+                      situacion.vencido ? FontWeight.w600 : FontWeight.normal,
+                ),
               ),
+              if (situacion.detalle != null)
+                Text(
+                  situacion.detalle!,
+                  style: TextStyle(color: c.textSecondary, fontSize: 14),
+                ),
             ],
           ),
         ),
+        IconButton(
+          onPressed: controller.clearSelection,
+          icon: Icon(Icons.close, color: c.textSecondary),
+          tooltip: 'Cambiar cliente',
+        ),
       ],
-      lista: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Detalles del Abono',
-              style: TextStyle(
-                fontSize: 18,
+    );
+  }
+
+  /// "① ¿Cuánto tiempo paga?": el número en un círculo y el título grande.
+  Widget _paso(BuildContext context, int numero, String titulo,
+      {bool apagado = false}) {
+    final c = context.colores;
+    final color = apagado ? c.textSecondary.withOpacity(0.5) : AppColors.accent;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$numero',
+              style: const TextStyle(
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
-                color: c.titleColor,
+                fontSize: 15,
               ),
             ),
-            const SizedBox(height: 20),
-
-            // Selector de precio fijo / libre
-            _buildModoToggle(context),
-            const SizedBox(height: 20),
-
-            // Cantidad, periodo y precio unitario
-            _buildCamposAbono(context),
-
-            // Total a pagar (solo lectura)
-            Obx(() {
-              final currency =
-                  NumberFormat.currency(locale: 'es_MX', symbol: '\$');
-              final total = controller.totalAmount;
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.accent.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Total a Pagar',
-                      style: TextStyle(
-                        color: c.textSecondary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      currency.format(total),
-                      style: const TextStyle(
-                        color: AppColors.accent,
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-            const SizedBox(height: 20),
-
-            // Método de pago: débito y crédito por separado; con tarjeta o
-            // transferencia, el folio escrito o escaneado del comprobante.
-            Text(
-              'Método de pago',
-              style: TextStyle(color: c.textSecondary, fontSize: 14),
-            ),
-            const SizedBox(height: 10),
-            Obx(() => SelectorMetodoPago(
-                  metodos: controller.paymentMethods,
-                  elegido: controller.paymentMethod.value,
-                  onElegir: controller.setPaymentMethod,
-                )),
-            Obx(() => controller.usaReferenciaPago
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: CampoReferenciaPago(controlador: controller),
-                  )
-                : const SizedBox.shrink()),
-            const SizedBox(height: 30),
-
-            // Proyección de Fecha
-            Obx(() {
-              final newExp = controller.calculateNewExpirationDate();
-              final formattedDate = DateFormat('dd/MM/yyyy').format(newExp);
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.info.withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.event_available, color: AppColors.info),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Nueva Fecha de Expiración',
-                            style:
-                                TextStyle(color: c.textSecondary, fontSize: 12),
-                          ),
-                          Text(
-                            formattedDate,
-                            style: const TextStyle(
-                              color: AppColors.info,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-            const SizedBox(height: 40),
-
-            // Botón Enviar
-            Obx(() => BotonGuardar(
-                  texto: 'Registrar abono',
-                  guardando: controller.isLoading.value,
-                  onPressed: () => controller.procesarAbono(),
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Toggle segmentado Precio fijo / Libre
-  Widget _buildModoToggle(BuildContext context) {
-    final c = context.colores;
-    return Container(
-      decoration: BoxDecoration(
-        color: c.contraste.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.contraste.withOpacity(0.10)),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: Obx(() {
-        final fijo = controller.isPrecioFijo.value;
-        return Row(
-          children: [
-            _modoButton(context, 'Precio fijo', true, fijo),
-            _modoButton(context, 'Libre', false, fijo),
-          ],
-        );
-      }),
-    );
-  }
-
-  Widget _modoButton(
-      BuildContext context, String label, bool value, bool fijoActivo) {
-    final c = context.colores;
-    final seleccionado = fijoActivo == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => controller.setPrecioFijo(value),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: seleccionado ? AppColors.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
           ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: seleccionado ? FontWeight.w700 : FontWeight.w500,
-              color: seleccionado ? Colors.white : c.textSecondary,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              titulo,
+              style: TextStyle(
+                color: apagado ? c.textSecondary : c.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  // Cantidad de periodos, tipo de periodo y precio unitario
-  Widget _buildCamposAbono(BuildContext context) {
+  /// Paso 1. Con costo fijo, una tarjeta por periodo con su precio; con
+  /// abono libre, el periodo y cuánto paga en total. En los dos, "¿Cuántos?".
+  Widget _pasoTiempo(BuildContext context) {
     final c = context.colores;
+    final fijo = controller.isPrecioFijo.value;
+    final periodos =
+        fijo ? controller.periodosConPrecio : controller.durationTypes;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 1. Periodo a pagar: cantidad + tipo
-        Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: TextField(
-                controller: controller.durationController,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: TextStyle(color: c.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'Cantidad',
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
-                  prefixIconConstraints:
-                      const BoxConstraints(minWidth: 36, minHeight: 36),
-                  prefixIcon: IconButton(
-                    onPressed: controller.decrementDuration,
-                    icon: const Icon(Icons.remove, size: 18),
-                    color: AppColors.accent,
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 36, minHeight: 36),
-                    splashRadius: 18,
-                    tooltip: 'Restar',
-                  ),
-                  suffixIconConstraints:
-                      const BoxConstraints(minWidth: 36, minHeight: 36),
-                  suffixIcon: IconButton(
-                    onPressed: controller.incrementDuration,
-                    icon: const Icon(Icons.add, size: 18),
-                    color: AppColors.accent,
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 36, minHeight: 36),
-                    splashRadius: 18,
-                    tooltip: 'Sumar',
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 3,
-              child: Obx(() => DropdownButtonFormField<String>(
-                    value: controller.durationType.value,
-                    decoration: const InputDecoration(
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 18),
-                    ),
-                    dropdownColor: c.cardBackground,
-                    style: TextStyle(color: c.textPrimary),
-                    items: controller.durationTypes.map((type) {
-                      return DropdownMenuItem(value: type, child: Text(type));
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) controller.setDurationType(val);
-                    },
-                  )),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        // 2. Precio unitario
-        Obx(() {
-          final fijo = controller.isPrecioFijo.value;
-          final sinPrecio = fijo && controller.configuredPrice == null;
-          return TextField(
-            controller: controller.unitPriceController,
-            readOnly: fijo,
+        if (controller.hayCostosFijos) ...[
+          _pestanasModo(context, fijo),
+          const SizedBox(height: 14),
+        ],
+        LayoutBuilder(builder: (context, medidas) {
+          final ancho = (medidas.maxWidth - 10) / 2;
+          return Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final p in periodos)
+                SizedBox(
+                    width: ancho, child: _tarjetaPeriodo(context, p, fijo)),
+            ],
+          );
+        }),
+        const SizedBox(height: 18),
+        _cuantos(context),
+        if (!fijo) ...[
+          const SizedBox(height: 18),
+          TextField(
+            key: const Key('monto_libre'),
+            controller: controller.montoLibreController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
             ],
             style: TextStyle(
-                color: c.textPrimary,
-                fontSize: 24,
-                fontWeight: FontWeight.bold),
-            decoration: InputDecoration(
-              labelText: 'Precio por ${controller.durationUnitLabel}',
-              helperText: fijo ? 'Precio configurado' : 'Precio libre',
-              helperStyle: TextStyle(color: c.textSecondary),
-              errorText:
-                  sinPrecio ? 'Sin precio configurado para este periodo' : null,
-              suffixIcon: fijo
-                  ? Icon(Icons.lock_outline, size: 18, color: c.textSecondary)
-                  : null,
-              prefixText: '\$ ',
-              prefixStyle: const TextStyle(
-                  color: AppColors.accent,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold),
-              // Bloqueado (precio fijo): más apagado que un campo normal.
-              fillColor: fijo ? c.contraste.withOpacity(0.02) : null,
+              color: c.textPrimary,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
-          );
-        }),
-        const SizedBox(height: 20),
+            decoration: const InputDecoration(
+              labelText: '¿Cuánto paga en total?',
+              prefixText: '\$ ',
+              prefixStyle: TextStyle(
+                color: AppColors.accent,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ],
+    );
+  }
+
+  /// "Costo fijo | Abono libre", como dos botones grandes.
+  Widget _pestanasModo(BuildContext context, bool fijo) {
+    final c = context.colores;
+    Widget pestana(String texto, bool valor) {
+      final elegida = fijo == valor;
+      return Expanded(
+        child: Material(
+          color: elegida ? AppColors.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => controller.setPrecioFijo(valor),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                texto,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: elegida ? FontWeight.bold : FontWeight.w500,
+                  color: elegida ? Colors.white : c.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: c.contraste.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.contraste.withOpacity(0.10)),
+      ),
+      child: Row(children: [
+        pestana('Costo fijo', true),
+        pestana('Abono libre', false),
+      ]),
+    );
+  }
+
+  /// Una opción de periodo: "1 mes" y, con costo fijo, su precio.
+  Widget _tarjetaPeriodo(BuildContext context, String periodo, bool fijo) {
+    final c = context.colores;
+    final elegida = controller.durationType.value == periodo;
+    final precio = controller.prices.value?.priceFor(periodo);
+    return Material(
+      color: elegida ? AppColors.accent.withOpacity(0.12) : c.cardBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: elegida ? AppColors.accent : c.borde,
+          width: elegida ? 2 : 1,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => controller.setDurationType(periodo),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      periodoEnPalabras(1, periodo),
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (fijo && precio != null)
+                      Text(
+                        pesos(precio),
+                        style: const TextStyle(
+                          color: AppColors.accent,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (elegida)
+                const Icon(Icons.check_circle, color: AppColors.accent),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// "¿Cuántos?  [ − ]  2 meses  [ + ]", con botones grandes.
+  Widget _cuantos(BuildContext context) {
+    final c = context.colores;
+    Widget boton(IconData icono, String ayuda, VoidCallback? accion) {
+      return Material(
+        color: c.cardBackground,
+        shape: CircleBorder(side: BorderSide(color: c.borde)),
+        child: IconButton(
+          onPressed: accion,
+          tooltip: ayuda,
+          icon: Icon(icono, size: 26),
+          color: AppColors.accent,
+          constraints: const BoxConstraints(minWidth: 52, minHeight: 52),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '¿Cuántos?',
+            style: TextStyle(color: c.textSecondary, fontSize: 16),
+          ),
+        ),
+        boton(
+          Icons.remove,
+          'Uno menos',
+          controller.durationValue.value > 1
+              ? controller.decrementDuration
+              : null,
+        ),
+        SizedBox(
+          width: 104,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              controller.periodoElegido,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        boton(Icons.add, 'Uno más', controller.incrementDuration),
+      ],
+    );
+  }
+
+  /// Paso 3: como un recibo. Qué paga, cuánto y hasta cuándo queda pagado.
+  Widget _resumen(BuildContext context) {
+    final c = context.colores;
+    final fijo = controller.isPrecioFijo.value;
+    final precio = controller.configuredPrice;
+    final total = controller.totalAmount;
+    final hasta = controller.calculateNewExpirationDate();
+
+    Widget renglon(String izquierda, String derecha, {bool grande = false}) {
+      final estilo = TextStyle(
+        color: grande ? c.textPrimary : c.textSecondary,
+        fontSize: grande ? 20 : 16,
+        fontWeight: grande ? FontWeight.bold : FontWeight.normal,
+      );
+      return Row(
+        children: [
+          Expanded(child: Text(izquierda, style: estilo)),
+          Text(derecha,
+              style: grande
+                  ? estilo.copyWith(color: AppColors.accent, fontSize: 24)
+                  : estilo),
+        ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: c.borde),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          renglon(
+            fijo && precio != null
+                ? '${controller.periodoElegido} × ${pesos(precio)}'
+                : controller.periodoElegido,
+            pesos(total),
+          ),
+          Divider(height: 24, color: c.divisor),
+          renglon('Total', pesos(total), grande: true),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Icon(Icons.event_available, color: AppColors.success),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    const TextSpan(text: 'Pagado hasta: '),
+                    TextSpan(
+                      text: fechaLarga(hasta, conDia: true),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ]),
+                  style: TextStyle(color: c.textPrimary, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// El botón de abajo, siempre en el mismo lugar: "Continuar" mientras se
+  /// llenan los pasos y "Cobrar $1,000" en el resumen. Si falta algo, apagado
+  /// y diciendo qué.
+  Widget _botonCobrar(BuildContext context) {
+    final c = context.colores;
+    final falta = controller.faltaParaCobrar;
+    final enResumen = controller.pasoActual.value == 3;
+    return PieDeFormulario(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (falta != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                falta,
+                style: TextStyle(color: c.textSecondary, fontSize: 15),
+              ),
+            ),
+          BotonGuardar(
+            texto: !enResumen
+                ? 'Continuar'
+                : falta == null
+                    ? 'Cobrar ${pesos(controller.totalAmount)}'
+                    : 'Cobrar',
+            guardando: controller.isLoading.value,
+            onPressed: falta != null
+                ? null
+                : enResumen
+                    ? controller.procesarAbono
+                    : controller.continuar,
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildSuccessState(BuildContext context) {
     final c = context.colores;
     final client = controller.selectedClient.value!;
+    final vence = client.expirationDate;
     return CentradoDesplazable(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.success.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check_circle,
-                  size: 80, color: AppColors.success),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                UserThumbnail(
+                  imageUrl: client.photoUrl,
+                  userName: client.name,
+                  size: 110,
+                ),
+                Positioned(
+                  right: -6,
+                  bottom: -6,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: c.backgroundColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check_circle,
+                        size: 44, color: AppColors.success),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
             Text(
-              '¡Abono Registrado!',
+              '¡Listo!',
               style: TextStyle(
-                fontSize: 28,
+                fontSize: 30,
                 fontWeight: FontWeight.bold,
                 color: c.titleColor,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text(
-              'Se registró el abono para ${client.name} correctamente.',
+              vence == null
+                  ? 'Se registró el pago de ${client.name}.'
+                  : '${client.name} quedó pagado hasta el '
+                      '${fechaLarga(vence)}.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: c.textSecondary),
+              style: TextStyle(fontSize: 17, color: c.textSecondary),
             ),
             const SizedBox(height: 40),
             BotonGuardar(
@@ -567,7 +772,3 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 }
-
-/// "\$50" en vez de "\$50.00"; con centavos, completos.
-String _montoCorto(double v) =>
-    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);

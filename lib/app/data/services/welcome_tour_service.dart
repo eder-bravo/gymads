@@ -157,6 +157,19 @@ class WelcomeTourService extends GetxService {
   /// a la hora de darlo por visto.
   bool _activeTourShown = false;
 
+  /// Los pasos del recorrido en pantalla, en orden. Para saber desde dónde
+  /// retomarlo si se pausa.
+  List<GlobalKey>? _pasosEnCurso;
+
+  /// El recorrido que se ocultó porque llegó un aviso del lector, con los
+  /// pasos que le faltan (desde el que se estaba viendo). Se retoma al
+  /// cerrarse el aviso.
+  ({String tour, String? rol, List<GlobalKey> pasos})? _pausa;
+
+  /// La instancia en uso, para que los avisos (que llaman a [avisoAbierto] y
+  /// [avisoCerrado] desde un widget) puedan pausar y retomar el recorrido.
+  static WelcomeTourService? _instancia;
+
   /// Clave (por gimnasio y recorrido) que marca un recorrido del DUEÑO como
   /// pendiente.
   ///
@@ -171,6 +184,7 @@ class WelcomeTourService extends GetxService {
 
   /// Debe llamarse antes de que se construya cualquier widget `Showcase`.
   WelcomeTourService init() {
+    _instancia = this;
     _showcaseView = ShowcaseView.register(
       enableAutoScroll: true,
       disableBarrierInteraction: true,
@@ -243,6 +257,7 @@ class WelcomeTourService extends GetxService {
     _vistosEmpleado = null;
     _startedTours.clear();
     _attempts.clear();
+    _pausa = null;
   }
 
   /// Arranca el recorrido de una pantalla si sigue pendiente. Idempotente: se
@@ -270,12 +285,13 @@ class WelcomeTourService extends GetxService {
       // Si la pantalla se cerró o nunca terminó de cargar no se marca nada: el
       // recorrido queda pendiente para el próximo intento.
       if (!await _waitForTargets(showcaseView, steps)) return;
-      if (showcaseView.isShowcaseRunning) return;
+      if (showcaseView.isShowcaseRunning || !_alFrente(steps)) return;
 
       _startedTours.add(tourId);
       _activeTour = tourId;
       _rolDelTour = _sesion().rol;
       _activeTourShown = false;
+      _pasosEnCurso = steps;
       // Un respiro para que la transición de ruta termine de asentarse antes
       // de pintar el resaltado.
       showcaseView.startShowCase(
@@ -299,11 +315,129 @@ class WelcomeTourService extends GetxService {
   ) async {
     const interval = Duration(milliseconds: 200);
     const attempts = 25; // 5 s de margen para cargar
-    for (var attempt = 0; attempt < attempts; attempt++) {
-      if (steps.every(showcaseView.isTargetRendered)) return true;
+    var estuvoMontada = false;
+    for (var attempt = 0;; attempt++) {
+      final montada = steps.every(showcaseView.isTargetRendered);
+      if (montada && _alFrente(steps)) return true;
+      // Se fue de la pantalla, o no terminó de cargar a tiempo.
+      if (!montada && (estuvoMontada || attempt >= attempts)) return false;
+      // Montada pero tapada (un formulario encima, el aviso del lector): se
+      // espera a que se destape, sin límite, mientras siga montada. Así el
+      // recorrido sale al volver a la pantalla en vez de perderse.
+      estuvoMontada = estuvoMontada || montada;
       await Future<void>.delayed(interval);
     }
-    return false;
+  }
+
+  /// Dónde está montado cada paso, para saber si su pantalla es la que se
+  /// ve. Lo avisa `TourStep`: la clave del paso no sirve para eso porque
+  /// showcaseview no la pone en ningún widget.
+  static final Map<GlobalKey, BuildContext> _dondeEsta = {};
+
+  static void pasoMontado(GlobalKey paso, BuildContext contexto) =>
+      _dondeEsta[paso] = contexto;
+
+  static void pasoDesmontado(GlobalKey paso, BuildContext contexto) {
+    if (identical(_dondeEsta[paso], contexto)) _dondeEsta.remove(paso);
+  }
+
+  /// Si la pantalla de los pasos es la que se ve, sin otra encima.
+  ///
+  /// Que estén montados no basta: al pasar una tarjeta nueva y tocar
+  /// "Registrar", Clientes se abre con el formulario de alta ya encima. La
+  /// lista sigue montada debajo y el recorrido de Clientes salía sobre el
+  /// formulario. Con otra pantalla encima se queda pendiente para la próxima
+  /// visita.
+  ///
+  /// Tampoco con un aviso encima que no es otra pantalla: el del lector en
+  /// Inicio ("Bienvenido", "Tarjeta no registrada") se dibuja dentro de la
+  /// misma pantalla ([avisoAbierto]).
+  static bool _alFrente(List<GlobalKey> steps) =>
+      _avisosEncima == 0 &&
+      steps.every((paso) {
+        final contexto = _dondeEsta[paso];
+        if (contexto == null || !contexto.mounted) return true;
+        return ModalRoute.of(contexto)?.isCurrent ?? true;
+      });
+
+  static int _avisosEncima = 0;
+
+  /// Un aviso que tapa la pantalla sin ser otra pantalla. Mientras haya uno,
+  /// no arranca ningún recorrido, y si ya había uno en pantalla se pausa (el
+  /// aviso quedaba debajo de su capa, sin poder verse ni cerrarse). Cada
+  /// [avisoAbierto] lleva su [avisoCerrado].
+  ///
+  /// Pausar y retomar va al frame siguiente: el aviso llama desde `initState`
+  /// y `dispose`, y cerrar o abrir el recorrido ahí mismo lo haría a mitad de
+  /// una construcción.
+  static void avisoAbierto() {
+    _avisosEncima++;
+    _alSiguienteFrame(() => _instancia?._pausarPorAviso());
+  }
+
+  static void avisoCerrado() {
+    if (_avisosEncima > 0) _avisosEncima--;
+    if (_avisosEncima > 0) return;
+    _alSiguienteFrame(() => _instancia?._retomarTrasAviso());
+  }
+
+  /// Corre [accion] al terminar el frame, y pide uno: si nada en pantalla
+  /// cambia, el frame no llegaría y la acción se quedaría esperando.
+  static void _alSiguienteFrame(VoidCallback accion) {
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) => accion())
+      ..ensureVisualUpdate();
+  }
+
+  /// Oculta el recorrido en pantalla SIN darlo por visto y recuerda en qué
+  /// paso iba. Sigue en [_startedTours]: mientras está en pausa nadie lo
+  /// arranca otra vez desde el principio.
+  void _pausarPorAviso() {
+    final tour = _activeTour;
+    final pasos = _pasosEnCurso;
+    final showcaseView = _showcaseView;
+    if (_avisosEncima == 0 || tour == null || pasos == null) return;
+    if (showcaseView == null || !showcaseView.isShowcaseRunning) return;
+
+    final indice = pasos.indexOf(showcaseView.getActiveShowcaseKey ?? pasos[0]);
+    _pausa = (
+      tour: tour,
+      rol: _rolDelTour,
+      pasos: pasos.sublist(indice < 0 ? 0 : indice),
+    );
+    // Se suelta antes de cerrarlo, para que `_onDismiss` no lo marque visto.
+    _activeTour = null;
+    _rolDelTour = null;
+    _activeTourShown = false;
+    _pasosEnCurso = null;
+    recorridoEnCurso.value = false;
+    showcaseView.dismiss();
+  }
+
+  /// Vuelve a mostrar el recorrido pausado en el paso donde se quedó, en
+  /// cuanto su pantalla esté al frente (el aviso pudo llevar a otra, como
+  /// "Registrar" a Clientes). Si se salió de la pantalla, queda pendiente y
+  /// saldrá completo en la próxima visita.
+  Future<void> _retomarTrasAviso() async {
+    final pausa = _pausa;
+    final showcaseView = _showcaseView;
+    if (pausa == null || showcaseView == null) return;
+    _pausa = null;
+
+    final listo = await _waitForTargets(showcaseView, pausa.pasos);
+    if (!listo || showcaseView.isShowcaseRunning || _activeTour != null) {
+      _startedTours.remove(pausa.tour);
+      return;
+    }
+
+    _activeTour = pausa.tour;
+    _rolDelTour = pausa.rol;
+    _activeTourShown = false;
+    _pasosEnCurso = pausa.pasos;
+    showcaseView.startShowCase(
+      pausa.pasos,
+      delay: const Duration(milliseconds: 400),
+    );
   }
 
   /// El usuario llegó al final del recorrido: solo ese queda como visto, los de
@@ -321,6 +455,7 @@ class WelcomeTourService extends GetxService {
     _activeTour = null;
     _rolDelTour = null;
     _activeTourShown = false;
+    _pasosEnCurso = null;
     recorridoEnCurso.value = false;
     if (finished == null) return;
 
@@ -341,6 +476,7 @@ class WelcomeTourService extends GetxService {
     _activeTour = null;
     _rolDelTour = null;
     _activeTourShown = false;
+    _pasosEnCurso = null;
     recorridoEnCurso.value = false;
     if (dismissed == null) return;
     await _markSeen([dismissed], rol: rol);
@@ -354,12 +490,14 @@ class WelcomeTourService extends GetxService {
   /// [_activeTour] ANTES de cerrarlo, para que `_onDismiss`/`_onFinish` no lo
   /// marquen.
   void cancelarRecorridoEnCurso() {
+    _pausa = null;
     final activo = _activeTour;
     if (activo == null) return;
     recorridoEnCurso.value = false;
     _activeTour = null;
     _rolDelTour = null;
     _activeTourShown = false;
+    _pasosEnCurso = null;
     _startedTours.remove(activo);
 
     final showcaseView = _showcaseView;

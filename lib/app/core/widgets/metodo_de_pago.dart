@@ -53,13 +53,17 @@ class SelectorMetodoPago extends StatelessWidget {
                       color: selected ? Colors.white : c.textSecondary,
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      nombreMetodoDePago(metodo),
-                      style: TextStyle(
-                        color: selected ? Colors.white : c.textSecondary,
-                        fontWeight:
-                            selected ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 13,
+                    // Con letra grande en el teléfono, el nombre se parte en
+                    // dos renglones en vez de salirse de la pantalla.
+                    Flexible(
+                      child: Text(
+                        nombreMetodoDePago(metodo),
+                        style: TextStyle(
+                          color: selected ? Colors.white : c.textSecondary,
+                          fontWeight:
+                              selected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],

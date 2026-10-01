@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/services/background_rfid_service.dart';
+import '../../../data/services/welcome_tour_service.dart';
 import '../../shared/widgets/welcome_screen_widget.dart';
 
 /// Widget que muestra el diálogo de bienvenida cuando se escanea en el home
@@ -20,7 +21,8 @@ class BackgroundWelcomeDialog extends StatelessWidget {
       return Obx(() {
         // Primero verificamos si debemos mostrar la pantalla de tarjeta no registrada
         if (service.showNotFoundDialog.value) {
-          return WelcomeScreenWidget(
+          return _TapaLosRecorridos(
+              child: WelcomeScreenWidget(
             // Una tarjeta nueva es un aviso nuevo (con su animación), aunque
             // reemplace al anterior.
             key: ValueKey(service.avisoId.value),
@@ -37,7 +39,7 @@ class BackgroundWelcomeDialog extends StatelessWidget {
               Get.toNamed('/clientes',
                   arguments: {'new_rfid': service.lastScannedUid.value});
             },
-          );
+          ));
         }
 
         // Si no, verificamos el diálogo de bienvenida normal
@@ -48,7 +50,8 @@ class BackgroundWelcomeDialog extends StatelessWidget {
 
         final user = service.currentUser.value!;
 
-        return WelcomeScreenWidget(
+        return _TapaLosRecorridos(
+            child: WelcomeScreenWidget(
           key: ValueKey(service.avisoId.value),
           onClose: service.cerrarAviso,
           userName: user.name,
@@ -72,11 +75,39 @@ class BackgroundWelcomeDialog extends StatelessWidget {
                   Get.toNamed('/clientes', arguments: {'edit_cliente': user});
                 }
               : null,
-        );
+        ));
       });
     } catch (e) {
       // Servicio no disponible
       return const SizedBox.shrink();
     }
   }
+}
+
+/// Mientras el aviso del lector está en pantalla no arranca ningún recorrido:
+/// salía encima del aviso, tapando a quien acababa de pasar su tarjeta.
+class _TapaLosRecorridos extends StatefulWidget {
+  const _TapaLosRecorridos({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_TapaLosRecorridos> createState() => _TapaLosRecorridosState();
+}
+
+class _TapaLosRecorridosState extends State<_TapaLosRecorridos> {
+  @override
+  void initState() {
+    super.initState();
+    WelcomeTourService.avisoAbierto();
+  }
+
+  @override
+  void dispose() {
+    WelcomeTourService.avisoCerrado();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

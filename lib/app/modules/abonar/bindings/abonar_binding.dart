@@ -4,7 +4,6 @@ import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/providers/ingreso_provider.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
-import 'package:gymads/app/data/services/background_rfid_service.dart';
 import '../controllers/abonar_controller.dart';
 
 class AbonarBinding extends Bindings {
@@ -19,7 +18,8 @@ class AbonarBinding extends Bindings {
 
     if (!Get.isRegistered<UserRepository>()) {
       Get.lazyPut<UserRepository>(
-        () => UserRepository(Get.find<SupabaseApiProvider>(tag: 'users_provider')),
+        () => UserRepository(
+            Get.find<SupabaseApiProvider>(tag: 'users_provider')),
       );
     }
 
@@ -49,9 +49,6 @@ class AbonarBinding extends Bindings {
         userRepository: Get.find<UserRepository>(),
         ingresoService: Get.find<IngresoService>(),
         pricesRepository: Get.find<AbonoPricesRepository>(),
-        rfidService: Get.isRegistered<BackgroundRfidService>() 
-            ? Get.find<BackgroundRfidService>() 
-            : null,
       ),
     );
   }

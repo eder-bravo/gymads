@@ -171,16 +171,16 @@ class UserRepository {
     }
   }
 
-  /// Crea un cliente y devuelve su id. Si no se puede, lanza una excepción
-  /// con el motivo ([GuardadoFallido], [NumeroDeClienteEnUso], o el error de
-  /// conexión / [TimeoutException]).
+  /// Crea un cliente y lo devuelve guardado (con su id y la URL de su foto).
+  /// Si no se puede, lanza una excepción con el motivo ([GuardadoFallido],
+  /// [NumeroDeClienteEnUso], o el error de conexión / [TimeoutException]).
   ///
   /// - La foto es obligatoria si se tomó: si no se puede subir, el cliente NO
   ///   se crea (antes se creaba sin foto, en silencio).
   /// - Idempotente: si un intento anterior sí se guardó pero la respuesta no
   ///   llegó (mala señal) y se vuelve a intentar, el número de cliente ya
-  ///   existe con ese mismo cliente: se devuelve su id en vez de fallar.
-  Future<String> crearCliente(UserModel user, {File? photoFile}) async {
+  ///   existe con ese mismo cliente: se devuelve ese en vez de fallar.
+  Future<UserModel> crearCliente(UserModel user, {File? photoFile}) async {
     String? fotoSubida;
     if (photoFile != null) {
       fotoSubida = await _subirFoto(
@@ -198,7 +198,8 @@ class UserRepository {
           .select('id')
           .single()
           .timeout(limiteAlGuardar);
-      return fila['id'] as String;
+      // Con su foto ya subida: quien lo recibe (Abonar) la muestra.
+      return user.copyWith(id: fila['id'] as String);
     } catch (e) {
       final indice = restriccionUnicaViolada(e);
       if (indice == 'idx_users_branch_rfid_card') {
@@ -210,7 +211,7 @@ class UserRepository {
         if (existente != null && esElMismoAlta(existente, user)) {
           // Ya se había guardado; la foto de este reintento sobra.
           await _borrarFotoSuelta(fotoSubida);
-          return existente.id!;
+          return existente;
         }
         await _borrarFotoSuelta(fotoSubida);
         throw const NumeroDeClienteEnUso();
@@ -223,7 +224,7 @@ class UserRepository {
   /// Compatibilidad: como [crearCliente], pero null si falla.
   Future<String?> addUser(UserModel user, {File? photoFile}) async {
     try {
-      return await crearCliente(user, photoFile: photoFile);
+      return (await crearCliente(user, photoFile: photoFile)).id;
     } catch (e) {
       AppLogger.error('UserRepository', 'Fallo al crear el usuario', e);
       return null;

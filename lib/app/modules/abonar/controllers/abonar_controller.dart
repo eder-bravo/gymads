@@ -9,12 +9,11 @@ import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
-import 'package:gymads/app/data/services/background_rfid_service.dart';
 import 'package:gymads/app/modules/ingresos/controllers/ingresos_controller.dart';
-import 'package:gymads/app/data/services/rfid_reader_service.dart';
-import 'package:gymads/app/modules/shared/widgets/rfid_reader_animation.dart';
 import 'dart:async';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+
+import '../vigencia.dart';
 
 /// Qué ofrece la pantalla de éxito, según desde dónde se llegó a Abonar.
 enum AlTerminarAbono {
@@ -53,13 +52,11 @@ class AbonarController extends GetxController
   final UserRepository userRepository;
   final IngresoService ingresoService;
   final AbonoPricesRepository pricesRepository;
-  final BackgroundRfidService? rfidService;
 
   AbonarController({
     required this.userRepository,
     required this.ingresoService,
     required this.pricesRepository,
-    this.rfidService,
   });
 
   // Buscador
@@ -77,60 +74,91 @@ class AbonarController extends GetxController
   // Cliente seleccionado
   final Rx<UserModel?> selectedClient = Rx<UserModel?>(null);
 
-  // Formulario de Abono
-  final unitPriceController = TextEditingController(); // Precio por periodo
-  final durationController = TextEditingController(text: '1'); // Cantidad de periodos
-  final durationType = 'Meses'.obs; // Tipo de tiempo: Meses, Semanas, Días
+  // Cobro: cuánto tiempo (cantidad × periodo), cuánto y cómo paga.
+  final durationType = 'Meses'.obs; // Meses, Semanas, Días o Años
+  final durationValue = 1.obs;
+
   /// Como se guarda en `metodo_pago` (efectivo, tarjeta_debito…).
   final paymentMethod = 'efectivo'.obs;
 
-  // Espejo reactivo de los campos de texto, para recalcular total y fecha en vivo
-  final unitPrice = 0.0.obs;
-  final durationValue = 1.obs;
+  /// Abono libre: lo que paga en total, escrito a mano.
+  final montoLibreController = TextEditingController();
+  final montoLibre = 0.0.obs;
 
-  double get totalAmount => unitPrice.value * durationValue.value;
+  double get totalAmount => totalDelCobro(
+        costoFijo: isPrecioFijo.value,
+        precioPorPeriodo: configuredPrice,
+        cantidad: durationValue.value,
+        montoLibre: montoLibre.value,
+      );
 
-  /// Unidad en singular para etiquetas ("por mes", "por semana"...)
-  String get durationUnitLabel {
-    switch (durationType.value) {
-      case 'Meses':
-        return 'mes';
-      case 'Semanas':
-        return 'semana';
-      case 'Días':
-        return 'día';
-      case 'Años':
-        return 'año';
-      default:
-        return 'periodo';
-    }
-  }
+  /// Qué falta para poder cobrar, o null si ya se puede.
+  String? get faltaParaCobrar => faltaParaCobrarDe(
+        costoFijo: isPrecioFijo.value,
+        precioPorPeriodo: configuredPrice,
+        cantidad: durationValue.value,
+        montoLibre: montoLibre.value,
+      );
+
+  /// "2 meses", "1 semana".
+  String get periodoElegido =>
+      periodoEnPalabras(durationValue.value, durationType.value);
 
   /// Los mismos que en Vender: débito y crédito por separado.
   final paymentMethods = metodosDePago;
 
   /// Si el método elegido lleva folio o referencia.
-  bool get usaReferenciaPago => metodosConReferencia.contains(paymentMethod.value);
+  bool get usaReferenciaPago =>
+      metodosConReferencia.contains(paymentMethod.value);
 
   void setPaymentMethod(String metodo) {
     paymentMethod.value = metodo;
     // La referencia es de una operación concreta: no sobrevive al cambio.
     limpiarReferencia();
   }
+
   final durationTypes = ['Meses', 'Semanas', 'Días', 'Años'];
 
   // Precios fijos configurados por el gimnasio (por día, semana, mes y año)
   final Rx<AbonoPricesModel?> prices = Rx<AbonoPricesModel?>(null);
+
+  /// Costo fijo (el precio configurado del periodo) o abono libre (se
+  /// escribe lo que paga).
   final isPrecioFijo = true.obs;
+
+  /// Si el gimnasio configuró al menos un precio: sin ninguno, solo hay
+  /// abono libre.
+  bool get hayCostosFijos => prices.value?.hasAnyPrice ?? false;
+
+  /// Los periodos que se ofrecen con costo fijo: los que tienen precio, en
+  /// el orden en que se suelen cobrar.
+  List<String> get periodosConPrecio => [
+        for (final p in const ['Meses', 'Semanas', 'Días', 'Años'])
+          if ((prices.value?.priceFor(p) ?? 0) > 0) p,
+      ];
 
   /// Precio configurado para el periodo seleccionado, si existe.
   double? get configuredPrice => prices.value?.priceFor(durationType.value);
 
   final isLoading = false.obs;
   final isSuccess = false.obs;
-  
-  // Suscripción al stream RFID
-  StreamSubscription<String>? _rfidSubscription;
+
+  /// El paso del cobro que está abierto: 1 cuánto tiempo, 2 cómo paga,
+  /// 3 resumen. Los anteriores se ven cerrados, con lo que se eligió.
+  final pasoActual = 1.obs;
+
+  /// Cierra el paso abierto y abre el siguiente.
+  void continuar() {
+    if (pasoActual.value == 1 && faltaParaCobrar != null) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (pasoActual.value < 3) pasoActual.value++;
+  }
+
+  /// Vuelve a abrir un paso ya hecho para cambiarlo. Los de después se
+  /// vuelven a confirmar con "Continuar".
+  void irAPaso(int paso) {
+    if (paso < pasoActual.value) pasoActual.value = paso;
+  }
 
   // ─── Tour de bienvenida ───
   // Solo cubre la pantalla de búsqueda: el formulario de cobro no existe
@@ -148,14 +176,12 @@ class AbonarController extends GetxController
   @override
   void onInit() {
     super.onInit();
-    
+
     // Si venimos con un cliente preseleccionado
     if (Get.arguments != null && Get.arguments['cliente'] != null) {
       selectedClient.value = Get.arguments['cliente'];
     }
     alTerminar = alTerminarDesde(Get.arguments);
-
-    _setupRfidListener();
 
     // Escuchar cambios en el buscador
     searchController.addListener(_applyFilter);
@@ -165,9 +191,9 @@ class AbonarController extends GetxController
     recargarAlCambiar(
         {TablaEnVivo.clientes}, () => loadClients(silencioso: true));
 
-    // Mantener el estado reactivo en sincronía con los campos de texto
-    unitPriceController.addListener(_onUnitPriceChanged);
-    durationController.addListener(_onDurationChanged);
+    montoLibreController.addListener(() {
+      montoLibre.value = double.tryParse(montoLibreController.text) ?? 0.0;
+    });
 
     _loadPrices();
   }
@@ -190,8 +216,8 @@ class AbonarController extends GetxController
     _modoInicial();
   }
 
-  /// Cómo abre el cobro: con precio fijo si hay al menos un precio
-  /// configurado, y en un periodo que lo tenga. El staff puede pasar a libre
+  /// Cómo abre el cobro: con costo fijo si hay al menos un precio
+  /// configurado, y en un periodo que lo tenga. Se puede pasar a abono libre
   /// en cada cobro.
   ///
   /// No se sigue `payment_mode`: un gimnasio que eligió "libre" en el
@@ -199,80 +225,35 @@ class AbonarController extends GetxController
   /// libre, teniendo precios que ofrecer.
   void _modoInicial() {
     final precios = prices.value;
-    isPrecioFijo.value = precios?.hasAnyPrice ?? false;
+    isPrecioFijo.value = hayCostosFijos;
     if (precios != null) {
       durationType.value = periodoConPrecio(precios, durationType.value);
     }
-    applyFixedPrice();
   }
 
-  /// Cambia entre precio fijo (tomado de la configuración) y precio libre.
+  /// Cambia entre costo fijo y abono libre.
   void setPrecioFijo(bool fijo) {
     if (fijo == isPrecioFijo.value) return;
+    if (fijo && !hayCostosFijos) return;
     isPrecioFijo.value = fijo;
-    if (fijo) {
-      applyFixedPrice();
-    } else {
-      // Al pasar a libre se deja vacío para escribir el precio. Si se quedaba
-      // el fijo ("350.00"), el campo ya tenía sus dos decimales y rechazaba
-      // cualquier dígito tecleado al final: parecía que no dejaba escribir.
-      unitPriceController.clear();
+    if (fijo && configuredPrice == null) {
+      durationType.value = periodosConPrecio.first;
     }
   }
 
-  /// Cambia el periodo y, en modo fijo, recarga el precio configurado.
-  void setDurationType(String type) {
-    durationType.value = type;
-    applyFixedPrice();
-  }
+  void setDurationType(String type) => durationType.value = type;
 
-  /// En modo fijo escribe el precio configurado del periodo actual en el campo
-  /// (el listener del TextEditingController recalcula total y fecha).
-  void applyFixedPrice() {
-    if (!isPrecioFijo.value) return;
-    final price = configuredPrice;
-    unitPriceController.text = price == null ? '' : price.toStringAsFixed(2);
-  }
-
-  void _onUnitPriceChanged() {
-    unitPrice.value = double.tryParse(unitPriceController.text) ?? 0.0;
-  }
-
-  void _onDurationChanged() {
-    durationValue.value = int.tryParse(durationController.text) ?? 0;
-  }
-
-  void incrementDuration() {
-    durationController.text = (durationValue.value + 1).toString();
-  }
+  void incrementDuration() => durationValue.value++;
 
   void decrementDuration() {
-    if (durationValue.value > 1) {
-      durationController.text = (durationValue.value - 1).toString();
-    }
+    if (durationValue.value > 1) durationValue.value--;
   }
 
   @override
   void onClose() {
     searchController.dispose();
-    unitPriceController.dispose();
-    durationController.dispose();
-    _rfidSubscription?.cancel();
+    montoLibreController.dispose();
     super.onClose();
-  }
-
-  void _setupRfidListener() {
-    if (rfidService != null) {
-      _rfidSubscription = rfidService!.lastScannedUid.listen((rfidUid) {
-        // Ignorar la auto-búsqueda para permitir que el botón manual tenga prioridad
-        // Opcional: Podrías habilitar esto de nuevo si quieres ambos modos
-        /*
-        if (rfidUid.isNotEmpty && Get.currentRoute == '/abonar') {
-          _searchByRfid(rfidUid);
-        }
-        */
-      });
-    }
   }
 
   /// Trae la lista de clientes y la deja ordenada por nombre.
@@ -327,74 +308,8 @@ class AbonarController extends GetxController
     return buffer.toString();
   }
 
-  Future<void> _searchByRfid(String rfid) async {
-    isLoadingClients.value = true;
-    try {
-      final allUsers = await userRepository.getAllUsers();
-      final user = allUsers.firstWhereOrNull((u) => u.rfidCard == rfid);
-      
-      if (user != null) {
-        selectClient(user);
-        _showSnackbar('Éxito', 'Cliente encontrado por tarjeta RFID');
-      } else {
-        _showSnackbar('No encontrado', 'Tarjeta RFID no registrada', isError: true);
-      }
-    } catch (e) {
-      AppLogger.error('AbonarController', 'Error buscando por RFID', e);
-    } finally {
-      isLoadingClients.value = false;
-    }
-  }
-
-  // Método manual de NFC que invoca el diálogo
-  void startNfcSearch(BuildContext context) {
-    Timer? pollTimer;
-    BuildContext? localDialogContext;
-    
-    // Pausar procesamiento automático
-    rfidService?.pauseScanning();
-
-    pollTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) async {
-      try {
-        final uid = await RfidReaderService.checkForCardSilent();
-        if (uid != null && uid.isNotEmpty && uid != 'NO_CARD') {
-          timer.cancel();
-          if (localDialogContext != null && Navigator.canPop(localDialogContext!)) {
-            Navigator.of(localDialogContext!).pop();
-          } else {
-            Get.back();
-          }
-          // Realizar la búsqueda con el UID encontrado
-          _searchByRfid(uid);
-        }
-      } catch (e) {
-        // Ignorar errores en modo silencioso
-      }
-    });
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        localDialogContext = dialogContext;
-        return RfidReaderAnimation(
-          isReading: true,
-          onCancel: () {
-            pollTimer?.cancel();
-            if (Navigator.canPop(dialogContext)) {
-              Navigator.of(dialogContext).pop();
-            }
-          },
-        );
-      },
-    ).then((_) {
-      pollTimer?.cancel();
-      // Reanudar procesamiento de fondo
-      rfidService?.resumeScanning();
-    });
-  }
-
   void selectClient(UserModel client) {
+    pasoActual.value = 1;
     selectedClient.value = client;
     // Limpiar el buscador ya repuebla la lista con todos los clientes, así que
     // al volver aquí sigue estando lista.
@@ -413,13 +328,14 @@ class AbonarController extends GetxController
     selectedClient.value = null;
     paymentMethod.value = 'efectivo';
     limpiarReferencia();
-    unitPriceController.clear();
-    durationController.text = '1';
+    montoLibreController.clear();
+    durationValue.value = 1;
     durationType.value = 'Meses';
     // El siguiente cliente vuelve a empezar con precio fijo, aunque al
     // anterior se le haya cobrado libre.
     _modoInicial();
     isSuccess.value = false;
+    pasoActual.value = 1;
     loadClients();
   }
 
@@ -428,7 +344,8 @@ class AbonarController extends GetxController
   DateTime calculatePeriodStartDate() {
     final client = selectedClient.value;
     final now = DateTime.now();
-    if (client?.expirationDate != null && client!.expirationDate!.isAfter(now)) {
+    if (client?.expirationDate != null &&
+        client!.expirationDate!.isAfter(now)) {
       return client.expirationDate!;
     }
     return now;
@@ -456,31 +373,22 @@ class AbonarController extends GetxController
 
   Future<void> procesarAbono() async {
     if (selectedClient.value == null) {
-      _showSnackbar('Error', 'Debes seleccionar un cliente primero', isError: true);
+      _showSnackbar('Error', 'Debes seleccionar un cliente primero',
+          isError: true);
+      return;
+    }
+
+    final falta = faltaParaCobrar;
+    if (falta != null) {
+      _showSnackbar('Falta un dato', falta, isError: true);
       return;
     }
 
     final periods = durationValue.value;
-    if (periods <= 0) {
-      _showSnackbar('Error', 'Selecciona una cantidad de periodos válida', isError: true);
-      return;
-    }
-
-    final precioUnitario = unitPrice.value;
-    if (precioUnitario <= 0) {
-      _showSnackbar(
-        'Error',
-        isPrecioFijo.value
-            ? 'No hay precio configurado para este periodo'
-            : 'Ingresa un precio unitario válido',
-        isError: true,
-      );
-      return;
-    }
-
     final amount = totalAmount;
-    final descripcion =
-        'Abono: $periods ${durationType.value.toLowerCase()} × \$${precioUnitario.toStringAsFixed(2)}';
+    final descripcion = isPrecioFijo.value
+        ? 'Abono: $periods ${durationType.value.toLowerCase()} × \$${configuredPrice!.toStringAsFixed(2)}'
+        : 'Abono: $periodoElegido · \$${amount.toStringAsFixed(2)}';
 
     isLoading.value = true;
     try {
@@ -499,7 +407,8 @@ class AbonarController extends GetxController
       );
 
       // Actualizar en base de datos
-      final success = await userRepository.updateUser(client.id!, updatedClient);
+      final success =
+          await userRepository.updateUser(client.id!, updatedClient);
 
       if (success) {
         // Registrar el Ingreso
@@ -509,17 +418,16 @@ class AbonarController extends GetxController
             clienteNombre: client.name,
             monto: amount,
             metodoPago: paymentMethod.value,
-            referenciaPago:
-                usaReferenciaPago ? referenciaParaGuardar : null,
+            referenciaPago: usaReferenciaPago ? referenciaParaGuardar : null,
             descripcion: descripcion,
             usuarioStaff: 'Staff',
-            notas: isPrecioFijo.value ? 'Abono fijo' : 'Abono libre',
+            notas: isPrecioFijo.value ? 'Costo fijo' : 'Abono libre',
             periodoInicio: periodStartDate,
             periodoFin: newExpirationDate,
           );
-          
+
           if (Get.isRegistered<IngresosController>()) {
-             IngresosController.refreshIngresosGlobally();
+            IngresosController.refreshIngresosGlobally();
           }
         } catch (e) {
           AppLogger.error('AbonarController', 'Error registrando ingreso', e);
@@ -540,7 +448,8 @@ class AbonarController extends GetxController
         isSuccess.value = true;
         _showSnackbar('Éxito', 'Abono registrado correctamente');
       } else {
-        _showSnackbar('Error', 'No se pudo actualizar el cliente', isError: true);
+        _showSnackbar('Error', 'No se pudo actualizar el cliente',
+            isError: true);
       }
     } catch (e) {
       _showSnackbar('Error', 'Ocurrió un error: $e', isError: true);

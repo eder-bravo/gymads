@@ -49,7 +49,7 @@ class OnboardingController extends GetxController {
     }
   }
 
-  /// "Abonos fijos": se pasa a configurar los precios. El modo NO se guarda
+  /// "Costos fijos": se pasa a configurar los precios. El modo NO se guarda
   /// todavía; se guarda al confirmar los precios (ver AbonoPricesController).
   /// Así, si el usuario abandona a medias, el asistente completo se repite.
   void chooseFijo() {

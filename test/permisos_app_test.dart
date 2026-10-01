@@ -1,3 +1,8 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/services/permisos_app.dart';
@@ -14,7 +19,10 @@ class _SolicitudFalsa implements SolicitudPermisos {
   @override
   final List<PermisoApp> permisos;
   final Map<PermisoApp, EstadoPermiso> respuesta;
+  Future<Map<PermisoApp, EstadoPermiso>>? pendiente;
+  Object? error;
   int pedidas = 0;
+  int canceladas = 0;
 
   @override
   Future<Map<PermisoApp, EstadoPermiso>> estados() async => respuesta;
@@ -22,8 +30,13 @@ class _SolicitudFalsa implements SolicitudPermisos {
   @override
   Future<Map<PermisoApp, EstadoPermiso>> pedirTodos() async {
     pedidas++;
-    return respuesta;
+    if (error != null) throw error!;
+    final enCurso = pendiente;
+    return enCurso == null ? respuesta : await enCurso;
   }
+
+  @override
+  void cancelar() => canceladas++;
 
   @override
   Future<void> abrirAjustes() async {}
@@ -117,6 +130,7 @@ void main() {
 
   group('Pantalla', () {
     tearDown(Get.reset);
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
 
     Future<_SolicitudFalsa> mostrar(
       WidgetTester tester, {
@@ -192,6 +206,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Bloqueado'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Abrir ajustes'), 100);
       expect(find.text('Abrir ajustes'), findsOneWidget);
     });
 
@@ -213,6 +228,72 @@ void main() {
       expect(find.text('Permitir'), findsOneWidget);
       expect(find.text('Listo'), findsOneWidget);
       expect(find.text('Ahora no'), findsNothing);
+    });
+
+    testWidgets('un fallo al pedir permisos permite continuar', (tester) async {
+      final solicitud = await mostrar(tester, respuesta: {});
+      solicitud.error = PlatformException(code: 'permiso_fallido');
+      await tester.tap(find.text('Permitir'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Sin confirmar'), findsNWidgets(4));
+      expect(find.text('Continuar'), findsOneWidget);
+      expect(PermisosApp.yaSePidieron, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'puede salir con un permiso pendiente e ignora su respuesta tardía',
+        (tester) async {
+      final pendiente = Completer<Map<PermisoApp, EstadoPermiso>>();
+      final solicitud = _SolicitudFalsa(_deIphone, {})
+        ..pendiente = pendiente.future;
+      final controller = Get.put(PermisosController(
+        solicitud: solicitud,
+        desdeConfiguracion: false,
+      ));
+      await tester.pumpWidget(GetMaterialApp(
+        home: const PermisosView(),
+        getPages: [
+          GetPage(
+              name: Routes.HOME,
+              page: () => const Scaffold(body: Text('Inicio de prueba')))
+        ],
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Permitir'));
+      await tester.pump();
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      await tester.tap(find.text('Continuar sin esperar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Inicio de prueba'), findsOneWidget);
+      expect(PermisosApp.yaSePidieron, isTrue);
+      expect(solicitud.canceladas, greaterThan(0));
+
+      pendiente.complete({PermisoApp.camara: EstadoPermiso.permitido});
+      await tester.pumpAndSettle();
+      expect(controller.estados, isEmpty);
+      expect(find.text('Inicio de prueba'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Windows continúa sin esperar un diálogo de permisos',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      Get.put(PermisosController(
+          solicitud: SolicitudPermisosSistema(), desdeConfiguracion: false));
+      await tester.pumpWidget(const GetMaterialApp(home: PermisosView()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Comprobar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Sin confirmar'), findsOneWidget);
+      expect(find.text('Continuar'), findsOneWidget);
+      expect(find.text('Abrir ajustes'), findsOneWidget);
+      debugDefaultTargetPlatformOverride = null;
     });
   });
 }

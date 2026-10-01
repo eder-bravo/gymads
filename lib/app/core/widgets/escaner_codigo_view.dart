@@ -8,6 +8,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/theme/app_colors.dart';
 import '../utils/confirmador_codigo.dart';
 import '../../../core/theme/siempre_oscuro.dart';
+import '../utils/plataforma_app.dart';
+import 'escaner_fisico_view.dart';
 
 /// Lector de códigos de barras.
 ///
@@ -104,7 +106,7 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
   @override
   void dispose() {
     _ocultarAviso?.cancel();
-    _controlador.dispose();
+    if (!PlataformaApp.escanerFisico) _controlador.dispose();
     super.dispose();
   }
 
@@ -174,6 +176,9 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
 
   @override
   Widget build(BuildContext context) {
+    if (PlataformaApp.escanerFisico) {
+      return EscanerFisicoView(titulo: widget.titulo, alLeer: widget.alLeer);
+    }
     return SiempreOscuro(
         child: Scaffold(
       backgroundColor: Colors.black,

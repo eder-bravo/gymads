@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/user_model.dart';
@@ -16,7 +17,8 @@ class ClientesView extends GetView<ClientesController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 1200,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Clientes',
@@ -125,7 +127,7 @@ class ClientesView extends GetView<ClientesController> {
 
                     return Refrescable(
                       onRefresh: controller.fetchClientes,
-                      child: ListView.builder(
+                      child: ListaAdaptable(
                         itemCount: filteredClientes.length,
                         padding: const EdgeInsets.only(bottom: 80),
                         itemBuilder: (context, index) {

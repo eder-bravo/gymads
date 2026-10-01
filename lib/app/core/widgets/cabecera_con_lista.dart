@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/plataforma_app.dart';
 
 /// Una cabecera (resumen, buscador, filtros) encima de una lista que ocupa el
 /// resto de la pantalla.
@@ -34,7 +35,9 @@ class CabeceraConLista extends StatelessWidget {
     // escribir el precio de un abono libre, ni buscar). El tamaño de la
     // pantalla no cambia con el teclado: solo al girar el teléfono.
     final alto = MediaQuery.sizeOf(context).height;
-    if (alto >= alturaMinima) {
+    // En una ventana de escritorio el tamaño puede cambiar continuamente.
+    // Conservar el mismo desplazable evita recrear el buscador y perder foco.
+    if (!PlataformaApp.escritorio && alto >= alturaMinima) {
       return Column(
         children: [
           ...cabecera,

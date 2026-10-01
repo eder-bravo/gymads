@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -14,7 +15,8 @@ class CuentaView extends GetView<ConfiguracionController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 800,
       backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Mi Cuenta'),
       body: SafeArea(
@@ -28,7 +30,8 @@ class CuentaView extends GetView<ConfiguracionController> {
                 // Personal info section
                 _buildSectionLabel(context, 'Información Personal'),
                 const SizedBox(height: 12),
-                _buildInfoTile(context,
+                _buildInfoTile(
+                  context,
                   icon: Icons.person_outline,
                   label: 'Nombre(s)',
                   value: controller.firstName.value,
@@ -40,7 +43,8 @@ class CuentaView extends GetView<ConfiguracionController> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _buildInfoTile(context,
+                _buildInfoTile(
+                  context,
                   icon: Icons.person_outline,
                   label: 'Apellidos',
                   value: controller.lastName.value,
@@ -60,7 +64,8 @@ class CuentaView extends GetView<ConfiguracionController> {
                 // El staff entra con código, sin correo: no tiene sentido
                 // mostrar una fila vacía.
                 if (controller.userEmail.value.isNotEmpty) ...[
-                  _buildInfoTile(context,
+                  _buildInfoTile(
+                    context,
                     icon: Icons.email_outlined,
                     label: 'Correo electrónico',
                     value: controller.userEmail.value,
@@ -69,7 +74,8 @@ class CuentaView extends GetView<ConfiguracionController> {
                   const SizedBox(height: 8),
                 ],
                 if (controller.tieneContrasena) ...[
-                  _buildInfoTile(context,
+                  _buildInfoTile(
+                    context,
                     icon: Icons.lock_outline,
                     label: 'Contraseña',
                     value: '••••••••',
@@ -77,7 +83,8 @@ class CuentaView extends GetView<ConfiguracionController> {
                   ),
                   const SizedBox(height: 8),
                 ],
-                _buildInfoTile(context,
+                _buildInfoTile(
+                  context,
                   icon: Icons.badge_outlined,
                   label: 'Rol',
                   value: controller.userRole.value,
@@ -89,15 +96,16 @@ class CuentaView extends GetView<ConfiguracionController> {
                 // Gym info section
                 _buildSectionLabel(context, 'Gimnasio'),
                 const SizedBox(height: 12),
-                _buildInfoTile(context,
+                _buildInfoTile(
+                  context,
                   icon: Icons.fitness_center,
                   label: 'Gimnasio',
                   value: controller.gymName.value.isNotEmpty
                       ? controller.gymName.value
                       : 'Cargando...',
                   // Espeja la política RLS de `gyms`: dueño y encargado.
-                  editable: TenantContextService.to
-                      .can(Permission.editarGimnasio),
+                  editable:
+                      TenantContextService.to.can(Permission.editarGimnasio),
                   onEdit: () => _showEditDialog(
                     context,
                     title: 'Gimnasio',
@@ -106,15 +114,16 @@ class CuentaView extends GetView<ConfiguracionController> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _buildInfoTile(context,
+                _buildInfoTile(
+                  context,
                   icon: Icons.location_on_outlined,
                   label: 'Sucursal',
                   value: controller.branchName.value.isNotEmpty
                       ? controller.branchName.value
                       : 'Cargando...',
                   // Espeja la política RLS de `branches`: dueño y encargado.
-                  editable: TenantContextService.to
-                      .can(Permission.editarGimnasio),
+                  editable:
+                      TenantContextService.to.can(Permission.editarGimnasio),
                   onEdit: () => _showEditDialog(
                     context,
                     title: 'Sucursal',
@@ -280,7 +289,8 @@ class CuentaView extends GetView<ConfiguracionController> {
     );
   }
 
-  Widget _buildInfoTile(BuildContext context, {
+  Widget _buildInfoTile(
+    BuildContext context, {
     required IconData icon,
     required String label,
     required String value,
@@ -322,8 +332,7 @@ class CuentaView extends GetView<ConfiguracionController> {
         ),
         trailing: editable && onEdit != null
             ? IconButton(
-                icon: Icon(Icons.edit_outlined,
-                    size: 20, color: c.titleColor),
+                icon: Icon(Icons.edit_outlined, size: 20, color: c.titleColor),
                 onPressed: onEdit,
               )
             : null,

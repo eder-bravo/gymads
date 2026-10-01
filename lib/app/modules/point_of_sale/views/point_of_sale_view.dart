@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -9,6 +10,8 @@ import '../../../core/utils/category_icons.dart';
 import '../../../core/widgets/tour_step.dart';
 import '../../../core/widgets/cabecera_con_lista.dart';
 import '../../../core/widgets/refrescable.dart';
+import '../../../core/widgets/escaner_automatico.dart';
+import '../../../core/utils/plataforma_app.dart';
 import '../../../global_widgets/app_header.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:gymads/app/core/widgets/metodo_de_pago.dart';
@@ -20,23 +23,25 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    final pantalla = ScaffoldAdaptable(
+      anchoMaximo: 1480,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Punto de Venta',
         actions: [
-          TourStep(
-            tourKey: controller.keyEscanear,
-            isFirstStep: true,
-            title: 'Escanear productos',
-            description: 'Escanea productos y se agregan solos al carrito.',
-            borderRadius: 24,
-            child: IconButton(
-              icon: const Icon(Icons.qr_code_scanner),
-              onPressed: controller.escanearAlCarrito,
-              tooltip: 'Escanear productos',
+          if (!PlataformaApp.escritorio)
+            TourStep(
+              tourKey: controller.keyEscanear,
+              isFirstStep: true,
+              title: 'Escanear productos',
+              description: 'Escanea productos y se agregan solos al carrito.',
+              borderRadius: 24,
+              child: IconButton(
+                icon: const Icon(Icons.qr_code_scanner),
+                onPressed: controller.escanearAlCarrito,
+                tooltip: 'Escanear productos',
+              ),
             ),
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: controller.refrescar,
@@ -45,119 +50,153 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: CabeceraConLista(
-                cabecera: [
-                  // Barra de búsqueda
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                    child: TourStep(
-                      tourKey: controller.keyBuscar,
-                      title: 'Buscador',
-                      description: 'Busca por nombre o código.',
-                      child: AppSearchField(
-                        hintText: 'Buscar productos...',
-                        onChanged: controller.searchProducts,
+        child: LayoutBuilder(builder: (context, constraints) {
+          final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
+          final lateral = PlataformaApp.escritorio &&
+              constraints.maxWidth >= 1100 * escala &&
+              constraints.maxHeight >= 420;
+          return Flex(
+            direction: lateral ? Axis.horizontal : Axis.vertical,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: CabeceraConLista(
+                  cabecera: [
+                    if (PlataformaApp.escritorio)
+                      TourStep(
+                        tourKey: controller.keyEscanear,
+                        isFirstStep: true,
+                        title: 'Escanear productos',
+                        description:
+                            'Usa tu lector: cada lectura agrega una unidad al carrito.',
+                        child: const AvisoEscanerAutomatico(),
+                      ),
+                    // Barra de búsqueda
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                      child: TourStep(
+                        tourKey: controller.keyBuscar,
+                        title: 'Buscador',
+                        description: 'Busca por nombre o código.',
+                        child: BusquedaConEscaner(
+                            child: AppSearchField(
+                          hintText: 'Buscar productos...',
+                          onChanged: controller.searchProducts,
+                        )),
                       ),
                     ),
-                  ),
 
-                  // Filtro de categorías
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: TourStep(
-                      tourKey: controller.keyCategorias,
-                      title: 'Categorías',
-                      description: 'Filtra los productos por categoría.',
-                      child: Obx(() => CategoryFilterChips(
-                            categories: controller.activeCategories
-                                .map((c) => CategoryChipData(
-                                      id: c.id,
-                                      label: c.name,
-                                      icon: CategoryIcons.resolve(c.icon),
-                                    ))
-                                .toList(),
-                            selectedId: controller.selectedCategoryId,
-                            onSelected: controller.setSelectedCategory,
-                          )),
+                    // Filtro de categorías
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: TourStep(
+                        tourKey: controller.keyCategorias,
+                        title: 'Categorías',
+                        description: 'Filtra los productos por categoría.',
+                        child: Obx(() => CategoryFilterChips(
+                              categories: controller.activeCategories
+                                  .map((c) => CategoryChipData(
+                                        id: c.id,
+                                        label: c.name,
+                                        icon: CategoryIcons.resolve(c.icon),
+                                      ))
+                                  .toList(),
+                              selectedId: controller.selectedCategoryId,
+                              onSelected: controller.setSelectedCategory,
+                            )),
+                      ),
                     ),
-                  ),
-                ],
-                // Grid de productos
-                lista: TourStep(
-                  tourKey: controller.keyProductos,
-                  title: 'Tus productos',
-                  description:
-                      'Toca un producto para agregarlo. Déjalo presionado para fijarlo arriba.',
-                  child: Obx(() {
-                    if (controller.isLoading) {
-                      return const Center(
-                        child:
-                            CircularProgressIndicator(color: AppColors.accent),
-                      );
-                    }
+                  ],
+                  // Grid de productos
+                  lista: TourStep(
+                    tourKey: controller.keyProductos,
+                    title: 'Tus productos',
+                    description:
+                        'Toca un producto para agregarlo. Déjalo presionado para fijarlo arriba.',
+                    child: Obx(() {
+                      if (controller.isLoading) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                              color: AppColors.accent),
+                        );
+                      }
 
-                    final products = controller.filteredProducts;
+                      final products = controller.filteredProducts;
 
-                    if (products.isEmpty) {
-                      return Refrescable.centrado(
+                      if (products.isEmpty) {
+                        return Refrescable.centrado(
+                          onRefresh: controller.refrescar,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.inventory_2_outlined,
+                                  size: 64, color: c.textSecondary),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No hay productos disponibles',
+                                style: TextStyle(color: c.textSecondary),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return Refrescable(
                         onRefresh: controller.refrescar,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.inventory_2_outlined,
-                                size: 64, color: c.textSecondary),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No hay productos disponibles',
-                              style: TextStyle(color: c.textSecondary),
-                            ),
-                          ],
+                        child: GridView.builder(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          // Columnas según el ancho disponible (2 en un teléfono
+                          // vertical, más de lado o en tablet) y alto fijo según
+                          // el contenido. Con una proporción ancho/alto, una
+                          // tarjeta ancha y baja no cabía.
+                          gridDelegate:
+                              SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 220,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            mainAxisExtent: 220 *
+                                (MediaQuery.textScalerOf(context).scale(14) /
+                                        14)
+                                    .clamp(1, double.infinity),
+                          ),
+                          itemCount: products.length,
+                          itemBuilder: (context, index) {
+                            return _buildProductCard(context, products[index]);
+                          },
                         ),
                       );
-                    }
-
-                    return Refrescable(
-                      onRefresh: controller.refrescar,
-                      child: GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                        // Columnas según el ancho disponible (2 en un teléfono
-                        // vertical, más de lado o en tablet) y alto fijo según
-                        // el contenido. Con una proporción ancho/alto, una
-                        // tarjeta ancha y baja no cabía.
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 220,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          mainAxisExtent: 220,
-                        ),
-                        itemCount: products.length,
-                        itemBuilder: (context, index) {
-                          return _buildProductCard(context, products[index]);
-                        },
-                      ),
-                    );
-                  }),
+                    }),
+                  ),
                 ),
               ),
-            ),
 
-            // Panel inferior fijo del carrito
-            TourStep(
-              tourKey: controller.keyCarrito,
-              title: 'Carrito y cobro',
-              description:
-                  'El total de la venta. Aquí eliges cómo te pagan y cobras.',
-              isLastStep: true,
-              child: _buildCartPanel(context),
-            ),
-          ],
-        ),
+              // Panel inferior fijo del carrito
+              SizedBox(
+                width: lateral ? 380 : null,
+                child: TourStep(
+                  tourKey: controller.keyCarrito,
+                  title: 'Carrito y cobro',
+                  description:
+                      'El total de la venta. Aquí eliges cómo te pagan y cobras.',
+                  isLastStep: true,
+                  child: _buildCartPanel(context, lateral: lateral),
+                ),
+              ),
+            ],
+          );
+        }),
       ),
     );
+    return PlataformaApp.escritorio
+        ? EscanerAutomatico(
+            habilitado: () =>
+                !controller.isLoading && !controller.isProcessingPayment,
+            alLeer: controller.agregarPorCodigo,
+            codigoRegistrado: (codigo) =>
+                controller.productoPorBarcode(codigo) != null,
+            child: pantalla,
+          )
+        : pantalla;
   }
 
   Widget _buildProductCard(BuildContext context, Product product) {
@@ -351,108 +390,145 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     );
   }
 
-  Widget _buildCartPanel(BuildContext context) {
+  Widget _buildCartPanel(BuildContext context, {bool lateral = false}) {
     final c = context.colores;
     return Obx(() {
       final unidades = controller.totalUnidades;
       final total = controller.finalAmount;
       final isEmpty = controller.cartItems.isEmpty;
 
+      final resumen = isEmpty
+          ? Center(
+              child: Text(
+                'Selecciona productos para cobrar',
+                style: TextStyle(color: c.textSecondary, fontSize: 13),
+              ),
+            )
+          : Row(
+              children: [
+                if (!lateral)
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.shopping_bag_outlined,
+                        color: AppColors.accent),
+                  ),
+                if (!lateral) const SizedBox(width: 12),
+
+                // Info del carrito
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$unidades ${unidades == 1 ? 'producto' : 'productos'}',
+                        style: TextStyle(
+                          color: c.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '\$${total.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 22,
+                          color: c.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Botón limpiar
+                IconButton(
+                  onPressed: () => controller.clearCart(),
+                  icon: const Icon(Icons.delete_outline),
+                  color: c.textSecondary,
+                  tooltip: 'Vaciar carrito',
+                ),
+                const SizedBox(width: 4),
+
+                // Botón cobrar
+                ElevatedButton(
+                  onPressed: () => _showPaymentDialog(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text(
+                    'Cobrar',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            );
       return Container(
         padding:
             EdgeInsets.symmetric(horizontal: 16, vertical: isEmpty ? 14 : 16),
         decoration: BoxDecoration(
           color: c.cardBackground,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
+          border: lateral ? Border(left: BorderSide(color: c.divisor)) : null,
+          boxShadow: lateral
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
         ),
         child: SafeArea(
           top: false,
-          child: isEmpty
-              ? Center(
-                  child: Text(
-                    'Selecciona productos para cobrar',
-                    style: TextStyle(color: c.textSecondary, fontSize: 13),
-                  ),
-                )
-              : Row(
+          child: lateral
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withOpacity(0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.shopping_bag_outlined,
-                          color: AppColors.accent),
-                    ),
-                    const SizedBox(width: 12),
-
-                    // Info del carrito
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$unidades ${unidades == 1 ? 'producto' : 'productos'}',
-                            style: TextStyle(
-                              color: c.textSecondary,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '\$${total.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 22,
-                              color: c.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Botón limpiar
-                    IconButton(
-                      onPressed: () => controller.clearCart(),
-                      icon: const Icon(Icons.delete_outline),
-                      color: c.textSecondary,
-                      tooltip: 'Vaciar carrito',
-                    ),
-                    const SizedBox(width: 4),
-
-                    // Botón cobrar
-                    ElevatedButton(
-                      onPressed: () => _showPaymentDialog(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 14,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text(
-                        'Cobrar',
+                    Text('Venta actual',
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+                            color: c.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Divider(color: c.divisor),
+                    Expanded(
+                      child: isEmpty
+                          ? Center(
+                              child: Text(
+                                  'Escanea o selecciona productos para comenzar',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: c.textSecondary)))
+                          : SingleChildScrollView(
+                              child: ListaCarrito(
+                                items: controller.cartItems.toList(),
+                                onCambiarCantidad: (item, cantidad) =>
+                                    controller.updateCartItemQuantity(
+                                        item.productId, cantidad),
+                              ),
+                            ),
                     ),
+                    Divider(color: c.divisor),
+                    const SizedBox(height: 8),
+                    resumen,
                   ],
-                ),
+                )
+              : resumen,
         ),
       );
     });

@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/access_logs_controller.dart';
@@ -16,7 +17,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 1120,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Entradas',

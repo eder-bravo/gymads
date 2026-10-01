@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/register_controller.dart';
@@ -14,17 +15,20 @@ class RegisterView extends GetView<RegisterController> {
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(gradient: c.fondoAcceso),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(context),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-                  child: _buildForm(context),
+        child: ContenidoEscritorio(
+          anchoMaximo: 720,
+          child: SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(context),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                    child: _buildForm(context),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -84,25 +88,29 @@ class RegisterView extends GetView<RegisterController> {
         const SizedBox(height: 20),
 
         // Personal info card
-        _buildCard(context,
+        _buildCard(
+          context,
           title: 'Datos Personales',
           icon: Icons.person_outline,
           children: [
-            _buildTextField(context,
+            _buildTextField(
+              context,
               controller: controller.firstNameController,
               label: 'Nombre(s)',
               icon: Icons.person,
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 14),
-            _buildTextField(context,
+            _buildTextField(
+              context,
               controller: controller.lastNameController,
               label: 'Apellidos',
               icon: Icons.person_outline,
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 14),
-            _buildTextField(context,
+            _buildTextField(
+              context,
               controller: controller.emailController,
               label: 'Correo electrónico',
               icon: Icons.email_outlined,
@@ -128,7 +136,8 @@ class RegisterView extends GetView<RegisterController> {
               );
             }),
             const SizedBox(height: 14),
-            Obx(() => _buildTextField(context,
+            Obx(() => _buildTextField(
+                  context,
                   controller: controller.passwordController,
                   label: 'Contraseña',
                   icon: Icons.lock_outline,
@@ -147,7 +156,8 @@ class RegisterView extends GetView<RegisterController> {
                   ),
                 )),
             const SizedBox(height: 14),
-            Obx(() => _buildTextField(context,
+            Obx(() => _buildTextField(
+                  context,
                   controller: controller.confirmPasswordController,
                   label: 'Confirmar contraseña',
                   icon: Icons.lock_outline,
@@ -170,18 +180,21 @@ class RegisterView extends GetView<RegisterController> {
         const SizedBox(height: 16),
 
         // Gym info card
-        _buildCard(context,
+        _buildCard(
+          context,
           title: 'Tu Gimnasio',
           icon: Icons.fitness_center,
           children: [
-            _buildTextField(context,
+            _buildTextField(
+              context,
               controller: controller.gymNameController,
               label: 'Nombre del gimnasio',
               icon: Icons.store,
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 14),
-            _buildTextField(context,
+            _buildTextField(
+              context,
               controller: controller.locationController,
               label: 'Ubicación',
               icon: Icons.location_on_outlined,
@@ -213,7 +226,8 @@ class RegisterView extends GetView<RegisterController> {
           children: [
             Text(
               '¿Ya tienes cuenta? ',
-              style: TextStyle(color: c.contraste.withOpacity(0.60), fontSize: 14),
+              style:
+                  TextStyle(color: c.contraste.withOpacity(0.60), fontSize: 14),
             ),
             GestureDetector(
               onTap: () => Get.back(),
@@ -305,7 +319,8 @@ class RegisterView extends GetView<RegisterController> {
     );
   }
 
-  Widget _buildCard(BuildContext context, {
+  Widget _buildCard(
+    BuildContext context, {
     required String title,
     required IconData icon,
     required List<Widget> children,
@@ -350,7 +365,8 @@ class RegisterView extends GetView<RegisterController> {
     );
   }
 
-  Widget _buildTextField(BuildContext context, {
+  Widget _buildTextField(
+    BuildContext context, {
     required TextEditingController controller,
     required String label,
     required IconData icon,
@@ -452,12 +468,14 @@ class RegisterView extends GetView<RegisterController> {
     controller.clearError();
 
     // Validate all fields
-    final nameErr = controller.validateFirstName(controller.firstNameController.text);
+    final nameErr =
+        controller.validateFirstName(controller.firstNameController.text);
     if (nameErr != null) {
       controller.errorMessage.value = nameErr;
       return;
     }
-    final lastErr = controller.validateLastName(controller.lastNameController.text);
+    final lastErr =
+        controller.validateLastName(controller.lastNameController.text);
     if (lastErr != null) {
       controller.errorMessage.value = lastErr;
       return;
@@ -467,22 +485,26 @@ class RegisterView extends GetView<RegisterController> {
       controller.errorMessage.value = emailErr;
       return;
     }
-    final passErr = controller.validatePassword(controller.passwordController.text);
+    final passErr =
+        controller.validatePassword(controller.passwordController.text);
     if (passErr != null) {
       controller.errorMessage.value = passErr;
       return;
     }
-    final confirmErr = controller.validateConfirmPassword(controller.confirmPasswordController.text);
+    final confirmErr = controller
+        .validateConfirmPassword(controller.confirmPasswordController.text);
     if (confirmErr != null) {
       controller.errorMessage.value = confirmErr;
       return;
     }
-    final gymErr = controller.validateGymName(controller.gymNameController.text);
+    final gymErr =
+        controller.validateGymName(controller.gymNameController.text);
     if (gymErr != null) {
       controller.errorMessage.value = gymErr;
       return;
     }
-    final locErr = controller.validateLocation(controller.locationController.text);
+    final locErr =
+        controller.validateLocation(controller.locationController.text);
     if (locErr != null) {
       controller.errorMessage.value = locErr;
       return;

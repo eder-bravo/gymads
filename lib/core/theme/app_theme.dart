@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
+import '../../app/core/utils/plataforma_app.dart';
 
 /// Los temas de la app: [claro] y [oscuro]. Salen del mismo [_construir], así
 /// que comparten formas, radios y tipografía; solo cambian los colores
 /// ([ColoresTema]). `GetMaterialApp` recibe los dos y elige según el modo
 /// guardado en `TemaService` (por defecto, el del teléfono).
 class AppTheme {
-  static final ThemeData claro = _construir(Brightness.light, ColoresTema.claro);
+  static final ThemeData claro =
+      _construir(Brightness.light, ColoresTema.claro);
   static final ThemeData oscuro =
       _construir(Brightness.dark, ColoresTema.oscuro);
 
@@ -30,10 +32,9 @@ class AppTheme {
       outlineVariant: c.divisor,
     );
     // Íconos de la barra de estado que se lean sobre el fondo.
-    final barraDeEstado = (esOscuro
-            ? SystemUiOverlayStyle.light
-            : SystemUiOverlayStyle.dark)
-        .copyWith(statusBarColor: Colors.transparent);
+    final barraDeEstado =
+        (esOscuro ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+            .copyWith(statusBarColor: Colors.transparent);
 
     return ThemeData(
       useMaterial3: true,
@@ -55,6 +56,9 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       dialogTheme: DialogThemeData(
+        constraints: PlataformaApp.escritorio
+            ? const BoxConstraints(maxWidth: 600)
+            : null,
         backgroundColor: c.cardBackground,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: TextStyle(
@@ -65,6 +69,9 @@ class AppTheme {
         contentTextStyle: TextStyle(color: c.textSecondary, fontSize: 15),
       ),
       bottomSheetTheme: BottomSheetThemeData(
+        constraints: PlataformaApp.escritorio
+            ? const BoxConstraints(maxWidth: 640)
+            : null,
         backgroundColor: c.cardBackground,
         modalBackgroundColor: c.cardBackground,
         surfaceTintColor: Colors.transparent,

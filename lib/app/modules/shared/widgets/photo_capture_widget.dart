@@ -9,6 +9,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../core/widgets/cached_user_image.dart';
 import '../views/circular_camera_view.dart';
+import '../../../core/utils/plataforma_app.dart';
 
 /// La foto del cliente en su formulario: la foto (o una silueta) y un botón
 /// que dice claramente qué hacer.
@@ -55,6 +56,8 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
   /// Sin permiso no se abre la cámara (fallaría en negro); se explica cómo
   /// darlo.
   Future<bool> _permisoDeCamara() async {
+    // El controlador nativo de escritorio solicita el permiso al abrir.
+    if (PlataformaApp.escritorio) return true;
     final c = context.colores;
     final estado = await Permission.camera.request();
     if (estado.isGranted || estado.isLimited) return true;
@@ -73,8 +76,7 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('Ahora no',
-                style: TextStyle(color: c.textSecondary)),
+            child: Text('Ahora no', style: TextStyle(color: c.textSecondary)),
           ),
           TextButton(
             onPressed: () {
@@ -105,6 +107,11 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
         duration: const Duration(milliseconds: 250),
       );
     } catch (e) {
+      if (PlataformaApp.escritorio) {
+        SnackbarHelper.error('No se tomó la foto',
+            'No se pudo abrir la cámara. Revisa los permisos del sistema.');
+        return;
+      }
       // Si la cámara propia falla, la del sistema.
       try {
         final foto = await ImagePicker().pickImage(
@@ -114,8 +121,8 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
         );
         if (foto != null) tomada = File(foto.path);
       } catch (_) {
-        SnackbarHelper.error(
-            'No se tomó la foto', 'No se pudo abrir la cámara. Intenta de nuevo.');
+        SnackbarHelper.error('No se tomó la foto',
+            'No se pudo abrir la cámara. Intenta de nuevo.');
       }
     }
 
@@ -169,8 +176,8 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
         isCircular: true,
       );
     } else {
-      contenido = Icon(Icons.person,
-          size: 64, color: c.textSecondary.withOpacity(0.6));
+      contenido =
+          Icon(Icons.person, size: 64, color: c.textSecondary.withOpacity(0.6));
     }
 
     return GestureDetector(
@@ -213,8 +220,8 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
                 shape: BoxShape.circle,
                 border: Border.all(color: c.backgroundColor, width: 3),
               ),
-              child: const Icon(Icons.photo_camera,
-                  size: 18, color: Colors.white),
+              child:
+                  const Icon(Icons.photo_camera, size: 18, color: Colors.white),
             ),
           ),
         ],

@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -17,7 +18,8 @@ class CategoriasView extends GetView<CategoriasController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 960,
       backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Categorías'),
       floatingActionButton: FloatingActionButton.extended(
@@ -133,7 +135,8 @@ class CategoriasView extends GetView<CategoriasController> {
     );
   }
 
-  Widget _buildTile(BuildContext context, ProductCategory category, {required Key key}) {
+  Widget _buildTile(BuildContext context, ProductCategory category,
+      {required Key key}) {
     final c = context.colores;
     final count = controller.countFor(category.id);
     final isInactive = !category.isActive;
@@ -234,7 +237,8 @@ class CategoriasView extends GetView<CategoriasController> {
     );
   }
 
-  void _onMenuAction(BuildContext context, String action, ProductCategory category) {
+  void _onMenuAction(
+      BuildContext context, String action, ProductCategory category) {
     switch (action) {
       case 'edit':
         showCategoryFormDialog(existing: category);

@@ -8,6 +8,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../../core/theme/siempre_oscuro.dart';
 import '../utils/recorte_circulo.dart';
+import '../../../core/utils/plataforma_app.dart';
+import 'desktop_camera_view.dart';
 
 class CircularCameraView extends StatefulWidget {
   final Function(File) onPhotoTaken;
@@ -43,7 +45,7 @@ class _CircularCameraViewState extends State<CircularCameraView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeCamera();
+    if (!PlataformaApp.escritorio) _initializeCamera();
   }
 
   @override
@@ -187,6 +189,10 @@ class _CircularCameraViewState extends State<CircularCameraView>
 
   @override
   Widget build(BuildContext context) {
+    if (PlataformaApp.escritorio) {
+      return DesktopCameraView(
+          onPhotoTaken: widget.onPhotoTaken, onCancel: widget.onCancel);
+    }
     return SiempreOscuro(
         child: Scaffold(
       backgroundColor: Colors.black,

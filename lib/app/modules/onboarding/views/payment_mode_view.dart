@@ -1,4 +1,6 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
+import '../../../core/utils/plataforma_app.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -13,11 +15,13 @@ class PaymentModeView extends GetView<OnboardingController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    final bool isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final bool isTablet = !PlataformaApp.escritorio &&
+        MediaQuery.sizeOf(context).shortestSide >= 600;
 
     return PopScope(
       canPop: false,
-      child: Scaffold(
+      child: ScaffoldAdaptable(
+        anchoMaximo: 800,
         backgroundColor: c.backgroundColor,
         appBar: const GymAppBar(
           title: 'Configuración inicial',

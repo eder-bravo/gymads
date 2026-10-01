@@ -216,6 +216,22 @@ class RegistroBusquedaLector {
         'version': ios.systemVersion,
       };
     }
+    if (Platform.isMacOS) {
+      final mac = await info.macOsInfo;
+      return {
+        'plataforma': 'macos',
+        'modelo': mac.model,
+        'version': mac.osRelease
+      };
+    }
+    if (Platform.isWindows) {
+      final windows = await info.windowsInfo;
+      return {
+        'plataforma': 'windows',
+        'version': windows.displayVersion,
+        'build': windows.buildNumber
+      };
+    }
     return {'plataforma': 'otro'};
   }
 }

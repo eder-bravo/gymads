@@ -2,6 +2,9 @@
 
 A new Flutter project.
 
+La adaptación a macOS y Windows, la auditoría de paquetes y la estrategia de
+cámaras y escáneres físicos se documentan en [docs/ESCRITORIO.md](docs/ESCRITORIO.md).
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 
+import 'permisos_escritorio.dart';
+
 /// Qué pasó con una tarjeta en el lector.
 enum ResultadoPase { entrada, salida, vencida, inactiva, noRegistrada }
 
@@ -59,7 +61,11 @@ class AvisosSistema {
   );
 
   static bool get _soportado =>
-      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+      !kIsWeb &&
+      (Platform.isAndroid ||
+          Platform.isIOS ||
+          Platform.isMacOS ||
+          Platform.isWindows);
 
   /// Prepara las notificaciones. No pide permiso: eso se hace solo en el
   /// teléfono que atiende el lector ([pedirPermiso]).
@@ -74,6 +80,14 @@ class AvisosSistema {
             requestSoundPermission: false,
             requestBadgePermission: false,
           ),
+          macOS: DarwinInitializationSettings(
+              requestAlertPermission: false,
+              requestSoundPermission: false,
+              requestBadgePermission: false),
+          windows: WindowsInitializationSettings(
+              appName: 'GymOne',
+              appUserModelId: 'GymOne.Desktop',
+              guid: 'c4528774-85b5-4dd4-9c45-47b9d4a7e292'),
         ),
       );
       await _plugin
@@ -97,7 +111,12 @@ class AvisosSistema {
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>()
             ?.requestNotificationsPermission();
-      } else {
+      } else if (Platform.isMacOS) {
+        // El aviso de macOS puede quedar pendiente fuera de la app. El canal
+        // nativo solicita y consulta sin esperar a que se conteste ese aviso.
+        await PermisosEscritorio.consultar('notificaciones',
+            pedir: true, tiempoLimite: const Duration(seconds: 8));
+      } else if (Platform.isIOS) {
         await _plugin
             .resolvePlatformSpecificImplementation<
                 IOSFlutterLocalNotificationsPlugin>()
@@ -137,6 +156,9 @@ class AvisosSistema {
             presentList: true,
             presentSound: true,
           ),
+          macOS: const DarwinNotificationDetails(
+              presentAlert: true, presentSound: true),
+          windows: const WindowsNotificationDetails(),
         ),
       );
     } catch (e) {

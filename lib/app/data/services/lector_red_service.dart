@@ -341,13 +341,19 @@ class LectorRedService {
       interfaces.sort((a, b) =>
           _prioridadInterfaz(a.name).compareTo(_prioridadInterfaz(b.name)));
 
+      final candidatas = <String>{};
       for (final interfaz in interfaces) {
         for (final direccion in interfaz.addresses) {
           if (esIpPrivada(direccion.address)) {
-            return ipsDeLaSubred(direccion.address);
+            candidatas.addAll(ipsDeLaSubred(direccion.address));
+            // Un equipo puede tener Ethernet y WiFi activos a la vez.
+            if (!Platform.isWindows && !Platform.isMacOS) {
+              return candidatas.toList();
+            }
           }
         }
       }
+      return candidatas.toList();
     } catch (e) {
       AppLogger.warning('LectorRedService', 'No se pudo leer la red: $e');
     }
@@ -355,6 +361,12 @@ class LectorRedService {
   }
 
   static int _prioridadInterfaz(String nombre) {
+    final n = nombre.toLowerCase();
+    if (n.startsWith('wi-fi') ||
+        n.startsWith('wifi') ||
+        n.startsWith('ethernet')) {
+      return 0;
+    }
     if (nombre == 'en0' || nombre.startsWith('wlan')) return 0;
     if (nombre.startsWith('en') || nombre.startsWith('eth')) return 1;
     return 2; // datos móviles, VPN...

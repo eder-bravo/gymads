@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/plataforma_app.dart';
 import 'dart:math';
 import 'package:intl/intl.dart';
 import 'package:gymads/core/theme/app_colors.dart';
@@ -79,7 +80,8 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
     if (!widget.isVisible) return const SizedBox.shrink();
 
     // Determinar si es una tableta basado en el ancho de la pantalla
-    final bool isTabletSize = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final bool isTabletSize = !PlataformaApp.escritorio &&
+        MediaQuery.sizeOf(context).shortestSide >= 600;
     final bool isSmallPhone = MediaQuery.sizeOf(context).shortestSide < 360;
 
     // Con estilo de texto propio: en Inicio el aviso va encima de todo,

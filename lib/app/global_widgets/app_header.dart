@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gymads/core/theme/app_colors.dart';
+import '../core/widgets/diseno_escritorio.dart';
 
 /// AppBar estándar de la aplicación.
 ///
@@ -26,16 +27,20 @@ class GymAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppBar(
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.bold),
+    final margen = AnchoContenido.margen(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: margen),
+      child: AppBar(
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: false,
+        titleSpacing: 16,
+        leading: leading,
+        actions: actions,
+        bottom: bottom,
       ),
-      centerTitle: false,
-      titleSpacing: 16,
-      leading: leading,
-      actions: actions,
-      bottom: bottom,
     );
   }
 }
@@ -144,17 +149,13 @@ class CategoryFilterChips extends StatelessWidget {
               avatar: Icon(
                 item.icon,
                 size: 18,
-                color:
-                    isSelected ? c.textPrimary : c.textSecondary,
+                color: isSelected ? c.textPrimary : c.textSecondary,
               ),
               label: Text(
                 item.label,
                 style: TextStyle(
-                  color: isSelected
-                      ? c.textPrimary
-                      : c.textSecondary,
-                  fontWeight:
-                      isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? c.textPrimary : c.textSecondary,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
               selected: isSelected,

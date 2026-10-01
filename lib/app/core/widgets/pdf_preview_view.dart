@@ -9,9 +9,8 @@ import '../../global_widgets/app_header.dart';
 
 /// Vista previa de un reporte antes de compartirlo o imprimirlo.
 ///
-/// El documento se arma en un isolate aparte (`PdfPreview` llama a
-/// [construir] fuera del hilo de UI), así que un reporte de cientos de
-/// movimientos no congela la pantalla.
+/// Los reportes tienen formato fijo. La impresión dinámica de `printing`
+/// espera otro PDF desde el hilo principal de macOS y puede bloquear Flutter.
 class PdfPreviewView extends StatelessWidget {
   const PdfPreviewView({
     super.key,
@@ -38,6 +37,9 @@ class PdfPreviewView extends StatelessWidget {
         canChangePageFormat: false,
         canChangeOrientation: false,
         canDebug: false,
+        // Entregar el documento antes de abrir el panel nativo: en macOS
+        // evita la espera bloqueante de PrintJob.knowsPageRange.
+        dynamicLayout: false,
         allowPrinting: true,
         allowSharing: true,
         initialPageFormat: PdfPageFormat.a4,

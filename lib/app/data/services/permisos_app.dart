@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -8,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/utils/app_logger.dart';
+import 'permisos_escritorio.dart';
 
 /// Los permisos de la app, tal como se le presentan a quien la usa.
 ///
@@ -37,21 +37,38 @@ enum EstadoPermiso {
 Map<PermisoApp, List<Permission>> permisosDelSistema({
   required bool ios,
   int? sdkAndroid,
-}) =>
-    {
-      PermisoApp.notificaciones: [Permission.notification],
-      PermisoApp.camara: [Permission.camera],
-      PermisoApp.bluetooth: ios
-          ? [Permission.bluetooth]
-          : [
-              Permission.bluetoothScan,
-              Permission.bluetoothConnect,
-              // Hasta Android 11, buscar por Bluetooth exige la ubicación.
-              if (sdkAndroid != null && sdkAndroid <= 30)
-                Permission.locationWhenInUse,
-            ],
-      if (ios) PermisoApp.redLocal: const [],
+  TargetPlatform? plataforma,
+  bool web = false,
+}) {
+  if (web || plataforma == TargetPlatform.linux) {
+    return {};
+  }
+  if (plataforma == TargetPlatform.macOS) {
+    return {
+      PermisoApp.notificaciones: const [],
+      PermisoApp.camara: const [],
+      PermisoApp.bluetooth: const [],
     };
+  }
+  if (plataforma == TargetPlatform.windows) {
+    // La webcam se gestiona en Privacidad. El plugin de permisos devuelve
+    // granted sin verificar ese bloqueo, así que se consulta por otra ruta.
+    return {PermisoApp.camara: const []};
+  }
+  return {
+    PermisoApp.notificaciones: [Permission.notification],
+    PermisoApp.camara: [Permission.camera],
+    PermisoApp.bluetooth: ios
+        ? [Permission.bluetooth]
+        : [
+            Permission.bluetoothScan,
+            Permission.bluetoothConnect,
+            if (sdkAndroid != null && sdkAndroid <= 30)
+              Permission.locationWhenInUse,
+          ],
+    if (ios) PermisoApp.redLocal: const [],
+  };
+}
 
 EstadoPermiso estadoDe(PermissionStatus estado) => switch (estado) {
       PermissionStatus.granted ||
@@ -101,12 +118,24 @@ abstract class SolicitudPermisos {
   /// contestaron no vuelven a salir.
   Future<Map<PermisoApp, EstadoPermiso>> pedirTodos();
 
+  /// Deja de pedir los permisos restantes si se abandona la pantalla.
+  /// Un aviso que ya abrió el sistema se contesta en el propio sistema.
+  void cancelar();
+
   Future<void> abrirAjustes();
 }
 
 class SolicitudPermisosSistema implements SolicitudPermisos {
-  final bool _ios = !kIsWeb && Platform.isIOS;
+  SolicitudPermisosSistema({
+    this.tiempoSolicitudEscritorio = const Duration(seconds: 50),
+    this.tiempoConsultaEscritorio = const Duration(seconds: 8),
+  });
+
+  final Duration tiempoSolicitudEscritorio;
+  final Duration tiempoConsultaEscritorio;
+  final bool _ios = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
   int? _sdk;
+  int _solicitud = 0;
 
   static const _canalRedLocal = MethodChannel('gymone/red_local');
 
@@ -123,20 +152,43 @@ class SolicitudPermisosSistema implements SolicitudPermisos {
   }
 
   Future<int?> _sdkAndroid() async {
-    if (kIsWeb || !Platform.isAndroid) return null;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
     return _sdk ??= (await DeviceInfoPlugin().androidInfo).version.sdkInt;
   }
 
-  Future<Map<PermisoApp, List<Permission>>> _mapa() async =>
-      permisosDelSistema(ios: _ios, sdkAndroid: await _sdkAndroid());
+  Future<Map<PermisoApp, List<Permission>>> _mapa() async => permisosDelSistema(
+      ios: _ios,
+      sdkAndroid: await _sdkAndroid(),
+      plataforma: defaultTargetPlatform,
+      web: kIsWeb);
 
   @override
-  List<PermisoApp> get permisos => [
-        PermisoApp.notificaciones,
-        PermisoApp.camara,
-        PermisoApp.bluetooth,
-        if (_ios) PermisoApp.redLocal,
-      ];
+  List<PermisoApp> get permisos => permisosDelSistema(
+          ios: _ios, plataforma: defaultTargetPlatform, web: kIsWeb)
+      .keys
+      .toList();
+
+  Future<EstadoPermiso> _nativo(PermisoApp permiso,
+      {bool pedir = false}) async {
+    if (_ios) return _redLocal();
+    // permission_handler_windows responde granted para cualquier permiso,
+    // aunque Privacidad bloquee la webcam: no presentarlo como confirmado.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+      return EstadoPermiso.sinDato;
+    }
+    try {
+      final respuesta = await PermisosEscritorio.consultar(permiso.name,
+          pedir: pedir,
+          tiempoLimite:
+              pedir ? tiempoSolicitudEscritorio : tiempoConsultaEscritorio);
+      return EstadoPermiso.values.firstWhere((e) => e.name == respuesta,
+          orElse: () => EstadoPermiso.sinDato);
+    } catch (e) {
+      AppLogger.warning(
+          'PermisosApp', 'No se pudo consultar ${permiso.name}: $e');
+      return EstadoPermiso.sinDato;
+    }
+  }
 
   @override
   Future<Map<PermisoApp, EstadoPermiso>> estados() async {
@@ -144,7 +196,7 @@ class SolicitudPermisosSistema implements SolicitudPermisos {
     return {
       for (final entrada in mapa.entries)
         entrada.key: entrada.value.isEmpty
-            ? await _redLocal()
+            ? await _nativo(entrada.key)
             : peorEstado([
                 for (final permiso in entrada.value)
                   estadoDe(await permiso.status),
@@ -154,29 +206,59 @@ class SolicitudPermisosSistema implements SolicitudPermisos {
 
   @override
   Future<Map<PermisoApp, EstadoPermiso>> pedirTodos() async {
+    final solicitud = ++_solicitud;
     final mapa = await _mapa();
+    if (solicitud != _solicitud) return {};
     var respuestas = <Permission, PermissionStatus>{};
     try {
-      respuestas = await [for (final l in mapa.values) ...l].request();
+      final nativos = [for (final l in mapa.values) ...l];
+      if (nativos.isNotEmpty) respuestas = await nativos.request();
     } catch (e) {
       AppLogger.error('PermisosApp', 'No se pudieron pedir los permisos', e);
     }
 
-    // La red local (iPhone) al final: comprobarla hace salir su aviso ahora,
-    // junto a los demás, y no la primera vez que la app le hable al lector.
-    return {
-      for (final entrada in mapa.entries)
-        entrada.key: entrada.value.isEmpty
-            ? await _redLocal()
-            : peorEstado([
-                for (final permiso in entrada.value)
-                  estadoDe(respuestas[permiso] ?? await permiso.status),
-              ]),
+    final entradas = mapa.entries.toList();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+      // El aviso de notificaciones puede quedarse pendiente fuera de la app.
+      // Solicitar primero los permisos con diálogo de cámara y Bluetooth.
+      const orden = [
+        PermisoApp.camara,
+        PermisoApp.bluetooth,
+        PermisoApp.notificaciones,
+      ];
+      entradas
+          .sort((a, b) => orden.indexOf(a.key).compareTo(orden.indexOf(b.key)));
+    }
+    final estados = <PermisoApp, EstadoPermiso>{
+      for (final permiso in mapa.keys) permiso: EstadoPermiso.sinDato,
     };
+    // La red local de iPhone permanece al final. Cada espera de escritorio
+    // tiene su límite; una respuesta pendiente no impide pedir las siguientes.
+    for (final entrada in entradas) {
+      if (solicitud != _solicitud) break;
+      estados[entrada.key] = entrada.value.isEmpty
+          ? await _nativo(entrada.key, pedir: true)
+          : peorEstado([
+              for (final permiso in entrada.value)
+                estadoDe(respuestas[permiso] ?? await permiso.status),
+            ]);
+    }
+    return estados;
   }
 
   @override
-  Future<void> abrirAjustes() => openAppSettings();
+  void cancelar() => _solicitud++;
+
+  @override
+  Future<void> abrirAjustes() async {
+    if (kIsWeb) return;
+    if (defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows) {
+      await PermisosEscritorio.abrirAjustes();
+    } else {
+      await openAppSettings();
+    }
+  }
 }
 
 /// Si en este teléfono ya se pidieron los permisos.
@@ -188,7 +270,11 @@ class PermisosApp {
 
   /// Con otra versión (si algún día se agrega un permiso) se vuelve a mostrar
   /// la pantalla una vez.
-  static const _clave = 'permisos_pedidos_v1';
+  static String get _clave => !kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.macOS ||
+              defaultTargetPlatform == TargetPlatform.windows)
+      ? 'permisos_escritorio_v2'
+      : 'permisos_pedidos_v1';
 
   static bool _pedidos = false;
   static Completer<void> _listos = Completer<void>();

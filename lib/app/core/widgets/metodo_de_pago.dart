@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../utils/referencia_de_pago.dart';
+import '../utils/plataforma_app.dart';
 
 /// Los métodos de pago como botones: el elegido en naranja. Lo usan Vender
 /// y Abonar, para que cobrar se vea y funcione igual en los dos.
@@ -105,7 +106,7 @@ class CampoReferenciaPago extends StatelessWidget {
           onChanged: r.setReferenciaPago,
         ),
         const SizedBox(height: 10),
-        Obx(() {
+        if (PlataformaApp.ocrMovil) Obx(() {
           if (r.leyendoReferencia.value) {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),

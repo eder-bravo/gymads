@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
@@ -16,7 +17,8 @@ class IngresosView extends GetView<IngresosController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 1120,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Ingresos',

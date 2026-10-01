@@ -5,10 +5,13 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
+import 'package:universal_ble/universal_ble.dart' as universal;
 
 import '../../core/utils/app_logger.dart';
 import 'estado_configuracion_lector.dart';
 import 'registro_busqueda_lector.dart';
+import 'transporte_lector_ble.dart';
 
 // UUIDs del firmware 6.0 (arduino/esp32_rfid_wifi_setup_fixed). Si cambian
 // allá, cambian aquí. No cambiaron con el nombre GymOne (v6.4.0): con ellos
@@ -346,8 +349,9 @@ class LimiteBusquedasBle {
 /// - Si la conexión se corta antes del resultado, se reconecta una vez y se
 ///   relee el estado. El lector no pierde el avance: vive en su loop.
 class LectorBleService {
-  LectorBleService({RegistroBusquedaLector? registro})
-      : registroBusqueda = registro ?? RegistroBusquedaLector.instance;
+  LectorBleService({RegistroBusquedaLector? registro, bool? usarBleWindows})
+      : registroBusqueda = registro ?? RegistroBusquedaLector.instance,
+        _usarBleWindows = usarBleWindows ?? (!kIsWeb && Platform.isWindows);
 
   final RegistroBusquedaLector registroBusqueda;
   _BusquedaBle? _busqueda;
@@ -356,14 +360,16 @@ class LectorBleService {
   static _BusquedaBle? _duenoEscaneo;
   static Future<void> _colaDueno = Future<void>.value();
   static final _limiteAndroid = LimiteBusquedasBle();
-  BluetoothDevice? _dispositivo;
-  BluetoothCharacteristic? _chRedes;
-  BluetoothCharacteristic? _chSsid;
-  BluetoothCharacteristic? _chClave;
-  BluetoothCharacteristic? _chGym;
-  BluetoothCharacteristic? _chOrden;
-  BluetoothCharacteristic? _chEstado;
-  BluetoothCharacteristic? _chSesion;
+  final bool _usarBleWindows;
+  bool get _windows => _usarBleWindows;
+  DispositivoLectorBle? _dispositivo;
+  CaracteristicaLectorBle? _chRedes;
+  CaracteristicaLectorBle? _chSsid;
+  CaracteristicaLectorBle? _chClave;
+  CaracteristicaLectorBle? _chGym;
+  CaracteristicaLectorBle? _chOrden;
+  CaracteristicaLectorBle? _chEstado;
+  CaracteristicaLectorBle? _chSesion;
   final String _tokenSesion = const Uuid().v4();
   Timer? _renovarSesion;
   bool _soportaSesiones = false;
@@ -375,9 +381,35 @@ class LectorBleService {
 
   /// Deja el Bluetooth listo para buscar, o explica por qué no se puede.
   Future<void> prepararBluetooth() async {
+    if (kIsWeb) {
+      throw const FalloBusquedaBle(
+          'Configura el lector de tarjetas desde la app de macOS, Windows o tu celular. '
+          'El escáner de códigos USB funciona en esta página como teclado.',
+          TipoFalloBusquedaBle.sinCompatibilidad);
+    }
+    if (_windows) {
+      final estado =
+          await universal.UniversalBle.getBluetoothAvailabilityState();
+      if (estado == universal.AvailabilityState.poweredOn) return;
+      if (estado == universal.AvailabilityState.unauthorized) {
+        throw const FalloBusquedaBle(
+            'Permite el acceso a Bluetooth en los ajustes de Windows.',
+            TipoFalloBusquedaBle.permisoBluetooth);
+      }
+      throw FalloBusquedaBle(
+          estado == universal.AvailabilityState.poweredOff
+              ? 'Enciende Bluetooth en Windows. Si este equipo no tiene adaptador, configura el lector desde tu celular con la misma cuenta y red del gimnasio.'
+              : 'No hay Bluetooth BLE disponible. Usa un adaptador USB compatible con Windows o configura el lector desde tu celular con la misma cuenta. '
+                  'Después, esta computadora lo encontrará en la red del gimnasio.',
+          estado == universal.AvailabilityState.poweredOff
+              ? TipoFalloBusquedaBle.bluetoothApagado
+              : TipoFalloBusquedaBle.sinCompatibilidad);
+    }
     if (!await FlutterBluePlus.isSupported) {
       throw const FalloBusquedaBle(
-          'Este teléfono no tiene Bluetooth compatible.',
+          'Este dispositivo no tiene Bluetooth compatible. Configura el lector '
+          'desde tu celular con la misma cuenta y red del gimnasio, o usa un adaptador BLE USB compatible. '
+          'Después podrás usar el lector desde esta computadora por la red.',
           TipoFalloBusquedaBle.sinCompatibilidad);
     }
 
@@ -431,6 +463,10 @@ class LectorBleService {
   }
 
   Future<void> _buscar(_BusquedaBle busqueda, Duration duracion) async {
+    if (_windows) {
+      await _buscarWindows(busqueda, duracion);
+      return;
+    }
     _busqueda = busqueda;
     final reloj = Stopwatch()..start();
     unawaited(registroBusqueda.registrar(EventoBusquedaLector.inicio));
@@ -562,6 +598,73 @@ class LectorBleService {
     }
   }
 
+  Future<void> _buscarWindows(_BusquedaBle busqueda, Duration duracion) async {
+    _busqueda = busqueda;
+    final encontrados = <String, LectorCercano>{};
+    StreamSubscription<universal.BleDevice>? resultados;
+    StreamSubscription<universal.AvailabilityState>? adaptador;
+    final fin = Completer<void>();
+    // Puede fallar antes de empezar a esperar el fin.
+    unawaited(fin.future.then((_) {}, onError: (Object _) {}));
+    try {
+      await _tomarEscaner(busqueda);
+      if (busqueda.cancelada) return;
+      await prepararBluetooth();
+      if (busqueda.cancelada) return;
+      await universal.UniversalBle.stopScan();
+      if (busqueda.cancelada) return;
+      resultados = universal.UniversalBle.scanStream.listen((d) {
+        if (busqueda.cancelada ||
+            busqueda.terminada ||
+            !d.services.any((s) => Guid(s) == _servicioUuid)) {
+          return;
+        }
+        encontrados[d.deviceId] = LectorCercano(
+            BluetoothDevice.fromId(d.deviceId),
+            d.name?.isNotEmpty == true ? d.name! : 'Lector GymOne',
+            d.rssi ?? -100,
+            ocupado: lectorOcupadoEnAnuncio({
+              for (final m in d.manufacturerDataList)
+                m.companyId: m.payload.toList()
+            }));
+        busqueda.salida.add(encontrados.values.toList()
+          ..sort((a, b) => b.rssi.compareTo(a.rssi)));
+      }, onError: (Object error) {
+        if (!fin.isCompleted) fin.completeError(error);
+      });
+      adaptador = universal.UniversalBle.availabilityStream.listen((estado) {
+        if (estado != universal.AvailabilityState.poweredOn &&
+            !fin.isCompleted) {
+          fin.completeError(const FalloBusquedaBle(
+              'Bluetooth dejó de estar disponible. Revisa el adaptador de Windows.',
+              TipoFalloBusquedaBle.bluetoothNoListo));
+        }
+      });
+      await universal.UniversalBle.startScan(
+          scanFilter: universal.ScanFilter(withServices: [_servicioUuid.str]));
+      if (busqueda.cancelada) return;
+      await Future.any([
+        fin.future,
+        busqueda.cancelacion.future,
+        Future<void>.delayed(duracion)
+      ]);
+    } catch (error) {
+      if (!busqueda.cancelada) {
+        busqueda.salida.addError(explicarFalloBusquedaBle(error));
+      }
+    } finally {
+      busqueda.terminada = true;
+      await resultados?.cancel();
+      await adaptador?.cancel();
+      if (identical(_duenoEscaneo, busqueda)) {
+        await _detenerEscaneoNativo();
+        if (identical(_duenoEscaneo, busqueda)) _duenoEscaneo = null;
+      }
+      if (identical(_busqueda, busqueda)) _busqueda = null;
+      unawaited(busqueda.salida.close());
+    }
+  }
+
   Future<void> _tomarEscaner(_BusquedaBle busqueda) {
     final turno = _colaDueno.then((_) async {
       if (busqueda.cancelada) return;
@@ -586,7 +689,11 @@ class LectorBleService {
 
   Future<void> _detenerEscaneoNativo() async {
     try {
-      await FlutterBluePlus.stopScan();
+      if (_windows) {
+        await universal.UniversalBle.stopScan();
+      } else if (!kIsWeb) {
+        await FlutterBluePlus.stopScan();
+      }
     } catch (error) {
       AppLogger.error('LectorBleService', 'Al detener la búsqueda', error);
       final explicado = explicarFalloBusquedaBle(error);
@@ -604,7 +711,8 @@ class LectorBleService {
   Future<void> conectar(LectorCercano lector) async {
     if (lector.ocupado) throw const LectorOcupadoException();
     await detenerBusqueda();
-    _dispositivo = lector.dispositivo;
+    await desconectar();
+    _dispositivo = DispositivoLectorBle(lector.dispositivo, windows: _windows);
     await _conectarDispositivo();
   }
 
@@ -643,7 +751,7 @@ class LectorBleService {
   }
 
   /// Localiza el servicio y las características del lector ya conectado.
-  Future<void> _prepararCaracteristicas(BluetoothDevice d) async {
+  Future<void> _prepararCaracteristicas(DispositivoLectorBle d) async {
     final servicios = await d.discoverServices();
     final servicio = servicios.firstWhere(
       (s) => s.uuid == _servicioUuid,
@@ -651,7 +759,7 @@ class LectorBleService {
           throw const LectorBleException('Ese aparato no es un lector GymOne.'),
     );
 
-    BluetoothCharacteristic ch(Guid uuid) =>
+    CaracteristicaLectorBle ch(Guid uuid) =>
         servicio.characteristics.firstWhere((c) => c.uuid == uuid,
             orElse: () => throw const LectorBleException(
                 'El lector tiene un programa distinto. Actualízalo.'));
@@ -878,7 +986,7 @@ class LectorBleService {
 
   // ─────────────────────────────────────────────────────────
 
-  Future<void> _escribir(BluetoothCharacteristic? c, String valor) async {
+  Future<void> _escribir(CaracteristicaLectorBle? c, String valor) async {
     if (c == null) throw const LectorBleException('No hay lector conectado.');
     await c.write(utf8.encode(valor), allowLongWrite: true, timeout: 10);
   }

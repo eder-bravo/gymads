@@ -205,8 +205,8 @@ class PdfReportService {
               children: [
                 pw.Expanded(
                   child: pw.Text(e.key,
-                      style: const pw.TextStyle(
-                          fontSize: 10, color: textPrimary)),
+                      style:
+                          const pw.TextStyle(fontSize: 10, color: textPrimary)),
                 ),
                 pw.Text(formato(e.value),
                     style: pw.TextStyle(
@@ -221,8 +221,8 @@ class PdfReportService {
                         ? '—'
                         : '${(e.value / total * 100).toStringAsFixed(1)}%',
                     textAlign: pw.TextAlign.right,
-                    style: const pw.TextStyle(
-                        fontSize: 10, color: textSecondary),
+                    style:
+                        const pw.TextStyle(fontSize: 10, color: textSecondary),
                   ),
                 ),
               ],
@@ -263,8 +263,7 @@ class PdfReportService {
       cellStyle: const pw.TextStyle(fontSize: 9, color: textPrimary),
       cellHeight: 18,
       cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      headerPadding:
-          const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      headerPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       cellAlignments: {
         for (var i = 0; i < columnas.length; i++)
           i: alineadasDerecha.contains(i)
@@ -283,12 +282,15 @@ class PdfReportService {
     pw.Document doc, {
     required String titulo,
     required String nombreArchivo,
-  }) {
-    return Get.to<void>(
+  }) async {
+    // Guardar una vez: la vista previa, imprimir y compartir reciben el mismo
+    // documento, sin volver a generar tablas mientras está abierto el panel.
+    final bytes = await doc.save();
+    await Get.to<void>(
       () => PdfPreviewView(
         titulo: titulo,
         nombreArchivo: nombreArchivo,
-        construir: (_) => doc.save(),
+        construir: (_) async => bytes,
       ),
     )!;
   }
@@ -296,7 +298,8 @@ class PdfReportService {
   /// Nombre de archivo sin espacios ni acentos, con la fecha del día.
   static String nombreArchivo(String base) {
     final now = DateTime.now();
-    final fecha = '${now.year}-${_dosDigitos(now.month)}-${_dosDigitos(now.day)}';
+    final fecha =
+        '${now.year}-${_dosDigitos(now.month)}-${_dosDigitos(now.day)}';
     return '${base.toLowerCase().replaceAll(' ', '-')}-$fecha.pdf';
   }
 

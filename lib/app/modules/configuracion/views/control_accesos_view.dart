@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -30,7 +31,8 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 880,
       backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Control de accesos'),
       body: SafeArea(

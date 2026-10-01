@@ -23,6 +23,7 @@ import 'package:gymads/app/data/services/avisos_sistema_service.dart';
 import 'package:gymads/app/data/services/permisos_app.dart';
 import 'package:gymads/app/data/services/tema_service.dart';
 import 'package:gymads/core/theme/app_theme.dart';
+import 'package:gymads/app/data/services/escaner_fisico_service.dart';
 
 /// GlobalKey para acceder al ScaffoldMessenger desde cualquier parte de la app
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
@@ -32,6 +33,7 @@ final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
 String _initialRoute = Routes.LOGIN;
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   // Carga las variables de entorno
   await dotenv.load(fileName: ".env");
 
@@ -51,6 +53,7 @@ void main() async {
 
   // Si en este teléfono ya se pidieron los permisos (pantalla antes de Inicio).
   await PermisosApp.cargar();
+  await EscanerFisicoService.cargar();
 
   // Inicializa Supabase (cliente principal) - SOLO UNA VEZ
   await Supabase.initialize(

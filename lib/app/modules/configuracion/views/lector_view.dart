@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -77,7 +78,8 @@ class _LectorViewState extends State<LectorView> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 880,
       backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Lector de tarjetas'),
       body: SafeArea(
@@ -361,27 +363,28 @@ class _LectorViewState extends State<LectorView> {
 
   Widget _interruptorLector() {
     final c = context.colores;
-    return Obx(() => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: c.cardBackground,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: controller.rfidEnabled.value,
-            title: Text('Usar el lector de tarjetas',
-                style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600)),
-            onChanged: (activar) {
-              if (activar) {
-                controller.testRfidConnection();
-              } else {
-                controller.cancelRfidScan();
-              }
-            },
+    return Obx(() => Material(
+          color: c.cardBackground,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: controller.rfidEnabled.value,
+              title: Text('Usar el lector de tarjetas',
+                  style: TextStyle(
+                      color: c.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600)),
+              onChanged: (activar) {
+                if (activar) {
+                  controller.testRfidConnection();
+                } else {
+                  controller.cancelRfidScan();
+                }
+              },
+            ),
           ),
         ));
   }
@@ -399,21 +402,22 @@ class _LectorViewState extends State<LectorView> {
     return Obx(() {
       final activo = servicio.recibirAvisosAqui.value;
 
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: c.cardBackground,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          value: activo,
-          title: Text('Recibir avisos en este teléfono',
-              style: TextStyle(
-                  color: c.textPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600)),
-          onChanged: servicio.setRecibirAvisosAqui,
+      return Material(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: activo,
+            title: Text('Recibir avisos en este teléfono',
+                style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600)),
+            onChanged: servicio.setRecibirAvisosAqui,
+          ),
         ),
       );
     });

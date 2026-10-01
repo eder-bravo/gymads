@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -40,7 +41,8 @@ class ProductFormView extends GetView<InventarioController> {
       barcodeController.text = arguments['barcode'] as String;
     }
 
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 760,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: isEditing ? 'Editar producto' : 'Nuevo producto',

@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../data/services/ocr_referencia_service.dart';
 import 'app_logger.dart';
 import 'snackbar_helper.dart';
+import 'plataforma_app.dart';
 
 /// Métodos de pago que se pueden elegir al cobrar (Vender y Abonar), con el
 /// valor que se guarda en `metodo_pago`.
@@ -80,6 +81,11 @@ mixin ReferenciaDePago on GetxController {
   /// entra a propósito: muchos comprobantes llegan por mensajería y nunca
   /// pasan por la cámara.
   Future<void> escanearReferencia({required bool desdeCamara}) async {
+    if (!PlataformaApp.ocrMovil) {
+      SnackbarHelper.info('Referencia de pago',
+          'Escribe el folio del comprobante en el campo de referencia.');
+      return;
+    }
     File? foto;
     try {
       final elegida = await ImagePicker().pickImage(

@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -17,6 +18,8 @@ import '../core/widgets/formulario.dart';
 import '../modules/shared/widgets/photo_capture_widget.dart';
 import 'app_header.dart';
 import 'tarjeta_del_formulario.dart';
+import '../core/utils/plataforma_app.dart';
+import '../core/utils/telefono_escritorio.dart';
 
 /// Alta y edición de un cliente.
 ///
@@ -248,7 +251,9 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
     if (!camposBien || _faltaFoto) return;
     final user = UserModel(
       name: widget.nombreController.text.trim(),
-      phone: widget.phoneController.text,
+      phone: PlataformaApp.escritorio
+          ? telefonoEscritorio(widget.phoneController.text)!
+          : widget.phoneController.text,
       email: widget.emailController.text.trim().isEmpty
           ? null
           : widget.emailController.text.trim(),
@@ -325,7 +330,8 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
       // Mientras guarda no se puede salir: se perdería lo escrito si falla.
       return PopScope(
         canPop: !guardando,
-        child: Scaffold(
+        child: ScaffoldAdaptable(
+          anchoMaximo: 760,
           backgroundColor: c.backgroundColor,
           appBar: GymAppBar(
             title: _titulo,
@@ -362,6 +368,20 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
 
   Widget _campoTelefono() {
     final c = context.colores;
+    if (PlataformaApp.escritorio) {
+      return TextFormField(
+          controller: widget.phoneController,
+          style: TextStyle(color: c.textPrimary, fontSize: 16),
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(
+              labelText: 'Teléfono *',
+              hintText: '10 dígitos de México o +código de país',
+              prefixIcon: Icon(Icons.phone_outlined)),
+          validator: (v) => telefonoEscritorio(v ?? '') == null
+              ? 'Escribe 10 dígitos o incluye +código de país'
+              : null);
+    }
     return InternationalPhoneNumberInput(
       initialValue: _telefonoInicial,
       onInputChanged: (numero) =>

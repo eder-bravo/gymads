@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -165,7 +166,8 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
   /// Crear: pantalla completa con el botón fijo abajo.
   Widget _pantallaNuevo() {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 760,
       backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Nuevo acceso'),
       body: SafeArea(

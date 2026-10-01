@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -152,7 +153,8 @@ class CobrarVisitaView extends GetView<CobrarVisitaController> {
       final guardando = controller.guardando.value;
       return PopScope(
         canPop: !guardando,
-        child: Scaffold(
+        child: ScaffoldAdaptable(
+          anchoMaximo: 760,
           backgroundColor: c.backgroundColor,
           appBar: GymAppBar(
             title: 'Cobrar visita',

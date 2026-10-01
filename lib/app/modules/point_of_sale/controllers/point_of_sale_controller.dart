@@ -19,8 +19,8 @@ import 'package:gymads/app/core/widgets/formulario.dart';
 
 class PointOfSaleController extends GetxController
     with ScreenTourMixin, RecargaEnVivoMixin, ReferenciaDePago {
-  final ProductRepository _productRepository = ProductRepository();
-  final SaleRepository _saleRepository = SaleRepository();
+  late final ProductRepository _productRepository = ProductRepository();
+  late final SaleRepository _saleRepository = SaleRepository();
 
   // Estado del carrito
   final RxList<SaleItem> _cartItems = <SaleItem>[].obs;
@@ -263,13 +263,16 @@ class PointOfSaleController extends GetxController
       () => EscanerCodigoView(
         titulo: 'Escanear productos',
         instruccion: 'Escanea cada producto para agregarlo a la venta',
-        alLeer: _agregarPorCodigo,
+        alLeer: agregarPorCodigo,
       ),
     );
   }
 
   /// Devuelve el aviso que muestra el escáner tras cada lectura.
-  Future<String?> _agregarPorCodigo(String codigo) async {
+  Future<String?> agregarPorCodigo(String codigo) async {
+    if (isLoading || isProcessingPayment) {
+      return 'Espera a que termine la operación';
+    }
     final producto = productoPorBarcode(codigo);
     if (producto == null) return 'Código no registrado';
 

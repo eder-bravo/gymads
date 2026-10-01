@@ -6,6 +6,8 @@ import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/core/utils/responsive_utils.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import '../../shared/widgets/welcome_screen_widget.dart';
+import '../../../core/widgets/diseno_escritorio.dart';
+import '../../../core/utils/plataforma_app.dart';
 
 class RfidCheckinView extends GetView<RfidCheckinController> {
   const RfidCheckinView({super.key});
@@ -13,7 +15,8 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
   @override
   Widget build(BuildContext context) {
     // Determinar si es una tableta basado en el ancho de la pantalla
-    final bool isTabletSize = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final bool isTabletSize = !PlataformaApp.escritorio &&
+        MediaQuery.sizeOf(context).shortestSide >= 600;
 
     // Determinar si es un teléfono pequeño
     final bool isSmallPhone = MediaQuery.sizeOf(context).shortestSide < 360;
@@ -24,7 +27,10 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
         child: Stack(
           children: [
             // Mostrar siempre la pantalla de espera
-            _buildMainContent(context, isTabletSize, isSmallPhone),
+            ContenidoEscritorio(
+              anchoMaximo: 800,
+              child: _buildMainContent(context, isTabletSize, isSmallPhone),
+            ),
 
             // Indicador de carga
             Obx(() => controller.isLoading.value

@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/product_model.dart';
@@ -9,6 +10,8 @@ import 'package:gymads/app/core/widgets/tour_step.dart';
 import '../../../core/permissions/permissions.dart';
 import '../../../core/widgets/cabecera_con_lista.dart';
 import '../../../core/widgets/refrescable.dart';
+import '../../../core/widgets/escaner_automatico.dart';
+import '../../../core/utils/plataforma_app.dart';
 import '../controllers/inventario_controller.dart';
 import 'stock_adjust_dialog.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
@@ -19,7 +22,8 @@ class InventarioView extends GetView<InventarioController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    final pantalla = ScaffoldAdaptable(
+      anchoMaximo: 1200,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Inventario',
@@ -27,7 +31,8 @@ class InventarioView extends GetView<InventarioController> {
           // Va bajo `ajustarStock` y no `gestionarProductos`: mover existencias
           // también lo hace el staff de sucursal, que no puede dar de alta
           // productos ni tocar precios. El almacén sí puede (tiene ambos).
-          if (controller.can(Permission.ajustarStock))
+          if (!PlataformaApp.escritorio &&
+              controller.can(Permission.ajustarStock))
             TourStep(
               tourKey: controller.keyEscanear,
               isFirstStep:
@@ -93,6 +98,17 @@ class InventarioView extends GetView<InventarioController> {
       body: SafeArea(
         child: CabeceraConLista(
           cabecera: [
+            if (PlataformaApp.escritorio &&
+                controller.can(Permission.ajustarStock))
+              TourStep(
+                tourKey: controller.keyEscanear,
+                isFirstStep:
+                    controller.esPrimerPasoDelTour(controller.keyEscanear),
+                title: 'Escanear código',
+                description:
+                    'Usa tu lector para abrir el ajuste de stock del producto.',
+                child: const AvisoEscanerAutomatico(),
+              ),
             _buildStatsSection(context),
             _buildFaltantesBanner(context),
             TourStep(
@@ -114,6 +130,17 @@ class InventarioView extends GetView<InventarioController> {
         ),
       ),
     );
+    return PlataformaApp.escritorio
+        ? EscanerAutomatico(
+            habilitado: () =>
+                controller.can(Permission.ajustarStock) &&
+                !controller.isLoading.value,
+            alLeer: (codigo) => _procesarCodigo(context, codigo),
+            codigoRegistrado: (codigo) =>
+                controller.productoPorBarcode(codigo) != null,
+            child: pantalla,
+          )
+        : pantalla;
   }
 
   /// Escanea un código y abre el ajuste de stock de ese producto.
@@ -121,17 +148,25 @@ class InventarioView extends GetView<InventarioController> {
   /// El diálogo de ajuste ya recibe el producto resuelto, así que escanear
   /// solo sustituye al paso de buscarlo a mano en la lista.
   Future<void> _escanearParaAjustar(BuildContext context) async {
-    final c = context.colores;
     final codigo = await controller.escanearCodigo(
       instruccion: 'Apunta al código del producto para ajustar su stock',
     );
-    if (codigo == null) return; // canceló
+    if (codigo == null || !context.mounted) return; // canceló
+    await _procesarCodigo(context, codigo);
+  }
+
+  /// El móvil y el lector automático de escritorio usan el mismo flujo.
+  Future<String?> _procesarCodigo(BuildContext context, String codigo) async {
+    if (!controller.can(Permission.ajustarStock)) return null;
+    final c = context.colores;
 
     final producto = controller.productoPorBarcode(codigo);
 
     if (producto != null) {
-      await showStockAdjustDialog(producto);
-      return;
+      final stock = await showStockAdjustDialog(producto);
+      return stock == null
+          ? 'Ajuste cancelado: ${producto.name}'
+          : '${producto.name}: stock $stock';
     }
 
     // Código no registrado. Es lo normal la primera vez que se escanea cada
@@ -175,10 +210,11 @@ class InventarioView extends GetView<InventarioController> {
       ),
     );
 
-    if (agregar != true) return;
+    if (agregar != true || !context.mounted) return 'Código no registrado';
 
     controller.resetForm();
     Get.toNamed(Routes.PRODUCT_FORM, arguments: {'barcode': codigo});
+    return 'Código no registrado';
   }
 
   Widget _buildStatsSection(BuildContext context) {
@@ -320,10 +356,11 @@ class InventarioView extends GetView<InventarioController> {
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: AppSearchField(
+      child: BusquedaConEscaner(
+          child: AppSearchField(
         hintText: 'Buscar productos...',
         onChanged: controller.setSearchQuery,
-      ),
+      )),
     );
   }
 
@@ -434,7 +471,7 @@ class InventarioView extends GetView<InventarioController> {
 
       return Refrescable(
         onRefresh: controller.refreshAll,
-        child: ListView.builder(
+        child: ListaAdaptable(
           itemCount: controller.filteredProducts.length,
           itemBuilder: (context, index) {
             final product = controller.filteredProducts[index];

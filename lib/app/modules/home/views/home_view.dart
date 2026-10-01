@@ -1,8 +1,10 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/permissions/permissions.dart';
+import '../../../core/utils/plataforma_app.dart';
 import '../../../core/widgets/tour_step.dart';
 
 import '../../../data/services/tenant_context_service.dart';
@@ -30,7 +32,8 @@ class HomeView extends GetView<HomeController> {
     // `sizeOf` y no `of`: este último crea dependencia con el MediaQueryData
     // entero —`viewInsets` incluido—, así que la animación del teclado
     // reconstruía esta pantalla en cada frame aunque estuviera oculta debajo.
-    final bool isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final bool isTablet = !PlataformaApp.escritorio &&
+        MediaQuery.sizeOf(context).shortestSide >= 600;
 
     // Asistente inicial / tour de bienvenida. Va aquí además de en onReady
     // porque al volver del asistente GetX puede reutilizar el controlador; la
@@ -44,7 +47,8 @@ class HomeView extends GetView<HomeController> {
       });
     }
 
-    final pantalla = Scaffold(
+    final pantalla = ScaffoldAdaptable(
+      anchoMaximo: 1200,
       backgroundColor: c.backgroundColor,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -274,10 +278,21 @@ class HomeView extends GetView<HomeController> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: constraints.maxWidth >= 600 ? 4 : 2,
+                  crossAxisCount: PlataformaApp.escritorio
+                      ? (constraints.maxWidth /
+                              (220 *
+                                  MediaQuery.textScalerOf(context).scale(14) /
+                                  14))
+                          .floor()
+                          .clamp(1, 4)
+                      : constraints.maxWidth >= 600
+                          ? 4
+                          : 2,
                   crossAxisSpacing: isTablet ? 16 : 12,
                   mainAxisSpacing: isTablet ? 16 : 12,
-                  mainAxisExtent: isTablet ? 180 : 165,
+                  mainAxisExtent: (isTablet ? 180.0 : 165.0) *
+                      (MediaQuery.textScalerOf(context).scale(14) / 14)
+                          .clamp(1, double.infinity),
                 ),
                 itemCount: modules.length,
                 itemBuilder: (context, index) {
@@ -336,21 +351,31 @@ class HomeView extends GetView<HomeController> {
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
-      child: Column(
-        children: actions.map((action) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: TourStep(
-              tourKey: action.showcaseKey,
-              title: action.label,
-              description: action.tourDescription,
-              borderRadius: 16,
-              isLastStep: action.showcaseKey == controller.keyConfiguracion,
-              child: _QuickActionTile(action: action),
-            ),
-          );
-        }).toList(),
-      ),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
+        final columnas = PlataformaApp.escritorio
+            ? (constraints.maxWidth / (300 * escala)).floor().clamp(1, 3)
+            : 1;
+        final ancho = (constraints.maxWidth - (columnas - 1) * 12) / columnas;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: actions
+              .map((action) => SizedBox(
+                    width: ancho,
+                    child: TourStep(
+                      tourKey: action.showcaseKey,
+                      title: action.label,
+                      description: action.tourDescription,
+                      borderRadius: 16,
+                      isLastStep:
+                          action.showcaseKey == controller.keyConfiguracion,
+                      child: _QuickActionTile(action: action),
+                    ),
+                  ))
+              .toList(),
+        );
+      }),
     );
   }
 }
@@ -446,7 +471,8 @@ class _ModuleCardState extends State<_ModuleCard>
   Widget build(BuildContext context) {
     final c = context.colores;
     final m = widget.module;
-    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final isTablet = !PlataformaApp.escritorio &&
+        MediaQuery.sizeOf(context).shortestSide >= 600;
 
     return AnimatedBuilder(
       animation: _scaleAnim,

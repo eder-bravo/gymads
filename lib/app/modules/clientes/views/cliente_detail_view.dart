@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/user_model.dart';
@@ -22,36 +23,37 @@ class ClienteDetailView extends GetView<ClientesController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 960,
       backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Detalles del Cliente'),
       // SafeArea: de lado, el notch tapaba el borde izquierdo de la ficha.
       body: SafeArea(
         child: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Cabecera con foto y nombre
-            _buildHeader(context),
+          child: Column(
+            children: [
+              // Cabecera con foto y nombre
+              _buildHeader(context),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Tarjetas de información rápida
-            _buildQuickInfoCards(context),
+              // Tarjetas de información rápida
+              _buildQuickInfoCards(context),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Detalles generales (incluyendo los nuevos campos email y address)
-            _buildDetailCards(context),
+              // Detalles generales (incluyendo los nuevos campos email y address)
+              _buildDetailCards(context),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Botones de acción principales
-            _buildActionButtons(context),
+              // Botones de acción principales
+              _buildActionButtons(context),
 
-            const SizedBox(height: 32),
-          ],
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -76,8 +78,8 @@ class ClienteDetailView extends GetView<ClientesController> {
             tag: 'avatar_${cliente.id}',
             // Ver la nota en ClienteCard: sin esto las iniciales volaban
             // subrayadas en amarillo.
-            flightShuttleBuilder: (context, animation, direction, desde, hacia) =>
-                Material(
+            flightShuttleBuilder:
+                (context, animation, direction, desde, hacia) => Material(
                     type: MaterialType.transparency,
                     child: (hacia.widget as Hero).child),
             child: GestureDetector(
@@ -87,26 +89,26 @@ class ClienteDetailView extends GetView<ClientesController> {
                       nombre: cliente.name)
                   : null,
               child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.accent,
-                  width: 3,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accent.withOpacity(0.3),
-                    blurRadius: 20,
-                    spreadRadius: 3,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.accent,
+                    width: 3,
                   ),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.accent.withOpacity(0.3),
+                      blurRadius: 20,
+                      spreadRadius: 3,
+                    ),
+                  ],
+                ),
+                child: UserThumbnail(
+                  imageUrl: cliente.photoUrl,
+                  userName: cliente.name,
+                  size: 130,
+                ),
               ),
-              child: UserThumbnail(
-                imageUrl: cliente.photoUrl,
-                userName: cliente.name,
-                size: 130,
-              ),
-            ),
             ),
           ),
           const SizedBox(width: 16),
@@ -136,7 +138,8 @@ class ClienteDetailView extends GetView<ClientesController> {
         children: [
           Expanded(
             child: Builder(
-              builder: (context) => _buildInfoCard(context,
+              builder: (context) => _buildInfoCard(
+                context,
                 icon: Icons.phone_outlined,
                 title: 'Teléfono',
                 value: cliente.phone,
@@ -153,13 +156,12 @@ class ClienteDetailView extends GetView<ClientesController> {
               builder: (context) {
                 final bool vinculado = cliente.rfidCard != null &&
                     cliente.rfidCard!.trim().isNotEmpty;
-                return _buildInfoCard(context,
+                return _buildInfoCard(
+                  context,
                   icon: Icons.vpn_key_outlined,
                   title: 'Llavero/Tarjeta',
                   value: vinculado ? 'Vinculado' : 'No vinculado',
-                  color: vinculado
-                      ? AppColors.success
-                      : c.textSecondary,
+                  color: vinculado ? AppColors.success : c.textSecondary,
                 );
               },
             ),
@@ -169,7 +171,8 @@ class ClienteDetailView extends GetView<ClientesController> {
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, {
+  Widget _buildInfoCard(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required String value,
@@ -248,18 +251,25 @@ class ClienteDetailView extends GetView<ClientesController> {
       child: Column(
         children: [
           // Card de información de contacto extendida
-          _buildDetailCard(context,
+          _buildDetailCard(
+            context,
             title: 'Contacto y Dirección',
             icon: Icons.contact_mail_outlined,
             children: [
-              _buildDetailRow(context,
+              _buildDetailRow(
+                context,
                 'Correo',
-                cliente.email?.isNotEmpty == true ? cliente.email! : 'No registrado',
+                cliente.email?.isNotEmpty == true
+                    ? cliente.email!
+                    : 'No registrado',
                 Icons.email_outlined,
               ),
-              _buildDetailRow(context,
+              _buildDetailRow(
+                context,
                 'Dirección',
-                cliente.address?.isNotEmpty == true ? cliente.address! : 'No registrada',
+                cliente.address?.isNotEmpty == true
+                    ? cliente.address!
+                    : 'No registrada',
                 Icons.location_on_outlined,
               ),
             ],
@@ -268,23 +278,27 @@ class ClienteDetailView extends GetView<ClientesController> {
           const SizedBox(height: 16),
 
           // Card de fechas importantes
-          _buildDetailCard(context,
+          _buildDetailCard(
+            context,
             title: 'Fechas Importantes',
             icon: Icons.calendar_today_outlined,
             children: [
-              _buildDetailRow(context,
+              _buildDetailRow(
+                context,
                 'Fecha de registro',
                 _formatDate(cliente.joinDate),
                 Icons.today_outlined,
               ),
               if (cliente.expirationDate != null)
-                _buildDetailRow(context,
+                _buildDetailRow(
+                  context,
                   'Hasta qué fecha puede entrar',
                   _formatDate(cliente.expirationDate!),
                   Icons.event_outlined,
                 ),
               if (cliente.lastPaymentDate != null)
-                _buildDetailRow(context,
+                _buildDetailRow(
+                  context,
                   'Último pago',
                   _formatDate(cliente.lastPaymentDate!),
                   Icons.payment_outlined,
@@ -300,7 +314,8 @@ class ClienteDetailView extends GetView<ClientesController> {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
-  Widget _buildDetailCard(BuildContext context, {
+  Widget _buildDetailCard(
+    BuildContext context, {
     required String title,
     required IconData icon,
     required List<Widget> children,
@@ -348,7 +363,8 @@ class ClienteDetailView extends GetView<ClientesController> {
     );
   }
 
-  Widget _buildDetailRow(BuildContext context, String label, String value, IconData icon) {
+  Widget _buildDetailRow(
+      BuildContext context, String label, String value, IconData icon) {
     final c = context.colores;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

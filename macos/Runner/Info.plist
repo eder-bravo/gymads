@@ -40,6 +40,15 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Necesitamos acceso a la cámara para tomar la foto de perfil de los miembros.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Usamos Bluetooth para configurar el WiFi del lector de tarjetas del gimnasio.</string>
+	<key>NSCameraUseContinuityCameraDeviceType</key>
+	<true/>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_gymone._tcp</string>
+		<string>_gymads._tcp</string>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Necesitamos acceso a la red local para conectar con el lector RFID del gimnasio.</string>
 	<key>NSHumanReadableCopyright</key>

@@ -15,7 +15,8 @@ class CameraService {
         (camera) => camera.lensDirection == CameraLensDirection.back,
       );
     } catch (e) {
-      AppLogger.error('CameraService', 'Error al verificar cámaras disponibles', e);
+      AppLogger.error(
+          'CameraService', 'Error al verificar cámaras disponibles', e);
       return false;
     }
   }
@@ -23,26 +24,29 @@ class CameraService {
   Future<void> initializeCamera() async {
     try {
       cameras = await availableCameras();
-      
+
       // Buscar específicamente la cámara trasera
-      final backCamera = cameras.where(
-        (camera) => camera.lensDirection == CameraLensDirection.back,
-      ).toList();
-      
-      if (backCamera.isEmpty) {
-        throw Exception('No se encontró cámara trasera disponible');
+      final backCamera = cameras
+          .where(
+            (camera) => camera.lensDirection == CameraLensDirection.back,
+          )
+          .toList();
+
+      if (cameras.isEmpty) {
+        throw Exception('No se encontraron cámaras disponibles');
       }
-      
+
       // Inicializar ÚNICAMENTE con la cámara trasera
       controller = CameraController(
-        backCamera.first,
+        backCamera.isNotEmpty ? backCamera.first : cameras.first,
         ResolutionPreset.high,
         enableAudio: false, // No necesitamos audio para fotos
       );
-      
+
       await controller?.initialize();
     } catch (e) {
-      AppLogger.error('CameraService', 'Error al inicializar la cámara trasera', e);
+      AppLogger.error(
+          'CameraService', 'Error al inicializar la cámara trasera', e);
       rethrow; // Re-lanzar error para que el llamador pueda manejarlo
     }
   }

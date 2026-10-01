@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -6,6 +7,7 @@ import 'package:gymads/core/theme/app_colors.dart';
 
 import '../../../data/services/permisos_app.dart';
 import '../controllers/permisos_controller.dart';
+import '../../../core/utils/plataforma_app.dart';
 
 class PermisosView extends GetView<PermisosController> {
   const PermisosView({super.key});
@@ -13,7 +15,8 @@ class PermisosView extends GetView<PermisosController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 760,
       backgroundColor: c.backgroundColor,
       appBar: controller.desdeConfiguracion
           ? const GymAppBar(title: 'Permisos de la app')
@@ -35,7 +38,9 @@ class PermisosView extends GetView<PermisosController> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'GymOne necesita estos permisos para funcionar.',
+                  PlataformaApp.escritorio
+                      ? 'Puedes continuar y activar estos permisos después en Configuración.'
+                      : 'GymOne necesita estos permisos para funcionar.',
                   style: TextStyle(
                     fontSize: 14,
                     color: c.textSecondary,
@@ -49,6 +54,13 @@ class PermisosView extends GetView<PermisosController> {
                   permiso: permiso,
                   estado: contestado ? controller.estados[permiso] : null,
                 ),
+              if (PlataformaApp.escanerFisico)
+                Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                        'El escáner USB o Bluetooth en modo teclado no necesita permisos de cámara. '
+                        'Empareja los lectores Bluetooth desde el sistema. '
+                        '${!kIsWeb && defaultTargetPlatform == TargetPlatform.windows ? 'En Windows habilita la cámara para aplicaciones de escritorio desde Privacidad; no aparece un diálogo de permiso.' : ''}')),
               const SizedBox(height: 16),
               ..._botones(context, contestado),
             ],
@@ -62,30 +74,58 @@ class PermisosView extends GetView<PermisosController> {
     final c = context.colores;
     final pidiendo = controller.pidiendo.value;
 
+    if (controller.permisos.isEmpty) {
+      return [
+        _BotonPrincipal(
+          texto: controller.desdeConfiguracion ? 'Listo' : 'Continuar',
+          onPressed: controller.desdeConfiguracion
+              ? controller.continuar
+              : controller.ahoraNo,
+        )
+      ];
+    }
+
     if (!contestado) {
       return [
         _BotonPrincipal(
-          texto: 'Permitir',
+          texto: !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
+              ? 'Comprobar'
+              : 'Permitir',
           cargando: pidiendo,
           onPressed: pidiendo ? null : controller.permitir,
         ),
         const SizedBox(height: 4),
         TextButton(
-          onPressed: pidiendo ? null : controller.ahoraNo,
+          onPressed: controller.ahoraNo,
           style: TextButton.styleFrom(foregroundColor: c.textSecondary),
-          child: const Text('Ahora no'),
+          child: Text(pidiendo ? 'Continuar sin esperar' : 'Ahora no'),
         ),
+        if (pidiendo)
+          Text(
+            'Responde a los avisos del sistema. Puedes continuar aunque algún permiso quede pendiente.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: c.textSecondary),
+          ),
       ];
     }
 
     return [
-      if (controller.hayBloqueados) ...[
+      if (controller.estados.values.contains(EstadoPermiso.sinDato)) ...[
         Text(
-          'Los bloqueados solo se pueden activar desde los ajustes del '
-          'teléfono.',
+          'Algunos permisos siguen sin confirmar. Puedes continuar y revisarlos después en Configuración.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 13, color: c.textSecondary),
         ),
+        const SizedBox(height: 8),
+      ],
+      if (controller.hayBloqueados || PlataformaApp.escritorio) ...[
+        if (controller.hayBloqueados)
+          Text(
+            'Los bloqueados solo se pueden activar desde los ajustes del '
+            'dispositivo.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: c.textSecondary),
+          ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: controller.abrirAjustes,
@@ -261,8 +301,9 @@ String _titulo(PermisoApp permiso) => switch (permiso) {
 String _motivo(PermisoApp permiso) => switch (permiso) {
       PermisoApp.notificaciones =>
         'Para avisarte de cada pase del lector aunque estés en otra app.',
-      PermisoApp.camara => 'Para la foto de los clientes y para escanear '
-          'códigos de barras y referencias de pago.',
+      PermisoApp.camara => PlataformaApp.escanerFisico
+          ? 'Para tomar fotos con la cámara integrada, una webcam o una cámara virtual.'
+          : 'Para la foto de los clientes y para escanear códigos de barras y referencias de pago.',
       // En Android el aviso del sistema lo llama "Dispositivos cercanos".
       PermisoApp.bluetooth => defaultTargetPlatform == TargetPlatform.android
           ? 'Para configurar el WiFi del lector. Android lo llama "Dispositivos cercanos".'

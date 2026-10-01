@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -19,7 +20,8 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 960,
       backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Accesos del personal'),
       floatingActionButton: FloatingActionButton.extended(

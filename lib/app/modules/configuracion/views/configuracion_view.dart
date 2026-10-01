@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -7,6 +8,8 @@ import '../../../core/widgets/tour_step.dart';
 import '../../../data/services/tema_service.dart';
 import '../../../global_widgets/app_header.dart';
 import '../controllers/configuracion_controller.dart';
+import '../../../core/utils/plataforma_app.dart';
+import 'escaner_configuracion_view.dart';
 
 class ConfiguracionView extends GetView<ConfiguracionController> {
   const ConfiguracionView({super.key});
@@ -14,7 +17,8 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    return Scaffold(
+    return ScaffoldAdaptable(
+      anchoMaximo: 880,
       backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Configuración'),
       body: SafeArea(
@@ -82,6 +86,15 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
     return Column(
       children: [
         // Opción de Cuenta
+        if (PlataformaApp.escanerFisico) ...[
+          _buildOptionTile(context,
+              icon: Icons.barcode_reader,
+              iconColor: AppColors.accent,
+              title: 'Escáner de códigos',
+              subtitle: 'Conexión USB o Bluetooth, ajustes y prueba',
+              onTap: () => Get.to(() => const EscanerConfiguracionView())),
+          const SizedBox(height: 16),
+        ],
         TourStep(
           tourKey: controller.keyCuenta,
           title: 'Cuenta',
@@ -244,7 +257,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         TourStep(
           tourKey: controller.keyPermisos,
           title: 'Permisos de la app',
-          description: 'Cámara, notificaciones y Bluetooth.',
+          description: 'Revisa el acceso a los dispositivos de este equipo.',
           borderRadius: 12,
           isLastStep: controller.esUltimoPasoDelTour(controller.keyPermisos),
           child: _buildOptionTile(
@@ -282,54 +295,49 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
       elevation: 3,
       color: enabled ? c.cardBackground : c.disabled,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: c.cardBackground,
-        ),
-        child: ListTile(
-          enabled: enabled,
-          leading: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              icon,
-              color: enabled ? iconColor : c.textHint,
-              size: 26,
-            ),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        enabled: enabled,
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(10),
           ),
-          title: Text(
-            title,
+          child: Icon(
+            icon,
+            color: enabled ? iconColor : c.textHint,
+            size: 26,
+          ),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            color: enabled ? c.textPrimary : c.textHint,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            subtitle,
             style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: enabled ? c.textPrimary : c.textHint,
+              fontSize: 13,
+              color: enabled ? c.textSecondary : c.textHint,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 13,
-                color: enabled ? c.textSecondary : c.textHint,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          trailing: trailing ??
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 18,
-                color: enabled ? c.textSecondary : c.textHint,
-              ),
-          onTap: enabled ? onTap : null,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         ),
+        trailing: trailing ??
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 18,
+              color: enabled ? c.textSecondary : c.textHint,
+            ),
+        onTap: enabled ? onTap : null,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       ),
     );
   }

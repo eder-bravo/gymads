@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -86,13 +87,15 @@ class _CambiarContrasenaViewState extends State<CambiarContrasenaView> {
           suffixIcon: ojo,
         ),
         validator: validar,
-        onFieldSubmitted: accion == TextInputAction.done ? (_) => _guardar() : null,
+        onFieldSubmitted:
+            accion == TextInputAction.done ? (_) => _guardar() : null,
       );
     }
 
     return PopScope(
       canPop: !_guardando,
-      child: Scaffold(
+      child: ScaffoldAdaptable(
+        anchoMaximo: 720,
         backgroundColor: c.backgroundColor,
         appBar: const GymAppBar(title: 'Cambiar contraseña'),
         body: SafeArea(
@@ -106,9 +109,8 @@ class _CambiarContrasenaViewState extends State<CambiarContrasenaView> {
                 campo(
                   _actual,
                   'Contraseña actual',
-                  validar: (v) => (v ?? '').isEmpty
-                      ? 'Escribe tu contraseña actual'
-                      : null,
+                  validar: (v) =>
+                      (v ?? '').isEmpty ? 'Escribe tu contraseña actual' : null,
                 ),
                 const SizedBox(height: 14),
                 campo(

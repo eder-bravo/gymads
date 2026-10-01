@@ -1,35 +1,37 @@
 import 'package:flutter/material.dart';
+import '../../app/core/utils/plataforma_app.dart';
 
 /// Extensión de contexto para facilitar el acceso a las dimensiones de pantalla
 extension ResponsiveContext on BuildContext {
   /// Devuelve el tamaño de la pantalla actual
   Size get screenSize => MediaQuery.of(this).size;
-  
+
   /// Devuelve el ancho de la pantalla
   double get screenWidth => screenSize.width;
-  
+
   /// Devuelve la altura de la pantalla
   double get screenHeight => screenSize.height;
-  
+
   /// Verifica si el dispositivo es una tablet.
   ///
   /// Se mira el lado CORTO, no el ancho: un teléfono de lado mide más de 600
   /// de ancho, y tratarlo como tablet le ponía textos y rejillas de tablet en
   /// una pantalla sin altura.
-  bool get isTablet => screenSize.shortestSide >= 600;
-  
+  bool get isTablet =>
+      !PlataformaApp.escritorio && screenSize.shortestSide >= 600;
+
   /// Verifica si el dispositivo es un teléfono pequeño (lado corto < 360)
   bool get isSmallPhone => screenSize.shortestSide < 360;
-  
+
   /// Verifica si el dispositivo está en modo landscape
   bool get isLandscape => screenWidth > screenHeight;
-  
+
   /// Devuelve el padding seguro para evitar notches y otros elementos
   EdgeInsets get safePadding => MediaQuery.of(this).padding;
-  
+
   /// Calcula un valor adaptativo según el ancho de la pantalla
   double adaptiveWidth(double percentage) => screenWidth * percentage;
-  
+
   /// Calcula un valor adaptativo según la altura de la pantalla
   double adaptiveHeight(double percentage) => screenHeight * percentage;
 }
@@ -38,10 +40,10 @@ extension ResponsiveContext on BuildContext {
 extension ResponsiveConstraints on BoxConstraints {
   /// Verifica si el ancho máximo disponible corresponde a una tablet
   bool get isTablet => maxWidth > 600;
-  
+
   /// Verifica si el ancho máximo corresponde a un teléfono pequeño
   bool get isSmallPhone => maxWidth < 360;
-  
+
   /// Verifica si estamos en modo landscape
   bool get isLandscape => maxWidth > maxHeight;
 }
@@ -105,7 +107,7 @@ class AdaptivePadding extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         EdgeInsets padding;
-        
+
         if (constraints.maxWidth > 1200) {
           // Padding para desktop
           padding = desktopPadding ?? tabletPadding ?? mobilePadding;
@@ -119,7 +121,7 @@ class AdaptivePadding extends StatelessWidget {
           // Padding móvil por defecto
           padding = mobilePadding;
         }
-        
+
         return Padding(
           padding: padding,
           child: child,
@@ -140,6 +142,9 @@ double getResponsiveValue({
   double? desktopValue,
   double? smallPhoneValue,
 }) {
+  // Redimensionar una ventana cambia la distribución, no la escala de sus
+  // controles. En escritorio se usan tamaños estables y explícitos.
+  if (PlataformaApp.escritorio) return desktopValue ?? defaultValue;
   final lado = MediaQuery.sizeOf(context).shortestSide;
 
   if (lado >= 900) {
@@ -158,27 +163,28 @@ class ResponsiveValues {
   /// Verifica si el dispositivo es una tablet (lado corto >= 600, así un
   /// teléfono de lado sigue contando como teléfono).
   static bool isTablet(BuildContext context) {
-    return MediaQuery.sizeOf(context).shortestSide >= 600;
+    return context.isTablet;
   }
-  
+
   /// Verifica si el dispositivo es un teléfono móvil estándar
   static bool isMobile(BuildContext context) {
     final lado = MediaQuery.sizeOf(context).shortestSide;
     return lado < 600 && lado >= 360;
   }
-  
+
   /// Verifica si el dispositivo es un teléfono pequeño (lado corto < 360)
   static bool isSmallPhone(BuildContext context) {
     return MediaQuery.sizeOf(context).shortestSide < 360;
   }
-  
+
   /// Devuelve la altura de la pantalla
   static double getHeight(BuildContext context) {
     return MediaQuery.of(context).size.height;
   }
-  
+
   /// Devuelve el ancho de la pantalla o un valor adaptado según el tipo de dispositivo
-  static double getWidth(BuildContext context, {
+  static double getWidth(
+    BuildContext context, {
     double mobile = 400.0,
     double tablet = 600.0,
     double desktop = 800.0,
@@ -192,11 +198,12 @@ class ResponsiveValues {
       smallPhoneValue: smallPhone,
     );
   }
-  
-  static double getFontSize(BuildContext context, {
+
+  static double getFontSize(
+    BuildContext context, {
     double mobile = 14.0,
     double tablet = 16.0,
-    double desktop = 18.0,
+    double? desktop,
     double smallPhone = 12.0,
   }) {
     return getResponsiveValue(
@@ -207,11 +214,12 @@ class ResponsiveValues {
       smallPhoneValue: smallPhone,
     );
   }
-  
-  static double getSpacing(BuildContext context, {
+
+  static double getSpacing(
+    BuildContext context, {
     double mobile = 16.0,
     double tablet = 24.0,
-    double desktop = 32.0,
+    double? desktop,
     double smallPhone = 12.0,
   }) {
     return getResponsiveValue(
@@ -222,11 +230,12 @@ class ResponsiveValues {
       smallPhoneValue: smallPhone,
     );
   }
-  
-  static double getIconSize(BuildContext context, {
+
+  static double getIconSize(
+    BuildContext context, {
     double mobile = 24.0,
     double tablet = 28.0,
-    double desktop = 32.0,
+    double? desktop,
     double smallPhone = 20.0,
   }) {
     return getResponsiveValue(
@@ -237,12 +246,13 @@ class ResponsiveValues {
       smallPhoneValue: smallPhone,
     );
   }
-  
+
   /// Devuelve un tamaño genérico adaptado al dispositivo
-  static double getSize(BuildContext context, {
+  static double getSize(
+    BuildContext context, {
     double mobile = 24.0,
     double tablet = 32.0,
-    double desktop = 40.0,
+    double? desktop,
     double smallPhone = 20.0,
   }) {
     return getResponsiveValue(

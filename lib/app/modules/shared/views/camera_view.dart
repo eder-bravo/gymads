@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/services/camera_service.dart';
 import '../../../../core/theme/siempre_oscuro.dart';
+import '../../../core/utils/plataforma_app.dart';
+import 'desktop_camera_view.dart';
 
 class CameraView extends StatefulWidget {
   const CameraView({super.key});
@@ -18,7 +20,7 @@ class _CameraViewState extends State<CameraView> {
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
+    if (!PlataformaApp.escritorio) _initializeCamera();
   }
 
   Future<void> _initializeCamera() async {
@@ -38,6 +40,12 @@ class _CameraViewState extends State<CameraView> {
 
   @override
   Widget build(BuildContext context) {
+    if (PlataformaApp.escritorio) {
+      return DesktopCameraView(
+          circular: false,
+          onPhotoTaken: (foto) => Get.back(result: foto),
+          onCancel: () => Get.back());
+    }
     if (!_isInitialized) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }

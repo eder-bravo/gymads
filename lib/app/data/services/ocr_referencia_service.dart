@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import '../../core/utils/app_logger.dart';
+import '../../core/utils/plataforma_app.dart';
 
 /// Lee la referencia de pago de la foto de un comprobante.
 ///
@@ -41,6 +42,7 @@ class OcrReferenciaService {
   /// "referencia" o "folio", después el resto por longitud (las referencias
   /// suelen ser largas). Lista vacía si no reconoce nada aprovechable.
   static Future<List<String>> extraerCandidatos(File archivo) async {
+    if (!PlataformaApp.ocrMovil) return const [];
     final lector = TextRecognizer(script: TextRecognitionScript.latin);
 
     try {

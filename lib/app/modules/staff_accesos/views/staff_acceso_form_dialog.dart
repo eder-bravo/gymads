@@ -1,5 +1,6 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -22,10 +23,9 @@ Future<({String nombre, String codigo})?> showStaffAccesoFormDialog({
   StaffAccesoModel? existing,
 }) {
   if (existing == null) {
-    return Get.to<({String nombre, String codigo})>(
+    return abrirFormulario<({String nombre, String codigo})>(
       () => const _StaffAccesoFormDialog(),
-      fullscreenDialog: true,
-    )!;
+    );
   }
   return Get.dialog<({String nombre, String codigo})>(
     _StaffAccesoFormDialog(existing: existing),
@@ -145,7 +145,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
                       rol.descripcion,
                       style: TextStyle(
                         color: c.textSecondary.withOpacity(0.8),
-                        fontSize: 12,
+                        fontSize: legible(12),
                         height: 1.3,
                       ),
                     ),
@@ -169,7 +169,17 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
     return ScaffoldAdaptable(
       anchoMaximo: 760,
       backgroundColor: c.backgroundColor,
-      appBar: const GymAppBar(title: 'Nuevo acceso'),
+      appBar: GymAppBar(
+        title: 'Nuevo acceso',
+        // En la ventana de escritorio, una X para cerrar (no una flecha).
+        leading: PlataformaApp.escritorio
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Cerrar',
+                onPressed: () => Get.back(),
+              )
+            : null,
+      ),
       body: SafeArea(
         child: ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -184,8 +194,10 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
           ],
         ),
       ),
-      bottomNavigationBar:
-          PieDeFormulario(child: _botonGuardar('Generar código')),
+      bottomNavigationBar: PieDeFormulario(
+        alCancelar: () => Get.back(),
+        child: _botonGuardar('Generar código'),
+      ),
     );
   }
 

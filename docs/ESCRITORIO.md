@@ -5,33 +5,161 @@ Las versiones exactas resueltas están en `pubspec.lock`.
 
 ## Diseño de escritorio
 
-macOS y Windows mantienen los colores, degradados, tipografía y formas de la
-app. El contenido tiene anchos máximos según su uso: formularios de 720–800
-puntos, configuración de 880, historiales de 960–1120 e inicio/listados de
-1200. El fondo llena la ventana y las barras, los campos, los botones al pie
-y las acciones flotantes quedan alineados con el contenido.
+macOS y Windows mantienen los colores, degradados, tipografía, formas y la
+navegación de la app (Inicio → pantallas). El contenido tiene anchos máximos
+según su uso: formularios de 720–800 puntos, configuración de 880, historiales
+(ingresos y entradas) de 960 e inicio/listados de 1200. El fondo llena la
+ventana y las barras, los campos, los botones al pie y las acciones flotantes
+quedan alineados con el contenido. La cabecera de Inicio ocupa todo el ancho
+y alinea su título con la columna de opciones.
 
-Inicio distribuye las opciones en columnas según el ancho disponible.
-Clientes e inventario muestran dos tarjetas por fila cuando caben, con altura
-natural y una columna al reducir la ventana o aumentar el texto. Punto de
-venta mantiene el catálogo y un carrito lateral de 380 puntos en ventanas
-amplias; vuelve al resumen inferior cuando falta ancho o altura. El carrito
-lateral permite cambiar cantidades y usa el mismo cobro de la app.
+Patrones propios de escritorio (en el teléfono no cambian):
 
-Los controles conservan sus tamaños al maximizar: cambiar la ventana ajusta
-la distribución, sin escalar toda la interfaz. Se respeta la escala de texto
-del sistema y los formularios siguen desplazándose con poca altura. Los
-diálogos y hojas de escritorio tienen ancho acotado. La búsqueda, el foco,
-los datos del formulario y el carrito se conservan al redimensionar; la
-captura automática del lector continúa funcionando.
+- **Formularios largos como ventana modal**: alta y edición de cliente,
+  producto, cobrar visita y nuevo acceso de personal se abren con
+  `abrirFormulario()` sobre la pantalla de origen (720×680 como máximo,
+  ajustada a la ventana). Un clic fuera no la cierra; se cierra con su botón.
+- **Hojas inferiores como diálogo**: cobro de venta, detalle de ingreso,
+  productos vendidos, apariencia y acciones de teléfono usan
+  `mostrarHojaAdaptable()`; en escritorio no muestran asa.
+- **Botón principal a la derecha**: `PieDeFormulario` y `BotonGuardar` toman
+  el ancho de su texto (mínimo 200) en vez de cruzar la pantalla. El detalle
+  de cliente agrupa Eliminar, Editar y Abonar en una fila.
+- **Mouse**: cursor de mano y borde resaltado al pasar sobre los accesos de
+  Inicio; clic derecho fija un producto en venta; las categorías se arrastran
+  directamente para reordenarlas. Sin "jalar para refrescar": cada pantalla
+  tiene su botón de recargar. En venta, un clic en la ficha agrega el
+  producto y su borde se resalta al pasar el mouse (`AlPasarMouse`).
+- **Configuración en dos columnas**, con Cerrar sesión aparte y a todo lo
+  ancho debajo de las opciones.
+- **Historiales alineados**: en ingresos y entradas el importe y el estado van
+  al borde derecho de cada ficha, con cifras tabulares.
+
+Clientes e inventario colocan tantas tarjetas por fila como quepan con al
+menos 420 puntos (hasta tres), con altura natural; con texto grande pasan a
+una columna. Punto de venta mantiene el catálogo y un carrito lateral de 380
+puntos en ventanas amplias; vuelve al resumen inferior cuando falta ancho o
+altura. El carrito lateral permite cambiar cantidades y usa el mismo cobro de
+la app.
+
+**Escala automática.** La interfaz está diseñada para una ventana de
+1280×800 y crece en proporción cuando la ventana es mayor: textos, íconos,
+tarjetas, espacios, diálogos y ventanas modales, en pasos de 5 % y hasta
+160 % (`VentanaEscritorio.escalaPara`). Maximizada en un monitor de 2560×1440
+se ve como una pantalla de 1600×880 ampliada; en 1920×1080, al 130 %. Las
+pantallas reciben el tamaño lógico, así que sus anchos máximos y columnas no
+cambian. Se respeta además la escala de texto del sistema y los formularios
+siguen desplazándose con poca altura. La búsqueda, el foco, los datos del
+formulario y el carrito se conservan al redimensionar o cambiar de escala; la
+captura automática del lector continúa funcionando y se pausa mientras hay
+una ventana modal abierta.
+
+**Fácil de usar para cualquiera** (revisión con ui-ux-pro-max, solo en
+escritorio; el teléfono queda idéntico):
+
+- **Acciones con texto, nada escondido en íconos.** La acción principal de
+  cada pantalla va en la barra con su nombre (`AccionDeBarra`: "Nuevo
+  cliente", "Nuevo producto", "Nueva categoría", "Nuevo acceso"); Categorías
+  y Personal ya no usan botón flotante. En las filas, las acciones más usadas
+  se ven como botones ("Editar", "Stock", "Cambiar rol", "Código nuevo") y el
+  resto va en "Más" (`AccionesDeFila`). Clic en un producto lo abre para
+  editar. Mi cuenta y Control de accesos dicen "Editar" y "Cambiar hora".
+- **Botones a su ancho y en fila** (`FilaDeBotones`): Lector, Permisos,
+  Escáner, asistente del lector y el cobro de venta. Los formularios en
+  ventana tienen "Cancelar" junto a guardar, y Escape los cierra.
+- **Letra legible:** ningún texto informativo por debajo de 14 (`legible()`).
+- **Títulos y textos uniformes** (`PlataformaApp.elegir`): minúscula inicial
+  ("Mi cuenta", "Detalle del cliente", "Registro"), importes con separador de
+  miles (`dinero()`), "1 transacción".
+- **Configuración del lector:** botón "Cancelar" en cada paso del asistente,
+  la computadora como primer ícono, errores en un recuadro, botones de "Buscar
+  de nuevo" / "Escribir otra red" que bajan de renglón con texto grande (antes
+  se salían de la pantalla). Los interruptores del lector explican qué hacen.
+- **Escáner de códigos:** tres formas de conectarlo con ícono; prefijo,
+  sufijo y modo serie dentro de "Opciones avanzadas".
+- **Otros:** precios en dos columnas, tooltips en los íconos que no tenían,
+  "Subir" y "Bajar" como alternativa a arrastrar categorías, la cámara con
+  ancho de lectura y el error técnico en "Ver detalles".
+
+`test/escritorio_compacto_test.dart` genera capturas de 37 pantallas,
+diálogos y pasos del asistente: escritorio maximizado (`pantallas/`), laptop
+(`laptop/`) y teléfono (`build/capturas_movil/<carpeta>`). Las del teléfono
+se generan aparte (`--plain-name 390`) y se comparan con
+`test/herramientas/comparar_capturas.py ANTES DESPUES 0`: tras esta revisión
+las 72 pantallas que existen en el teléfono quedaron idénticas píxel a píxel
+(solo cambió la cámara de escritorio, que el teléfono no usa).
+
+**Inicio de escritorio** (`home/views/inicio_escritorio.dart`) es una rejilla
+"bento" que llena la ventana, siguiendo la recomendación de ui-ux-pro-max
+para tableros:
+
+- Vender, el módulo del mostrador, en una tarjeta grande; Abonar, Clientes e
+  Inventario alrededor, con los degradados del teléfono, el ícono como marca
+  de agua y una ligera ampliación al pasar el mouse. Si el rol no ve algún
+  módulo, la rejilla se reacomoda (1 a 4 tarjetas).
+- Debajo, los números de hoy (`ResumenDelDia`): ingresos cobrados, entradas
+  y membresías que vencen en 7 días. Cada uno solo aparece con su permiso
+  (ver ingresos, ver accesos, gestionar clientes), se vuelve a pedir cada vez
+  que Inicio regresa al frente y abre su pantalla con un clic. Si un dato no
+  carga se muestra "—" sin afectar a los demás.
+- Configuración pasa a un botón en la cabecera, junto a la fecha.
+- Atajos: ⌘/Ctrl + 1…6 abren las tarjetas en orden de lectura y
+  ⌘/Ctrl + coma abre Configuración. Cada tarjeta muestra su atajo.
+
+El recorrido de bienvenida conserva sus pasos: los números de ingresos y
+entradas y el botón de Configuración llevan las claves de antes. En una
+ventana de menos de 720 puntos se usa la lista del teléfono.
+
+Los textos hablan del equipo y no del teléfono (`PlataformaApp.equipo`):
+apariencia "Según el sistema", "Recibir avisos en este equipo", el asistente
+del lector y los mensajes de Bluetooth. Los permisos de Bluetooth remiten a
+Ajustes del Sistema › Privacidad y seguridad › Bluetooth. Las instrucciones
+de los recorridos dicen "Haz clic" en lugar de "Toca".
 
 `test/escritorio_layout_test.dart` verifica ambos destinos simulados con
-ventanas de 1920×1000 a 600–800×430, texto al 130 %, cambios de cantidad,
-cobro y lectura física tras redimensionar. Para generar capturas opcionales
-del render de Flutter con datos de prueba, ejecutar ese archivo con
+ventanas de 1920×1000 hasta el mínimo, texto hasta el 200 %, cambios de
+cantidad, cobro, lectura física tras redimensionar y el formulario como
+ventana modal. Para generar capturas opcionales del render de Flutter con
+datos de prueba, ejecutar ese archivo (o `test/escritorio_compacto_test.dart`,
+que guarda las 26 pantallas maximizadas, en claro y oscuro y con sombras
+reales, en `build/capturas_escritorio/pantallas`) con
 `--dart-define=CAPTURAS_ESCRITORIO=true` y `FUENTES_CAPTURA` apuntando a
 `bin/cache/artifacts/material_fonts` del SDK de Flutter. Se guardan en
 `build/capturas_escritorio`.
+
+### Tamaño de la ventana
+
+La ventana se puede redimensionar y maximizar, con un contenido mínimo de
+**960×600 puntos**: cabe en pantallas de 1366×768 y de 1920×1080 al 150 %,
+descontando barras de tareas y de título. macOS lo aplica mediante
+`contentMinSize`; Windows calcula el marco y la barra de título según el DPI
+del monitor en `WM_GETMINMAXINFO`.
+
+La primera vez abre en 1280×800, centrada y limitada al área visible del
+monitor. macOS recuerda después el tamaño y la posición (`VentanaPrincipal`);
+Windows centra la ventana en el área de trabajo en cada inicio.
+
+`VentanaEscritorio` aplica además el mínimo dentro de Flutter, sobre el
+navegador de la app. Si el sistema entrega un tamaño menor durante resize, o
+se usa una ventana abierta antes de recompilar el runner, conserva un área de
+960×600 y permite desplazarla horizontal y verticalmente. Mantiene montadas
+las rutas y los diálogos al cruzar el límite, conservando campos y foco. Esta
+protección solo se aplica a macOS y Windows. Los cambios nativos del tamaño
+requieren detener la app y volver a ejecutarla; hot restart no los aplica.
+
+Las pantallas conservan sus variantes compactas (resúmenes en varias filas,
+fichas con el importe debajo del nombre, botón de cobro en su propia fila)
+para texto grande y para el respaldo de `VentanaEscritorio`.
+`test/escritorio_compacto_test.dart` cubre 26 pantallas/estados, el
+formulario de producto y la selección de clientes en Abonar en macOS y Windows
+simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
+103×120 puntos.
+
+Verificación de esta revisión: 534 pruebas aprobadas de la batería completa
+(la falla restante es la preexistente de `test/widget_test.dart`), análisis
+sin incidencias nuevas y compilación de macOS, con capturas a 2560×1410
+(`*-maximizada.png`). En macOS la app abrió en 1280×800 centrada. La compilación nativa de Windows queda pendiente de una
+computadora Windows.
 
 ## Escáner de códigos de barras
 
@@ -140,6 +268,36 @@ sigue suponiendo redes /24, como el código previo; para redes con otra máscara
 o adaptadores VPN pueden hacer falta ajustes adicionales. El firewall debe
 permitir la red local. No se implementó provisión del RFID por cable: conectar
 USB a ese firmware no lo convierte en escáner HID ni en canal de configuración.
+
+## Renderizador de macOS
+
+`macos/Runner/Info.plist` fija `FLTEnableImpeller` en `false`. Flutter 3.47.5
+activa Impeller por defecto, y el cierre con `The texture and its descriptor
+disagree about its size` coincide con un fallo del motor al reutilizar superficies
+de tamaños distintos al cambiar la ventana. Se usa temporalmente **Skia sobre
+Metal**, manteniendo la aceleración gráfica, hasta validar un SDK con el arreglo.
+Este ajuste solo afecta a macOS; el backend Metal del registro no existe en Windows.
+
+La opción se aplica al arrancar un binario recompilado, incluyendo Release.
+Cerrar y volver a ejecutar; hot reload/hot restart no actualizan `Info.plist`.
+Para depurar explícitamente con esta configuración:
+
+```sh
+flutter run -d macos --no-enable-impeller
+```
+
+No usar `--enable-impeller`, que sobrescribe el ajuste de la app. Un `try/catch`
+de Dart no puede recuperar un cierre nativo del hilo de renderizado.
+
+Referencias: [opción oficial de Flutter](https://docs.flutter.dev/perf/impeller#macos)
+y [corrección propuesta para superficies de tamaño incorrecto](https://github.com/flutter/flutter/pull/192522).
+
+Validación: en una app aislada que usa la vista previa real, el registro confirmó
+`Using the Skia rendering backend (Metal)` sin pasar flags. El PDF siguió visible
+al entrar/salir de pantalla completa y al ampliar/restaurar la ventana; el panel
+de impresión abrió y canceló sin bloqueo ni errores de render. Pasaron las seis
+pruebas de `test/impresion_pdf_test.dart`. Esta comprobación no envió trabajos a
+una impresora física ni reproduce todos los posibles desencadenantes del cierre.
 
 ## Impresión de reportes
 

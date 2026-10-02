@@ -7,25 +7,48 @@ import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/core/utils/category_icons.dart';
 import '../controllers/inventario_controller.dart';
+import '../../../core/utils/plataforma_app.dart';
+import '../../../routes/app_pages.dart';
 import 'stock_adjust_dialog.dart';
 
-class ProductFormView extends GetView<InventarioController> {
-  const ProductFormView({super.key});
+/// Abre el formulario de producto: en escritorio, ventana sobre el
+/// inventario; en el teléfono, su pantalla. [argumentos] son los mismos de la
+/// ruta (`isEditing`, `barcode`).
+Future<void> abrirFormularioProducto([Map<String, dynamic>? argumentos]) async {
+  if (PlataformaApp.escritorio) {
+    await abrirFormulario(() => ProductFormView(argumentos: argumentos));
+  } else {
+    await Get.toNamed(Routes.PRODUCT_FORM, arguments: argumentos);
+  }
+}
+
+class ProductFormView extends StatefulWidget {
+  const ProductFormView({super.key, this.argumentos});
+
+  /// Los de la ventana de escritorio; en la ruta llegan por `Get.arguments`.
+  final Map<String, dynamic>? argumentos;
 
   @override
-  Widget build(BuildContext context) {
-    final c = context.colores;
-    final arguments = Get.arguments as Map<String, dynamic>? ?? {};
-    final bool isEditing = arguments['isEditing'] ?? false;
-    final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final priceController = TextEditingController();
-    final stockController = TextEditingController();
-    final barcodeController = TextEditingController();
+  State<ProductFormView> createState() => _ProductFormViewState();
+}
 
-    // Id de la categoría, no el nombre: así renombrarla no desenlaza nada.
-    final selectedCategoryId = RxnString(null);
+class _ProductFormViewState extends State<ProductFormView> {
+  final controller = Get.find<InventarioController>();
+  final formKey = GlobalKey<FormState>();
+  final nameController = TextEditingController();
+  final descriptionController = TextEditingController();
+  final priceController = TextEditingController();
+  final stockController = TextEditingController();
+  final barcodeController = TextEditingController();
+  final selectedCategoryId = RxnString(null);
+  late final bool isEditing;
+
+  @override
+  void initState() {
+    super.initState();
+    final arguments =
+        widget.argumentos ?? Get.arguments as Map<String, dynamic>? ?? {};
+    isEditing = arguments['isEditing'] ?? false;
 
     // Si estamos editando, llenar los campos con los datos del producto actual
     if (isEditing && controller.currentProduct.value != null) {
@@ -40,7 +63,34 @@ class ProductFormView extends GetView<InventarioController> {
       // Llega desde "Código no registrado" al escanear en el inventario.
       barcodeController.text = arguments['barcode'] as String;
     }
+  }
 
+  Future<void> _escanear() async {
+    final codigo = await controller.escanearCodigo(
+      titulo: 'Código del producto',
+      instruccion: 'Apunta al código de barras del envase',
+    );
+    if (mounted && codigo != null) barcodeController.text = codigo;
+  }
+
+  @override
+  void dispose() {
+    for (final campo in [
+      nameController,
+      descriptionController,
+      priceController,
+      stockController,
+      barcodeController
+    ]) {
+      campo.dispose();
+    }
+    selectedCategoryId.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colores;
     return ScaffoldAdaptable(
       anchoMaximo: 760,
       backgroundColor: c.backgroundColor,
@@ -59,6 +109,12 @@ class ProductFormView extends GetView<InventarioController> {
       ),
       // Como en los demás formularios: el botón para guardar, fijo abajo.
       bottomNavigationBar: PieDeFormulario(
+        // Igual que la X: deja el formulario limpio para la próxima vez.
+        alCancelar: () {
+          if (controller.guardandoProducto.value) return;
+          controller.resetForm();
+          Get.back();
+        },
         child: Obx(() => BotonGuardar(
               texto: isEditing ? 'Guardar cambios' : 'Guardar producto',
               guardando: controller.guardandoProducto.value,
@@ -124,8 +180,8 @@ class ProductFormView extends GetView<InventarioController> {
                             'Describe las características del producto...',
                         prefixIcon: const Icon(Icons.description),
                         helperText: 'Opcional - Máximo 500 caracteres',
-                        helperStyle:
-                            TextStyle(fontSize: 11, color: c.textSecondary),
+                        helperStyle: TextStyle(
+                            fontSize: legible(11), color: c.textSecondary),
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
@@ -148,6 +204,7 @@ class ProductFormView extends GetView<InventarioController> {
                           : null;
 
                       return DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: validValue,
                         style: TextStyle(color: c.textPrimary),
                         decoration: const InputDecoration(
@@ -163,9 +220,12 @@ class ProductFormView extends GetView<InventarioController> {
                                 Icon(CategoryIcons.resolve(category.icon),
                                     size: 18, color: AppColors.accent),
                                 const SizedBox(width: 10),
-                                Text(
-                                  category.name,
-                                  style: TextStyle(color: c.textPrimary),
+                                Expanded(
+                                  child: Text(
+                                    category.name,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: c.textPrimary),
+                                  ),
                                 ),
                               ],
                             ),
@@ -214,8 +274,8 @@ class ProductFormView extends GetView<InventarioController> {
                             fontSize: 22,
                             fontWeight: FontWeight.bold),
                         helperText: 'Precio unitario en MXN',
-                        helperStyle:
-                            TextStyle(fontSize: 11, color: c.textSecondary),
+                        helperStyle: TextStyle(
+                            fontSize: legible(11), color: c.textSecondary),
                       ),
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
@@ -255,18 +315,22 @@ class ProductFormView extends GetView<InventarioController> {
                         labelText: 'Código (opcional)',
                         hintText: 'Escanéalo del envase o escríbelo',
                         prefixIcon: const Icon(Icons.qr_code),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.qr_code_scanner),
-                          tooltip: 'Escanear',
-                          onPressed: () async {
-                            final codigo = await controller.escanearCodigo(
-                              titulo: 'Código del producto',
-                              instruccion:
-                                  'Apunta al código de barras del envase',
-                            );
-                            if (codigo != null) barcodeController.text = codigo;
-                          },
-                        ),
+                        // En escritorio el botón dice qué hace.
+                        suffixIcon: PlataformaApp.escritorio
+                            ? Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: TextButton.icon(
+                                  onPressed: _escanear,
+                                  icon: const Icon(Icons.qr_code_scanner,
+                                      size: 20),
+                                  label: const Text('Escanear'),
+                                ),
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.qr_code_scanner),
+                                tooltip: 'Escanear',
+                                onPressed: _escanear,
+                              ),
                       ),
                     ),
                   ],
@@ -301,8 +365,8 @@ class ProductFormView extends GetView<InventarioController> {
                           suffixStyle:
                               TextStyle(color: c.textSecondary, fontSize: 14),
                           helperText: 'Unidades en existencia',
-                          helperStyle:
-                              TextStyle(fontSize: 11, color: c.textSecondary),
+                          helperStyle: TextStyle(
+                              fontSize: legible(11), color: c.textSecondary),
                         ),
                         keyboardType: TextInputType.number,
                         inputFormatters: [
@@ -369,7 +433,7 @@ class ProductFormView extends GetView<InventarioController> {
                           ? 'unidades vendidas sin existencias'
                           : 'unidades en existencia',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: legible(12),
                         color: c.textSecondary,
                       ),
                     ),

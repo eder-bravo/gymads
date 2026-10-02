@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/plataforma_app.dart';
+import '../../../core/widgets/diseno_escritorio.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
@@ -32,115 +34,107 @@ class TransactionTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: c.disabled.withOpacity(0.4)),
             ),
-            child: Row(
-              children: [
-                // Icono del concepto
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: controller
-                        .getColorForConcepto(ingreso.concepto)
-                        .withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    _getIconForConcepto(ingreso.concepto),
-                    color: controller.getColorForConcepto(ingreso.concepto),
-                    size: 24,
-                  ),
+            child: FilaConDetalle(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: controller
+                      .getColorForConcepto(ingreso.concepto)
+                      .withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(width: 12),
-
-                // Información de la transacción
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                child: Icon(
+                  _getIconForConcepto(ingreso.concepto),
+                  color: controller.getColorForConcepto(ingreso.concepto),
+                  size: 24,
+                ),
+              ),
+              principal: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    ingreso.clienteNombre,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: c.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
                     children: [
                       Text(
-                        ingreso.clienteNombre,
+                        ingreso.conceptoDescripcion,
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: c.textPrimary,
+                          fontSize: 14,
+                          color: c.textSecondary,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              ingreso.conceptoDescripcion,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: c.textSecondary,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: controller
-                                  .getColorForMetodoPago(ingreso.metodoPago)
-                                  .withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              ingreso.metodoPagoDescripcion,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: controller
-                                    .getColorForMetodoPago(ingreso.metodoPago),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if ((ingreso.referenciaPago ?? '').isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          'Ref. ${ingreso.referenciaPago}',
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: controller
+                              .getColorForMetodoPago(ingreso.metodoPago)
+                              .withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          ingreso.metodoPagoDescripcion,
                           style: TextStyle(
                             fontSize: 12,
-                            color: c.textSecondary,
+                            color: controller
+                                .getColorForMetodoPago(ingreso.metodoPago),
+                            fontWeight: FontWeight.w500,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ],
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-
-                // Monto y fecha
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
+                  if ((ingreso.referenciaPago ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      controller.formatCurrency(ingreso.montoFinal),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.success,
-                        fontSize: 17,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      controller.formatFechaCorta(ingreso.fecha),
+                      'Ref. ${ingreso.referenciaPago}',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: legible(12),
                         color: c.textSecondary,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                ),
-              ],
+                ],
+              ),
+              detalle: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    controller.formatCurrency(ingreso.montoFinal),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.success,
+                      fontSize: 17,
+                      // En escritorio, cifras del mismo ancho: los importes
+                      // se alinean de una fila a otra.
+                      fontFeatures: PlataformaApp.escritorio
+                          ? const [FontFeature.tabularFigures()]
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    controller.formatFechaCorta(ingreso.fecha),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: c.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

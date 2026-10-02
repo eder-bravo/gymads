@@ -39,6 +39,9 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
   mac.CameraMacOSArguments? _argumentos;
   File? _foto;
   String? _error;
+
+  /// El error técnico, aparte del mensaje: se ve solo con "Ver detalles".
+  String? _detalleError;
   bool _cargando = true;
   bool _tomando = false;
   bool _cerrado = false;
@@ -91,6 +94,7 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
     setState(() {
       _cargando = true;
       _error = null;
+      _detalleError = null;
     });
     _operacion = _operacion.then((_) async {
       try {
@@ -147,8 +151,14 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
       } catch (e) {
         await _liberar();
         if (!_cerrado) {
-          _error = 'No se pudo abrir la cámara. Revisa los permisos, '
-              'cierra otras apps que la usen o elige otra cámara.\n$e';
+          if (e is StateError) {
+            // Mensajes de la propia app ("No hay cámaras…"): se leen tal cual.
+            _error = e.message;
+          } else {
+            _error = 'No se pudo abrir la cámara. Revisa los permisos, '
+                'cierra otras apps que la usen o elige otra cámara.';
+            _detalleError = '$e';
+          }
         }
       } finally {
         if (mounted) setState(() => _cargando = false);
@@ -209,6 +219,7 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
             title: const Text('Foto del cliente'),
             leading: IconButton(
                 icon: const Icon(Icons.close),
+                tooltip: 'Cerrar',
                 onPressed: _tomando ? null : widget.onCancel),
             actions: [
               IconButton(
@@ -219,53 +230,76 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
                       : () => _actualizar())
             ]),
         body: SafeArea(
-            child: Column(children: [
-          if (_camaras.isNotEmpty && _foto == null)
-            Padding(
-                padding: const EdgeInsets.all(16),
-                child: DropdownButtonFormField<String>(
-                    initialValue: _elegida,
-                    key: ValueKey(_elegida),
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Cámara'),
-                    items: _camaras
-                        .map((c) => DropdownMenuItem(
-                            value: c.id,
-                            child: Text(c.nombre,
-                                overflow: TextOverflow.ellipsis)))
-                        .toList(),
-                    onChanged: _cargando || _tomando
-                        ? null
-                        : (id) => _actualizar(seleccionar: id))),
-          Expanded(child: _contenido()),
-          Padding(
-              padding: const EdgeInsets.all(16),
-              child: _foto == null
-                  ? FilledButton.icon(
-                      onPressed: _cargando || _tomando || _error != null
-                          ? null
-                          : _tomar,
-                      icon: const Icon(Icons.camera_alt),
-                      label: Text(_tomando ? 'Tomando foto…' : 'Tomar foto'))
-                  : Wrap(spacing: 16, children: [
-                      OutlinedButton(
-                          onPressed: () async {
-                            final foto = _foto!;
-                            setState(() => _foto = null);
-                            await foto.delete();
-                          },
-                          child: const Text('Repetir')),
-                      FilledButton(
-                          onPressed: () => widget.onPhotoTaken(_foto!),
-                          child: const Text('Usar foto'))
-                    ])),
-          const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Text(
-                  'Para usar la cámara del celular, actívala como webcam en el sistema o en su aplicación y actualiza la lista.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70))),
-        ])),
+            child: LayoutBuilder(
+                builder: (context, limites) => SingleChildScrollView(
+                        child: Column(children: [
+                      if (_camaras.isNotEmpty && _foto == null)
+                        Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: _anchoDeLectura(DropdownButtonFormField<
+                                    String>(
+                                initialValue: _elegida,
+                                key: ValueKey(_elegida),
+                                isExpanded: true,
+                                decoration:
+                                    const InputDecoration(labelText: 'Cámara'),
+                                items: _camaras
+                                    .map((c) => DropdownMenuItem(
+                                        value: c.id,
+                                        child: Text(c.nombre,
+                                            overflow: TextOverflow.ellipsis)))
+                                    .toList(),
+                                onChanged: _cargando || _tomando
+                                    ? null
+                                    : (id) => _actualizar(seleccionar: id)))),
+                      SizedBox(
+                          height: (limites.maxHeight * 0.6)
+                              .clamp(180, double.infinity),
+                          child: _contenido()),
+                      Padding(
+                          padding: const EdgeInsets.all(16),
+                          // Botones de buen tamaño y con ícono: es lo único
+                          // que hay que hacer en esta pantalla.
+                          child: _foto == null
+                              ? FilledButton.icon(
+                                  onPressed:
+                                      _cargando || _tomando || _error != null
+                                          ? null
+                                          : _tomar,
+                                  style: _estiloBoton,
+                                  icon: const Icon(Icons.camera_alt),
+                                  label: Text(_tomando
+                                      ? 'Tomando foto…'
+                                      : 'Tomar foto'))
+                              : Wrap(
+                                  alignment: WrapAlignment.center,
+                                  spacing: 16,
+                                  runSpacing: 12,
+                                  children: [
+                                      OutlinedButton.icon(
+                                          onPressed: () async {
+                                            final foto = _foto!;
+                                            setState(() => _foto = null);
+                                            await foto.delete();
+                                          },
+                                          style: _estiloBoton,
+                                          icon: const Icon(Icons.refresh),
+                                          label: const Text('Repetir')),
+                                      FilledButton.icon(
+                                          onPressed: () =>
+                                              widget.onPhotoTaken(_foto!),
+                                          style: _estiloBoton,
+                                          icon: const Icon(Icons.check),
+                                          label: const Text('Usar foto'))
+                                    ])),
+                      Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: _anchoDeLectura(const Text(
+                              'Para usar la cámara del celular, actívala como webcam en el sistema o en su aplicación y actualiza la lista.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  color: Colors.white70, fontSize: 15)))),
+                    ])))),
       ));
 
   Widget _contenido() {
@@ -278,15 +312,32 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
           child: SingleChildScrollView(
               child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Text(_error!, textAlign: TextAlign.center),
-                    TextButton(
+                  child: _anchoDeLectura(
+                      Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16, height: 1.4)),
+                    if (_detalleError != null)
+                      Theme(
+                        data: Theme.of(context)
+                            .copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          title: const Text('Ver detalles',
+                              textAlign: TextAlign.center),
+                          children: [
+                            SelectableText(_detalleError!,
+                                style: const TextStyle(
+                                    fontSize: 13, color: Colors.white70)),
+                          ],
+                        ),
+                      ),
+                    const TextButton(
                         onPressed: PermisosEscritorio.abrirAjustes,
-                        child: const Text('Abrir permisos de cámara')),
+                        child: Text('Abrir permisos de cámara')),
                     TextButton(
                         onPressed: () => _actualizar(),
                         child: const Text('Intentar de nuevo')),
-                  ]))));
+                  ])))));
     }
     return LayoutBuilder(builder: (context, limites) {
       _vista = limites.biggest;
@@ -300,6 +351,21 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
       ]);
     });
   }
+
+  static const _estiloBoton = ButtonStyle(
+    minimumSize: WidgetStatePropertyAll(Size(200, 48)),
+    textStyle: WidgetStatePropertyAll(
+        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+  );
+
+  /// Textos y selector con un ancho que se lee cómodo: en una ventana grande
+  /// no se estiran de lado a lado.
+  Widget _anchoDeLectura(Widget child) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: child,
+        ),
+      );
 
   void _errorWindows() {
     final controller = _windows;

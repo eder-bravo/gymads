@@ -21,19 +21,16 @@ class IngresosPdfBuilder {
           ('Transacciones', '${estadisticas.totalTransacciones}'),
           ('Promedio', _moneda(estadisticas.promedioTransaccion)),
         ]),
-
         PdfReportService.seccion('Por concepto'),
         PdfReportService.desglose(
           _conNombresLegibles(estadisticas.ingresosPorConcepto),
           formato: _moneda,
         ),
-
         PdfReportService.seccion('Por método de pago'),
         PdfReportService.desglose(
           _metodosLegibles(estadisticas.ingresosPorMetodo),
           formato: _moneda,
         ),
-
         PdfReportService.seccion(
             'Detalle de transacciones (${ingresos.length})'),
         PdfReportService.tabla(

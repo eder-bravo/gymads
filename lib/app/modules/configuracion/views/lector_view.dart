@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -136,6 +137,7 @@ class _LectorViewState extends State<LectorView> {
     if (controller.comprobandoLector.value) return const SizedBox.shrink();
 
     final estado = controller.estadoLector.value;
+    if (PlataformaApp.escritorio) return _accionesEscritorio(estado);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -212,6 +214,87 @@ class _LectorViewState extends State<LectorView> {
             icono: Icons.link_off,
             color: AppColors.error,
             onTap: _confirmarDesvincular,
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// En escritorio: los botones en una fila, cada uno de su ancho, la
+  /// acción principal al final. "Desvincular" va aparte, debajo, para que
+  /// no se oprima por error junto a "Probar".
+  Widget _accionesEscritorio(EstadoLector estado) {
+    final principal = switch (estado) {
+      EstadoLector.sinConfigurar => [
+          _botonSecundario(
+            texto: 'Buscar mi lector en la red',
+            icono: Icons.wifi_find,
+            onTap: controller.buscarLectorEnRed,
+          ),
+          _boton(
+            texto: 'Agregar lector',
+            icono: Icons.add,
+            color: AppColors.accent,
+            onTap: () => _abrirAsistente(cambiarWifi: false),
+          ),
+        ],
+      EstadoLector.sinConexion => [
+          _botonSecundario(
+            texto: 'Buscar de nuevo en la red',
+            icono: Icons.wifi_find,
+            onTap: controller.buscarLectorEnRed,
+          ),
+          _boton(
+            texto: 'Configurar el lector',
+            icono: Icons.bluetooth_searching,
+            color: AppColors.accent,
+            onTap: _cambiarWifi,
+          ),
+        ],
+      EstadoLector.libre => [
+          _boton(
+            texto: 'Vincular a mi gimnasio',
+            icono: Icons.link,
+            color: AppColors.success,
+            onTap: () => controller.vincularLector(_ipObjetivo),
+          ),
+        ],
+      EstadoLector.deOtroGimnasio => [
+          _boton(
+            texto: 'Formatear lector',
+            icono: Icons.restart_alt,
+            color: AppColors.error,
+            onTap: _confirmarFormateo,
+          ),
+        ],
+      EstadoLector.mio => [
+          _botonSecundario(
+            texto: 'Cambiar WiFi del lector',
+            icono: Icons.wifi,
+            onTap: _cambiarWifi,
+          ),
+          _boton(
+            texto: 'Probar lector',
+            icono: Icons.contactless,
+            color: AppColors.accent,
+            onTap: () => abrirPruebaLector(context),
+          ),
+        ],
+    };
+    return Column(
+      children: [
+        FilaDeBotones(children: principal),
+        if (estado == EstadoLector.mio) ...[
+          const SizedBox(height: 20),
+          TextButton.icon(
+            onPressed: _confirmarDesvincular,
+            icon: const Icon(Icons.link_off, size: 18),
+            label: const Text('Desvincular el lector'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+              textStyle:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ],
@@ -377,6 +460,13 @@ class _LectorViewState extends State<LectorView> {
                       color: c.textPrimary,
                       fontSize: 15,
                       fontWeight: FontWeight.w600)),
+              // En escritorio se explica qué cambia al activarlo.
+              subtitle: PlataformaApp.escritorio
+                  ? Text(
+                      'Los clientes registran su entrada al pasar su '
+                      'tarjeta o llavero.',
+                      style: TextStyle(color: c.textSecondary, fontSize: 14))
+                  : null,
               onChanged: (activar) {
                 if (activar) {
                   controller.testRfidConnection();
@@ -411,11 +501,17 @@ class _LectorViewState extends State<LectorView> {
           child: SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: activo,
-            title: Text('Recibir avisos en este teléfono',
+            title: Text('Recibir avisos en este ${PlataformaApp.equipo}',
                 style: TextStyle(
                     color: c.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600)),
+            subtitle: PlataformaApp.escritorio
+                ? Text(
+                    'Muestra aquí la bienvenida de cada cliente que pase su '
+                    'tarjeta.',
+                    style: TextStyle(color: c.textSecondary, fontSize: 14))
+                : null,
             onChanged: servicio.setRecibirAvisosAqui,
           ),
         ),

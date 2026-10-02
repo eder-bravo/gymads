@@ -81,13 +81,13 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                                '${controller.firstNameController.text} ${controller.lastNameController.text}'
-                                    .trim(),
-                                style: TextStyle(
-                                  color: c.contraste.withOpacity(0.70),
-                                  fontSize: 14,
-                                ),
-                              ),
+                            '${controller.firstNameController.text} ${controller.lastNameController.text}'
+                                .trim(),
+                            style: TextStyle(
+                              color: c.contraste.withOpacity(0.70),
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -102,8 +102,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                     decoration: BoxDecoration(
                       color: c.tarjetaAcceso,
                       borderRadius: BorderRadius.circular(20),
-                      border:
-                          Border.all(color: c.contraste.withOpacity(0.1)),
+                      border: Border.all(color: c.contraste.withOpacity(0.1)),
                       boxShadow: [
                         BoxShadow(
                           color: c.sombra,
@@ -117,22 +116,25 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.store, color: AppColors.accent, size: 22),
+                            const Icon(Icons.store,
+                                color: AppColors.accent, size: 22),
                             const SizedBox(width: 10),
-                            Text(
+                            Expanded(
+                                child: Text(
                               'Tu Gimnasio',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: c.contraste,
                               ),
-                            ),
+                            )),
                           ],
                         ),
                         const SizedBox(height: 20),
 
                         // Gym name
-                        _buildTextField(context,
+                        _buildTextField(
+                          context,
                           controller: controller.gymNameController,
                           label: 'Nombre del gimnasio',
                           icon: Icons.fitness_center,
@@ -141,7 +143,8 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                         const SizedBox(height: 16),
 
                         // Location
-                        _buildTextField(context,
+                        _buildTextField(
+                          context,
                           controller: controller.locationController,
                           label: 'Ubicación',
                           icon: Icons.location_on_outlined,
@@ -248,7 +251,8 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
     );
   }
 
-  Widget _buildTextField(BuildContext context, {
+  Widget _buildTextField(
+    BuildContext context, {
     required TextEditingController controller,
     required String label,
     required IconData icon,
@@ -263,8 +267,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle:
-            TextStyle(color: c.contraste.withOpacity(0.3), fontSize: 13),
+        hintStyle: TextStyle(color: c.contraste.withOpacity(0.3), fontSize: 13),
         prefixIcon: Icon(icon, color: c.contraste.withOpacity(0.54), size: 20),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

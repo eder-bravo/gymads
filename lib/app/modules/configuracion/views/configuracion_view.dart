@@ -18,7 +18,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
   Widget build(BuildContext context) {
     final c = context.colores;
     return ScaffoldAdaptable(
-      anchoMaximo: 880,
+      anchoMaximo: 960,
       backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Configuración'),
       body: SafeArea(
@@ -83,199 +83,213 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
 
   Widget _buildConfigurationOptions(BuildContext context) {
     final c = context.colores;
-    return Column(
-      children: [
-        // Opción de Cuenta
-        if (PlataformaApp.escanerFisico) ...[
-          _buildOptionTile(context,
-              icon: Icons.barcode_reader,
-              iconColor: AppColors.accent,
-              title: 'Escáner de códigos',
-              subtitle: 'Conexión USB o Bluetooth, ajustes y prueba',
-              onTap: () => Get.to(() => const EscanerConfiguracionView())),
-          const SizedBox(height: 16),
-        ],
-        TourStep(
-          tourKey: controller.keyCuenta,
-          title: 'Cuenta',
-          description: 'Tus datos, el gimnasio y tu contraseña.',
-          borderRadius: 12,
-          isFirstStep: true,
-          isLastStep: controller.esUltimoPasoDelTour(controller.keyCuenta),
-          child: _buildOptionTile(
-            context,
-            icon: Icons.account_circle,
-            iconColor: AppColors.info,
-            title: 'Cuenta',
-            subtitle: 'Información personal y configuración de cuenta',
-            onTap: () => controller.openAccountSettings(),
-            trailing: _buildStatusIndicator(true),
-          ),
-        ),
-
-        // Claro, oscuro o como el teléfono. Se guarda en este teléfono y la
-        // ve cualquier rol. Sin paso de tour: no vuelve a mostrar el tour a
-        // quien ya lo vio.
-        const SizedBox(height: 12),
-        TourStep(
-          tourKey: controller.keyApariencia,
-          title: 'Apariencia',
-          description: 'Clara, oscura o como tu teléfono.',
-          borderRadius: 12,
-          isLastStep: controller.esUltimoPasoDelTour(controller.keyApariencia),
-          child: _buildOptionTile(
-            context,
-            icon: Icons.brightness_6_outlined,
+    final opciones = <Widget>[
+      // Opción de Cuenta
+      if (PlataformaApp.escanerFisico) ...[
+        _buildOptionTile(context,
+            icon: Icons.barcode_reader,
             iconColor: AppColors.accent,
-            title: 'Apariencia',
-            subtitle: _HojaApariencia.nombre(TemaService.to.modo.value),
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              showDragHandle: true,
-              builder: (_) => const _HojaApariencia(),
-            ),
+            title: 'Escáner de códigos',
+            subtitle: 'Conexión USB o Bluetooth, ajustes y prueba',
+            onTap: () => Get.to(() => const EscanerConfiguracionView())),
+        const SizedBox(height: 16),
+      ],
+      TourStep(
+        tourKey: controller.keyCuenta,
+        title: 'Cuenta',
+        description: 'Tus datos, el gimnasio y tu contraseña.',
+        borderRadius: 12,
+        isFirstStep: true,
+        isLastStep: controller.esUltimoPasoDelTour(controller.keyCuenta),
+        child: _buildOptionTile(
+          context,
+          icon: Icons.account_circle,
+          iconColor: AppColors.info,
+          title: 'Cuenta',
+          subtitle: 'Información personal y configuración de cuenta',
+          onTap: () => controller.openAccountSettings(),
+          trailing: _buildStatusIndicator(true),
+        ),
+      ),
+
+      // Claro, oscuro o como el teléfono. Se guarda en este teléfono y la
+      // ve cualquier rol. Sin paso de tour: no vuelve a mostrar el tour a
+      // quien ya lo vio.
+      const SizedBox(height: 12),
+      TourStep(
+        tourKey: controller.keyApariencia,
+        title: 'Apariencia',
+        description: PlataformaApp.escritorio
+            ? 'Clara, oscura o como tu sistema.'
+            : 'Clara, oscura o como tu teléfono.',
+        borderRadius: 12,
+        isLastStep: controller.esUltimoPasoDelTour(controller.keyApariencia),
+        child: _buildOptionTile(
+          context,
+          icon: Icons.brightness_6_outlined,
+          iconColor: AppColors.accent,
+          title: 'Apariencia',
+          subtitle: _HojaApariencia.nombre(TemaService.to.modo.value),
+          onTap: () => mostrarHojaAdaptable<void>(
+            context,
+            showDragHandle: true,
+            anchoMaximo: 420,
+            builder: (_) => const _HojaApariencia(),
           ),
         ),
+      ),
 
-        // Precios de abonos: los fija quien puede tocar el gimnasio.
-        if (controller.can(Permission.gestionarPreciosAbonos)) ...[
-          const SizedBox(height: 12),
-          TourStep(
-            tourKey: controller.keyPrecios,
-            title: 'Precios de abonos',
-            description: 'Cuánto cuesta un día, una semana, un mes o un año.',
-            borderRadius: 12,
-            isLastStep: controller.esUltimoPasoDelTour(controller.keyPrecios),
-            child: _buildOptionTile(
-              context,
-              icon: Icons.attach_money,
-              iconColor: AppColors.success,
-              title: 'Precios de Abonos',
-              subtitle: 'Precio por día, semana, mes y año',
-              onTap: () => controller.openAbonoPrices(),
-              trailing: Icon(Icons.arrow_forward_ios,
-                  size: 16, color: c.textSecondary),
-            ),
-          ),
-        ],
-
-        // Categorías de productos (inventario y punto de venta)
-        if (controller.can(Permission.gestionarCategorias)) ...[
-          const SizedBox(height: 12),
-          TourStep(
-            tourKey: controller.keyCategorias,
-            title: 'Categorías de productos',
-            description: 'Para agrupar tus productos.',
-            borderRadius: 12,
-            isLastStep:
-                controller.esUltimoPasoDelTour(controller.keyCategorias),
-            child: _buildOptionTile(
-              context,
-              icon: Icons.category,
-              iconColor: AppColors.accent,
-              title: 'Categorías de productos',
-              subtitle: 'Organiza el inventario y el punto de venta',
-              onTap: () => controller.openCategorias(),
-              trailing: Icon(Icons.arrow_forward_ios,
-                  size: 16, color: c.textSecondary),
-            ),
-          ),
-        ],
-
-        // Accesos del personal: el dueño y el encargado, cada uno solo sobre
-        // los roles por debajo del suyo.
-        if (controller.can(Permission.gestionarAccesosStaff)) ...[
-          const SizedBox(height: 12),
-          TourStep(
-            tourKey: controller.keyAccesos,
-            title: 'Accesos del personal',
-            description:
-                'Tus empleados entran con un código, sin correo ni contraseña.',
-            borderRadius: 12,
-            isLastStep: controller.esUltimoPasoDelTour(controller.keyAccesos),
-            child: _buildOptionTile(
-              context,
-              icon: Icons.badge,
-              iconColor: AppColors.brand,
-              title: 'Accesos del personal',
-              subtitle: 'Códigos de entrada para tus empleados',
-              onTap: () => controller.openStaffAccesos(),
-              trailing: Icon(Icons.arrow_forward_ios,
-                  size: 16, color: c.textSecondary),
-            ),
-          ),
-        ],
-
-        // Entradas y salidas de los clientes, y horario del gimnasio.
-        if (controller.can(Permission.gestionarControlAccesos)) ...[
-          const SizedBox(height: 12),
-          TourStep(
-            tourKey: controller.keyControlAccesos,
-            title: 'Control de accesos',
-            description: 'Si se marca la salida y en qué horario abres.',
-            borderRadius: 12,
-            isLastStep:
-                controller.esUltimoPasoDelTour(controller.keyControlAccesos),
-            child: _buildOptionTile(
-              context,
-              icon: Icons.door_front_door_outlined,
-              iconColor: AppColors.info,
-              title: 'Control de accesos',
-              subtitle: 'Entradas, salidas y horario del gimnasio',
-              onTap: () => controller.openControlAccesos(),
-              trailing: Icon(Icons.arrow_forward_ios,
-                  size: 16, color: c.textSecondary),
-            ),
-          ),
-        ],
-
-        // El lector de tarjetas: su IP y a qué gimnasio pertenece.
-        if (controller.can(Permission.gestionarControlAccesos)) ...[
-          const SizedBox(height: 12),
-          TourStep(
-            tourKey: controller.keyLector,
-            title: 'Lector de tarjetas',
-            description: 'Conecta y vincula el lector a tu gimnasio.',
-            borderRadius: 12,
-            isLastStep: controller.esUltimoPasoDelTour(controller.keyLector),
-            child: _buildOptionTile(
-              context,
-              icon: Icons.nfc,
-              iconColor: AppColors.brand,
-              title: 'Lector de tarjetas',
-              subtitle: 'Vinculación y dirección del lector',
-              onTap: () => controller.openLector(),
-              trailing: Icon(Icons.arrow_forward_ios,
-                  size: 16, color: c.textSecondary),
-            ),
-          ),
-        ],
-
-        // Los permisos se piden todos al entrar la primera vez; aquí se ve
-        // cómo quedaron y se corrigen.
+      // Precios de abonos: los fija quien puede tocar el gimnasio.
+      if (controller.can(Permission.gestionarPreciosAbonos)) ...[
         const SizedBox(height: 12),
         TourStep(
-          tourKey: controller.keyPermisos,
-          title: 'Permisos de la app',
-          description: 'Revisa el acceso a los dispositivos de este equipo.',
+          tourKey: controller.keyPrecios,
+          title: 'Precios de abonos',
+          description: 'Cuánto cuesta un día, una semana, un mes o un año.',
           borderRadius: 12,
-          isLastStep: controller.esUltimoPasoDelTour(controller.keyPermisos),
+          isLastStep: controller.esUltimoPasoDelTour(controller.keyPrecios),
           child: _buildOptionTile(
             context,
-            icon: Icons.verified_user_outlined,
-            iconColor: AppColors.info,
-            title: 'Permisos de la app',
-            subtitle: 'Cámara, notificaciones y lector de tarjetas',
-            onTap: () => controller.openPermisos(),
+            icon: Icons.attach_money,
+            iconColor: AppColors.success,
+            title: 'Precios de Abonos',
+            subtitle: 'Precio por día, semana, mes y año',
+            onTap: () => controller.openAbonoPrices(),
             trailing:
                 Icon(Icons.arrow_forward_ios, size: 16, color: c.textSecondary),
           ),
         ),
+      ],
 
+      // Categorías de productos (inventario y punto de venta)
+      if (controller.can(Permission.gestionarCategorias)) ...[
+        const SizedBox(height: 12),
+        TourStep(
+          tourKey: controller.keyCategorias,
+          title: 'Categorías de productos',
+          description: 'Para agrupar tus productos.',
+          borderRadius: 12,
+          isLastStep: controller.esUltimoPasoDelTour(controller.keyCategorias),
+          child: _buildOptionTile(
+            context,
+            icon: Icons.category,
+            iconColor: AppColors.accent,
+            title: 'Categorías de productos',
+            subtitle: 'Organiza el inventario y el punto de venta',
+            onTap: () => controller.openCategorias(),
+            trailing:
+                Icon(Icons.arrow_forward_ios, size: 16, color: c.textSecondary),
+          ),
+        ),
+      ],
+
+      // Accesos del personal: el dueño y el encargado, cada uno solo sobre
+      // los roles por debajo del suyo.
+      if (controller.can(Permission.gestionarAccesosStaff)) ...[
+        const SizedBox(height: 12),
+        TourStep(
+          tourKey: controller.keyAccesos,
+          title: 'Accesos del personal',
+          description:
+              'Tus empleados entran con un código, sin correo ni contraseña.',
+          borderRadius: 12,
+          isLastStep: controller.esUltimoPasoDelTour(controller.keyAccesos),
+          child: _buildOptionTile(
+            context,
+            icon: Icons.badge,
+            iconColor: AppColors.brand,
+            title: 'Accesos del personal',
+            subtitle: 'Códigos de entrada para tus empleados',
+            onTap: () => controller.openStaffAccesos(),
+            trailing:
+                Icon(Icons.arrow_forward_ios, size: 16, color: c.textSecondary),
+          ),
+        ),
+      ],
+
+      // Entradas y salidas de los clientes, y horario del gimnasio.
+      if (controller.can(Permission.gestionarControlAccesos)) ...[
+        const SizedBox(height: 12),
+        TourStep(
+          tourKey: controller.keyControlAccesos,
+          title: 'Control de accesos',
+          description: 'Si se marca la salida y en qué horario abres.',
+          borderRadius: 12,
+          isLastStep:
+              controller.esUltimoPasoDelTour(controller.keyControlAccesos),
+          child: _buildOptionTile(
+            context,
+            icon: Icons.door_front_door_outlined,
+            iconColor: AppColors.info,
+            title: 'Control de accesos',
+            subtitle: 'Entradas, salidas y horario del gimnasio',
+            onTap: () => controller.openControlAccesos(),
+            trailing:
+                Icon(Icons.arrow_forward_ios, size: 16, color: c.textSecondary),
+          ),
+        ),
+      ],
+
+      // El lector de tarjetas: su IP y a qué gimnasio pertenece.
+      if (controller.can(Permission.gestionarControlAccesos)) ...[
+        const SizedBox(height: 12),
+        TourStep(
+          tourKey: controller.keyLector,
+          title: 'Lector de tarjetas',
+          description: 'Conecta y vincula el lector a tu gimnasio.',
+          borderRadius: 12,
+          isLastStep: controller.esUltimoPasoDelTour(controller.keyLector),
+          child: _buildOptionTile(
+            context,
+            icon: Icons.nfc,
+            iconColor: AppColors.brand,
+            title: 'Lector de tarjetas',
+            subtitle: 'Vinculación y dirección del lector',
+            onTap: () => controller.openLector(),
+            trailing:
+                Icon(Icons.arrow_forward_ios, size: 16, color: c.textSecondary),
+          ),
+        ),
+      ],
+
+      // Los permisos se piden todos al entrar la primera vez; aquí se ve
+      // cómo quedaron y se corrigen.
+      const SizedBox(height: 12),
+      TourStep(
+        tourKey: controller.keyPermisos,
+        title: 'Permisos de la app',
+        description: 'Revisa el acceso a los dispositivos de este equipo.',
+        borderRadius: 12,
+        isLastStep: controller.esUltimoPasoDelTour(controller.keyPermisos),
+        child: _buildOptionTile(
+          context,
+          icon: Icons.verified_user_outlined,
+          iconColor: AppColors.info,
+          title: 'Permisos de la app',
+          subtitle: 'Cámara, notificaciones y lector de tarjetas',
+          onTap: () => controller.openPermisos(),
+          trailing:
+              Icon(Icons.arrow_forward_ios, size: 16, color: c.textSecondary),
+        ),
+      ),
+
+      const SizedBox(height: 24),
+
+      // Sección de acciones peligrosas
+      _buildDangerousActions(),
+    ];
+    if (!PlataformaApp.escritorio) return Column(children: opciones);
+    // En escritorio las opciones van en dos columnas en vez de una lista
+    // larga de tarjetas separadas; las acciones peligrosas quedan aparte,
+    // debajo y a todo lo ancho.
+    final tarjetas = opciones.where((w) => w is! SizedBox).toList();
+    final peligrosas = tarjetas.removeLast();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ResumenAdaptable(anchoMinimo: 380, espacio: 12, children: tarjetas),
         const SizedBox(height: 24),
-
-        // Sección de acciones peligrosas
-        _buildDangerousActions(),
+        peligrosas,
       ],
     );
   }
@@ -416,7 +430,8 @@ class _HojaApariencia extends StatelessWidget {
   const _HojaApariencia();
 
   static String nombre(ThemeMode modo) => switch (modo) {
-        ThemeMode.system => 'Según el teléfono',
+        ThemeMode.system =>
+          PlataformaApp.escritorio ? 'Según el sistema' : 'Según el teléfono',
         ThemeMode.light => 'Claro',
         ThemeMode.dark => 'Oscuro',
       };

@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -159,7 +160,7 @@ class AgregarLectorController extends GetxController {
       onError: (Object e) {
         if (!vigente()) return;
         if (!reintento && e is FalloBusquedaBle && e.reintentable) {
-          mensaje.value = 'El Bluetooth del teléfono no respondió. '
+          mensaje.value = 'El Bluetooth del ${PlataformaApp.equipo} no respondió. '
               'Intentando una vez más…';
           unawaited(_ble.registroBusqueda.registrar(
               EventoBusquedaLector.reintento,
@@ -185,7 +186,7 @@ class AgregarLectorController extends GetxController {
             mensaje.value = 'No apareció ningún lector. Revisa que esté '
                 'conectado a la corriente y que su luz parpadee rápido. '
                 'Si otro dispositivo lo está configurando, espera a que termine. '
-                'Si sigue sin aparecer, apaga el Bluetooth del teléfono, '
+                'Si sigue sin aparecer, apaga el Bluetooth del ${PlataformaApp.equipo}, '
                 'espera 5 segundos y vuelve a encenderlo.';
             falloAlBuscar.value = true;
             paso.value = PasoAgregar.fallo;
@@ -242,7 +243,7 @@ class AgregarLectorController extends GetxController {
     } catch (e) {
       if (!vigente()) return;
       AppLogger.error('AgregarLectorController', 'Al preparar el lector', e);
-      mensaje.value = 'No se pudo hablar con el lector. Acerca el teléfono y '
+      mensaje.value = 'No se pudo hablar con el lector. Acerca el ${PlataformaApp.equipo} y '
           'reintenta.';
       paso.value = PasoAgregar.fallo;
     } finally {
@@ -327,7 +328,7 @@ class AgregarLectorController extends GetxController {
     } on LectorBleException catch (e) {
       mensaje.value = e.mensaje;
     } catch (_) {
-      mensaje.value = 'No se pudieron buscar las redes. Acerca el teléfono al '
+      mensaje.value = 'No se pudieron buscar las redes. Acerca el ${PlataformaApp.equipo} al '
           'lector y vuelve a intentar.';
     } finally {
       if (!_ble.sesionExclusiva) await _ble.desconectar();
@@ -417,7 +418,7 @@ class AgregarLectorController extends GetxController {
       }
     } else {
       mensaje.value = 'No se pudo confirmar si el lector se conectó. Revisa '
-          'que este teléfono esté en el mismo WiFi que elegiste y busca el '
+          'que este ${PlataformaApp.equipo} esté en el mismo WiFi que elegiste y busca el '
           'lector desde la pantalla anterior.';
       paso.value = PasoAgregar.fallo;
     }
@@ -535,7 +536,7 @@ class AgregarLectorController extends GetxController {
     }
 
     mensaje.value = 'El lector se conectó, pero no aparece en la red de este '
-        'teléfono. Revisa que el teléfono esté en el mismo WiFi.';
+        '${PlataformaApp.equipo}. Revisa que el ${PlataformaApp.equipo} esté en el mismo WiFi.';
     paso.value = PasoAgregar.fallo;
   }
 

@@ -1,7 +1,9 @@
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/widgets/diseno_escritorio.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/lector_ble_service.dart';
 import '../../../global_widgets/app_header.dart';
@@ -43,7 +45,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) controller.volverARedes();
           },
-          child: Scaffold(
+          child: ScaffoldAdaptable(
+            anchoMaximo: 880,
             backgroundColor: c.backgroundColor,
             appBar: GymAppBar(
                 title: cambiarWifi
@@ -54,7 +57,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                 padding: const EdgeInsets.all(20),
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
+                    constraints: BoxConstraints(
+                        maxWidth: PlataformaApp.escritorio ? 560 : 480),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -102,37 +106,48 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
   Widget _paso(BuildContext context) {
     switch (controller.paso.value) {
       case PasoAgregar.buscando:
-        return _buscando(context);
+        return _conSalida(context, _buscando(context));
       case PasoAgregar.preparando:
-        return _encabezado(
-          context,
-          titulo: 'Lector encontrado',
-          texto: 'Preparando las redes WiFi que puedes elegir. '
-              'Mantén el teléfono cerca del lector.',
-        );
+        return _conSalida(
+            context,
+            _encabezado(
+              context,
+              titulo: 'Lector encontrado',
+              texto: PlataformaApp.escritorio
+                  ? 'Preparando las redes WiFi que puedes elegir. '
+                      'Deja el equipo cerca del lector.'
+                  : 'Preparando las redes WiFi que puedes elegir. '
+                      'Mantén el teléfono cerca del lector.',
+            ));
       case PasoAgregar.elegirRed:
-        return _elegirRed(context);
+        return _conSalida(context, _elegirRed(context));
       case PasoAgregar.escribirClave:
         return _escribirClave(context);
       case PasoAgregar.conectando:
-        return _encabezado(
-          context,
-          titulo: controller.esperandoRespuesta.value
-              ? 'Esperando la respuesta del lector…'
-              : 'Enviando la red al lector…',
-          texto: controller.esperandoRespuesta.value
-              ? 'El lector está conectándose al WiFi. En cuanto responda, '
-                  'terminará la configuración. Mantén el lector encendido.'
-              : 'Mantén el teléfono cerca y el lector encendido.',
-        );
+        return _conSalida(
+            context,
+            _encabezado(
+              context,
+              titulo: controller.esperandoRespuesta.value
+                  ? 'Esperando la respuesta del lector…'
+                  : 'Enviando la red al lector…',
+              texto: controller.esperandoRespuesta.value
+                  ? 'El lector está conectándose al WiFi. En cuanto responda, '
+                      'terminará la configuración. Mantén el lector encendido.'
+                  : PlataformaApp.escritorio
+                      ? 'Deja el equipo cerca y el lector encendido.'
+                      : 'Mantén el teléfono cerca y el lector encendido.',
+            ));
       case PasoAgregar.comprobando:
-        return _encabezado(
-          context,
-          titulo: 'Casi listo',
-          texto: controller.guardandoLector.value
-              ? 'El lector respondió. Terminando la configuración…'
-              : 'El lector se conectó. Confirmando que responda en tu WiFi…',
-        );
+        return _conSalida(
+            context,
+            _encabezado(
+              context,
+              titulo: 'Casi listo',
+              texto: controller.guardandoLector.value
+                  ? 'El lector respondió. Terminando la configuración…'
+                  : 'El lector se conectó. Confirmando que responda en tu WiFi…',
+            ));
       case PasoAgregar.listo:
         return _listo(context);
       case PasoAgregar.fallo:
@@ -155,8 +170,10 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
               ? 'Hay más de un lector cerca. Elige el tuyo.'
               : controller.mensaje.value ??
                   (cambiarWifi
-                      ? 'Mantén el teléfono cerca del lector.'
-                      : 'Conecta el lector a la corriente y deja el teléfono '
+                      ? (PlataformaApp.escritorio
+                          ? 'Deja el equipo cerca del lector.'
+                          : 'Mantén el teléfono cerca del lector.')
+                      : 'Conecta el lector a la corriente y deja el ${PlataformaApp.equipo} '
                           'cerca.'),
         ),
         if (varios) const SizedBox(height: 16),
@@ -199,7 +216,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           texto: redes.isEmpty
               ? 'El lector no vio ninguna red. Acércalo al módem y busca de '
                   'nuevo, o escribe el nombre de la red.'
-              : 'Toca la red del gimnasio.',
+              : '${PlataformaApp.toca} la red del gimnasio.',
         ),
         const SizedBox(height: 20),
         if (controller.mensaje.value != null) ...[
@@ -215,24 +232,49 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
         else
           for (final red in redes) _filaRed(context, red),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            TextButton.icon(
-              onPressed: controller.buscandoRedes.value
-                  ? null
-                  : controller.actualizarRedes,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Buscar de nuevo'),
-              style: TextButton.styleFrom(foregroundColor: c.textSecondary),
-            ),
-            const Spacer(),
-            TextButton(
-              onPressed: controller.elegirOtraRed,
-              style: TextButton.styleFrom(foregroundColor: AppColors.accent),
-              child: const Text('Otra red'),
-            ),
-          ],
-        ),
+        if (PlataformaApp.escritorio)
+          // En escritorio, con texto grande los dos botones bajan de
+          // renglón en vez de salirse de la pantalla.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: controller.buscandoRedes.value
+                    ? null
+                    : controller.actualizarRedes,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Buscar de nuevo'),
+                style: TextButton.styleFrom(foregroundColor: c.textSecondary),
+              ),
+              TextButton.icon(
+                onPressed: controller.elegirOtraRed,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Escribir otra red'),
+                style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+              ),
+            ],
+          )
+        else
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: controller.buscandoRedes.value
+                    ? null
+                    : controller.actualizarRedes,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Buscar de nuevo'),
+                style: TextButton.styleFrom(foregroundColor: c.textSecondary),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: controller.elegirOtraRed,
+                style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+                child: const Text('Otra red'),
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -256,7 +298,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           context,
           titulo: otraRed ? 'Otra red' : (red?.ssid ?? 'Red elegida'),
           texto: otraRed
-              ? 'Escribe el nombre de la red tal como aparece en el teléfono, '
+              ? 'Escribe el nombre de la red tal como aparece en el ${PlataformaApp.equipo}, '
                   'y su contraseña.'
               : controller.pideClave
                   ? 'Escribe la contraseña del WiFi.'
@@ -327,7 +369,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
             child: Text(
               'Distingue mayúsculas y minúsculas.',
               style: TextStyle(
-                  color: c.textSecondary.withOpacity(0.8), fontSize: 12),
+                  color: c.textSecondary.withOpacity(0.8),
+                  fontSize: legible(12)),
             ),
           ),
         ],
@@ -362,18 +405,37 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           _aviso(context, controller.avisoFinal.value!),
         ],
         const SizedBox(height: 24),
-        _botonPrincipal('Probar lector', Icons.contactless,
-            () => abrirPruebaLector(context)),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () => Get.back(),
-          icon: const Icon(Icons.done),
-          label: const Text('Terminar'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(0, 52),
-            foregroundColor: AppColors.accent,
+        if (PlataformaApp.escritorio)
+          FilaDeBotones(children: [
+            OutlinedButton.icon(
+              onPressed: () => Get.back(),
+              icon: const Icon(Icons.done),
+              label: const Text('Terminar'),
+              style: estiloBotonEscritorio(
+                  texto: AppColors.accent, contorno: true),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => abrirPruebaLector(context),
+              icon: const Icon(Icons.contactless),
+              label: const Text('Probar lector'),
+              style: estiloBotonEscritorio(
+                  fondo: AppColors.accent, texto: Colors.white),
+            ),
+          ])
+        else ...[
+          _botonPrincipal('Probar lector', Icons.contactless,
+              () => abrirPruebaLector(context)),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => Get.back(),
+            icon: const Icon(Icons.done),
+            label: const Text('Terminar'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 52),
+              foregroundColor: AppColors.accent,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -382,12 +444,27 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _encabezado(
-          context,
-          titulo:
-              controller.lectorOcupado.value ? 'Lector ocupado' : 'No se pudo',
-          texto: controller.mensaje.value ?? 'Algo salió mal.',
-        ),
+        if (PlataformaApp.escritorio) ...[
+          // En escritorio el motivo va en un recuadro, como los demás
+          // avisos, y no como un párrafo suelto bajo el título.
+          _encabezado(
+            context,
+            titulo: controller.lectorOcupado.value
+                ? 'Lector ocupado'
+                : 'No se pudo',
+            texto: 'Esto es lo que pasó:',
+          ),
+          const SizedBox(height: 16),
+          _aviso(context, controller.mensaje.value ?? 'Algo salió mal.',
+              error: true),
+        ] else
+          _encabezado(
+            context,
+            titulo: controller.lectorOcupado.value
+                ? 'Lector ocupado'
+                : 'No se pudo',
+            texto: controller.mensaje.value ?? 'Algo salió mal.',
+          ),
         const SizedBox(height: 24),
         _botonPrincipal(
             controller.lectorOcupado.value
@@ -415,6 +492,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
             ),
           ),
         ],
+        if (PlataformaApp.escritorio) _botonSalir(context, 'Salir'),
       ],
     );
   }
@@ -454,25 +532,27 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     );
   }
 
-  Widget _aviso(BuildContext context, String texto) {
+  Widget _aviso(BuildContext context, String texto, {bool error = false}) {
     final c = context.colores;
+    final color = error ? AppColors.error : AppColors.warning;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.12),
+        color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.warning.withOpacity(0.35)),
+        border: Border.all(color: color.withOpacity(0.35)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, color: AppColors.warning, size: 20),
+          Icon(error ? Icons.error_outline : Icons.info_outline,
+              color: color, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               texto,
-              style:
-                  TextStyle(color: c.textPrimary, fontSize: 13, height: 1.35),
+              style: TextStyle(
+                  color: c.textPrimary, fontSize: legible(13), height: 1.35),
             ),
           ),
         ],
@@ -516,7 +596,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                 Padding(
                   padding: const EdgeInsets.only(left: 6),
                   child: Text('No compatible',
-                      style: TextStyle(color: c.textSecondary, fontSize: 11)),
+                      style: TextStyle(
+                          color: c.textSecondary, fontSize: legible(11))),
                 ),
               if (red.pideClave)
                 Padding(
@@ -538,7 +619,47 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
   bool _esDeEsteGimnasio(String nombreBle) =>
       RfidConfig.registrados.any((r) => r.nombre == nombreBle);
 
+  /// En escritorio cada paso tiene una salida a la vista: "Cancelar" (o
+  /// "Salir" si falló), además de la flecha de la barra, que no todos ven.
+  Widget _conSalida(BuildContext context, Widget paso) {
+    if (!PlataformaApp.escritorio) return paso;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [paso, _botonSalir(context, 'Cancelar')],
+    );
+  }
+
+  Widget _botonSalir(BuildContext context, String texto) => Padding(
+        padding: const EdgeInsets.only(top: 20),
+        child: Center(
+          child: TextButton.icon(
+            // Igual que la flecha de la barra.
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.close, size: 18),
+            label: Text(texto),
+            style: TextButton.styleFrom(
+              foregroundColor: context.colores.textSecondary,
+              minimumSize: const Size(0, 44),
+              textStyle:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      );
+
   Widget _botonPrincipal(String texto, IconData icono, VoidCallback? onTap) {
+    // En escritorio, del ancho de su texto y centrado.
+    if (PlataformaApp.escritorio) {
+      return Center(
+        child: ElevatedButton.icon(
+          onPressed: onTap,
+          icon: Icon(icono, size: 20),
+          label: Text(texto),
+          style: estiloBotonEscritorio(
+              fondo: AppColors.accent, texto: Colors.white),
+        ),
+      );
+    }
     return SizedBox(
       height: 50,
       child: ElevatedButton.icon(

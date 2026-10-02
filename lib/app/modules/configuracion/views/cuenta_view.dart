@@ -1,5 +1,6 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/permissions/permissions.dart';
@@ -18,7 +19,9 @@ class CuentaView extends GetView<ConfiguracionController> {
     return ScaffoldAdaptable(
       anchoMaximo: 800,
       backgroundColor: c.backgroundColor,
-      appBar: const GymAppBar(title: 'Mi Cuenta'),
+      appBar: GymAppBar(
+          title: PlataformaApp.elegir(
+              escritorio: 'Mi cuenta', movil: 'Mi Cuenta')),
       body: SafeArea(
         child: Obx(() => ListView(
               padding: const EdgeInsets.all(16.0),
@@ -28,7 +31,8 @@ class CuentaView extends GetView<ConfiguracionController> {
                 const SizedBox(height: 24),
 
                 // Personal info section
-                _buildSectionLabel(context, 'Información Personal'),
+                _buildSectionLabel(context, 'Información Personal',
+                    escritorio: 'Información personal'),
                 const SizedBox(height: 12),
                 _buildInfoTile(
                   context,
@@ -139,7 +143,8 @@ class CuentaView extends GetView<ConfiguracionController> {
                   const SizedBox(height: 40),
 
                   // Danger zone
-                  _buildSectionLabel(context, 'Zona de Peligro'),
+                  _buildSectionLabel(context, 'Zona de Peligro',
+                      escritorio: 'Zona de peligro'),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -164,13 +169,16 @@ class CuentaView extends GetView<ConfiguracionController> {
                           'Elimina permanentemente tu gimnasio, clientes, inventario, pagos y tu cuenta. Esta acción no se puede deshacer.',
                           style: TextStyle(
                             color: c.textSecondary,
-                            fontSize: 12,
+                            fontSize: legible(12),
                             height: 1.4,
                           ),
                         ),
                         const SizedBox(height: 12),
                         SizedBox(
-                          width: double.infinity,
+                          // En escritorio, del ancho de su texto: un botón
+                          // rojo de lado a lado parece la acción principal.
+                          width:
+                              PlataformaApp.escritorio ? null : double.infinity,
                           child: OutlinedButton.icon(
                             onPressed: controller.isLoading.value
                                 ? null
@@ -192,7 +200,10 @@ class CuentaView extends GetView<ConfiguracionController> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal:
+                                      PlataformaApp.escritorio ? 24 : 0),
                             ),
                           ),
                         ),
@@ -209,6 +220,7 @@ class CuentaView extends GetView<ConfiguracionController> {
 
   Widget _buildProfileHeader(BuildContext context) {
     final c = context.colores;
+    if (PlataformaApp.escritorio) return _cabeceraEscritorio(context);
     return Card(
       elevation: 4,
       color: c.cardBackground,
@@ -262,6 +274,61 @@ class CuentaView extends GetView<ConfiguracionController> {
     );
   }
 
+  /// En escritorio, avatar y datos en una fila: el bloque alto centrado del
+  /// teléfono dejaba mucho hueco en la ventana.
+  Widget _cabeceraEscritorio(BuildContext context) {
+    final c = context.colores;
+    return Card(
+      elevation: 2,
+      color: c.cardBackground,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 32,
+              backgroundColor: c.titleColor.withOpacity(0.15),
+              child: Text(
+                _getInitials(),
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: c.titleColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    controller.userName.value.isNotEmpty
+                        ? controller.userName.value
+                        : '—',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: c.textPrimary,
+                    ),
+                  ),
+                  if (controller.userEmail.value.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      controller.userEmail.value,
+                      style: TextStyle(fontSize: 15, color: c.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _getInitials() {
     final first = controller.firstName.value;
     final last = controller.lastName.value;
@@ -276,8 +343,11 @@ class CuentaView extends GetView<ConfiguracionController> {
     return initials;
   }
 
-  Widget _buildSectionLabel(BuildContext context, String label) {
+  Widget _buildSectionLabel(BuildContext context, String label,
+      {String? escritorio}) {
     final c = context.colores;
+    // En escritorio, el mismo título de sección que los formularios.
+    if (PlataformaApp.escritorio) return TituloSeccion(escritorio ?? label);
     return Text(
       label,
       style: TextStyle(
@@ -314,7 +384,7 @@ class CuentaView extends GetView<ConfiguracionController> {
         title: Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: legible(12),
             color: c.textSecondary,
             fontWeight: FontWeight.w500,
           ),
@@ -330,12 +400,26 @@ class CuentaView extends GetView<ConfiguracionController> {
             ),
           ),
         ),
-        trailing: editable && onEdit != null
-            ? IconButton(
-                icon: Icon(Icons.edit_outlined, size: 20, color: c.titleColor),
+        trailing: editable && onEdit != null && PlataformaApp.escritorio
+            // En escritorio, "Editar" con texto: un lápiz suelto no dice
+            // qué hace.
+            ? TextButton.icon(
                 onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Editar'),
+                style: TextButton.styleFrom(
+                  foregroundColor: c.titleColor,
+                  textStyle: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600),
+                ),
               )
-            : null,
+            : editable && onEdit != null
+                ? IconButton(
+                    icon: Icon(Icons.edit_outlined,
+                        size: 20, color: c.titleColor),
+                    onPressed: onEdit,
+                  )
+                : null,
         // Toda la fila abre la edición, no solo el lápiz.
         onTap: editable ? onEdit : null,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -387,6 +471,7 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
   late final TextEditingController _textController =
       TextEditingController(text: widget.currentValue);
   bool _isSaving = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -396,7 +481,13 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
 
   Future<void> _handleSave() async {
     final newValue = _textController.text.trim();
-    if (newValue.isEmpty) return;
+    if (newValue.isEmpty) {
+      // En escritorio se dice por qué no se guarda; antes no pasaba nada.
+      if (PlataformaApp.escritorio) {
+        setState(() => _error = 'Escribe ${widget.title.toLowerCase()}.');
+      }
+      return;
+    }
     setState(() => _isSaving = true);
     try {
       await widget.onSave(newValue);
@@ -420,7 +511,9 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
         controller: _textController,
         autofocus: true,
         style: TextStyle(color: c.textPrimary),
-        decoration: InputDecoration(labelText: widget.title),
+        decoration: InputDecoration(labelText: widget.title, errorText: _error),
+        // En escritorio, Enter guarda.
+        onSubmitted: PlataformaApp.escritorio ? (_) => _handleSave() : null,
       ),
       actions: [
         BotonCancelar(onPressed: _isSaving ? null : () => Get.back()),

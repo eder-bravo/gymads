@@ -1,5 +1,6 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -21,16 +22,32 @@ class CategoriasView extends GetView<CategoriasController> {
     return ScaffoldAdaptable(
       anchoMaximo: 960,
       backgroundColor: c.backgroundColor,
-      appBar: const GymAppBar(title: 'Categorías'),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.accent,
-        onPressed: () => showCategoryFormDialog(),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Nueva',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
+      appBar: GymAppBar(
+        title: 'Categorías',
+        // En escritorio la acción va arriba, con texto, junto al título.
+        actions: PlataformaApp.escritorio
+            ? [
+                AccionDeBarra(
+                  texto: 'Nueva categoría',
+                  icono: Icons.add,
+                  onPressed: () => showCategoryFormDialog(),
+                  movil: const SizedBox.shrink(),
+                ),
+              ]
+            : null,
       ),
+      floatingActionButton: PlataformaApp.escritorio
+          ? null
+          : FloatingActionButton.extended(
+              backgroundColor: AppColors.accent,
+              onPressed: () => showCategoryFormDialog(),
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text(
+                'Nueva',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
       body: SafeArea(
         child: Obx(() {
           if (controller.isLoading.value) {
@@ -110,10 +127,13 @@ class CategoriasView extends GetView<CategoriasController> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Mantén pulsada una categoría para cambiar su orden.',
+                  PlataformaApp.escritorio
+                      ? 'Arrastra una categoría para cambiar su orden, o usa '
+                          '"Más" › Subir o Bajar.'
+                      : 'Mantén pulsada una categoría para cambiar su orden.',
                   style: TextStyle(
                     color: c.textSecondary.withOpacity(0.7),
-                    fontSize: 12,
+                    fontSize: legible(12),
                   ),
                 ),
               ),
@@ -125,9 +145,23 @@ class CategoriasView extends GetView<CategoriasController> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
             itemCount: controller.categories.length,
             onReorder: controller.reorder,
+            // Con mouse, el asa por defecto quedaba encima del menú de cada
+            // categoría: se arrastra la tarjeta entera, sin esperar.
+            buildDefaultDragHandles: !PlataformaApp.escritorio,
             itemBuilder: (context, index) {
               final category = controller.categories[index];
-              return _buildTile(context, category, key: ValueKey(category.id));
+              if (!PlataformaApp.escritorio) {
+                return _buildTile(context, category,
+                    key: ValueKey(category.id));
+              }
+              return ReorderableDragStartListener(
+                key: ValueKey(category.id),
+                index: index,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: _buildTile(context, category),
+                ),
+              );
             },
           ),
         ),
@@ -136,7 +170,7 @@ class CategoriasView extends GetView<CategoriasController> {
   }
 
   Widget _buildTile(BuildContext context, ProductCategory category,
-      {required Key key}) {
+      {Key? key}) {
     final c = context.colores;
     final count = controller.countFor(category.id);
     final isInactive = !category.isActive;
@@ -206,36 +240,81 @@ class CategoriasView extends GetView<CategoriasController> {
                     count == 1 ? '1 producto' : '$count productos',
                     style: TextStyle(
                       color: c.textSecondary.withOpacity(0.75),
-                      fontSize: 12,
+                      fontSize: legible(12),
                     ),
                   ),
                 ],
               ),
             ),
-            PopupMenuButton<String>(
-              color: c.cardBackground,
-              icon: Icon(Icons.more_vert,
-                  color: c.textSecondary.withOpacity(0.8)),
-              onSelected: (value) => _onMenuAction(context, value, category),
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: Text('Editar')),
-                PopupMenuItem(
-                  value: 'toggle',
-                  child: Text(isInactive ? 'Reactivar' : 'Desactivar'),
+            AccionesDeFila(
+              visibles: [
+                AccionDeFila(
+                  texto: 'Editar',
+                  icono: Icons.edit_outlined,
+                  onPressed: () => _onMenuAction(context, 'edit', category),
+                ),
+              ],
+              mas: [
+                // Mover sin arrastrar: para quien no maneja bien el mouse.
+                if (_indice(category) > 0)
+                  AccionDeFila(
+                    texto: 'Subir',
+                    icono: Icons.arrow_upward,
+                    onPressed: () => controller.reorder(
+                        _indice(category), _indice(category) - 1),
+                  ),
+                if (_indice(category) < controller.categories.length - 1)
+                  AccionDeFila(
+                    texto: 'Bajar',
+                    icono: Icons.arrow_downward,
+                    // ReorderableListView cuenta el destino con el
+                    // elemento aún en su sitio: dos lugares más abajo.
+                    onPressed: () => controller.reorder(
+                        _indice(category), _indice(category) + 2),
+                  ),
+                AccionDeFila(
+                  texto: isInactive ? 'Reactivar' : 'Desactivar',
+                  icono: isInactive
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  onPressed: () => _onMenuAction(context, 'toggle', category),
                 ),
                 if (controller.puedeGestionar)
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Eliminar',
-                        style: TextStyle(color: AppColors.error)),
+                  AccionDeFila(
+                    texto: 'Eliminar',
+                    icono: Icons.delete_outline,
+                    peligrosa: true,
+                    onPressed: () => _onMenuAction(context, 'delete', category),
                   ),
               ],
+              movil: PopupMenuButton<String>(
+                color: c.cardBackground,
+                icon: Icon(Icons.more_vert,
+                    color: c.textSecondary.withOpacity(0.8)),
+                onSelected: (value) => _onMenuAction(context, value, category),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'edit', child: Text('Editar')),
+                  PopupMenuItem(
+                    value: 'toggle',
+                    child: Text(isInactive ? 'Reactivar' : 'Desactivar'),
+                  ),
+                  if (controller.puedeGestionar)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Eliminar',
+                          style: TextStyle(color: AppColors.error)),
+                    ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  int _indice(ProductCategory category) =>
+      controller.categories.indexWhere((c) => c.id == category.id);
 
   void _onMenuAction(
       BuildContext context, String action, ProductCategory category) {

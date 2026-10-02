@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/core/widgets/cached_user_image.dart';
@@ -131,7 +132,7 @@ class ClienteCard extends StatelessWidget {
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: primaryColor,
-                                  fontSize: 12,
+                                  fontSize: legible(12),
                                 ),
                               ),
                             ],

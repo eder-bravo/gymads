@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/material_localizations_12h.dart';
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:gymads/app/bindings/initial_binding.dart';
 import 'package:gymads/app/data/config/rfid_config.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
@@ -204,7 +205,7 @@ class _MyAppState extends State<MyApp> {
       // lo quiere.
       builder: (context, child) => GestureDetector(
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: child,
+        child: VentanaEscritorio(child: child ?? const SizedBox.shrink()),
       ),
       theme: AppTheme.claro,
       darkTheme: AppTheme.oscuro,

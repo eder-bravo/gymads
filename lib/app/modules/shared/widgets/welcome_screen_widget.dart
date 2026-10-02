@@ -144,6 +144,13 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                   padding: EdgeInsets.symmetric(
                     vertical: isTabletSize ? 40 : 24
                   ),
+                  // En escritorio, el contenido con un ancho cómodo: en una
+                  // ventana grande no se estira de lado a lado.
+                  child: Center(
+                    child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                      maxWidth:
+                          PlataformaApp.escritorio ? 900 : double.infinity),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -165,9 +172,13 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                     horizontal: 16),
                                 child: Text(
                                 widget.isNotFound
-                                    ? 'Tarjeta No Registrada'
+                                    ? PlataformaApp.elegir(
+                                        escritorio: 'Tarjeta no registrada',
+                                        movil: 'Tarjeta No Registrada')
                                     : widget.isExpired
-                                        ? 'Membresía Vencida'
+                                        ? PlataformaApp.elegir(
+                                            escritorio: 'Membresía vencida',
+                                            movil: 'Membresía Vencida')
                                         : widget.isSalida
                                             ? '¡Hasta pronto!'
                                             : '¡Bienvenido!',
@@ -453,6 +464,8 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                         }
                       ),
                     ],
+                  ),
+                  ),
                   ),
                 ),
               ),

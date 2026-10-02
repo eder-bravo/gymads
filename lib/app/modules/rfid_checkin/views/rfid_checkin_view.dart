@@ -22,7 +22,9 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
     final bool isSmallPhone = MediaQuery.sizeOf(context).shortestSide < 360;
 
     return Scaffold(
-      appBar: const GymAppBar(title: 'Acceso con Tarjeta'),
+      appBar: GymAppBar(
+          title: PlataformaApp.elegir(
+              escritorio: 'Acceso con tarjeta', movil: 'Acceso con Tarjeta')),
       body: SafeArea(
         child: Stack(
           children: [
@@ -84,7 +86,9 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Control de Acceso',
+                          PlataformaApp.elegir(
+                              escritorio: 'Control de acceso',
+                              movil: 'Control de Acceso'),
                           style: TextStyle(
                             fontSize: titleSize,
                             fontWeight: FontWeight.bold,
@@ -114,16 +118,24 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
                             ? Container(
                                 padding: const EdgeInsets.all(16),
                                 margin: const EdgeInsets.only(bottom: 16),
+                                // En escritorio, los colores del tema: el rojo
+                                // pálido fijo se perdía en modo oscuro.
                                 decoration: BoxDecoration(
-                                  color: Colors.red.shade100,
+                                  color: PlataformaApp.escritorio
+                                      ? AppColors.error.withOpacity(0.12)
+                                      : Colors.red.shade100,
                                   borderRadius: BorderRadius.circular(10),
-                                  border:
-                                      Border.all(color: Colors.red.shade300),
+                                  border: Border.all(
+                                      color: PlataformaApp.escritorio
+                                          ? AppColors.error.withOpacity(0.4)
+                                          : Colors.red.shade300),
                                 ),
                                 child: Text(
                                   controller.errorMessage.value,
                                   style: TextStyle(
-                                    color: Colors.red.shade800,
+                                    color: PlataformaApp.escritorio
+                                        ? AppColors.error
+                                        : Colors.red.shade800,
                                     fontSize: isTabletSize
                                         ? 18.0
                                         : (isSmallPhone ? 14.0 : 16.0),

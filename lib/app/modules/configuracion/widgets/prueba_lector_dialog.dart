@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -170,7 +171,7 @@ class _PruebaLectorDialogState extends State<PruebaLectorDialog>
 
   void _fallarConexion() {
     _error = 'El lector no respondió. Revisa que esté encendido y que este '
-        'teléfono esté conectado al mismo WiFi.';
+        '${PlataformaApp.equipo} esté conectado al mismo WiFi.';
     _cambiarEstado(_EstadoPrueba.fallo);
   }
 

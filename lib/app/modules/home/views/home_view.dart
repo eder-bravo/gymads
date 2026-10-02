@@ -1,5 +1,7 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -9,9 +11,13 @@ import '../../../core/widgets/tour_step.dart';
 
 import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
+import '../../abonar/vigencia.dart';
 import '../controllers/home_controller.dart';
+import '../controllers/resumen_del_dia.dart';
 import '../widgets/background_welcome_dialog.dart';
 import '../widgets/fondo_estirable.dart';
+
+part 'inicio_escritorio.dart';
 
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
@@ -26,6 +32,9 @@ class HomeView extends GetView<HomeController> {
       return _pantalla(context);
     });
   }
+
+  /// Ancho de la columna de opciones en escritorio.
+  static const double _anchoContenido = 1200;
 
   Widget _pantalla(BuildContext context) {
     final c = context.colores;
@@ -47,28 +56,11 @@ class HomeView extends GetView<HomeController> {
       });
     }
 
-    final pantalla = ScaffoldAdaptable(
-      anchoMaximo: 1200,
-      backgroundColor: c.backgroundColor,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        // Los íconos de la barra de estado los pone el tema según el modo.
-      ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics()),
+    Widget opciones() => ContenidoEscritorio(
+          anchoMaximo: _anchoContenido,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ─── Header con gradiente ───
-              _buildHeader(context, isTablet),
-
-              const SizedBox(height: 8),
-
               // ─── Módulos principales ───
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: isTablet ? 28 : 20),
@@ -85,7 +77,7 @@ class HomeView extends GetView<HomeController> {
               const SizedBox(height: 10),
               _buildMainModules(context, isTablet),
 
-              const SizedBox(height: 16),
+              SizedBox(height: PlataformaApp.escritorio ? 28 : 16),
 
               // ─── Más opciones ───
               Padding(
@@ -106,7 +98,79 @@ class HomeView extends GetView<HomeController> {
               const SizedBox(height: 14),
             ],
           ),
-        ),
+        );
+
+    // La cabecera llena la ventana; las opciones van en la columna de 1200
+    // (solo cambia en escritorio: en el teléfono no hay columna).
+    final pantalla = ScaffoldAdaptable(
+      anchoMaximo: double.infinity,
+      backgroundColor: c.backgroundColor,
+      extendBodyBehindAppBar: true,
+      // En escritorio no hay barra de estado, y esta barra transparente
+      // quedaba encima de la cabecera: se tragaba el clic en Configuración.
+      appBar: _usaBento(context)
+          ? null
+          : AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              // Los íconos de la barra de estado los pone el tema según el modo.
+            ),
+      body: SafeArea(
+        top: false,
+        child: _usaBento(context)
+            // En escritorio la cabecera va arriba y la rejilla de módulos y
+            // números de hoy llena el alto que queda.
+            ? CustomScrollView(
+                physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics()),
+                slivers: [
+                  SliverToBoxAdapter(child: _buildHeader(context, isTablet)),
+                  // El alto que queda bajo la cabecera, fijo aunque se
+                  // desplace o rebote. Con poca altura o texto grande, la
+                  // rejilla conserva un mínimo y se desplaza.
+                  SliverLayoutBuilder(
+                    builder: (context, limites) {
+                      final escala =
+                          MediaQuery.textScalerOf(context).scale(14) / 14;
+                      final alto = (limites.viewportMainAxisExtent -
+                              limites.precedingScrollExtent -
+                              48)
+                          .clamp(440.0 * escala, double.infinity);
+                      return SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: SizedBox(
+                            height: alto,
+                            child: ContenidoEscritorio(
+                              anchoMaximo: _anchoContenido,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                child: _inicioEscritorio(context),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              )
+            : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics()),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ─── Header con gradiente ───
+                    _buildHeader(context, isTablet),
+
+                    const SizedBox(height: 8),
+
+                    opciones(),
+                  ],
+                ),
+              ),
       ),
       // Diálogo de bienvenida RFID en segundo plano
     );
@@ -129,6 +193,11 @@ class HomeView extends GetView<HomeController> {
   Widget _buildHeader(BuildContext context, bool isTablet) {
     final c = context.colores;
     final topPadding = MediaQuery.of(context).padding.top;
+    // En escritorio el texto se alinea con la columna de opciones.
+    final margen = PlataformaApp.escritorio
+        ? ((MediaQuery.sizeOf(context).width - _anchoContenido) / 2)
+            .clamp(0.0, double.infinity)
+        : 0.0;
     return TourStep(
       tourKey: controller.keyHeader,
       title: '¡Te damos la bienvenida!',
@@ -174,39 +243,173 @@ class HomeView extends GetView<HomeController> {
         child: Container(
           width: double.infinity,
           padding: EdgeInsets.fromLTRB(
-            isTablet ? 32 : 24,
+            (isTablet ? 32 : 24) + margen,
             topPadding + (isTablet ? 18 : 14),
-            isTablet ? 32 : 24,
+            (isTablet ? 32 : 24) + margen,
             isTablet ? 16 : 14,
           ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.brand.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(14),
+          child: _usaBento(context)
+              ? _cabeceraEscritorio(context)
+              : Wrap(
+                  spacing: 14,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.brand.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        Icons.dashboard_rounded,
+                        color: AppColors.brand,
+                        size: isTablet ? 26 : 22,
+                      ),
+                    ),
+                    Text(
+                      'Inicio',
+                      style: TextStyle(
+                        fontSize: isTablet ? 26 : 22,
+                        fontWeight: FontWeight.w800,
+                        color: c.contraste,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
-                child: Icon(
-                  Icons.dashboard_rounded,
-                  color: AppColors.brand,
-                  size: isTablet ? 26 : 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Text(
-                'Inicio',
-                style: TextStyle(
-                  fontSize: isTablet ? 26 : 22,
-                  fontWeight: FontWeight.w800,
-                  color: c.contraste,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
+    );
+  }
+
+  /// La cabecera de escritorio: el título, la fecha de hoy y Configuración
+  /// (que en la rejilla no ocupa una tarjeta).
+  Widget _cabeceraEscritorio(BuildContext context) {
+    final c = context.colores;
+    final hoy = fechaLarga(DateTime.now(), conDia: true);
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.brand.withOpacity(0.18),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.dashboard_rounded,
+              color: AppColors.brand, size: 22),
+        ),
+        const SizedBox(width: 14),
+        Text(
+          'Inicio',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: c.contraste,
+            letterSpacing: 0.5,
+          ),
+        ),
+        // La fecha ocupa el espacio libre, pegada al engrane: los dos quedan
+        // al borde derecho de la rejilla.
+        Expanded(
+          child: Text(
+            hoy[0].toUpperCase() + hoy.substring(1),
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: c.contraste.withOpacity(0.7),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        TourStep(
+          tourKey: controller.keyConfiguracion,
+          title: 'Configuración',
+          description: 'Tu cuenta, precios, categorías, lector y permisos.',
+          borderRadius: 14,
+          isLastStep: true,
+          child: IconButton(
+            onPressed: controller.goToConfiguracion,
+            tooltip: 'Configuración (${_textoAtajo(',')})',
+            icon: const Icon(Icons.settings_outlined),
+            color: c.contraste,
+            style: IconButton.styleFrom(
+              backgroundColor: c.contraste.withOpacity(0.08),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// La rejilla de escritorio con los módulos de este rol y sus números de
+  /// hoy. Vender, el del mostrador, va primero y en grande.
+  Widget _inicioEscritorio(BuildContext context) {
+    final c = context.colores;
+    final resumen = Get.isRegistered<ResumenDelDia>()
+        ? Get.find<ResumenDelDia>()
+        : Get.put(ResumenDelDia());
+    const orden = ['Vender', 'Abonar', 'Clientes', 'Inventario'];
+    final modulos = _modulos()
+      ..sort(
+          (a, b) => orden.indexOf(a.label).compareTo(orden.indexOf(b.label)));
+    final verIngresos = controller.can(Permission.verIngresos);
+    final verEntradas = controller.can(Permission.verAccesos);
+    final verClientes = controller.can(Permission.gestionarClientes);
+    return _InicioEscritorio(
+      modulos: modulos,
+      cargando: resumen.cargando,
+      recargar: () => resumen.cargar(
+        ingresos: verIngresos,
+        entradas: verEntradas,
+        vencen: verClientes,
+      ),
+      abrirConfiguracion: controller.goToConfiguracion,
+      datos: [
+        if (verIngresos)
+          _DatoDeHoy(
+            label: 'Ingresos',
+            detalle: 'Cobrado hoy',
+            icon: Icons.receipt_long_outlined,
+            color: c.titleColor,
+            valor: () {
+              final v = resumen.ingresos.value;
+              return v == null ? null : pesos(v);
+            },
+            onTap: controller.goToPaymentRegistration,
+            showcaseKey: controller.keyIngresos,
+            tourDescription:
+                'Lo cobrado hoy. Haz clic para ver todos los pagos y ventas.',
+          ),
+        if (verEntradas)
+          _DatoDeHoy(
+            label: 'Entradas',
+            detalle: 'Hoy',
+            icon: Icons.door_sliding_outlined,
+            color: const Color(0xFF81C784),
+            valor: () => resumen.entradas.value?.toString(),
+            onTap: controller.goToAccessLogs,
+            showcaseKey: controller.keyEntradas,
+            tourDescription:
+                'Cuántos entraron hoy. Haz clic para ver quién y a qué hora.',
+          ),
+        if (verClientes)
+          _DatoDeHoy(
+            label: 'Por vencer',
+            detalle:
+                'Membresías en los próximos ${ResumenDelDia.diasPorVencer} días',
+            icon: Icons.event_busy_outlined,
+            color: AppColors.warning,
+            valor: () => resumen.vencen.value?.toString(),
+            onTap: controller.goToClientes,
+            conAtajo: false,
+          ),
+      ],
     );
   }
 
@@ -226,47 +429,49 @@ class HomeView extends GetView<HomeController> {
   // ─────────────────────────────────────────────────────────
   // MAIN MODULES (cards grandes con iconos)
   // ─────────────────────────────────────────────────────────
-  Widget _buildMainModules(BuildContext context, bool isTablet) {
-    final modules = [
-      _ModuleItem(
-        icon: Icons.people_alt_outlined,
-        label: 'Clientes',
-        subtitle: 'Gestión de miembros',
-        gradient: const [Color(0xFF667eea), Color(0xFF764ba2)],
-        onTap: controller.goToClientes,
-        showcaseKey: controller.keyClientes,
-        tourDescription: 'Tus miembros y cuándo vence su abono.',
-      ),
-      _ModuleItem(
-        icon: Icons.payments_outlined,
-        label: 'Abonar',
-        subtitle: 'Cobrar membresías',
-        gradient: const [Color(0xFFf093fb), Color(0xFFf5576c)],
-        onTap: controller.goToAbonar,
-        showcaseKey: controller.keyAbonar,
-        tourDescription: 'Cobra y renueva membresías.',
-      ),
-      _ModuleItem(
-        icon: Icons.storefront_outlined,
-        label: 'Vender',
-        subtitle: 'Punto de venta',
-        gradient: const [Color(0xFF4facfe), Color(0xFF00f2fe)],
-        onTap: controller.goToPointOfSale,
-        showcaseKey: controller.keyVender,
-        tourDescription: 'Vende bebidas, suplementos y demás productos.',
-      ),
-      _ModuleItem(
-        icon: Icons.inventory_2_outlined,
-        label: 'Inventario',
-        subtitle: 'Productos y stock',
-        gradient: const [Color(0xFF43e97b), Color(0xFF38f9d7)],
-        onTap: controller.goToInventario,
-        showcaseKey: controller.keyInventario,
-        tourDescription:
-            'Administra tus productos y controla el stock disponible.',
-      ),
-    ].where(_permitido).toList();
+  /// Los módulos principales que este rol puede abrir.
+  List<_ModuleItem> _modulos() => [
+        _ModuleItem(
+          icon: Icons.people_alt_outlined,
+          label: 'Clientes',
+          subtitle: 'Gestión de miembros',
+          gradient: const [Color(0xFF667eea), Color(0xFF764ba2)],
+          onTap: controller.goToClientes,
+          showcaseKey: controller.keyClientes,
+          tourDescription: 'Tus miembros y cuándo vence su abono.',
+        ),
+        _ModuleItem(
+          icon: Icons.payments_outlined,
+          label: 'Abonar',
+          subtitle: 'Cobrar membresías',
+          gradient: const [Color(0xFFf093fb), Color(0xFFf5576c)],
+          onTap: controller.goToAbonar,
+          showcaseKey: controller.keyAbonar,
+          tourDescription: 'Cobra y renueva membresías.',
+        ),
+        _ModuleItem(
+          icon: Icons.storefront_outlined,
+          label: 'Vender',
+          subtitle: 'Punto de venta',
+          gradient: const [Color(0xFF4facfe), Color(0xFF00f2fe)],
+          onTap: controller.goToPointOfSale,
+          showcaseKey: controller.keyVender,
+          tourDescription: 'Vende bebidas, suplementos y demás productos.',
+        ),
+        _ModuleItem(
+          icon: Icons.inventory_2_outlined,
+          label: 'Inventario',
+          subtitle: 'Productos y stock',
+          gradient: const [Color(0xFF43e97b), Color(0xFF38f9d7)],
+          onTap: controller.goToInventario,
+          showcaseKey: controller.keyInventario,
+          tourDescription:
+              'Administra tus productos y controla el stock disponible.',
+        ),
+      ].where(_permitido).toList();
 
+  Widget _buildMainModules(BuildContext context, bool isTablet) {
+    final modules = _modulos();
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
       // Columnas según el ANCHO disponible (un teléfono de lado cabe en 4),
@@ -290,7 +495,11 @@ class HomeView extends GetView<HomeController> {
                           : 2,
                   crossAxisSpacing: isTablet ? 16 : 12,
                   mainAxisSpacing: isTablet ? 16 : 12,
-                  mainAxisExtent: (isTablet ? 180.0 : 165.0) *
+                  mainAxisExtent: (PlataformaApp.escritorio
+                          ? 200.0
+                          : isTablet
+                              ? 180.0
+                              : 165.0) *
                       (MediaQuery.textScalerOf(context).scale(14) / 14)
                           .clamp(1, double.infinity),
                 ),
@@ -448,6 +657,7 @@ class _ModuleCardState extends State<_ModuleCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnim;
+  bool _encima = false;
 
   @override
   void initState() {
@@ -482,89 +692,97 @@ class _ModuleCardState extends State<_ModuleCard>
           child: child,
         );
       },
-      child: GestureDetector(
-        onTapDown: (_) => _controller.forward(),
-        onTapUp: (_) {
-          _controller.reverse();
-          m.onTap();
-        },
-        onTapCancel: () => _controller.reverse(),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                m.gradient[0].withOpacity(0.15),
-                m.gradient[1].withOpacity(0.08),
-              ],
-            ),
-            border: Border.all(
-              color: m.gradient[0].withOpacity(0.2),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: m.gradient[0].withOpacity(0.08),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _encima = true),
+        onExit: (_) => setState(() => _encima = false),
+        child: GestureDetector(
+          onTapDown: (_) => _controller.forward(),
+          onTapUp: (_) {
+            _controller.reverse();
+            m.onTap();
+          },
+          onTapCancel: () => _controller.reverse(),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  m.gradient[0].withOpacity(0.15),
+                  m.gradient[1].withOpacity(0.08),
+                ],
               ),
-            ],
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(isTablet ? 18 : 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Icon container
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: m.gradient,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: m.gradient[0].withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    m.icon,
-                    color: Colors.white,
-                    size: isTablet ? 26 : 24,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                // Text
-                Text(
-                  m.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: isTablet ? 17 : 16,
-                    fontWeight: FontWeight.w700,
-                    color: c.textPrimary,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  m.subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: isTablet ? 13 : 11,
-                    color: c.textSecondary.withOpacity(0.7),
-                    fontWeight: FontWeight.w500,
-                  ),
+              border: Border.all(
+                color: m.gradient[0].withOpacity(_encima ? 0.5 : 0.2),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: m.gradient[0].withOpacity(0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
                 ),
               ],
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(isTablet ? 18 : 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Icon container
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: m.gradient,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: m.gradient[0].withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      m.icon,
+                      color: Colors.white,
+                      size:
+                          PlataformaApp.escritorio ? 28 : (isTablet ? 26 : 24),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  // Text
+                  Text(
+                    m.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: isTablet || PlataformaApp.escritorio ? 17 : 16,
+                      fontWeight: FontWeight.w700,
+                      color: c.textPrimary,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    m.subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: PlataformaApp.escritorio
+                          ? 12.5
+                          : (isTablet ? 13 : 11),
+                      color: c.textSecondary.withOpacity(0.7),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -587,83 +805,95 @@ class _QuickActionTile extends StatefulWidget {
 
 class _QuickActionTileState extends State<_QuickActionTile> {
   bool _pressed = false;
+  bool _encima = false;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
     final a = widget.action;
 
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        a.onTap();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-          decoration: BoxDecoration(
-            color: c.cardBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: a.color.withOpacity(0.12),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _encima = true),
+      onExit: (_) => setState(() => _encima = false),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          a.onTap();
+        },
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 100),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              color: c.cardBackground,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: a.color.withOpacity(_encima ? 0.4 : 0.12),
+                width: 1,
               ),
-            ],
-          ),
-          child: Row(
-            children: [
-              // Icon
-              Container(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: LayoutBuilder(builder: (context, constraints) {
+              final compacto = constraints.maxWidth <
+                  180 * MediaQuery.textScalerOf(context).scale(14) / 14;
+              final texto = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(a.label,
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: c.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text(a.subtitle,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: c.textSecondary.withOpacity(0.7),
+                          fontWeight: FontWeight.w500)),
+                ],
+              );
+              final icono = Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: a.color.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(a.icon, color: a.color, size: 24),
-              ),
-              const SizedBox(width: 16),
-              // Text
-              Expanded(
-                child: Column(
+              );
+              if (compacto) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      a.label,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: c.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      a.subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: c.textSecondary.withOpacity(0.7),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Arrow
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: c.contraste.withOpacity(0.2),
-                size: 16,
-              ),
-            ],
+                  children: [icono, const SizedBox(height: 12), texto],
+                );
+              }
+              return Row(
+                children: [
+                  // Icon
+                  icono,
+                  const SizedBox(width: 16),
+                  // Text
+                  Expanded(
+                    child: texto,
+                  ),
+                  // Arrow
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: c.contraste.withOpacity(0.2),
+                    size: 16,
+                  ),
+                ],
+              );
+            }),
           ),
         ),
       ),

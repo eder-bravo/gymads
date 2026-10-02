@@ -1,5 +1,6 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -23,16 +24,32 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
     return ScaffoldAdaptable(
       anchoMaximo: 960,
       backgroundColor: c.backgroundColor,
-      appBar: const GymAppBar(title: 'Accesos del personal'),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.accent,
-        onPressed: _crear,
-        icon: const Icon(Icons.person_add, color: Colors.white),
-        label: const Text(
-          'Nuevo',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
+      appBar: GymAppBar(
+        title: 'Accesos del personal',
+        // En escritorio la acción va arriba, con texto, junto al título.
+        actions: PlataformaApp.escritorio
+            ? [
+                AccionDeBarra(
+                  texto: 'Nuevo acceso',
+                  icono: Icons.person_add,
+                  onPressed: _crear,
+                  movil: const SizedBox.shrink(),
+                ),
+              ]
+            : null,
       ),
+      floatingActionButton: PlataformaApp.escritorio
+          ? null
+          : FloatingActionButton.extended(
+              backgroundColor: AppColors.accent,
+              onPressed: _crear,
+              icon: const Icon(Icons.person_add, color: Colors.white),
+              label: const Text(
+                'Nuevo',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
       body: SafeArea(
         child: Obx(() {
           if (controller.isLoading.value) {
@@ -114,7 +131,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
                           rol.descripcion,
                           style: TextStyle(
                             color: c.textSecondary.withOpacity(0.8),
-                            fontSize: 12,
+                            fontSize: legible(12),
                             height: 1.3,
                           ),
                         ),
@@ -349,7 +366,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
                       ),
                     ],
                   ),
-                  style: const TextStyle(fontSize: 13),
+                  style: TextStyle(fontSize: legible(13)),
                 ),
               ),
             ],
@@ -360,40 +377,75 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
         // al dueño, y sin esto tendría un menú cuyas opciones fallan todas.
         trailing: !controller.puedeGestionar(acceso)
             ? null
-            : PopupMenuButton<String>(
-                color: c.cardBackground,
-                icon: Icon(Icons.more_vert, color: c.textSecondary),
-                onSelected: (value) {
-                  switch (value) {
-                    case 'renombrar':
-                      showStaffAccesoFormDialog(existing: acceso);
-                      break;
-                    case 'rol':
-                      _cambiarRol(context, acceso);
-                      break;
-                    case 'regenerar':
-                      _regenerar(context, acceso);
-                      break;
-                    case 'revocar':
-                      _revocar(context, acceso);
-                      break;
-                    case 'eliminar':
-                      _eliminar(context, acceso);
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  _menuItem('renombrar', Icons.edit, 'Cambiar nombre'),
-                  _menuItem('rol', Icons.badge_outlined, 'Cambiar rol'),
-                  _menuItem(
-                      'regenerar', Icons.autorenew, 'Generar código nuevo'),
-                  // Revocar solo tiene sentido si todavía hay algo que cortar.
-                  if (!acceso.estaRevocado)
-                    _menuItem('revocar', Icons.block, 'Revocar acceso',
-                        color: AppColors.warning),
-                  _menuItem('eliminar', Icons.delete_outline, 'Eliminar',
-                      color: AppColors.error),
+            : AccionesDeFila(
+                visibles: [
+                  AccionDeFila(
+                    texto: 'Cambiar rol',
+                    icono: Icons.badge_outlined,
+                    onPressed: () => _cambiarRol(context, acceso),
+                  ),
+                  AccionDeFila(
+                    texto: 'Código nuevo',
+                    icono: Icons.autorenew,
+                    onPressed: () => _regenerar(context, acceso),
+                  ),
                 ],
+                mas: [
+                  AccionDeFila(
+                    texto: 'Cambiar nombre',
+                    icono: Icons.edit_outlined,
+                    onPressed: () =>
+                        showStaffAccesoFormDialog(existing: acceso),
+                  ),
+                  if (!acceso.estaRevocado)
+                    AccionDeFila(
+                      texto: 'Revocar acceso',
+                      icono: Icons.block,
+                      peligrosa: true,
+                      onPressed: () => _revocar(context, acceso),
+                    ),
+                  AccionDeFila(
+                    texto: 'Eliminar',
+                    icono: Icons.delete_outline,
+                    peligrosa: true,
+                    onPressed: () => _eliminar(context, acceso),
+                  ),
+                ],
+                movil: PopupMenuButton<String>(
+                  color: c.cardBackground,
+                  icon: Icon(Icons.more_vert, color: c.textSecondary),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'renombrar':
+                        showStaffAccesoFormDialog(existing: acceso);
+                        break;
+                      case 'rol':
+                        _cambiarRol(context, acceso);
+                        break;
+                      case 'regenerar':
+                        _regenerar(context, acceso);
+                        break;
+                      case 'revocar':
+                        _revocar(context, acceso);
+                        break;
+                      case 'eliminar':
+                        _eliminar(context, acceso);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    _menuItem('renombrar', Icons.edit, 'Cambiar nombre'),
+                    _menuItem('rol', Icons.badge_outlined, 'Cambiar rol'),
+                    _menuItem(
+                        'regenerar', Icons.autorenew, 'Generar código nuevo'),
+                    // Revocar solo tiene sentido si todavía hay algo que cortar.
+                    if (!acceso.estaRevocado)
+                      _menuItem('revocar', Icons.block, 'Revocar acceso',
+                          color: AppColors.warning),
+                    _menuItem('eliminar', Icons.delete_outline, 'Eliminar',
+                        color: AppColors.error),
+                  ],
+                ),
               ),
       ),
     );

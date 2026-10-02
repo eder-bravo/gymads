@@ -163,7 +163,7 @@ class _ChoiceCard extends StatelessWidget {
                       Text(
                         description,
                         style: TextStyle(
-                          fontSize: isTablet ? 14 : 12.5,
+                          fontSize: isTablet ? 14 : legible(12.5),
                           color: c.textSecondary.withOpacity(0.75),
                           fontWeight: FontWeight.w500,
                           height: 1.35,

@@ -111,8 +111,9 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   lista: TourStep(
                     tourKey: controller.keyProductos,
                     title: 'Tus productos',
-                    description:
-                        'Toca un producto para agregarlo. Déjalo presionado para fijarlo arriba.',
+                    description: PlataformaApp.escritorio
+                        ? 'Haz clic en un producto para agregarlo. Con clic derecho lo fijas arriba.'
+                        : 'Toca un producto para agregarlo. Déjalo presionado para fijarlo arriba.',
                     child: Obx(() {
                       if (controller.isLoading) {
                         return const Center(
@@ -209,98 +210,106 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       final inCart = quantity > 0;
       final pinned = controller.isPinned(product.id);
 
-      return GestureDetector(
-        // Fijar arriba es un atajo de mostrador, por eso va en la pulsación
-        // larga: no estorba al toque normal, que es agregar a la venta.
-        onLongPress: () {
-          HapticFeedback.mediumImpact();
-          controller.togglePinned(product);
-        },
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: c.cardBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: inCart
-                  ? AppColors.accent
-                  : AppColors.accent.withOpacity(0.12),
-              width: inCart ? 2 : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Ícono de categoría + badge de stock
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: c.containerBackground,
-                      shape: BoxShape.circle,
+      // Con mouse, toda la ficha agrega el producto (el botón sigue ahí) y
+      // el borde se aviva al pasar por encima.
+      return AlPasarMouse(
+          builder: (context, encima) => GestureDetector(
+                onTap: PlataformaApp.escritorio
+                    ? () => controller.addProductToCart(product)
+                    : null,
+                // Fijar arriba es un atajo de mostrador, por eso va en la pulsación
+                // larga: no estorba al toque normal, que es agregar a la venta.
+                onLongPress: () {
+                  HapticFeedback.mediumImpact();
+                  controller.togglePinned(product);
+                },
+                // Con mouse, el clic derecho hace lo mismo.
+                onSecondaryTap: () => controller.togglePinned(product),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: c.cardBackground,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: inCart
+                          ? AppColors.accent
+                          : AppColors.accent.withOpacity(encima ? 0.45 : 0.12),
+                      width: inCart ? 2 : 1,
                     ),
-                    child: Icon(
-                      CategoryIcons.resolve(
-                          controller.categoryById[product.categoryId]?.icon),
-                      color: AppColors.accent,
-                      size: 20,
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (pinned) ...[
-                        const Icon(Icons.push_pin,
-                            size: 14, color: AppColors.accent),
-                        const SizedBox(width: 6),
-                      ],
-                      _buildStockBadge(product.stock),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
                     ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Ícono de categoría + badge de stock
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: c.containerBackground,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              CategoryIcons.resolve(controller
+                                  .categoryById[product.categoryId]?.icon),
+                              color: AppColors.accent,
+                              size: 20,
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (pinned) ...[
+                                const Icon(Icons.push_pin,
+                                    size: 14, color: AppColors.accent),
+                                const SizedBox(width: 6),
+                              ],
+                              _buildStockBadge(product.stock),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
 
-              // Nombre
-              Text(
-                product.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: c.textPrimary,
+                      // Nombre
+                      Text(
+                        product.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: c.textPrimary,
+                        ),
+                      ),
+                      const Spacer(),
+
+                      // Precio
+                      Text(
+                        dinero(product.price),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Control de cantidad
+                      _buildQuantityControl(context, product, quantity),
+                    ],
+                  ),
                 ),
-              ),
-              const Spacer(),
-
-              // Precio
-              Text(
-                '\$${product.price.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 17,
-                  color: AppColors.accent,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Control de cantidad
-              _buildQuantityControl(context, product, quantity),
-            ],
-          ),
-        ),
-      );
+              ));
     });
   }
 
@@ -364,6 +373,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               quantity - 1,
             ),
             icon: const Icon(Icons.remove, size: 18),
+            tooltip: PlataformaApp.escritorio ? 'Quitar uno' : null,
             color: c.textSecondary,
             padding: EdgeInsets.zero,
             splashRadius: 18,
@@ -380,6 +390,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
           IconButton(
             onPressed: () => controller.addProductToCart(product),
             icon: const Icon(Icons.add, size: 18),
+            tooltip: PlataformaApp.escritorio ? 'Agregar otro' : null,
             color: AppColors.accent,
             padding: EdgeInsets.zero,
             splashRadius: 18,
@@ -397,87 +408,74 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       final total = controller.finalAmount;
       final isEmpty = controller.cartItems.isEmpty;
 
+      final informacion = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$unidades ${unidades == 1 ? 'producto' : 'productos'}',
+              style: TextStyle(color: c.textSecondary, fontSize: 13)),
+          const SizedBox(height: 2),
+          Text(dinero(total),
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                  color: c.textPrimary)),
+        ],
+      );
+      final limpiar = IconButton(
+        onPressed: controller.clearCart,
+        icon: const Icon(Icons.delete_outline),
+        color: c.textSecondary,
+        tooltip: 'Vaciar carrito',
+      );
+      final cobrar = ElevatedButton(
+        onPressed: () => _showPaymentDialog(context),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        child: const Text('Cobrar',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      );
       final resumen = isEmpty
           ? Center(
-              child: Text(
-                'Selecciona productos para cobrar',
-                style: TextStyle(color: c.textSecondary, fontSize: 13),
-              ),
-            )
-          : Row(
-              children: [
-                if (!lateral)
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.shopping_bag_outlined,
-                        color: AppColors.accent),
-                  ),
-                if (!lateral) const SizedBox(width: 12),
-
-                // Info del carrito
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              child: Text('Selecciona productos para cobrar',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: c.textSecondary, fontSize: 13)))
+          : LayoutBuilder(builder: (context, constraints) {
+              final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
+              if (PlataformaApp.escritorio &&
+                  constraints.maxWidth < 560 * escala) {
+                return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        '$unidades ${unidades == 1 ? 'producto' : 'productos'}',
-                        style: TextStyle(
-                          color: c.textSecondary,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '\$${total.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 22,
-                          color: c.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Botón limpiar
-                IconButton(
-                  onPressed: () => controller.clearCart(),
-                  icon: const Icon(Icons.delete_outline),
-                  color: c.textSecondary,
-                  tooltip: 'Vaciar carrito',
-                ),
+                      Row(children: [Expanded(child: informacion), limpiar]),
+                      const SizedBox(height: 8),
+                      cobrar,
+                    ]);
+              }
+              return Row(children: [
+                if (!lateral) ...[
+                  Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                          color: AppColors.accent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.shopping_bag_outlined,
+                          color: AppColors.accent)),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(child: informacion),
+                limpiar,
                 const SizedBox(width: 4),
-
-                // Botón cobrar
-                ElevatedButton(
-                  onPressed: () => _showPaymentDialog(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 14,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Text(
-                    'Cobrar',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ],
-            );
+                cobrar,
+              ]);
+            });
       return Container(
         padding:
             EdgeInsets.symmetric(horizontal: 16, vertical: isEmpty ? 14 : 16),
@@ -548,12 +546,14 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
 
   void _showPaymentDialog(BuildContext context) {
     final c = context.colores;
-    showModalBottomSheet(
-      context: context,
+    // En escritorio, ventana centrada junto al carrito lateral.
+    mostrarHojaAdaptable(
+      context,
       isScrollControlled: true,
       // Sin esto, de lado la hoja llega hasta debajo de la barra de estado.
       useSafeArea: true,
       backgroundColor: Colors.transparent,
+      anchoMaximo: 520,
       builder: (context) => Container(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -571,17 +571,19 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: c.textSecondary,
-                    borderRadius: BorderRadius.circular(2),
+              if (!PlataformaApp.escritorio) ...[
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: c.textSecondary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
+              ],
 
               // Título
               Text(
@@ -656,13 +658,13 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                         if (controller.discountAmount > 0) ...[
                           const SizedBox(height: 8),
                           _buildSummaryRow(context, 'Descuento',
-                              '-\$${controller.discountAmount.toStringAsFixed(2)}'),
+                              '-${dinero(controller.discountAmount)}'),
                         ],
                         const Divider(height: 24),
                         _buildSummaryRow(
                           context,
                           'TOTAL',
-                          '\$${controller.finalAmount.toStringAsFixed(2)}',
+                          dinero(controller.finalAmount),
                           isBold: true,
                         ),
                       ],
@@ -719,7 +721,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       if (controller.changeAmount > 0) ...[
                         const SizedBox(height: 12),
                         Text(
-                          'Cambio: \$${controller.changeAmount.toStringAsFixed(2)}',
+                          'Cambio: ${dinero(controller.changeAmount)}',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -743,18 +745,39 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                     )
                   : const SizedBox.shrink()),
 
-              // Botón procesar
-              Obx(() => BotonGuardar(
-                    texto: 'Cobrar venta',
-                    guardando: controller.isProcessingPayment,
-                    onPressed: controller.canProcessSale()
-                        ? () => _processSale(context)
-                        : null,
-                  )),
-              const SizedBox(height: 12),
+              // En escritorio, "Cancelar" y "Cobrar venta" lado a lado y a
+              // la derecha, como en cualquier ventana.
+              if (PlataformaApp.escritorio)
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    BotonCancelar(onPressed: () => Navigator.pop(context)),
+                    Obx(() => BotonGuardar(
+                          texto: 'Cobrar venta',
+                          guardando: controller.isProcessingPayment,
+                          onPressed: controller.canProcessSale()
+                              ? () => _processSale(context)
+                              : null,
+                        )),
+                  ],
+                )
+              else ...[
+                // Botón procesar
+                Obx(() => BotonGuardar(
+                      texto: 'Cobrar venta',
+                      guardando: controller.isProcessingPayment,
+                      onPressed: controller.canProcessSale()
+                          ? () => _processSale(context)
+                          : null,
+                    )),
+                const SizedBox(height: 12),
 
-              // Botón cancelar
-              BotonCancelar(onPressed: () => Navigator.pop(context)),
+                // Botón cancelar
+                BotonCancelar(onPressed: () => Navigator.pop(context)),
+              ],
             ],
           ),
         ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../widgets/diseno_escritorio.dart';
+import 'plataforma_app.dart';
 import 'snackbar_helper.dart';
 
 /// Utilidades para interactuar con números telefónicos:
@@ -23,7 +25,8 @@ class PhoneUtils {
 
   static bool _isValid(String phone) => _onlyDigits(phone).length >= 7;
 
-  /// Muestra un menú inferior con las acciones de Llamar y WhatsApp.
+  /// Muestra un menú inferior (en escritorio, una ventana) con las acciones
+  /// de Llamar y WhatsApp.
   static void showActions(BuildContext context, String? phone) {
     final c = context.colores;
     if (phone == null || !_isValid(phone)) {
@@ -34,8 +37,9 @@ class PhoneUtils {
       return;
     }
 
-    showModalBottomSheet(
-      context: context,
+    mostrarHojaAdaptable(
+      context,
+      anchoMaximo: 420,
       backgroundColor: c.cardBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -46,15 +50,17 @@ class PhoneUtils {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: c.textSecondary.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(2),
+              if (!PlataformaApp.escritorio) ...[
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: c.textSecondary.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
               Text(
                 phone,
                 style: TextStyle(

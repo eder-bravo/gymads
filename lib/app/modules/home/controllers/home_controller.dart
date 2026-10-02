@@ -157,6 +157,8 @@ class HomeController extends GetxController {
     Get.toNamed(Routes.ABONAR);
   }
 
+  void goToConfiguracion() => Get.toNamed(Routes.CONFIGURACION);
+
   void goToAccessLogs() {
     statusMessages.add('Navegando a Entradas...');
     Get.toNamed(Routes.ACCESS_LOGS);

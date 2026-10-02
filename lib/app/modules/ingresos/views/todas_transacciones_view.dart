@@ -38,14 +38,16 @@ class TodasTransaccionesView extends GetView<IngresosController> {
                   const Icon(Icons.receipt_long_outlined,
                       color: AppColors.accent, size: 20),
                   const SizedBox(width: 8),
-                  Obx(() => Text(
-                        '${controller.todasTransacciones.length} transacciones',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: c.textPrimary,
-                        ),
-                      )),
+                  Expanded(
+                      child: Obx(() => Text(
+                            controller.transacciones(
+                                controller.todasTransacciones.length),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: c.textPrimary,
+                            ),
+                          ))),
                 ],
               ),
             ),

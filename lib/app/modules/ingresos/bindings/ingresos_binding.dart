@@ -11,14 +11,14 @@ class IngresosBinding extends Bindings {
     Get.lazyPut<IngresoProvider>(
       () => IngresoProvider(),
     );
-    
+
     // Service
     Get.lazyPut<IngresoService>(
       () => IngresoService(
         ingresoProvider: Get.find<IngresoProvider>(),
       ),
     );
-    
+
     // Controller
     Get.lazyPut<IngresosController>(
       () => IngresosController(

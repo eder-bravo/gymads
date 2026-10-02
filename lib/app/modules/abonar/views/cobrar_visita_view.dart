@@ -1,4 +1,5 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -31,15 +32,26 @@ typedef RegistrarVisita = Future<String?> Function(DatosVisita datos);
 /// Abre "Cobrar visita". [precioDia] es el precio por día configurado: llena
 /// el monto, que se puede cambiar.
 Future<void> abrirCobrarVisita({double? precioDia}) async {
-  final cobrada = await Get.to<double>(
-    () => const CobrarVisitaView(),
-    binding: BindingsBuilder(() {
-      Get.put(CobrarVisitaController(precioDia: precioDia));
-    }),
-  );
+  final double? cobrada;
+  if (PlataformaApp.escritorio) {
+    // En una ventana no hay ruta que libere el controlador al cerrarse.
+    Get.put(CobrarVisitaController(precioDia: precioDia));
+    try {
+      cobrada = await abrirFormulario<double>(() => const CobrarVisitaView());
+    } finally {
+      Get.delete<CobrarVisitaController>();
+    }
+  } else {
+    cobrada = await Get.to<double>(
+      () => const CobrarVisitaView(),
+      binding: BindingsBuilder(() {
+        Get.put(CobrarVisitaController(precioDia: precioDia));
+      }),
+    );
+  }
   if (cobrada != null) {
     SnackbarHelper.success(
-        'Visita cobrada', '\$${cobrada.toStringAsFixed(2)} · entrada anotada');
+        'Visita cobrada', '${dinero(cobrada)} · entrada anotada');
   }
 }
 
@@ -238,6 +250,7 @@ class CobrarVisitaView extends GetView<CobrarVisitaController> {
             ),
           ),
           bottomNavigationBar: PieDeFormulario(
+            alCancelar: guardando ? null : () => Get.back(),
             child: BotonGuardar(
               texto: 'Cobrar visita',
               icono: Icons.confirmation_number_outlined,

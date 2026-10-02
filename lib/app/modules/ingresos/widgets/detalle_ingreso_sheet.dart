@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:gymads/app/core/utils/periodo_filtro_mixin.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
 import '../controllers/ingresos_controller.dart';
 
-String _moneda(double monto) => '\$${monto.toStringAsFixed(2)}';
+String _moneda(double monto) => dinero(monto);
 
 String _fechaConHora(DateTime f) {
   final local = f.toLocal();
@@ -19,19 +21,21 @@ String _fecha(DateTime f) =>
     '${f.day} ${PeriodoFiltroMixin.nombresMesesCortos[f.month - 1]} ${f.year}';
 
 /// Hoja inferior con el mismo aspecto en las dos vistas: un asa, un título y
-/// el contenido, limitada al 80 % de la pantalla.
+/// el contenido, limitada al 80 % de la pantalla. En escritorio, ventana
+/// centrada sin asa.
 Future<void> _mostrarHoja(
   BuildContext context, {
   required String titulo,
   String? subtitulo,
   required Widget contenido,
 }) {
-    final c = context.colores;
-  return showModalBottomSheet(
-    context: context,
+  final c = context.colores;
+  return mostrarHojaAdaptable(
+    context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
+    anchoMaximo: 600,
     builder: (context) => Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.8,
@@ -44,17 +48,20 @@ Future<void> _mostrarHoja(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: c.textSecondary.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(2),
+          if (PlataformaApp.escritorio)
+            const SizedBox(height: 20)
+          else
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: c.textSecondary.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 8, 4),
             child: Row(
@@ -104,7 +111,7 @@ Future<void> _mostrarHoja(
 /// Detalle de un cobro: qué productos llevó (si fue una venta), total, método
 /// y referencia.
 Future<void> mostrarDetalleIngreso(BuildContext context, IngresoModel ingreso) {
-    final c = context.colores;
+  final c = context.colores;
   final esVenta = ingreso.items.isNotEmpty;
   final filas = <Widget>[
     if (esVenta) ...[
@@ -153,7 +160,7 @@ Future<void> mostrarDetalleIngreso(BuildContext context, IngresoModel ingreso) {
 /// vendido a lo menos.
 Future<void> mostrarProductosVendidos(
     BuildContext context, IngresosController controller) {
-    final c = context.colores;
+  final c = context.colores;
   // Sin lo de otro periodo mientras llega lo de este.
   controller.productosVendidos.clear();
   controller.fetchProductosVendidos();
@@ -331,7 +338,7 @@ class _FilaProducto extends StatelessWidget {
                 Text(
                   detalle,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: legible(12),
                     color: c.textSecondary,
                   ),
                 ),

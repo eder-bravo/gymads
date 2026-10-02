@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -119,7 +120,7 @@ class ClientesController extends GetxController
       rfidController.text = initialRfid;
     }
 
-    Get.to(
+    abrirFormulario(
       () => ClienteFormDialog(
         nombreController: nombreController,
         phoneController: phoneController,
@@ -133,7 +134,6 @@ class ClientesController extends GetxController
         guardando: guardandoCliente,
         fullScreen: true,
       ),
-      fullscreenDialog: true,
     );
   }
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:get/get.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:gymads/app/core/permissions/permissions.dart';
@@ -14,7 +15,6 @@ import 'package:gymads/app/modules/inventario/controllers/inventario_controller.
 import 'package:gymads/app/modules/inventario/views/inventario_view.dart';
 import 'package:gymads/app/modules/point_of_sale/controllers/point_of_sale_controller.dart';
 import 'package:gymads/app/modules/point_of_sale/views/point_of_sale_view.dart';
-import 'package:gymads/app/routes/app_pages.dart';
 
 const _escritorio =
     TargetPlatformVariant({TargetPlatform.macOS, TargetPlatform.windows});
@@ -357,20 +357,18 @@ void main() {
       'inventario ofrece registrar un código nuevo con el barcode puesto',
       (tester) async {
     Get.put<InventarioController>(_Inventario());
-    await tester
-        .pumpWidget(GetMaterialApp(home: const InventarioView(), getPages: [
-      GetPage(
-          name: Routes.PRODUCT_FORM,
-          page: () =>
-              Scaffold(body: Text('Nuevo: ${Get.arguments['barcode']}'))),
-    ]));
+    await tester.pumpWidget(const GetMaterialApp(home: InventarioView()));
     await tester.pumpAndSettle();
     await _leer(tester, '000999999999');
     await tester.pumpAndSettle();
     expect(find.text('Código no registrado'), findsOneWidget);
     await tester.tap(find.text('Agregar producto'));
     await tester.pumpAndSettle();
-    expect(find.text('Nuevo: 000999999999'), findsOneWidget);
+    // En escritorio el formulario abre en una ventana sobre el inventario.
+    final ventana = find.byType(VentanaFormulario);
+    expect(ventana, findsOneWidget);
+    expect(find.descendant(of: ventana, matching: find.text('000999999999')),
+        findsOneWidget);
   }, variant: _escritorio);
 
   testWidgets('inventario respeta el permiso para ajustar stock',

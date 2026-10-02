@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -57,8 +58,8 @@ class ListaCarrito extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${item.quantity} × \$${item.unitPrice.toStringAsFixed(2)}'
-                  '  =  \$${item.total.toStringAsFixed(2)}',
+                  '${item.quantity} × ${dinero(item.unitPrice)}'
+                  '  =  ${dinero(item.total)}',
                   style: TextStyle(color: c.textSecondary, fontSize: 14),
                 ),
               ],

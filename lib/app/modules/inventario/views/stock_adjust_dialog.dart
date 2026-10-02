@@ -1,4 +1,6 @@
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
@@ -153,7 +155,7 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
             Expanded(
               child: Text(
                 'Faltan $_faltante ${_unidades(_faltante)} · '
-                '\$${valor.toStringAsFixed(2)}',
+                '${dinero(valor)}',
                 style: const TextStyle(
                   color: AppColors.error,
                   fontSize: 13,
@@ -193,34 +195,39 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
   Widget _direccionButton(String label, IconData icon, bool valor) {
     final c = context.colores;
     final seleccionado = _agregar == valor;
+    // Con mouse: cursor de mano y un fondo tenue al pasar por encima.
     return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _agregar = valor),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: seleccionado
-                ? (valor ? AppColors.success : AppColors.warning)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon,
-                  size: 18,
-                  color: seleccionado ? Colors.white : c.textSecondary),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: seleccionado ? FontWeight.w700 : FontWeight.w500,
-                  color:
-                      seleccionado ? Colors.white : c.textSecondary,
+      child: AlPasarMouse(
+        builder: (context, encima) => GestureDetector(
+          onTap: () => setState(() => _agregar = valor),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: seleccionado
+                  ? (valor ? AppColors.success : AppColors.warning)
+                  : encima
+                      ? c.textSecondary.withOpacity(0.12)
+                      : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon,
+                    size: 18,
+                    color: seleccionado ? Colors.white : c.textSecondary),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight:
+                        seleccionado ? FontWeight.w700 : FontWeight.w500,
+                    color: seleccionado ? Colors.white : c.textSecondary,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -240,15 +247,18 @@ class _StockAdjustDialogState extends State<_StockAdjustDialog> {
       final cubierto = _cantidad >= _faltante ? _faltante : _cantidad;
       lineas.add(('Cubre el faltante de $cubierto', c.textSecondary));
       lineas.add(_resultado >= 0
-          ? ('Quedarán $_resultado ${_unidades(_resultado)} disponibles',
-              AppColors.success)
+          ? (
+              'Quedarán $_resultado ${_unidades(_resultado)} disponibles',
+              AppColors.success
+            )
           : ('Seguirán faltando ${-_resultado}', AppColors.error));
     } else {
       lineas.add(_resultado >= 0
-          ? ('Quedará en $_resultado ${_unidades(_resultado)}',
-              c.textPrimary)
-          : ('Quedará con ${-_resultado} ${_unidades(-_resultado)} faltantes',
-              AppColors.error));
+          ? ('Quedará en $_resultado ${_unidades(_resultado)}', c.textPrimary)
+          : (
+              'Quedará con ${-_resultado} ${_unidades(-_resultado)} faltantes',
+              AppColors.error
+            ));
     }
 
     return Container(

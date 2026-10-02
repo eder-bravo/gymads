@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../utils/plataforma_app.dart';
 
 /// Piezas comunes de los formularios, para que todos se vean igual: el mismo
 /// botón para guardar, los mismos títulos de sección y la misma nota de campos
@@ -9,7 +10,8 @@ import '../../../core/theme/app_colors.dart';
 /// El botón de la acción principal de un formulario.
 ///
 /// Mientras [guardando] está desactivado y dice "Guardando…": un segundo toque
-/// no manda otro guardado. En pantalla completa ocupa todo el ancho; en un
+/// no manda otro guardado. En pantalla completa del teléfono ocupa todo el
+/// ancho; en escritorio toma el ancho de su texto (mínimo 200), y en un
 /// diálogo va [compacto], junto a "Cancelar".
 class BotonGuardar extends StatelessWidget {
   const BotonGuardar({
@@ -68,8 +70,11 @@ class BotonGuardar extends StatelessWidget {
         foregroundColor: Colors.white,
         disabledBackgroundColor: fondo.withOpacity(0.5),
         disabledForegroundColor: Colors.white.withOpacity(0.85),
-        minimumSize:
-            compacto ? const Size(0, 44) : const Size.fromHeight(48),
+        minimumSize: compacto
+            ? const Size(0, 44)
+            : PlataformaApp.escritorio
+                ? const Size(200, 46)
+                : const Size.fromHeight(48),
         padding: EdgeInsets.symmetric(horizontal: compacto ? 18 : 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -87,10 +92,17 @@ class BotonGuardar extends StatelessWidget {
 /// abajo, y el botón quedaba escondido detrás del teclado (el numérico del
 /// iPhone ni siquiera tiene tecla para cerrarse), así que no había cómo
 /// guardar.
+///
+/// En escritorio la acción va a la derecha, como en las ventanas del sistema,
+/// en vez de una barra que cruza toda la pantalla.
 class PieDeFormulario extends StatelessWidget {
-  const PieDeFormulario({super.key, required this.child});
+  const PieDeFormulario({super.key, required this.child, this.alCancelar});
 
   final Widget child;
+
+  /// En escritorio pone "Cancelar" a la izquierda del botón principal (en
+  /// el teléfono se sale con la X o el gesto de atrás, como siempre).
+  final VoidCallback? alCancelar;
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +126,26 @@ class PieDeFormulario extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          child: child,
+          child: PlataformaApp.escritorio
+              ? Align(
+                  alignment: Alignment.centerRight,
+                  heightFactor: 1,
+                  // Wrap y no Row: con texto grande, "Cancelar" sube a su
+                  // propio renglón en vez de salirse de la ventana.
+                  child: alCancelar == null
+                      ? child
+                      : Wrap(
+                          alignment: WrapAlignment.end,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 12,
+                          runSpacing: 8,
+                          children: [
+                            BotonCancelar(onPressed: alCancelar),
+                            child,
+                          ],
+                        ),
+                )
+              : child,
         ),
       ),
     );

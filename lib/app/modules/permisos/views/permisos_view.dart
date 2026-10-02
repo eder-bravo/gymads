@@ -62,11 +62,101 @@ class PermisosView extends GetView<PermisosController> {
                         'Empareja los lectores Bluetooth desde el sistema. '
                         '${!kIsWeb && defaultTargetPlatform == TargetPlatform.windows ? 'En Windows habilita la cámara para aplicaciones de escritorio desde Privacidad; no aparece un diálogo de permiso.' : ''}')),
               const SizedBox(height: 16),
-              ..._botones(context, contestado),
+              if (PlataformaApp.escritorio)
+                _botonesEscritorio(context, contestado)
+              else
+                ..._botones(context, contestado),
             ],
           );
         }),
       ),
+    );
+  }
+
+  /// En escritorio: los avisos arriba y los botones en una fila, cada uno de
+  /// su ancho, la acción principal al final.
+  Widget _botonesEscritorio(BuildContext context, bool contestado) {
+    final c = context.colores;
+    final pidiendo = controller.pidiendo.value;
+    final notas = <String>[];
+    final botones = <Widget>[];
+    Widget principal(String texto, VoidCallback? onPressed,
+            {bool cargando = false}) =>
+        ElevatedButton(
+          onPressed: onPressed,
+          style: estiloBotonEscritorio(
+              fondo: AppColors.accent, texto: Colors.white),
+          child: cargando
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : Text(texto),
+        );
+    final abrirAjustes = OutlinedButton.icon(
+      onPressed: controller.abrirAjustes,
+      icon: const Icon(Icons.settings_outlined, size: 18),
+      label: const Text('Abrir ajustes'),
+      style: estiloBotonEscritorio(texto: AppColors.accent, contorno: true),
+    );
+
+    if (controller.permisos.isEmpty) {
+      botones.add(principal(
+          controller.desdeConfiguracion ? 'Listo' : 'Continuar',
+          controller.desdeConfiguracion
+              ? controller.continuar
+              : controller.ahoraNo));
+    } else if (!contestado) {
+      if (pidiendo) {
+        notas.add('Responde a los avisos del sistema. Puedes continuar '
+            'aunque algún permiso quede pendiente.');
+      }
+      botones
+        ..add(TextButton(
+          onPressed: controller.ahoraNo,
+          style: TextButton.styleFrom(
+              foregroundColor: c.textSecondary,
+              minimumSize: const Size(0, 48),
+              textStyle: const TextStyle(fontSize: 15)),
+          child: Text(pidiendo ? 'Continuar sin esperar' : 'Ahora no'),
+        ))
+        ..add(principal(
+            !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
+                ? 'Comprobar'
+                : 'Permitir',
+            pidiendo ? null : controller.permitir,
+            cargando: pidiendo));
+    } else {
+      if (controller.estados.values.contains(EstadoPermiso.sinDato)) {
+        notas.add('Algunos permisos siguen sin confirmar. Puedes continuar '
+            'y revisarlos después en Configuración.');
+      }
+      if (controller.hayBloqueados) {
+        notas.add('Los bloqueados solo se pueden activar desde los ajustes '
+            'del sistema.');
+      }
+      botones.add(abrirAjustes);
+      if (controller.desdeConfiguracion && controller.hayNegados) {
+        botones.add(principal('Permitir', pidiendo ? null : controller.permitir,
+            cargando: pidiendo));
+      }
+      botones.add(principal(
+          controller.desdeConfiguracion ? 'Listo' : 'Continuar',
+          controller.continuar));
+    }
+
+    return Column(
+      children: [
+        for (final nota in notas)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(nota,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15, color: c.textSecondary)),
+          ),
+        FilaDeBotones(children: botones),
+      ],
     );
   }
 

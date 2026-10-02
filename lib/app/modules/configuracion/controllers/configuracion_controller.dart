@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/permissions/permissions.dart';
@@ -932,7 +933,8 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     Get.dialog(
       AlertDialog(
         scrollable: true,
-        title: const Text('Cerrar Sesión'),
+        title: Text(PlataformaApp.elegir(
+            escritorio: 'Cerrar sesión', movil: 'Cerrar Sesión')),
         content: const Text('¿Estás seguro que deseas cerrar la sesión?'),
         actions: [
           BotonCancelar(onPressed: () => Get.back()),

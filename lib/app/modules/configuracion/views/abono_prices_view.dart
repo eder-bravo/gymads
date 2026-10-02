@@ -1,5 +1,6 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
@@ -59,7 +60,7 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                           'Al cobrar, el precio se llena solo según el periodo.',
                           style: TextStyle(
                             color: c.textSecondary,
-                            fontSize: 13,
+                            fontSize: legible(13),
                           ),
                         ),
                       ),
@@ -69,33 +70,56 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                 const SizedBox(height: 24),
                 const TituloSeccion('Precio por periodo',
                     detalle: 'Deja vacío el periodo que no ofrezcas.'),
-                _priceField(
-                  context,
-                  controller: controller.dayController,
-                  label: 'Precio por día',
-                  icon: Icons.today,
-                ),
-                const SizedBox(height: 16),
-                _priceField(
-                  context,
-                  controller: controller.weekController,
-                  label: 'Precio por semana',
-                  icon: Icons.date_range,
-                ),
-                const SizedBox(height: 16),
-                _priceField(
-                  context,
-                  controller: controller.monthController,
-                  label: 'Precio por mes',
-                  icon: Icons.calendar_month,
-                ),
-                const SizedBox(height: 16),
-                _priceField(
-                  context,
-                  controller: controller.yearController,
-                  label: 'Precio por año',
-                  icon: Icons.event_repeat,
-                ),
+                // En escritorio, dos por fila: un precio no necesita un
+                // campo de lado a lado de la ventana.
+                if (PlataformaApp.escritorio)
+                  ResumenAdaptable(anchoMinimo: 300, espacio: 16, children: [
+                    _priceField(context,
+                        controller: controller.dayController,
+                        label: 'Precio por día',
+                        icon: Icons.today),
+                    _priceField(context,
+                        controller: controller.weekController,
+                        label: 'Precio por semana',
+                        icon: Icons.date_range),
+                    _priceField(context,
+                        controller: controller.monthController,
+                        label: 'Precio por mes',
+                        icon: Icons.calendar_month),
+                    _priceField(context,
+                        controller: controller.yearController,
+                        label: 'Precio por año',
+                        icon: Icons.event_repeat),
+                  ])
+                else ...[
+                  _priceField(
+                    context,
+                    controller: controller.dayController,
+                    label: 'Precio por día',
+                    icon: Icons.today,
+                  ),
+                  const SizedBox(height: 16),
+                  _priceField(
+                    context,
+                    controller: controller.weekController,
+                    label: 'Precio por semana',
+                    icon: Icons.date_range,
+                  ),
+                  const SizedBox(height: 16),
+                  _priceField(
+                    context,
+                    controller: controller.monthController,
+                    label: 'Precio por mes',
+                    icon: Icons.calendar_month,
+                  ),
+                  const SizedBox(height: 16),
+                  _priceField(
+                    context,
+                    controller: controller.yearController,
+                    label: 'Precio por año',
+                    icon: Icons.event_repeat,
+                  ),
+                ],
               ],
             ),
           );

@@ -342,7 +342,10 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
             ),
           ),
           body: SafeArea(bottom: false, child: formulario),
-          bottomNavigationBar: PieDeFormulario(child: boton),
+          bottomNavigationBar: PieDeFormulario(
+            alCancelar: guardando ? null : () => Get.back(),
+            child: boton,
+          ),
         ),
       );
     });

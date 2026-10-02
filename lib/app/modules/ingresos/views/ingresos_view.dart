@@ -18,7 +18,7 @@ class IngresosView extends GetView<IngresosController> {
   Widget build(BuildContext context) {
     final c = context.colores;
     return ScaffoldAdaptable(
-      anchoMaximo: 1120,
+      anchoMaximo: 960,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Ingresos',
@@ -73,15 +73,15 @@ class IngresosView extends GetView<IngresosController> {
               padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
               child: Row(
                 children: [
-                  Text(
+                  Expanded(
+                      child: Text(
                     'Transacciones',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: c.titleColor,
                     ),
-                  ),
-                  const Spacer(),
+                  )),
                   TourStep(
                     tourKey: controller.keyVerTodas,
                     title: 'Ver todas',
@@ -171,9 +171,9 @@ class IngresosView extends GetView<IngresosController> {
               ),
               const SizedBox(height: 6),
               Text(
-                '${stats.totalTransacciones} transacciones · Promedio ${controller.formatCurrency(stats.promedioTransaccion)}',
+                '${controller.transacciones(stats.totalTransacciones)} · Promedio ${controller.formatCurrency(stats.promedioTransaccion)}',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: legible(12),
                   color: c.textSecondary,
                 ),
               ),

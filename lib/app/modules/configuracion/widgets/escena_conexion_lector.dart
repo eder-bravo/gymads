@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -71,7 +72,15 @@ bool etapaEnMovimiento(EtapaConexion etapa) => const {
 // Escena: teléfono → lector → WiFi
 // ─────────────────────────────────────────────────────────
 
-enum _Enlace { apagado, fluyendo, fluyendoDeVuelta, fijo, pausado, hecho, fallo }
+enum _Enlace {
+  apagado,
+  fluyendo,
+  fluyendoDeVuelta,
+  fijo,
+  pausado,
+  hecho,
+  fallo
+}
 
 enum _Nodo { tenue, activo, hecho, fallo }
 
@@ -124,31 +133,72 @@ class _EscenaConexionState extends State<EscenaConexion>
     super.dispose();
   }
 
-  (_Nodo, _Nodo, _Nodo, _Enlace, _Enlace) get _estado =>
-      switch (widget.etapa) {
-        EtapaConexion.buscando =>
-          (_Nodo.activo, _Nodo.tenue, _Nodo.tenue, _Enlace.apagado, _Enlace.apagado),
-        EtapaConexion.conectandoBluetooth =>
-          (_Nodo.activo, _Nodo.activo, _Nodo.tenue, _Enlace.fluyendo, _Enlace.apagado),
-        EtapaConexion.eligiendoWifi =>
-          (_Nodo.hecho, _Nodo.activo, _Nodo.tenue, _Enlace.fijo, _Enlace.apagado),
-        EtapaConexion.conectandoWifi =>
-          (_Nodo.hecho, _Nodo.activo, _Nodo.activo, _Enlace.pausado, _Enlace.fluyendo),
-        EtapaConexion.comprobando =>
-          (_Nodo.activo, _Nodo.hecho, _Nodo.hecho, _Enlace.fluyendoDeVuelta, _Enlace.hecho),
-        EtapaConexion.listo =>
-          (_Nodo.hecho, _Nodo.hecho, _Nodo.hecho, _Enlace.hecho, _Enlace.hecho),
-        EtapaConexion.falloBluetooth =>
-          (_Nodo.activo, _Nodo.fallo, _Nodo.tenue, _Enlace.fallo, _Enlace.apagado),
-        EtapaConexion.falloWifi =>
-          (_Nodo.hecho, _Nodo.activo, _Nodo.fallo, _Enlace.pausado, _Enlace.fallo),
+  (_Nodo, _Nodo, _Nodo, _Enlace, _Enlace) get _estado => switch (widget.etapa) {
+        EtapaConexion.buscando => (
+            _Nodo.activo,
+            _Nodo.tenue,
+            _Nodo.tenue,
+            _Enlace.apagado,
+            _Enlace.apagado
+          ),
+        EtapaConexion.conectandoBluetooth => (
+            _Nodo.activo,
+            _Nodo.activo,
+            _Nodo.tenue,
+            _Enlace.fluyendo,
+            _Enlace.apagado
+          ),
+        EtapaConexion.eligiendoWifi => (
+            _Nodo.hecho,
+            _Nodo.activo,
+            _Nodo.tenue,
+            _Enlace.fijo,
+            _Enlace.apagado
+          ),
+        EtapaConexion.conectandoWifi => (
+            _Nodo.hecho,
+            _Nodo.activo,
+            _Nodo.activo,
+            _Enlace.pausado,
+            _Enlace.fluyendo
+          ),
+        EtapaConexion.comprobando => (
+            _Nodo.activo,
+            _Nodo.hecho,
+            _Nodo.hecho,
+            _Enlace.fluyendoDeVuelta,
+            _Enlace.hecho
+          ),
+        EtapaConexion.listo => (
+            _Nodo.hecho,
+            _Nodo.hecho,
+            _Nodo.hecho,
+            _Enlace.hecho,
+            _Enlace.hecho
+          ),
+        EtapaConexion.falloBluetooth => (
+            _Nodo.activo,
+            _Nodo.fallo,
+            _Nodo.tenue,
+            _Enlace.fallo,
+            _Enlace.apagado
+          ),
+        EtapaConexion.falloWifi => (
+            _Nodo.hecho,
+            _Nodo.activo,
+            _Nodo.fallo,
+            _Enlace.pausado,
+            _Enlace.fallo
+          ),
       };
 
   static String _descripcion(EtapaConexion etapa) => switch (etapa) {
         EtapaConexion.buscando => 'Buscando el lector por Bluetooth',
         EtapaConexion.conectandoBluetooth =>
-          'Conectando el teléfono con el lector',
-        EtapaConexion.eligiendoWifi => 'Teléfono y lector conectados',
+          'Conectando el ${PlataformaApp.equipo} con el lector',
+        EtapaConexion.eligiendoWifi => PlataformaApp.escritorio
+            ? 'Equipo y lector conectados'
+            : 'Teléfono y lector conectados',
         EtapaConexion.conectandoWifi => 'El lector se conecta al WiFi',
         EtapaConexion.comprobando => 'Buscando el lector en el WiFi',
         EtapaConexion.listo => 'Lector listo',
@@ -234,7 +284,11 @@ class _EscenaConexionState extends State<EscenaConexion>
                   ),
                 ),
               ),
-              nodo(0, Icons.smartphone, telefono),
+              // El aparato que configura: la computadora en escritorio.
+              nodo(
+                  0,
+                  PlataformaApp.escritorio ? Icons.computer : Icons.smartphone,
+                  telefono),
               nodo(1, Icons.nfc, lector),
               nodo(2, Icons.router_outlined, wifi),
               if (marca != null) marca,
@@ -277,7 +331,8 @@ class _Insignia extends StatelessWidget {
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
-            border: Border.all(color: context.colores.backgroundColor, width: 2),
+            border:
+                Border.all(color: context.colores.backgroundColor, width: 2),
           ),
           child: Icon(icono, size: 14, color: Colors.white),
         ),
@@ -319,7 +374,9 @@ class _PintorEnlaces extends CustomPainter {
   void _enlace(Canvas canvas, Offset a, Offset b, _Enlace estado) {
     final color = switch (estado) {
       _Enlace.apagado || _Enlace.pausado => tenue,
-      _Enlace.fluyendo || _Enlace.fluyendoDeVuelta || _Enlace.fijo =>
+      _Enlace.fluyendo ||
+      _Enlace.fluyendoDeVuelta ||
+      _Enlace.fijo =>
         AppColors.accent,
       _Enlace.hecho => AppColors.success,
       _Enlace.fallo => AppColors.error,
@@ -459,8 +516,7 @@ class _Paso extends StatelessWidget {
       EstadoPaso.hecho => AppColors.success,
       EstadoPaso.fallo => AppColors.error,
     };
-    final relleno =
-        estado == EstadoPaso.hecho || estado == EstadoPaso.fallo;
+    final relleno = estado == EstadoPaso.hecho || estado == EstadoPaso.fallo;
 
     return Semantics(
       label: '$nombre: ${switch (estado) {
@@ -514,7 +570,7 @@ class _Paso extends StatelessWidget {
             nombre,
             style: TextStyle(
               color: estado == EstadoPaso.pendiente ? c.textSecondary : color,
-              fontSize: 12,
+              fontSize: PlataformaApp.escritorio ? 14 : 12,
               fontWeight: estado == EstadoPaso.enCurso
                   ? FontWeight.w700
                   : FontWeight.w500,

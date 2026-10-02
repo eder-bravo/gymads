@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
@@ -140,7 +141,7 @@ class _CodigoGeneradoDialog extends StatelessWidget {
                       'Guárdalo ahora: no se podrá volver a ver.',
                       style: TextStyle(
                         color: c.textSecondary.withOpacity(0.9),
-                        fontSize: 12.5,
+                        fontSize: legible(12.5),
                         height: 1.35,
                       ),
                     ),

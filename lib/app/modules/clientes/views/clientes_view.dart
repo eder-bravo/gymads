@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -35,10 +36,15 @@ class ClientesView extends GetView<ClientesController> {
                 'Registra un miembro nuevo con su foto, sus datos y su tarjeta.',
             borderRadius: 24,
             isFirstStep: true,
-            child: IconButton(
-              icon: const Icon(Icons.add),
+            child: AccionDeBarra(
+              texto: 'Nuevo cliente',
+              icono: Icons.person_add_alt_1,
               onPressed: () => _showAddDialog(),
-              tooltip: 'Agregar cliente',
+              movil: IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: () => _showAddDialog(),
+                tooltip: 'Agregar cliente',
+              ),
             ),
           ),
         ],
@@ -91,7 +97,8 @@ class ClientesView extends GetView<ClientesController> {
                 child: TourStep(
                   tourKey: controller.keyLista,
                   title: 'Tus clientes',
-                  description: 'Toca a un miembro para ver su ficha.',
+                  description:
+                      '${PlataformaApp.toca} un miembro para ver su ficha.',
                   isLastStep: true,
                   child: Obx(() {
                     final filteredClientes = controller.filteredClientes;

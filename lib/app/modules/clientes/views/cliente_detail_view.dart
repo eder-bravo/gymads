@@ -1,4 +1,5 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/user_model.dart';
@@ -26,7 +27,10 @@ class ClienteDetailView extends GetView<ClientesController> {
     return ScaffoldAdaptable(
       anchoMaximo: 960,
       backgroundColor: c.backgroundColor,
-      appBar: const GymAppBar(title: 'Detalles del Cliente'),
+      appBar: GymAppBar(
+          title: PlataformaApp.elegir(
+              escritorio: 'Detalle del cliente',
+              movil: 'Detalles del Cliente')),
       // SafeArea: de lado, el notch tapaba el borde izquierdo de la ficha.
       body: SafeArea(
         child: SingleChildScrollView(
@@ -134,37 +138,42 @@ class ClienteDetailView extends GetView<ClientesController> {
     final c = context.colores;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      child: ResumenAdaptable(
+        anchoMinimo: 220,
+        espacio: 16,
         children: [
-          Expanded(
-            child: Builder(
-              builder: (context) => _buildInfoCard(
-                context,
-                icon: Icons.phone_outlined,
-                title: 'Teléfono',
-                value: cliente.phone,
-                color: AppColors.info,
-                trailing: const Icon(Icons.touch_app_outlined,
-                    color: AppColors.info, size: 18),
-                onTap: () => PhoneUtils.showActions(context, cliente.phone),
-              ),
+          Builder(
+            builder: (context) => _buildInfoCard(
+              context,
+              icon: Icons.phone_outlined,
+              title: 'Teléfono',
+              value: cliente.phone,
+              color: AppColors.info,
+              // En escritorio dice qué pasa al hacer clic; el dedo de
+              // "toca aquí" no aplica con mouse.
+              trailing: PlataformaApp.escritorio
+                  ? const Text('Llamar o WhatsApp',
+                      style: TextStyle(
+                          color: AppColors.info,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600))
+                  : const Icon(Icons.touch_app_outlined,
+                      color: AppColors.info, size: 18),
+              onTap: () => PhoneUtils.showActions(context, cliente.phone),
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Builder(
-              builder: (context) {
-                final bool vinculado = cliente.rfidCard != null &&
-                    cliente.rfidCard!.trim().isNotEmpty;
-                return _buildInfoCard(
-                  context,
-                  icon: Icons.vpn_key_outlined,
-                  title: 'Llavero/Tarjeta',
-                  value: vinculado ? 'Vinculado' : 'No vinculado',
-                  color: vinculado ? AppColors.success : c.textSecondary,
-                );
-              },
-            ),
+          Builder(
+            builder: (context) {
+              final bool vinculado = cliente.rfidCard != null &&
+                  cliente.rfidCard!.trim().isNotEmpty;
+              return _buildInfoCard(
+                context,
+                icon: Icons.vpn_key_outlined,
+                title: 'Llavero/Tarjeta',
+                value: vinculado ? 'Vinculado' : 'No vinculado',
+                color: vinculado ? AppColors.success : c.textSecondary,
+              );
+            },
           ),
         ],
       ),
@@ -182,7 +191,7 @@ class ClienteDetailView extends GetView<ClientesController> {
   }) {
     final c = context.colores;
     final card = Container(
-      height: 120, // Altura fija para que tengan el mismo tamaño
+      constraints: const BoxConstraints(minHeight: 120),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: c.cardBackground,
@@ -210,16 +219,18 @@ class ClienteDetailView extends GetView<ClientesController> {
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: legible(12),
                     color: c.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-              if (trailing != null) trailing,
+              if (trailing != null)
+                // En escritorio el aviso es texto: que se ajuste al ancho.
+                PlataformaApp.escritorio ? Flexible(child: trailing) : trailing,
             ],
           ),
-          const Spacer(), // Empuja el texto hacia abajo
+          const SizedBox(height: 12),
           Text(
             value,
             style: TextStyle(
@@ -253,7 +264,9 @@ class ClienteDetailView extends GetView<ClientesController> {
           // Card de información de contacto extendida
           _buildDetailCard(
             context,
-            title: 'Contacto y Dirección',
+            title: PlataformaApp.elegir(
+                escritorio: 'Contacto y dirección',
+                movil: 'Contacto y Dirección'),
             icon: Icons.contact_mail_outlined,
             children: [
               _buildDetailRow(
@@ -280,7 +293,8 @@ class ClienteDetailView extends GetView<ClientesController> {
           // Card de fechas importantes
           _buildDetailCard(
             context,
-            title: 'Fechas Importantes',
+            title: PlataformaApp.elegir(
+                escritorio: 'Fechas importantes', movil: 'Fechas Importantes'),
             icon: Icons.calendar_today_outlined,
             children: [
               _buildDetailRow(
@@ -346,14 +360,15 @@ class ClienteDetailView extends GetView<ClientesController> {
                 child: Icon(icon, color: c.titleColor, size: 20),
               ),
               const SizedBox(width: 12),
-              Text(
+              Expanded(
+                  child: Text(
                 title,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: c.titleColor,
                 ),
-              ),
+              )),
             ],
           ),
           const SizedBox(height: 16),
@@ -402,6 +417,40 @@ class ClienteDetailView extends GetView<ClientesController> {
 
   Widget _buildActionButtons(BuildContext context) {
     final c = context.colores;
+    // En escritorio, una fila de botones a la derecha, la acción principal al
+    // final, como en las ventanas del sistema.
+    if (PlataformaApp.escritorio) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _buildActionButton(
+              label: 'Eliminar',
+              icon: Icons.delete_outline,
+              color: AppColors.error,
+              onPressed: () => _deleteCliente(context),
+              isOutlined: true,
+            ),
+            _buildActionButton(
+              label: 'Editar',
+              icon: Icons.edit_outlined,
+              color: c.titleColor,
+              onPressed: _editCliente,
+              isOutlined: true,
+            ),
+            _buildActionButton(
+              label: 'Abonar',
+              icon: Icons.payment,
+              color: AppColors.success,
+              onPressed: _abonarCliente,
+            ),
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -420,26 +469,23 @@ class ClienteDetailView extends GetView<ClientesController> {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
+          ResumenAdaptable(
+            anchoMinimo: 180,
+            espacio: 16,
             children: [
-              Expanded(
-                child: _buildActionButton(
-                  label: 'Editar',
-                  icon: Icons.edit_outlined,
-                  color: c.titleColor,
-                  onPressed: _editCliente,
-                  isOutlined: true,
-                ),
+              _buildActionButton(
+                label: 'Editar',
+                icon: Icons.edit_outlined,
+                color: c.titleColor,
+                onPressed: _editCliente,
+                isOutlined: true,
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildActionButton(
-                  label: 'Eliminar',
-                  icon: Icons.delete_outline,
-                  color: AppColors.error,
-                  onPressed: () => _deleteCliente(context),
-                  isOutlined: true,
-                ),
+              _buildActionButton(
+                label: 'Eliminar',
+                icon: Icons.delete_outline,
+                color: AppColors.error,
+                onPressed: () => _deleteCliente(context),
+                isOutlined: true,
               ),
             ],
           ),
@@ -456,9 +502,11 @@ class ClienteDetailView extends GetView<ClientesController> {
     bool isOutlined = false,
     bool isFullWidth = false,
   }) {
-    return SizedBox(
+    return Container(
       width: isFullWidth ? double.infinity : null,
-      height: 52,
+      constraints: PlataformaApp.escritorio
+          ? const BoxConstraints(minHeight: 44, minWidth: 140)
+          : const BoxConstraints(minHeight: 52),
       child: isOutlined
           ? OutlinedButton.icon(
               onPressed: onPressed,
@@ -506,7 +554,7 @@ class ClienteDetailView extends GetView<ClientesController> {
   void _editCliente() {
     controller.setupFormForEdit(cliente);
 
-    Get.to(
+    abrirFormulario(
       () => ClienteFormDialog(
         nombreController: controller.nombreController,
         phoneController: controller.phoneController,
@@ -541,7 +589,6 @@ class ClienteDetailView extends GetView<ClientesController> {
         isEditing: true,
         fullScreen: true,
       ),
-      fullscreenDialog: true,
     );
   }
 

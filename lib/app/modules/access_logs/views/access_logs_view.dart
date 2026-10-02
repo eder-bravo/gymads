@@ -18,7 +18,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
   Widget build(BuildContext context) {
     final c = context.colores;
     return ScaffoldAdaptable(
-      anchoMaximo: 1120,
+      anchoMaximo: 960,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Entradas',
@@ -89,7 +89,8 @@ class AccessLogsView extends GetView<AccessLogsController> {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Obx(() {
-        return Row(
+        return ResumenAdaptable(
+          espacio: 0,
           children: [
             _buildStatCard(
               context,
@@ -177,7 +178,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                         child: Text(
                           controller.etiquetaFranja(entrada.key),
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: legible(12),
                             color: c.textSecondary,
                             fontWeight: entrada.key == pico
                                 ? FontWeight.w700
@@ -206,7 +207,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
                           '${entrada.value}',
                           textAlign: TextAlign.right,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: legible(12),
                             color: c.textPrimary,
                             fontWeight: entrada.key == pico
                                 ? FontWeight.w700
@@ -226,50 +227,48 @@ class AccessLogsView extends GetView<AccessLogsController> {
   Widget _buildStatCard(
       BuildContext context, String title, String value, Color color) {
     final c = context.colores;
-    return Expanded(
-      child: Container(
-        height: 88,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: c.cardBackground,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: color.withOpacity(0.3),
-            width: 1,
-          ),
+    return Container(
+      constraints: const BoxConstraints(minHeight: 88),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1,
         ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              // "10 a.m. – 12 p.m." no cabe al mismo tamaño que un número suelto;
-              // encogerlo es mejor que recortarlo con puntos suspensivos.
-              child: Text(
-                value,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-                maxLines: 1,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              title,
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            // "10 a.m. – 12 p.m." no cabe al mismo tamaño que un número suelto;
+            // encogerlo es mejor que recortarlo con puntos suspensivos.
+            child: Text(
+              value,
               style: TextStyle(
-                fontSize: 13,
-                color: c.textSecondary,
-                fontWeight: FontWeight.w500,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: color,
               ),
-              textAlign: TextAlign.center,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              color: c.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
@@ -394,76 +393,65 @@ class AccessLogsView extends GetView<AccessLogsController> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // Icono de acceso
-            CircleAvatar(
-              backgroundColor: color.withOpacity(0.2),
-              radius: 26,
-              child: Icon(
-                icon,
-                color: color,
-                size: 26,
-              ),
+        child: FilaConDetalle(
+          leading: CircleAvatar(
+            backgroundColor: color.withOpacity(0.2),
+            radius: 26,
+            child: Icon(
+              icon,
+              color: color,
+              size: 26,
             ),
-            const SizedBox(width: 14),
-
-            // Información del usuario
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    log.userName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: c.textPrimary,
-                      fontSize: 18,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Staff: ${log.staffUser}',
-                    style: TextStyle(
-                      color: c.textSecondary,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Información del acceso
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    esVisita ? 'VISITA' : log.accessType.toUpperCase(),
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+          ),
+          principal: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                log.userName,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: c.textPrimary,
+                  fontSize: 18,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  HoraFormato.fechaYHora(log.accessTime),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Staff: ${log.staffUser}',
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          detalle: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  esVisita ? 'VISITA' : log.accessType.toUpperCase(),
                   style: TextStyle(
-                    color: c.textSecondary,
-                    fontSize: 13,
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                HoraFormato.fechaYHora(log.accessTime),
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -12,6 +13,12 @@ import '../../core/utils/app_logger.dart';
 import 'estado_configuracion_lector.dart';
 import 'registro_busqueda_lector.dart';
 import 'transporte_lector_ble.dart';
+
+/// Dónde se da el permiso de Bluetooth: en macOS, los ajustes del sistema;
+/// en el teléfono, los permisos de la app.
+String get _ajustesBluetooth => PlataformaApp.escritorio
+    ? 'Ajustes del Sistema > Privacidad y seguridad > Bluetooth'
+    : 'Ajustes > Aplicaciones > GymOne > Permisos';
 
 // UUIDs del firmware 6.0 (arduino/esp32_rfid_wifi_setup_fixed). Si cambian
 // allá, cambian aquí. No cambiaron con el nombre GymOne (v6.4.0): con ellos
@@ -266,16 +273,19 @@ FalloBusquedaBle explicarFalloBusquedaBle(Object error) {
       ubicacion
           ? 'Permite a GymOne acceder a la ubicación en Ajustes > '
               'Aplicaciones > GymOne > Permisos y vuelve a intentar.'
-          : 'Permite a GymOne usar Bluetooth o «Dispositivos cercanos» en '
-              'Ajustes > Aplicaciones > GymOne > Permisos y vuelve a intentar.',
+          : PlataformaApp.escritorio
+              ? 'Permite a GymOne usar Bluetooth en $_ajustesBluetooth y '
+                  'vuelve a intentar.'
+              : 'Permite a GymOne usar Bluetooth o «Dispositivos cercanos» en '
+                  '$_ajustesBluetooth y vuelve a intentar.',
       ubicacion
           ? TipoFalloBusquedaBle.permisoUbicacion
           : TipoFalloBusquedaBle.permisoBluetooth,
     );
   }
   if (descripcion.contains('must be turned on')) {
-    return const FalloBusquedaBle(
-      'Enciende el Bluetooth del teléfono y pulsa «Intentar de nuevo».',
+    return FalloBusquedaBle(
+      'Enciende el Bluetooth del ${PlataformaApp.equipo} y pulsa «Intentar de nuevo».',
       TipoFalloBusquedaBle.bluetoothApagado,
     );
   }
@@ -296,7 +306,7 @@ FalloBusquedaBle explicarFalloBusquedaBle(Object error) {
     );
   }
   return FalloBusquedaBle(
-    'El teléfono no pudo buscar por Bluetooth. Apágalo, espera 5 segundos, '
+    'El ${PlataformaApp.equipo} no pudo buscar por Bluetooth. Apágalo, espera 5 segundos, '
     'vuelve a encenderlo y pulsa «Intentar de nuevo».',
     codigo == 1
         ? TipoFalloBusquedaBle.inicioFallido
@@ -406,10 +416,14 @@ class LectorBleService {
               : TipoFalloBusquedaBle.sinCompatibilidad);
     }
     if (!await FlutterBluePlus.isSupported) {
-      throw const FalloBusquedaBle(
-          'Este dispositivo no tiene Bluetooth compatible. Configura el lector '
-          'desde tu celular con la misma cuenta y red del gimnasio, o usa un adaptador BLE USB compatible. '
-          'Después podrás usar el lector desde esta computadora por la red.',
+      throw FalloBusquedaBle(
+          PlataformaApp.escritorio
+              ? 'Este equipo no tiene Bluetooth compatible. Configura el lector '
+                  'desde tu celular con la misma cuenta y red del gimnasio, o usa un adaptador BLE USB compatible. '
+                  'Después podrás usar el lector desde esta computadora por la red.'
+              : 'Este dispositivo no tiene Bluetooth compatible. Configura el lector '
+                  'desde tu celular con la misma cuenta y red del gimnasio, o usa un adaptador BLE USB compatible. '
+                  'Después podrás usar el lector desde esta computadora por la red.',
           TipoFalloBusquedaBle.sinCompatibilidad);
     }
 
@@ -431,16 +445,19 @@ class LectorBleService {
     }
 
     if (estado == BluetoothAdapterState.unauthorized) {
-      throw const FalloBusquedaBle(
-          'La app no tiene permiso para usar Bluetooth. Actívalo en los '
-          'ajustes del teléfono.',
+      throw FalloBusquedaBle(
+          PlataformaApp.escritorio
+              ? 'La app no tiene permiso para usar Bluetooth. Actívalo en '
+                  '$_ajustesBluetooth.'
+              : 'La app no tiene permiso para usar Bluetooth. Actívalo en los '
+                  'ajustes del teléfono.',
           TipoFalloBusquedaBle.permisoBluetooth);
     }
     if (estado != BluetoothAdapterState.on) {
       throw FalloBusquedaBle(
           estado == BluetoothAdapterState.off
-              ? 'Enciende el Bluetooth del teléfono para encontrar el lector.'
-              : 'El Bluetooth del teléfono aún no está listo. Espera un '
+              ? 'Enciende el Bluetooth del ${PlataformaApp.equipo} para encontrar el lector.'
+              : 'El Bluetooth del ${PlataformaApp.equipo} aún no está listo. Espera un '
                   'momento y vuelve a intentar.',
           estado == BluetoothAdapterState.off
               ? TipoFalloBusquedaBle.bluetoothApagado
@@ -540,14 +557,14 @@ class LectorBleService {
       adaptadorSub = FlutterBluePlus.adapterState.listen((estado) {
         if (estado == BluetoothAdapterState.off ||
             estado == BluetoothAdapterState.turningOff) {
-          terminar(const FalloBusquedaBle(
-              'Se apagó el Bluetooth del teléfono. Enciéndelo y pulsa '
+          terminar(FalloBusquedaBle(
+              'Se apagó el Bluetooth del ${PlataformaApp.equipo}. Enciéndelo y pulsa '
               '«Intentar de nuevo».',
               TipoFalloBusquedaBle.bluetoothApagado));
         } else if (estado == BluetoothAdapterState.unauthorized) {
-          terminar(const FalloBusquedaBle(
-              'La app perdió el permiso de Bluetooth. Actívalo en Ajustes > '
-              'Aplicaciones > GymOne > Permisos y vuelve a intentar.',
+          terminar(FalloBusquedaBle(
+              'La app perdió el permiso de Bluetooth. Actívalo en '
+              '$_ajustesBluetooth y vuelve a intentar.',
               TipoFalloBusquedaBle.permisoBluetooth));
         }
       });
@@ -562,8 +579,8 @@ class LectorBleService {
           registroBusqueda.registrar(EventoBusquedaLector.escaneoIniciado));
       await Future.any([fin.future, busqueda.cancelacion.future]).timeout(
           duracion + const Duration(seconds: 2),
-          onTimeout: () => terminar(const FalloBusquedaBle(
-              'El teléfono no terminó la búsqueda Bluetooth. Apaga Bluetooth, '
+          onTimeout: () => terminar(FalloBusquedaBle(
+              'El ${PlataformaApp.equipo} no terminó la búsqueda Bluetooth. Apaga Bluetooth, '
               'espera 5 segundos y vuelve a encenderlo para intentar de nuevo.',
               TipoFalloBusquedaBle.interno)));
       if (fallo != null) throw fallo!;
@@ -745,8 +762,8 @@ class LectorBleService {
     } catch (e) {
       AppLogger.error('LectorBleService', 'No se pudo conectar', e);
       await desconectar();
-      throw const LectorBleException(
-          'No se pudo conectar con el lector. Acerca el teléfono y reintenta.');
+      throw LectorBleException(
+          'No se pudo conectar con el lector. Acerca el ${PlataformaApp.equipo} y reintenta.');
     }
   }
 
@@ -1007,8 +1024,8 @@ class LectorBleService {
         return await accion();
       } catch (e) {
         if (e is LectorBleException) rethrow;
-        throw const LectorBleException(
-            'Se perdió la conexión con el lector. Acerca el teléfono y '
+        throw LectorBleException(
+            'Se perdió la conexión con el lector. Acerca el ${PlataformaApp.equipo} y '
             'reintenta.');
       }
     }

@@ -125,7 +125,7 @@ class _EscanerFisicoViewState extends State<EscanerFisicoView> {
                             child: Text(_aviso!, textAlign: TextAlign.center)),
                       const SizedBox(height: 20),
                       const Text(
-                          'Si no aparece el código, toca el campo. Usa el modo HID/teclado '
+                          'Si no aparece el código, haz clic en el campo. Usa el modo HID/teclado '
                           'y el terminador elegido en Configuración → Escáner de códigos. '
                           'Sin Bluetooth puedes usar cable o un receptor USB compatible.',
                           textAlign: TextAlign.center),

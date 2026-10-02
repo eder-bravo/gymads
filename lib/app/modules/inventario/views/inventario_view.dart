@@ -13,6 +13,7 @@ import '../../../core/widgets/refrescable.dart';
 import '../../../core/widgets/escaner_automatico.dart';
 import '../../../core/utils/plataforma_app.dart';
 import '../controllers/inventario_controller.dart';
+import 'product_form_view.dart';
 import 'stock_adjust_dialog.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
 
@@ -54,6 +55,7 @@ class InventarioView extends GetView<InventarioController> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => controller.refreshAll(),
+            tooltip: PlataformaApp.escritorio ? 'Actualizar' : null,
           ),
           // Las categorías las ordena quien gestiona el inventario.
           if (controller.can(Permission.gestionarCategorias))
@@ -64,14 +66,23 @@ class InventarioView extends GetView<InventarioController> {
               title: 'Categorías',
               description: 'Agrupa tus productos por categoría.',
               borderRadius: 24,
-              child: IconButton(
-                icon: const Icon(Icons.category_outlined),
-                tooltip: 'Categorías',
+              child: AccionDeBarra(
+                texto: 'Categorías',
+                icono: Icons.category_outlined,
+                secundaria: true,
                 onPressed: () async {
                   await Get.toNamed(Routes.CATEGORIAS);
-                  // Al volver pueden haber cambiado nombres, iconos u orden.
                   controller.loadCategories();
                 },
+                movil: IconButton(
+                  icon: const Icon(Icons.category_outlined),
+                  tooltip: 'Categorías',
+                  onPressed: () async {
+                    await Get.toNamed(Routes.CATEGORIAS);
+                    // Al volver pueden haber cambiado nombres, iconos u orden.
+                    controller.loadCategories();
+                  },
+                ),
               ),
             ),
           // Dar de alta un producto fija su precio: es de quien gestiona el
@@ -84,13 +95,21 @@ class InventarioView extends GetView<InventarioController> {
               borderRadius: 24,
               isFirstStep:
                   controller.esPrimerPasoDelTour(controller.keyAgregar),
-              child: IconButton(
-                icon: const Icon(Icons.add),
+              child: AccionDeBarra(
+                texto: 'Nuevo producto',
+                icono: Icons.add,
                 onPressed: () {
                   controller.resetForm();
-                  Get.toNamed(Routes.PRODUCT_FORM);
+                  abrirFormularioProducto();
                 },
-                tooltip: 'Agregar producto',
+                movil: IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () {
+                    controller.resetForm();
+                    abrirFormularioProducto();
+                  },
+                  tooltip: 'Agregar producto',
+                ),
               ),
             ),
         ],
@@ -123,7 +142,9 @@ class InventarioView extends GetView<InventarioController> {
           lista: TourStep(
             tourKey: controller.keyLista,
             title: 'Tus productos',
-            description: 'Toca un producto para editarlo o ajustar su stock.',
+            description: PlataformaApp.escritorio
+                ? 'Haz clic en un producto para editarlo, o en "Stock" para ajustar sus existencias.'
+                : 'Toca un producto para editarlo o ajustar su stock.',
             isLastStep: controller.esUltimoPasoDelTour(controller.keyLista),
             child: _buildProductList(context),
           ),
@@ -213,7 +234,7 @@ class InventarioView extends GetView<InventarioController> {
     if (agregar != true || !context.mounted) return 'Código no registrado';
 
     controller.resetForm();
-    Get.toNamed(Routes.PRODUCT_FORM, arguments: {'barcode': codigo});
+    abrirFormularioProducto({'barcode': codigo});
     return 'Código no registrado';
   }
 
@@ -232,15 +253,23 @@ class InventarioView extends GetView<InventarioController> {
           border: Border.all(color: AppColors.accent.withOpacity(0.3)),
         ),
         margin: const EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+        child: ResumenAdaptable(
           children: [
-            _buildStatItem(context, 'Total Productos',
+            _buildStatItem(
+                context,
+                PlataformaApp.elegir(
+                    escritorio: 'Productos', movil: 'Total Productos'),
                 '${controller.inventoryStats['totalProducts'] ?? 0}'),
-            _buildStatItem(context, 'Stock Total',
+            _buildStatItem(
+                context,
+                PlataformaApp.elegir(
+                    escritorio: 'Unidades en stock', movil: 'Stock Total'),
                 '${controller.inventoryStats['totalStock'] ?? 0}'),
-            _buildStatItem(context, 'Valor Total',
-                '\$${(controller.inventoryStats['totalValue'] ?? 0.0).toStringAsFixed(2)}'),
+            _buildStatItem(
+                context,
+                PlataformaApp.elegir(
+                    escritorio: 'Valor del inventario', movil: 'Valor Total'),
+                dinero(controller.inventoryStats['totalValue'] ?? 0.0)),
           ],
         ),
       );
@@ -297,7 +326,7 @@ class InventarioView extends GetView<InventarioController> {
                       Text(
                         '$productos ${productos == 1 ? 'producto' : 'productos'} · '
                         '$unidades ${unidades == 1 ? 'unidad' : 'unidades'} · '
-                        '\$${valor.toStringAsFixed(2)}',
+                        '${dinero(valor)}',
                         style: TextStyle(
                           color: c.textSecondary,
                           fontSize: 13,
@@ -307,11 +336,13 @@ class InventarioView extends GetView<InventarioController> {
                       const SizedBox(height: 2),
                       Text(
                         filtrando
-                            ? 'Toca para ver todos los productos'
+                            ? PlataformaApp.escritorio
+                                ? 'Haz clic para ver todos los productos'
+                                : 'Toca para ver todos los productos'
                             : 'Se descontarán solas al reponer stock',
                         style: TextStyle(
                           color: c.textSecondary,
-                          fontSize: 12,
+                          fontSize: legible(12),
                         ),
                       ),
                     ],
@@ -345,7 +376,7 @@ class InventarioView extends GetView<InventarioController> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: legible(12),
             color: c.textSecondary,
           ),
         ),
@@ -415,7 +446,7 @@ class InventarioView extends GetView<InventarioController> {
                 ElevatedButton.icon(
                   onPressed: () {
                     controller.resetForm();
-                    Get.toNamed(Routes.PRODUCT_FORM);
+                    abrirFormularioProducto();
                   },
                   icon: const Icon(Icons.add),
                   label: const Text('Agregar primer producto'),
@@ -484,6 +515,7 @@ class InventarioView extends GetView<InventarioController> {
 
   Widget _buildProductCard(BuildContext context, Product product) {
     final c = context.colores;
+    if (PlataformaApp.escritorio) return _fichaEscritorio(context, product);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: c.cardBackground,
@@ -516,7 +548,7 @@ class InventarioView extends GetView<InventarioController> {
             ),
             const SizedBox(width: 8),
             Text(
-              '\$${product.price.toStringAsFixed(2)}',
+              dinero(product.price),
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: AppColors.accent,
@@ -535,7 +567,9 @@ class InventarioView extends GetView<InventarioController> {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
-            Row(
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
               children: [
                 Container(
                   padding:
@@ -558,7 +592,6 @@ class InventarioView extends GetView<InventarioController> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
                 // Ajuste de una unidad, pegado al stock que modifica.
                 _buildStockStepper(product),
               ],
@@ -571,7 +604,7 @@ class InventarioView extends GetView<InventarioController> {
           onSelected: (value) {
             if (value == 'edit') {
               controller.editProduct(product);
-              Get.toNamed(Routes.PRODUCT_FORM, arguments: {'isEditing': true});
+              abrirFormularioProducto({'isEditing': true});
             } else if (value == 'stock') {
               showStockAdjustDialog(product);
             } else if (value == 'deactivate') {
@@ -639,6 +672,153 @@ class InventarioView extends GetView<InventarioController> {
         ),
         // Sin onTap: la ficha con todos los datos se quitó. Lo que se hace
         // con un producto está en el menú y en los botones de +/-.
+      ),
+    );
+  }
+
+  void _editar(Product product) {
+    controller.editProduct(product);
+    abrirFormularioProducto({'isEditing': true});
+  }
+
+  /// La ficha de escritorio: clic en ella para editar, y las acciones con
+  /// texto a la vista ("Editar", "Stock"); lo que se usa poco, en "Más".
+  Widget _fichaEscritorio(BuildContext context, Product product) {
+    final c = context.colores;
+    final puedeEditar = controller.can(Permission.gestionarProductos);
+    final puedeAjustar = controller.can(Permission.ajustarStock);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: c.cardBackground,
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: puedeEditar
+            ? () => _editar(product)
+            : puedeAjustar
+                ? () => showStockAdjustDialog(product)
+                : null,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    backgroundColor: AppColors.accent.withOpacity(0.2),
+                    child: Text(
+                      product.name.isNotEmpty
+                          ? product.name[0].toUpperCase()
+                          : 'P',
+                      style: const TextStyle(
+                          color: AppColors.accent, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(product.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: c.textPrimary)),
+                        if (product.description.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(product.description,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: c.textSecondary, fontSize: 14)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    dinero(product.price),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.accent,
+                      fontSize: 18,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: (product.stock > 0
+                                ? AppColors.success
+                                : AppColors.error)
+                            .withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        product.stock < 0
+                            ? 'Faltan ${-product.stock}'
+                            : 'Stock: ${product.stock}',
+                        style: TextStyle(
+                          color: product.stock > 0
+                              ? AppColors.success
+                              : AppColors.error,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    _buildStockStepper(product),
+                  ]),
+                  AccionesDeFila(
+                    visibles: [
+                      if (puedeEditar)
+                        AccionDeFila(
+                            texto: 'Editar',
+                            icono: Icons.edit_outlined,
+                            onPressed: () => _editar(product)),
+                      if (puedeAjustar)
+                        AccionDeFila(
+                            texto: 'Stock',
+                            icono: Icons.sync_alt,
+                            onPressed: () => showStockAdjustDialog(product)),
+                    ],
+                    mas: [
+                      if (product.stock <= 0 && puedeEditar)
+                        AccionDeFila(
+                            texto: 'Desactivar',
+                            icono: Icons.visibility_off_outlined,
+                            onPressed: () =>
+                                controller.deactivateProduct(product.id)),
+                      if (puedeEditar)
+                        AccionDeFila(
+                            texto: 'Eliminar',
+                            icono: Icons.delete_outline,
+                            peligrosa: true,
+                            onPressed: () =>
+                                controller.deleteProduct(product.id)),
+                    ],
+                    movil: const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

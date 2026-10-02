@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:get/get.dart';
 import '../../../routes/app_pages.dart';
 import '../controllers/auth_controller.dart';
@@ -30,8 +31,8 @@ class LoginView extends GetView<AuthController> {
                   const SizedBox(height: 24),
 
                   // Create account link
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
                     children: [
                       Text(
                         '¿No tienes cuenta? ',
@@ -192,8 +193,8 @@ class LoginView extends GetView<AuthController> {
   /// dueño desde Configuración.
   Widget _buildStaffButton(BuildContext context) {
     final c = context.colores;
-    return SizedBox(
-      height: 50,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 50),
       child: OutlinedButton(
         onPressed: () => Get.toNamed(Routes.STAFF_CODE),
         style: OutlinedButton.styleFrom(
@@ -208,14 +209,16 @@ class LoginView extends GetView<AuthController> {
           children: [
             Icon(Icons.badge_outlined, size: 20, color: c.contraste),
             const SizedBox(width: 12),
-            Text(
+            Flexible(
+                child: Text(
               'Entrar como staff',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: c.contraste,
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
               ),
-            ),
+            )),
           ],
         ),
       ),
@@ -260,6 +263,11 @@ class LoginView extends GetView<AuthController> {
                     : Icons.visibility,
                 color: c.contraste.withOpacity(0.7),
               ),
+              tooltip: PlataformaApp.escritorio
+                  ? (controller.obscurePassword.value
+                      ? 'Mostrar contraseña'
+                      : 'Ocultar contraseña')
+                  : null,
               onPressed: controller.togglePasswordVisibility,
             ),
           ),
@@ -300,8 +308,8 @@ class LoginView extends GetView<AuthController> {
   }
 
   Widget _buildLoginButton() {
-    return Obx(() => SizedBox(
-          height: 50,
+    return Obx(() => ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 50),
           child: ElevatedButton(
             onPressed: controller.isLoading.value ? null : controller.login,
             style: ElevatedButton.styleFrom(
@@ -326,13 +334,15 @@ class LoginView extends GetView<AuthController> {
                     children: [
                       Icon(Icons.login, size: 20),
                       SizedBox(width: 8),
-                      Text(
+                      Flexible(
+                          child: Text(
                         'Iniciar Sesión',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
-                      ),
+                      )),
                     ],
                   ),
           ),
@@ -341,8 +351,8 @@ class LoginView extends GetView<AuthController> {
 
   Widget _buildGoogleButton(BuildContext context) {
     final c = context.colores;
-    return Obx(() => SizedBox(
-          height: 50,
+    return Obx(() => ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 50),
           child: OutlinedButton(
             onPressed:
                 controller.isLoading.value ? null : controller.loginWithGoogle,
@@ -370,14 +380,16 @@ class LoginView extends GetView<AuthController> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(
+                Flexible(
+                    child: Text(
                   'Continuar con Google',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: c.contraste,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
-                ),
+                )),
               ],
             ),
           ),

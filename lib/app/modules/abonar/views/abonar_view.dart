@@ -1,4 +1,5 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -80,7 +81,7 @@ class AbonarView extends GetView<AbonarController> {
             isFirstStep: true,
             child: Obx(() {
               final precio = controller.prices.value?.priceDay;
-              return OutlinedButton.icon(
+              final boton = OutlinedButton.icon(
                 onPressed: () => abrirCobrarVisita(precioDia: precio),
                 icon: const Icon(Icons.confirmation_number_outlined, size: 20),
                 label: Text(precio == null
@@ -89,13 +90,23 @@ class AbonarView extends GetView<AbonarController> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.accent,
                   side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
-                  minimumSize: const Size.fromHeight(48),
+                  // En escritorio, del ancho de su texto y a la derecha:
+                  // la búsqueda del cliente es lo principal de la pantalla.
+                  minimumSize: PlataformaApp.escritorio
+                      ? const Size(0, 48)
+                      : const Size.fromHeight(48),
+                  padding: PlataformaApp.escritorio
+                      ? const EdgeInsets.symmetric(horizontal: 20)
+                      : null,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                   textStyle: const TextStyle(
                       fontSize: 15, fontWeight: FontWeight.w600),
                 ),
               );
+              return PlataformaApp.escritorio
+                  ? Align(alignment: Alignment.centerRight, child: boton)
+                  : boton;
             }),
           ),
           const SizedBox(height: 16),
@@ -115,7 +126,7 @@ class AbonarView extends GetView<AbonarController> {
             child: TourStep(
               tourKey: controller.keyResultados,
               title: 'Cobra su membresía',
-              description: 'Toca a un cliente para cobrarle.',
+              description: '${PlataformaApp.toca} un cliente para cobrarle.',
               isLastStep: true,
               child: Obx(() {
                 if (controller.isLoadingClients.value) {
@@ -147,26 +158,61 @@ class AbonarView extends GetView<AbonarController> {
                         margin: const EdgeInsets.only(bottom: 8),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
-                        child: ListTile(
-                          onTap: () => controller.selectClient(client),
-                          leading: UserThumbnail(
-                            imageUrl: client.photoUrl,
-                            userName: client.name,
-                            size: 40,
-                          ),
-                          title: Text(
-                            client.name,
-                            style: TextStyle(
-                                color: c.textPrimary,
-                                fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            'Tel: ${client.phone}',
-                            style: TextStyle(color: c.textSecondary),
-                          ),
-                          trailing: const Icon(Icons.arrow_forward_ios,
-                              size: 16, color: AppColors.accent),
-                        ),
+                        child: LayoutBuilder(builder: (context, limites) {
+                          final escala =
+                              MediaQuery.textScalerOf(context).scale(14) / 14;
+                          if (limites.maxWidth < 280 * escala) {
+                            return InkWell(
+                              onTap: () => controller.selectClient(client),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: UserThumbnail(
+                                        imageUrl: client.photoUrl,
+                                        userName: client.name,
+                                        size: 40,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(client.name,
+                                        style: TextStyle(
+                                            color: c.textPrimary,
+                                            fontWeight: FontWeight.bold)),
+                                    Text('Tel: ${client.phone}',
+                                        style:
+                                            TextStyle(color: c.textSecondary)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                          return ListTile(
+                            onTap: () => controller.selectClient(client),
+                            leading: UserThumbnail(
+                              imageUrl: client.photoUrl,
+                              userName: client.name,
+                              size: 40,
+                            ),
+                            title: Text(
+                              client.name,
+                              style: TextStyle(
+                                  color: c.textPrimary,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text(
+                              'Tel: ${client.phone}',
+                              style: TextStyle(color: c.textSecondary),
+                            ),
+                            trailing: const Icon(Icons.arrow_forward_ios,
+                                size: 16, color: AppColors.accent),
+                          );
+                        }),
                       );
                     },
                   ),
@@ -352,11 +398,23 @@ class AbonarView extends GetView<AbonarController> {
             ],
           ),
         ),
-        IconButton(
-          onPressed: controller.clearSelection,
-          icon: Icon(Icons.close, color: c.textSecondary),
-          tooltip: 'Cambiar cliente',
-        ),
+        if (PlataformaApp.escritorio)
+          TextButton.icon(
+            onPressed: controller.clearSelection,
+            icon: const Icon(Icons.swap_horiz, size: 18),
+            label: const Text('Cambiar cliente'),
+            style: TextButton.styleFrom(
+              foregroundColor: c.textSecondary,
+              textStyle:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          )
+        else
+          IconButton(
+            onPressed: controller.clearSelection,
+            icon: Icon(Icons.close, color: c.textSecondary),
+            tooltip: 'Cambiar cliente',
+          ),
       ],
     );
   }
@@ -686,6 +744,9 @@ class AbonarView extends GetView<AbonarController> {
     return PieDeFormulario(
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: PlataformaApp.escritorio
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.center,
         children: [
           if (falta != null)
             Padding(

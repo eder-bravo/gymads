@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
@@ -26,6 +28,7 @@ class StaffCodeView extends GetView<StaffCodeController> {
                 alignment: Alignment.centerLeft,
                 child: IconButton(
                   onPressed: () => Get.back(),
+                  tooltip: PlataformaApp.escritorio ? 'Regresar' : null,
                   icon: Icon(Icons.arrow_back, color: c.contraste),
                 ),
               ),
@@ -119,7 +122,7 @@ class StaffCodeView extends GetView<StaffCodeController> {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: c.contraste.withOpacity(0.5),
-              fontSize: 12,
+              fontSize: legible(12),
               height: 1.4,
             ),
           ),

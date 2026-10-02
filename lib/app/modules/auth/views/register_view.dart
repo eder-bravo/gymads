@@ -1,5 +1,6 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:get/get.dart';
 import '../controllers/register_controller.dart';
 import '../widgets/horario_selector.dart';
@@ -43,6 +44,7 @@ class RegisterView extends GetView<RegisterController> {
         children: [
           IconButton(
             onPressed: () => Get.back(),
+            tooltip: PlataformaApp.escritorio ? 'Regresar' : null,
             icon: Icon(Icons.arrow_back_ios, color: c.contraste),
           ),
           const SizedBox(width: 8),
@@ -151,6 +153,11 @@ class RegisterView extends GetView<RegisterController> {
                       color: c.contraste.withOpacity(0.54),
                       size: 20,
                     ),
+                    tooltip: PlataformaApp.escritorio
+                        ? (controller.obscurePassword.value
+                            ? 'Mostrar contraseña'
+                            : 'Ocultar contraseña')
+                        : null,
                     onPressed: () => controller.obscurePassword.value =
                         !controller.obscurePassword.value,
                   ),
@@ -171,6 +178,11 @@ class RegisterView extends GetView<RegisterController> {
                       color: c.contraste.withOpacity(0.54),
                       size: 20,
                     ),
+                    tooltip: PlataformaApp.escritorio
+                        ? (controller.obscureConfirmPassword.value
+                            ? 'Mostrar contraseña'
+                            : 'Ocultar contraseña')
+                        : null,
                     onPressed: () => controller.obscureConfirmPassword.value =
                         !controller.obscureConfirmPassword.value,
                   ),
@@ -221,8 +233,8 @@ class RegisterView extends GetView<RegisterController> {
         const SizedBox(height: 16),
 
         // Login link
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Wrap(
+          alignment: WrapAlignment.center,
           children: [
             Text(
               '¿Ya tienes cuenta? ',
@@ -254,8 +266,8 @@ class RegisterView extends GetView<RegisterController> {
 
   Widget _buildGoogleButton(BuildContext context) {
     final c = context.colores;
-    return Obx(() => SizedBox(
-          height: 52,
+    return Obx(() => ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 52),
           child: OutlinedButton(
             onPressed: controller.isLoading.value
                 ? null
@@ -285,14 +297,16 @@ class RegisterView extends GetView<RegisterController> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(
+                Flexible(
+                    child: Text(
                   'Registrarse con Google',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: c.contraste,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
-                ),
+                )),
               ],
             ),
           ),
@@ -301,19 +315,42 @@ class RegisterView extends GetView<RegisterController> {
 
   Widget _buildDivider(BuildContext context) {
     final c = context.colores;
+    // En escritorio el texto toma su ancho y las dos líneas se reparten el
+    // resto: con el texto en un espacio fijo quedaba recargado a un lado.
+    if (PlataformaApp.escritorio) {
+      return Row(
+        children: [
+          Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
+          Flexible(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'o regístrate con tu correo',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: c.contraste.withOpacity(0.6), fontSize: 14),
+              ),
+            ),
+          ),
+          Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
+        ],
+      );
+    }
     return Row(
       children: [
         Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'o regístrate con email',
-            style: TextStyle(
-              color: c.contraste.withOpacity(0.5),
-              fontSize: 13,
-            ),
-          ),
-        ),
+        Flexible(
+            flex: 4,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'o regístrate con email',
+                style: TextStyle(
+                  color: c.contraste.withOpacity(0.5),
+                  fontSize: 13,
+                ),
+              ),
+            )),
         Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
       ],
     );
@@ -348,14 +385,15 @@ class RegisterView extends GetView<RegisterController> {
             children: [
               Icon(icon, color: AppColors.accent, size: 22),
               const SizedBox(width: 10),
-              Text(
+              Expanded(
+                  child: Text(
                 title,
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
                   color: c.contraste,
                 ),
-              ),
+              )),
             ],
           ),
           const SizedBox(height: 16),
@@ -425,8 +463,8 @@ class RegisterView extends GetView<RegisterController> {
   }
 
   Widget _buildRegisterButton() {
-    return Obx(() => SizedBox(
-          height: 52,
+    return Obx(() => ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 52),
           child: ElevatedButton(
             onPressed: controller.isLoading.value ? null : _onRegister,
             style: ElevatedButton.styleFrom(
@@ -451,13 +489,15 @@ class RegisterView extends GetView<RegisterController> {
                     children: [
                       Icon(Icons.person_add, size: 20),
                       SizedBox(width: 8),
-                      Text(
+                      Flexible(
+                          child: Text(
                         'Crear Cuenta',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
-                      ),
+                      )),
                     ],
                   ),
           ),

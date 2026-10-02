@@ -71,14 +71,16 @@ class PeriodoSelector extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Obx(() => Text(
-                                controller.periodoLabel,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: c.textPrimary,
-                                ),
-                              )),
+                          Flexible(
+                              child: Obx(() => Text(
+                                    controller.periodoLabel,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: c.textPrimary,
+                                    ),
+                                  ))),
                           const SizedBox(width: 4),
                           const Icon(Icons.arrow_drop_down,
                               color: AppColors.accent, size: 22),
@@ -117,7 +119,8 @@ class PeriodoSelector extends StatelessWidget {
     );
   }
 
-  Widget _modoButton(BuildContext context, String label, String value, String activo) {
+  Widget _modoButton(
+      BuildContext context, String label, String value, String activo) {
     final c = context.colores;
     final seleccionado = activo == value;
     return Expanded(
@@ -284,8 +287,8 @@ class PeriodoSelector extends StatelessWidget {
                         final month = index + 1;
                         final isFuture =
                             controller.esMesFuturo(displayYear, month);
-                        final isAnterior =
-                            controller.esMesAnteriorACreacion(displayYear, month);
+                        final isAnterior = controller.esMesAnteriorACreacion(
+                            displayYear, month);
                         final isDisabled = isFuture || isAnterior;
                         final isSelected = displayYear == current.year &&
                             month == current.month;

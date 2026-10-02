@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/diseno_escritorio.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 
 import '../../../data/models/gym_settings_model.dart';
@@ -34,16 +35,17 @@ class HorarioSelector extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.schedule, color: c.contraste.withOpacity(0.54), size: 20),
+            Icon(Icons.schedule,
+                color: c.contraste.withOpacity(0.54), size: 20),
             const SizedBox(width: 8),
-            Text(
+            Expanded(
+                child: Text(
               'Horario',
               style: TextStyle(
                 color: c.contraste.withOpacity(0.7),
                 fontSize: 14,
               ),
-            ),
-            const Spacer(),
+            )),
             _buildVeinticuatroHoras(context),
           ],
         ),
@@ -51,33 +53,22 @@ class HorarioSelector extends StatelessWidget {
         if (_esVeinticuatroHoras)
           _buildAbiertoSiempre(context)
         else
-          Row(
-            children: [
-              Expanded(
-                child: _buildHoraPill(
-                  context,
-                  etiqueta: 'Abre',
-                  hora: apertura,
-                  onPick: (h) => onChanged(h, cierre),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildHoraPill(
-                  context,
-                  etiqueta: 'Cierra',
-                  hora: cierre,
-                  onPick: (h) => onChanged(apertura, h),
-                ),
-              ),
-            ],
-          ),
+          ResumenAdaptable(anchoMinimo: 140, espacio: 10, children: [
+            _buildHoraPill(context,
+                etiqueta: 'Abre',
+                hora: apertura,
+                onPick: (h) => onChanged(h, cierre)),
+            _buildHoraPill(context,
+                etiqueta: 'Cierra',
+                hora: cierre,
+                onPick: (h) => onChanged(apertura, h)),
+          ]),
         const SizedBox(height: 6),
         Text(
           'Lo usamos para el reporte de entradas. Puedes cambiarlo después.',
           style: TextStyle(
             color: c.contraste.withOpacity(0.35),
-            fontSize: 11,
+            fontSize: legible(11),
           ),
         ),
       ],
@@ -107,8 +98,10 @@ class HorarioSelector extends StatelessWidget {
         child: Text(
           '24 horas',
           style: TextStyle(
-            color: _esVeinticuatroHoras ? c.contraste : c.contraste.withOpacity(0.60),
-            fontSize: 12,
+            color: _esVeinticuatroHoras
+                ? c.contraste
+                : c.contraste.withOpacity(0.60),
+            fontSize: legible(12),
             fontWeight:
                 _esVeinticuatroHoras ? FontWeight.w700 : FontWeight.w500,
           ),
@@ -161,7 +154,7 @@ class HorarioSelector extends StatelessWidget {
               etiqueta,
               style: TextStyle(
                 color: c.contraste.withOpacity(0.5),
-                fontSize: 11,
+                fontSize: legible(11),
               ),
             ),
             const SizedBox(height: 2),

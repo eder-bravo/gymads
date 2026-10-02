@@ -8,14 +8,33 @@ class MainFlutterWindow: NSWindow {
   private var permisos: PermisosEscritorio?
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
-    let windowFrame = self.frame
     self.contentViewController = flutterViewController
-    self.setFrame(windowFrame, display: true)
+    // Tamaño del contenido en puntos; la barra de título queda fuera.
+    self.contentMinSize = NSSize(width: 960, height: 600)
+    // Primera apertura: 1280×800 centrada y dentro del área visible. Después
+    // se recuerda el tamaño y la posición que dejó el usuario.
+    if !self.setFrameUsingName("VentanaPrincipal") {
+      self.setFrame(marcoInicial(), display: true)
+    }
+    self.setFrameAutosaveName("VentanaPrincipal")
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     permisos = PermisosEscritorio(messenger: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
+  }
+
+  private func marcoInicial() -> NSRect {
+    guard let visible = (self.screen ?? NSScreen.main)?.visibleFrame else {
+      return self.frame
+    }
+    var marco = self.frameRect(forContentRect: NSRect(x: 0, y: 0, width: 1280, height: 800))
+    let minimo = self.frameRect(forContentRect: NSRect(origin: .zero, size: self.contentMinSize))
+    marco.size.width = max(min(marco.width, visible.width), minimo.width)
+    marco.size.height = max(min(marco.height, visible.height), minimo.height)
+    marco.origin.x = visible.midX - marco.width / 2
+    marco.origin.y = visible.midY - marco.height / 2
+    return marco
   }
 }
 

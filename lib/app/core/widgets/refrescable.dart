@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../utils/plataforma_app.dart';
+
 /// Permite recargar una pantalla tirando de ella hacia abajo.
 ///
 /// Existe por un detalle que se olvida fácil: `RefreshIndicator` solo reacciona
@@ -40,6 +42,11 @@ class Refrescable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Con mouse no hay tirón: en escritorio se recarga con el botón de la
+    // barra y la lista conserva su física normal.
+    if (PlataformaApp.escritorio) {
+      return _centrado ? _envolverCentrado() : child;
+    }
     return RefreshIndicator(
       onRefresh: onRefresh,
       color: Theme.of(context).colorScheme.primary,

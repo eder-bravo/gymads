@@ -1,5 +1,7 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -48,11 +50,12 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _buildSectionLabel('REGISTRO'),
+              _buildSectionLabel('REGISTRO', escritorio: 'Registro'),
               const SizedBox(height: 8),
               _buildSalidasTile(ajustes),
               const SizedBox(height: 24),
-              _buildSectionLabel('HORARIO DEL GIMNASIO'),
+              _buildSectionLabel('HORARIO DEL GIMNASIO',
+                  escritorio: 'Horario del gimnasio'),
               const SizedBox(height: 8),
               _buildHorarioTile(
                 context,
@@ -73,7 +76,7 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
                 child: Text(
                   'Se usa en el reporte de entradas.',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: legible(12),
                     color: c.textSecondary,
                     height: 1.4,
                   ),
@@ -86,8 +89,10 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
     );
   }
 
-  Widget _buildSectionLabel(String label) {
+  Widget _buildSectionLabel(String label, {String? escritorio}) {
     final c = context.colores;
+    // En escritorio, el mismo título de sección que los formularios.
+    if (PlataformaApp.escritorio) return TituloSeccion(escritorio ?? label);
     return Text(
       label,
       style: TextStyle(
@@ -132,7 +137,7 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
                 ? 'El segundo pase del día marca la salida del cliente'
                 : 'Solo se registra la entrada de cada día',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: legible(13),
               color: c.textSecondary,
             ),
           ),
@@ -165,7 +170,7 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
         title: Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: legible(12),
             color: c.textSecondary,
             fontWeight: FontWeight.w500,
           ),
@@ -181,7 +186,19 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
             ),
           ),
         ),
-        trailing: Icon(Icons.edit_outlined, size: 20, color: c.titleColor),
+        // En escritorio dice qué hace; en el teléfono, el lápiz de siempre.
+        trailing: PlataformaApp.escritorio
+            ? TextButton.icon(
+                onPressed: () => _elegirHora(context, hora, onSelect),
+                icon: const Icon(Icons.schedule, size: 18),
+                label: const Text('Cambiar hora'),
+                style: TextButton.styleFrom(
+                  foregroundColor: c.titleColor,
+                  textStyle: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              )
+            : Icon(Icons.edit_outlined, size: 20, color: c.titleColor),
         onTap: () => _elegirHora(context, hora, onSelect),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),

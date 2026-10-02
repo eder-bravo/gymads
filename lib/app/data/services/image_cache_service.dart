@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -43,13 +44,9 @@ class ImageCacheService {
       await _thumbnailDir!.create(recursive: true);
       await _fullSizeDir!.create(recursive: true);
       
-      if (kDebugMode) {
-        print('📁 ImageCacheService inicializado: ${_cacheDir!.path}');
-      }
+      AppLogger.info('ImageCacheService', 'ImageCacheService inicializado');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error inicializando ImageCacheService: $e');
-      }
+      AppLogger.error('ImageCacheService', 'Error inicializando ImageCacheService', e);
     }
   }
   
@@ -60,18 +57,14 @@ class ImageCacheService {
   /// Retorna la ruta local del archivo en caché o null si hay error
   Future<String?> getUserImage(String userId, String? photoUrl, {bool isThumbnail = false}) async {
     if (photoUrl == null || photoUrl.isEmpty) {
-      if (kDebugMode) {
-        print('🖼️ ImageCacheService: photoUrl vacía para usuario $userId');
-      }
+      AppLogger.info('ImageCacheService', 'ImageCacheService: photoUrl vacía para usuario');
       return null;
     }
     
     try {
       // Verificar que el servicio esté inicializado
       if (_cacheDir == null) {
-        if (kDebugMode) {
-          print('🔄 ImageCacheService: Inicializando para usuario $userId');
-        }
+        AppLogger.info('ImageCacheService', 'ImageCacheService: Inicializando para usuario');
         await initialize();
       }
       
@@ -80,33 +73,23 @@ class ImageCacheService {
       final fileName = '${userId}_${targetSize}.jpg';
       final cachedFile = File('${cacheDir.path}/$fileName');
       
-      if (kDebugMode) {
-        print('🔍 ImageCacheService: Buscando ${isThumbnail ? 'miniatura' : 'imagen completa'} para $userId');
-        print('   Archivo: $fileName');
-        print('   URL: $photoUrl');
-      }
+      AppLogger.info('ImageCacheService', 'Archivo');
       
       // Si existe en caché y es válido, retornarlo
       if (await cachedFile.exists()) {
         final isValid = await _isCacheValid(cachedFile, photoUrl);
         if (isValid) {
-          if (kDebugMode) {
-            print('✅ ImageCacheService: Imagen desde caché: $fileName');
-          }
+          AppLogger.info('ImageCacheService', 'ImageCacheService: Imagen desde caché');
           return cachedFile.path;
         } else {
           // Caché obsoleto, eliminarlo
           await cachedFile.delete();
-          if (kDebugMode) {
-            print('🗑️ ImageCacheService: Caché obsoleto eliminado: $fileName');
-          }
+          AppLogger.info('ImageCacheService', 'ImageCacheService: Caché obsoleto eliminado');
         }
       }
       
       // Descargar, optimizar y guardar en caché
-      if (kDebugMode) {
-        print('⬇️ ImageCacheService: Descargando imagen para $userId');
-      }
+      AppLogger.info('ImageCacheService', 'ImageCacheService: Descargando imagen');
       final optimizedPath = await _downloadAndOptimizeImage(
         userId, 
         photoUrl, 
@@ -115,15 +98,13 @@ class ImageCacheService {
       );
       
       if (optimizedPath != null && kDebugMode) {
-        print('✅ ImageCacheService: Imagen optimizada guardada: $fileName');
+        AppLogger.info('ImageCacheService', 'ImageCacheService: Imagen optimizada guardada');
       }
       
       return optimizedPath;
       
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ ImageCacheService ERROR para usuario $userId: $e');
-      }
+      AppLogger.error('ImageCacheService', 'ImageCacheService ERROR para usuario', e);
       return null;
     }
   }
@@ -131,9 +112,7 @@ class ImageCacheService {
   /// Descargar imagen desde Supabase y optimizarla
   Future<String?> _downloadAndOptimizeImage(String userId, String photoUrl, int targetSize, bool isThumbnail) async {
     try {
-      if (kDebugMode) {
-        print('⬇️ Descargando imagen: $photoUrl');
-      }
+      AppLogger.info('ImageCacheService', 'Descargando imagen');
 
       // Bucket privado: resolver una URL firmada antes de descargar.
       // Si no se puede firmar (p. ej. path externo), usar el valor tal cual.
@@ -143,18 +122,14 @@ class ImageCacheService {
       // Descargar imagen desde Supabase
       final response = await http.get(Uri.parse(downloadUrl));
       if (response.statusCode != 200) {
-        if (kDebugMode) {
-          print('❌ Error descargando imagen: ${response.statusCode}');
-        }
+        AppLogger.error('ImageCacheService', 'Error descargando imagen');
         return null;
       }
       
       // Decodificar imagen
       final originalImage = img.decodeImage(response.bodyBytes);
       if (originalImage == null) {
-        if (kDebugMode) {
-          print('❌ Error decodificando imagen');
-        }
+        AppLogger.error('ImageCacheService', 'Error decodificando imagen');
         return null;
       }
       
@@ -183,16 +158,14 @@ class ImageCacheService {
         final originalSize = response.bodyBytes.length;
         final optimizedSize = jpegBytes.length;
         final reduction = ((originalSize - optimizedSize) / originalSize * 100).round();
-        print('✅ Imagen optimizada: $fileName');
-        print('   Original: ${(originalSize / 1024).round()}KB → Optimizada: ${(optimizedSize / 1024).round()}KB ($reduction% reducción)');
+        AppLogger.info('ImageCacheService', 'Imagen optimizada');
+        AppLogger.info('ImageCacheService', 'Original: ${(originalSize / 1024).round()}KB Optimizada: ${(optimizedSize / 1024).round()}KB ($reduction% reducción)');
       }
       
       return cachedFile.path;
       
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error optimizando imagen: $e');
-      }
+      AppLogger.error('ImageCacheService', 'Error optimizando imagen', e);
       return null;
     }
   }
@@ -230,9 +203,7 @@ class ImageCacheService {
       
       await metadataFile.writeAsString(jsonEncode(metadata));
     } catch (e) {
-      if (kDebugMode) {
-        print('⚠️ Error guardando metadatos: $e');
-      }
+      AppLogger.warning('ImageCacheService', 'Error guardando metadatos');
     }
   }
   
@@ -254,13 +225,9 @@ class ImageCacheService {
         }
       }
       
-      if (kDebugMode) {
-        print('🧹 Limpieza de caché completada: $deletedCount archivos eliminados');
-      }
+      AppLogger.info('ImageCacheService', 'Limpieza de caché completada: $deletedCount archivos eliminados');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error limpiando caché: $e');
-      }
+      AppLogger.error('ImageCacheService', 'Error limpiando caché', e);
     }
   }
   
@@ -290,14 +257,10 @@ class ImageCacheService {
         await _cacheDir!.delete(recursive: true);
         await initialize(); // Recrear directorios
         
-        if (kDebugMode) {
-          print('🗑️ Caché completamente limpiado');
-        }
+        AppLogger.info('ImageCacheService', 'Caché completamente limpiado');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error limpiando caché: $e');
-      }
+      AppLogger.error('ImageCacheService', 'Error limpiando caché', e);
     }
   }
   
@@ -312,13 +275,9 @@ class ImageCacheService {
         getUserImage(userId, photoUrl, isThumbnail: false),
       ]);
       
-      if (kDebugMode) {
-        print('🚀 Imagen precargada: $userId');
-      }
+      AppLogger.info('ImageCacheService', 'Imagen precargada');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error precargando imagen: $e');
-      }
+      AppLogger.error('ImageCacheService', 'Error precargando imagen', e);
     }
   }
 }

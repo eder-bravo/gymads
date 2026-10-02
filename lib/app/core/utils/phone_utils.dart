@@ -25,6 +25,7 @@ class PhoneUtils {
 
   /// Muestra un menú inferior con las acciones de Llamar y WhatsApp.
   static void showActions(BuildContext context, String? phone) {
+    final c = context.colores;
     if (phone == null || !_isValid(phone)) {
       SnackbarHelper.error(
         'Teléfono inválido',
@@ -35,7 +36,7 @@ class PhoneUtils {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.cardBackground,
+      backgroundColor: c.cardBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -49,15 +50,15 @@ class PhoneUtils {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.textSecondary.withOpacity(0.4),
+                  color: c.textSecondary.withOpacity(0.4),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
                 phone,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
+                style: TextStyle(
+                  color: c.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -65,9 +66,9 @@ class PhoneUtils {
               const SizedBox(height: 8),
               ListTile(
                 leading: const Icon(Icons.call, color: AppColors.success),
-                title: const Text(
+                title: Text(
                   'Llamar',
-                  style: TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: c.textPrimary),
                 ),
                 onTap: () {
                   Navigator.of(sheetContext).pop();
@@ -76,9 +77,9 @@ class PhoneUtils {
               ),
               ListTile(
                 leading: const Icon(Icons.chat, color: Color(0xFF25D366)),
-                title: const Text(
+                title: Text(
                   'Enviar WhatsApp',
-                  style: TextStyle(color: AppColors.textPrimary),
+                  style: TextStyle(color: c.textPrimary),
                 ),
                 onTap: () {
                   Navigator.of(sheetContext).pop();

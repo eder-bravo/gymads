@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import '../models/staff_profile_model.dart';
 
 /// Provider for fetching staff profiles from Supabase
@@ -13,21 +14,37 @@ class StaffProfileProvider {
     try {
       final response = await _supabase
           .from('staff_profiles')
-          .select('*, gyms(name, brand_color, brand_font, created_at)')
+          .select('*, gyms(name, created_at, payment_mode)')
           .eq('user_id', userId)
           .eq('is_active', true)
           .maybeSingle();
 
       if (response == null) {
-        print('⚠️ No staff_profile found for user: $userId');
+        AppLogger.warning('StaffProfileProvider', 'No staff_profile found for user');
         return null;
       }
 
       return StaffProfileModel.fromJson(response);
     } catch (e) {
-      print('❌ Error fetching staff profile: $e');
+      AppLogger.error('StaffProfileProvider', 'Error fetching staff profile', e);
       return null;
     }
+  }
+
+  /// El perfil de [userId] tal como está ahora en la base, para notar un
+  /// cambio de rol o una revocación con la app abierta.
+  ///
+  /// A diferencia de [getByUserId], no filtra `is_active` (un perfil revocado
+  /// vuelve con `isActive` false) y NO atrapa los errores: sin red lanza, para
+  /// no confundir "no hay conexión" con "ya no tiene acceso". Null solo si la
+  /// fila ya no existe.
+  Future<StaffProfileModel?> obtenerPerfil(String userId) async {
+    final response = await _supabase
+        .from('staff_profiles')
+        .select('*, gyms(name, created_at, payment_mode)')
+        .eq('user_id', userId)
+        .maybeSingle();
+    return response == null ? null : StaffProfileModel.fromJson(response);
   }
 
   /// Get staff profile by ID
@@ -43,7 +60,7 @@ class StaffProfileProvider {
 
       return StaffProfileModel.fromJson(response);
     } catch (e) {
-      print('❌ Error fetching staff profile by ID: $e');
+      AppLogger.error('StaffProfileProvider', 'Error fetching staff profile by ID', e);
       return null;
     }
   }
@@ -62,7 +79,7 @@ class StaffProfileProvider {
           .map((json) => StaffProfileModel.fromJson(json))
           .toList();
     } catch (e) {
-      print('❌ Error fetching staff profiles by branch: $e');
+      AppLogger.error('StaffProfileProvider', 'Error fetching staff profiles by branch', e);
       return [];
     }
   }
@@ -91,7 +108,7 @@ class StaffProfileProvider {
 
       return StaffProfileModel.fromJson(response);
     } catch (e) {
-      print('❌ Error creating staff profile: $e');
+      AppLogger.error('StaffProfileProvider', 'Error creating staff profile', e);
       return null;
     }
   }
@@ -102,7 +119,7 @@ class StaffProfileProvider {
       await _supabase.from('staff_profiles').update(updates).eq('id', id);
       return true;
     } catch (e) {
-      print('❌ Error updating staff profile: $e');
+      AppLogger.error('StaffProfileProvider', 'Error updating staff profile', e);
       return false;
     }
   }

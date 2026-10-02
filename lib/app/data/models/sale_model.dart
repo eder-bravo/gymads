@@ -24,6 +24,8 @@ class Sale {
   final double cambio;
   final String ventaTipo;
   final double subtotal;
+  // Folio / referencia de la operación (tarjeta y transferencia)
+  final String? referenciaPago;
 
   Sale({
     this.id,
@@ -49,6 +51,7 @@ class Sale {
     this.cambio = 0,
     this.ventaTipo = 'membresia',
     this.subtotal = 0,
+    this.referenciaPago,
   });
 
   factory Sale.fromJson(Map<String, dynamic> json) {
@@ -96,6 +99,7 @@ class Sale {
       cambio: (json['cambio'] ?? 0).toDouble(),
       ventaTipo: json['venta_tipo'] ?? 'membresia',
       subtotal: (json['subtotal'] ?? 0).toDouble(),
+      referenciaPago: json['referencia_pago'],
     );
   }
 
@@ -129,7 +133,12 @@ class Sale {
     if (clienteId != null && clienteId!.isNotEmpty) {
       json['cliente_id'] = clienteId;
     }
-    
+
+    // Solo incluir la referencia si se capturó (es opcional)
+    if (referenciaPago != null && referenciaPago!.isNotEmpty) {
+      json['referencia_pago'] = referenciaPago;
+    }
+
     // Solo incluir campos opcionales si tienen valor
     if (periodoInicio != null) json['periodo_inicio'] = periodoInicio!.toIso8601String();
     if (periodoFin != null) json['periodo_fin'] = periodoFin!.toIso8601String();
@@ -157,6 +166,7 @@ class Sale {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<SaleItem>? items,
+    String? referenciaPago,
   }) {
     return Sale(
       id: id ?? this.id,
@@ -182,6 +192,7 @@ class Sale {
       cambio: cambio,
       ventaTipo: ventaTipo,
       subtotal: subtotal,
+      referenciaPago: referenciaPago ?? this.referenciaPago,
     );
   }
 }

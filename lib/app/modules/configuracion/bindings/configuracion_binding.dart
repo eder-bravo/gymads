@@ -1,7 +1,7 @@
 import 'package:get/get.dart';
 
+import '../controllers/abono_prices_controller.dart';
 import '../controllers/configuracion_controller.dart';
-import '../controllers/membership_plans_controller.dart';
 
 class ConfiguracionBinding extends Bindings {
   @override
@@ -9,8 +9,8 @@ class ConfiguracionBinding extends Bindings {
     Get.lazyPut<ConfiguracionController>(
       () => ConfiguracionController(),
     );
-    Get.lazyPut<MembershipPlansController>(
-      () => MembershipPlansController(),
+    Get.lazyPut<AbonoPricesController>(
+      () => AbonoPricesController(),
     );
   }
 }

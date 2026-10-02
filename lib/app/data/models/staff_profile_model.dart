@@ -11,13 +11,14 @@ class StaffProfileModel {
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
-  // Gym branding fields (joined from gyms table)
+  // Gym name (joined from gyms table)
   final String? gymName;
-  final String? brandColor;
-  final String? brandFont;
   // Gym creation date (joined from gyms table) — used as the lower bound
   // for date navigation (e.g. income months can't go before the account existed)
   final DateTime? gymCreatedAt;
+  // Modo de cobro del gimnasio (joined from gyms table): 'fijo' | 'libre'.
+  // Null significa que el asistente de configuración inicial está pendiente.
+  final String? paymentMode;
 
   StaffProfileModel({
     required this.id,
@@ -32,9 +33,8 @@ class StaffProfileModel {
     required this.createdAt,
     required this.updatedAt,
     this.gymName,
-    this.brandColor,
-    this.brandFont,
     this.gymCreatedAt,
+    this.paymentMode,
   });
 
   factory StaffProfileModel.fromJson(Map<String, dynamic> json) {
@@ -53,12 +53,10 @@ class StaffProfileModel {
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       gymName: gymData?['name'] as String? ?? json['gym_name'] as String?,
-      brandColor:
-          gymData?['brand_color'] as String? ?? json['brand_color'] as String?,
-      brandFont:
-          gymData?['brand_font'] as String? ?? json['brand_font'] as String?,
-      gymCreatedAt: _parseDate(
-          gymData?['created_at'] ?? json['gym_created_at']),
+      gymCreatedAt:
+          _parseDate(gymData?['created_at'] ?? json['gym_created_at']),
+      paymentMode: gymData?['payment_mode'] as String? ??
+          json['payment_mode'] as String?,
     );
   }
 
@@ -84,9 +82,8 @@ class StaffProfileModel {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'gym_name': gymName,
-      'brand_color': brandColor,
-      'brand_font': brandFont,
       'gym_created_at': gymCreatedAt?.toIso8601String(),
+      'payment_mode': paymentMode,
     };
   }
 
@@ -117,9 +114,8 @@ class StaffProfileModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? gymName,
-    String? brandColor,
-    String? brandFont,
     DateTime? gymCreatedAt,
+    String? paymentMode,
   }) {
     return StaffProfileModel(
       id: id ?? this.id,
@@ -134,9 +130,8 @@ class StaffProfileModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       gymName: gymName ?? this.gymName,
-      brandColor: brandColor ?? this.brandColor,
-      brandFont: brandFont ?? this.brandFont,
       gymCreatedAt: gymCreatedAt ?? this.gymCreatedAt,
+      paymentMode: paymentMode ?? this.paymentMode,
     );
   }
 

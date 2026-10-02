@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/snackbar_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,21 +15,12 @@ class EmailConfirmationView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final email = (Get.arguments as Map<String, dynamic>?)?['email'] ?? '';
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1a1a2e),
-              Color(0xFF16213e),
-              Color(0xFF0f3460),
-            ],
-          ),
-        ),
+        decoration: BoxDecoration(gradient: c.fondoAcceso),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -57,12 +49,12 @@ class EmailConfirmationView extends StatelessWidget {
                   const SizedBox(height: 32),
 
                   // Title
-                  const Text(
+                  Text(
                     '¡Revisa tu correo!',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: c.contraste,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -73,7 +65,7 @@ class EmailConfirmationView extends StatelessWidget {
                     'Hemos enviado un enlace de confirmación a:',
                     style: TextStyle(
                       fontSize: 15,
-                      color: Colors.white.withOpacity(0.7),
+                      color: c.contraste.withOpacity(0.7),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -84,9 +76,9 @@ class EmailConfirmationView extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
+                      color: c.contraste.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withOpacity(0.15)),
+                      border: Border.all(color: c.contraste.withOpacity(0.15)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -100,10 +92,10 @@ class EmailConfirmationView extends StatelessWidget {
                         Flexible(
                           child: Text(
                             email,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              color: c.contraste,
                             ),
                           ),
                         ),
@@ -116,21 +108,21 @@ class EmailConfirmationView extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: c.contraste.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      border: Border.all(color: c.contraste.withOpacity(0.1)),
                     ),
                     child: Column(
                       children: [
-                        _buildStep('1', 'Abre tu correo electrónico'),
+                        _buildStep(context, '1', 'Abre tu correo electrónico'),
                         const SizedBox(height: 12),
-                        _buildStep(
+                        _buildStep(context,
                             '2', 'Busca el correo de confirmación de GymOne'),
                         const SizedBox(height: 12),
-                        _buildStep(
+                        _buildStep(context,
                             '3', 'Haz clic en el enlace de confirmación'),
                         const SizedBox(height: 12),
-                        _buildStep('4', 'Regresa aquí e inicia sesión'),
+                        _buildStep(context, '4', 'Regresa aquí e inicia sesión'),
                       ],
                     ),
                   ),
@@ -172,8 +164,8 @@ class EmailConfirmationView extends StatelessWidget {
                         style: TextStyle(fontSize: 14),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                        foregroundColor: c.contraste.withOpacity(0.70),
+                        side: BorderSide(color: c.contraste.withOpacity(0.3)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -187,7 +179,7 @@ class EmailConfirmationView extends StatelessWidget {
                     '¿No lo encuentras? Revisa tu carpeta de spam.',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.white.withOpacity(0.4),
+                      color: c.contraste.withOpacity(0.4),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -200,7 +192,8 @@ class EmailConfirmationView extends StatelessWidget {
     );
   }
 
-  Widget _buildStep(String number, String text) {
+  Widget _buildStep(BuildContext context, String number, String text) {
+    final c = context.colores;
     return Row(
       children: [
         Container(
@@ -227,7 +220,7 @@ class EmailConfirmationView extends StatelessWidget {
             text,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.white.withOpacity(0.8),
+              color: c.contraste.withOpacity(0.8),
             ),
           ),
         ),
@@ -241,7 +234,7 @@ class EmailConfirmationView extends StatelessWidget {
         type: OtpType.signup,
         email: email,
       );
-        SnackbarHelper.success('✉️ Correo reenviado', 'Revisa tu bandeja de entrada');
+        SnackbarHelper.success('Correo reenviado', 'Revisa tu bandeja de entrada');
     } catch (e) {
         SnackbarHelper.error('Error', 'No se pudo reenviar. Intenta más tarde.');
     }

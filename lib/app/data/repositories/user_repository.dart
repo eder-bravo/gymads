@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/fallo_al_guardar.dart';
+import 'package:gymads/app/data/services/supabase_service.dart';
+import 'package:gymads/app/data/services/tenant_query_helper.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/providers/api_provider.dart';
 import 'package:gymads/app/data/providers/storage_provider.dart';
@@ -18,232 +22,133 @@ class UserRepository {
     try {
       final response = await _apiProvider.get(id);
       if (response['error'] || response['data'] == null) {
-        if (kDebugMode) {
-          print('Error al obtener usuario por ID: ${response['message']}');
-        }
+        AppLogger.error('UserRepository', 'Fallo al obtener usuario por ID');
         return null;
       }
 
       return UserModel.fromJson(response['data']);
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al obtener usuario: $e');
-      }
+      AppLogger.error('UserRepository', 'Fallo al obtener usuario', e);
       return null;
     }
   }
 
-  /// Obtiene un usuario por su tarjeta RFID
+  /// El cliente con la tarjeta [rfidUid], o null si ninguno la tiene.
+  ///
+  /// Si no se pudo preguntar (sin internet, el servidor no contestó) lanza
+  /// [ErrorAlBuscarTarjeta]: antes devolvía null igual que "no existe", y el
+  /// aviso decía "Tarjeta no registrada" a un cliente que sí lo estaba.
   Future<UserModel?> getUserByRfid(String rfidUid) async {
-    try {
-      if (kDebugMode) {
-        print('🔍 Buscando usuario con RFID: $rfidUid');
+    // Verificar si el provider es SupabaseApiProvider para usar el método específico
+    final Map<String, dynamic> response;
+
+    if (_apiProvider.runtimeType.toString().contains('SupabaseApiProvider')) {
+      final supabaseProvider = _apiProvider as dynamic;
+      response = await supabaseProvider.getUserByRfid(rfidUid);
+    } else {
+      // Fallback para otros providers: buscar en toda la lista
+      response = await _apiProvider.getAll();
+
+      if (response['error'] == true || response['data'] is! List) {
+        AppLogger.error('UserRepository', 'Respuesta inválida al buscar por RFID');
+        throw const ErrorAlBuscarTarjeta();
       }
 
-      // Verificar si el provider es SupabaseApiProvider para usar el método específico
-      Map<String, dynamic> response;
-      
-      if (_apiProvider.runtimeType.toString().contains('SupabaseApiProvider')) {
-        final supabaseProvider = _apiProvider as dynamic;
-        response = await supabaseProvider.getUserByRfid(rfidUid);
-        
-        if (kDebugMode) {
-          print('🔍 Respuesta getUserByRfid específico: $response');
+      // Buscar el usuario que coincida con el rfid_card
+      for (final item in response['data'] as List) {
+        if (item is Map<String, dynamic> && item['rfid_card'] == rfidUid) {
+          return UserModel.fromJson(item);
         }
-      } else {
-        // Fallback para otros providers: buscar en toda la lista
-        response = await _apiProvider.getAll();
-
-        if (response['error'] == true || response['data'] == null) {
-          if (kDebugMode) {
-            print('❌ Error en la respuesta o datos nulos');
-            print('Response: $response');
-          }
-          return null;
-        }
-
-        final data = response['data'];
-        if (data is! List) {
-          if (kDebugMode) {
-            print('❌ Data no es una lista');
-          }
-          return null;
-        }
-
-        // Buscar el usuario que coincida con el rfid_card
-        for (var item in data) {
-          if (item is Map<String, dynamic> && item['rfid_card'] == rfidUid) {
-            if (kDebugMode) {
-              print('✅ Usuario encontrado en lista por RFID. Datos: $item');
-            }
-            return UserModel.fromJson(item);
-          }
-        }
-
-        if (kDebugMode) {
-          print('❌ No se encontró ningún usuario con RFID: $rfidUid');
-        }
-        return null;
-      }
-
-      // Procesar respuesta del método específico
-      if (response['error'] == true) {
-        if (kDebugMode) {
-          print('❌ Error en getUserByRfid: ${response['message']}');
-        }
-        return null;
-      }
-
-      if (response['data'] == null) {
-        if (kDebugMode) {
-          print('ℹ️ Usuario con RFID $rfidUid no encontrado');
-        }
-        return null;
-      }
-
-      final userData = response['data'];
-      if (userData is Map<String, dynamic>) {
-        if (kDebugMode) {
-          print('✅ Usuario encontrado por RFID. Datos: $userData');
-        }
-        return UserModel.fromJson(userData);
-      }
-
-      if (kDebugMode) {
-        print('❌ Formato de datos incorrecto');
-      }
-      return null;
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al obtener usuario por RFID: $e');
-        print('❌ Stack trace: ${StackTrace.current}');
       }
       return null;
     }
+
+    // Procesar respuesta del método específico
+    if (response['error'] == true) {
+      AppLogger.error('UserRepository', 'Fallo al buscar usuario por RFID');
+      throw const ErrorAlBuscarTarjeta();
+    }
+
+    final userData = response['data'];
+    if (userData == null) return null;
+    if (userData is Map<String, dynamic>) {
+      return UserModel.fromJson(userData);
+    }
+
+    AppLogger.error('UserRepository', 'Formato de datos inesperado al buscar por RFID');
+    throw const ErrorAlBuscarTarjeta();
   }
 
   /// Obtiene un usuario por su número de usuario (userNumber)
   Future<UserModel?> getUserByNumber(String userNumber) async {
     try {
-      if (kDebugMode) {
-        print('🔍 Buscando usuario con número: $userNumber');
-      }
-
       // Verificar si el provider es SupabaseApiProvider para usar el método específico
       Map<String, dynamic> response;
       
       if (_apiProvider.runtimeType.toString().contains('SupabaseApiProvider')) {
         final supabaseProvider = _apiProvider as dynamic;
         response = await supabaseProvider.getUserByNumber(userNumber);
-        
-        if (kDebugMode) {
-          print('🔍 Respuesta getUserByNumber específico: $response');
-        }
       } else {
         // Fallback para otros providers: buscar en toda la lista
         response = await _apiProvider.getAll();
 
         if (response['error'] == true || response['data'] == null) {
-          if (kDebugMode) {
-            print('❌ Error en la respuesta o datos nulos');
-            print('Response: $response');
-          }
+          AppLogger.error('UserRepository', 'Respuesta inválida al buscar por número');
           return null;
         }
 
         final data = response['data'];
         if (data is! List) {
-          if (kDebugMode) {
-            print('❌ Data no es una lista');
-          }
+          AppLogger.error('UserRepository', 'Formato de datos inesperado al buscar por número');
           return null;
         }
 
         // Buscar el usuario que coincida con el userNumber
         for (var item in data) {
           if (item is Map<String, dynamic> && item['user_number'] == userNumber) {
-            if (kDebugMode) {
-              print('✅ Usuario encontrado en lista. Datos: $item');
-            }
             return UserModel.fromJson(item);
           }
         }
 
-        if (kDebugMode) {
-          print('❌ No se encontró ningún usuario con el número: $userNumber');
-        }
         return null;
       }
 
       // Procesar respuesta del método específico
       if (response['error'] == true) {
-        if (kDebugMode) {
-          print('❌ Error en getUserByNumber: ${response['message']}');
-        }
+        AppLogger.error('UserRepository', 'Fallo al buscar usuario por número');
         return null;
       }
 
       if (response['data'] == null) {
-        if (kDebugMode) {
-          print('ℹ️ Usuario con número $userNumber no encontrado');
-        }
         return null;
       }
 
       final userData = response['data'];
       if (userData is Map<String, dynamic>) {
-        if (kDebugMode) {
-          print('✅ Usuario encontrado. Datos: $userData');
-        }
         return UserModel.fromJson(userData);
       }
 
-      if (kDebugMode) {
-        print('❌ Formato de datos incorrecto');
-      }
+      AppLogger.error('UserRepository', 'Formato de datos inesperado al buscar por número');
       return null;
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al obtener usuario por número: $e');
-        print('❌ Stack trace: ${StackTrace.current}');
-      }
+      AppLogger.error('UserRepository', 'Fallo al buscar usuario por número', e);
       return null;
     }
   }
 
-  /// Obtiene todos los usuarios disponibles con precios de membresía
+  /// Obtiene todos los usuarios de la sucursal actual
   Future<List<UserModel>> getAllUsers() async {
     try {
-      // Verificar si el provider es SupabaseApiProvider para usar el método especializado
-      Map<String, dynamic> response;
-      
-      if (_apiProvider.runtimeType.toString().contains('SupabaseApiProvider')) {
-        final supabaseProvider = _apiProvider as dynamic;
-        response = await supabaseProvider.getUsersWithMembershipInfo();
-        
-        if (kDebugMode) {
-          print('Respuesta getAllUsers con precios: $response');
-        }
-      } else {
-        // Fallback para otros providers
-        response = await _apiProvider.getAll();
-        if (kDebugMode) {
-          print('Respuesta getAll (fallback): $response');
-        }
-      }
-      
+      final response = await _apiProvider.getAll();
+
       if (response['error'] || response['data'] == null) {
-        if (kDebugMode) {
-          print('Error en getAllUsers: ${response['message']}');
-        }
+        AppLogger.error('UserRepository', 'Fallo al obtener la lista de usuarios');
         return [];
       }
 
       final data = response['data'];
       if (data is! List) {
-        if (kDebugMode) {
-          print('Error: Los datos no son una lista');
-        }
+        AppLogger.error('UserRepository', 'Formato de datos inesperado en la lista de usuarios');
         return [];
       }
 
@@ -254,103 +159,121 @@ class UserRepository {
           try {
             users.add(UserModel.fromJson(item));
           } catch (e) {
-            if (kDebugMode) {
-              print('Error al procesar usuario: $e');
-              print('Datos del usuario: $item');
-            }
+            AppLogger.error('UserRepository', 'Fallo al procesar un usuario de la lista', e);
           }
         }
       }
 
       return users;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al obtener usuarios: $e');
-      }
+      AppLogger.error('UserRepository', 'Fallo al obtener la lista de usuarios', e);
       return [];
     }
   }
 
-  /// Agrega un nuevo usuario con foto
-  /// Añade un nuevo usuario y devuelve su ID si es exitoso
+  /// Crea un cliente y lo devuelve guardado (con su id y la URL de su foto).
+  /// Si no se puede, lanza una excepción con el motivo ([GuardadoFallido],
+  /// [NumeroDeClienteEnUso], o el error de conexión / [TimeoutException]).
+  ///
+  /// - La foto es obligatoria si se tomó: si no se puede subir, el cliente NO
+  ///   se crea (antes se creaba sin foto, en silencio).
+  /// - Idempotente: si un intento anterior sí se guardó pero la respuesta no
+  ///   llegó (mala señal) y se vuelve a intentar, el número de cliente ya
+  ///   existe con ese mismo cliente: se devuelve ese en vez de fallar.
+  Future<UserModel> crearCliente(UserModel user, {File? photoFile}) async {
+    String? fotoSubida;
+    if (photoFile != null) {
+      fotoSubida = await _subirFoto(
+        photoFile,
+        // Nombre provisional: el id real aún no existe.
+        DateTime.now().millisecondsSinceEpoch.toString(),
+      );
+      user = user.copyWith(photoUrl: fotoSubida);
+    }
+
+    try {
+      final fila = await SupabaseService.client
+          .from('users')
+          .insert(TenantQueryHelper.withTenant(user.toJson()))
+          .select('id')
+          .single()
+          .timeout(limiteAlGuardar);
+      // Con su foto ya subida: quien lo recibe (Abonar) la muestra.
+      return user.copyWith(id: fila['id'] as String);
+    } catch (e) {
+      final indice = restriccionUnicaViolada(e);
+      if (indice == 'idx_users_branch_rfid_card') {
+        await _borrarFotoSuelta(fotoSubida);
+        throw const GuardadoFallido('Esa tarjeta ya es de otro cliente.');
+      }
+      if (indice == 'idx_users_branch_user_number') {
+        final existente = await _clientePorNumero(user.userNumber);
+        if (existente != null && esElMismoAlta(existente, user)) {
+          // Ya se había guardado; la foto de este reintento sobra.
+          await _borrarFotoSuelta(fotoSubida);
+          return existente;
+        }
+        await _borrarFotoSuelta(fotoSubida);
+        throw const NumeroDeClienteEnUso();
+      }
+      await _borrarFotoSuelta(fotoSubida);
+      rethrow;
+    }
+  }
+
+  /// Compatibilidad: como [crearCliente], pero null si falla.
   Future<String?> addUser(UserModel user, {File? photoFile}) async {
     try {
-      if (kDebugMode) {
-        print('👤 Iniciando proceso de creación de usuario en UserRepository');
-        print('👤 Usuario: ${user.name}');
-        print('👤 ¿Tiene foto? ${photoFile != null}');
-      }
-      
-      // Si se proporciona una foto, primero la subimos a Supabase
-      if (photoFile != null) {
-        if (kDebugMode) {
-          print('👤 Procesando foto del usuario...');
-          print('👤 Ruta de la foto: ${photoFile.path}');
-        }
-
-        // Verificar que el archivo existe ANTES de leer sus metadatos
-        // (photoFile.length() lanza PathNotFoundException si ya no existe)
-        if (!await photoFile.exists()) {
-          if (kDebugMode) {
-            print('❌ ERROR: El archivo de foto no existe físicamente: ${photoFile.path}');
-          }
-          // Continuamos sin foto
-        } else {
-          if (kDebugMode) {
-            print('👤 Tamaño: ${(await photoFile.length() / 1024).toStringAsFixed(2)} KB');
-          }
-
-          // ID temporal para la foto (se usará el ID real cuando esté disponible)
-          final tempId = DateTime.now().millisecondsSinceEpoch.toString();
-
-          final photoUrl = await _storageProvider.uploadUserPhoto(
-            photoFile,
-            tempId,
-          );
-
-          if (photoUrl != null) {
-            if (kDebugMode) {
-              print('✅ Foto subida correctamente: $photoUrl');
-            }
-            // Actualizar el modelo de usuario con la URL de la foto
-            user = user.copyWith(photoUrl: photoUrl);
-          } else {
-            if (kDebugMode) {
-              print('❌ Error al subir la foto del usuario');
-            }
-            // Continuamos con la creación del usuario aunque no se pudo subir la foto
-          }
-        }
-      }
-
-      if (kDebugMode) {
-        print('👤 Enviando datos del usuario a la API...');
-        print('👤 Datos: ${user.toJson()}');
-      }
-      
-      final response = await _apiProvider.add(user.toJson());
-      
-      if (kDebugMode) {
-        print('👤 Respuesta de la API: $response');
-      }
-      
-      if (!response['error'] && response['data'] != null) {
-        final String userId = response['data']['id'];
-        if (kDebugMode) {
-          print('✅ Usuario creado correctamente con ID: $userId');
-        }
-        return userId;
-      } else {
-        if (kDebugMode) {
-          print('❌ Error al crear usuario: ${response['message']}');
-        }
-        return null;
-      }
+      return (await crearCliente(user, photoFile: photoFile)).id;
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ ERROR en UserRepository.addUser: $e');
-        print('❌ Stack trace: ${StackTrace.current}');
-      }
+      AppLogger.error('UserRepository', 'Fallo al crear el usuario', e);
+      return null;
+    }
+  }
+
+  /// Sube la foto de un cliente. Si no se puede, lanza [GuardadoFallido]: sin
+  /// foto no se guarda nada.
+  Future<String> _subirFoto(File foto, String nombre) async {
+    if (!await foto.exists()) {
+      throw const GuardadoFallido(
+          'La foto ya no está disponible. Vuelve a tomarla.');
+    }
+    String? url;
+    try {
+      url = await _storageProvider
+          .uploadUserPhoto(foto, nombre)
+          .timeout(limiteAlGuardar);
+    } on TimeoutException {
+      url = null;
+    }
+    if (url == null) {
+      throw const GuardadoFallido(
+          'No se pudo guardar la foto. Revisa tu conexión e intenta de nuevo.');
+    }
+    return url;
+  }
+
+  /// Una foto que se subió para un guardado que al final no se hizo.
+  Future<void> _borrarFotoSuelta(String? url) async {
+    if (url == null) return;
+    try {
+      await _storageProvider.deleteUserPhoto(url);
+    } catch (_) {
+      // Una foto huérfana no afecta a nadie.
+    }
+  }
+
+  Future<UserModel?> _clientePorNumero(String numero) async {
+    try {
+      var consulta = SupabaseService.client
+          .from('users')
+          .select()
+          .eq('user_number', numero);
+      final branchId = TenantQueryHelper.branchIdOrNull;
+      if (branchId != null) consulta = consulta.eq('branch_id', branchId);
+      final fila = await consulta.maybeSingle().timeout(limiteAlGuardar);
+      return fila == null ? null : UserModel.fromJson(fila);
+    } catch (_) {
       return null;
     }
   }
@@ -367,106 +290,86 @@ class UserRepository {
       final response = await _apiProvider.addDocument(id, user.toJson());
       return !response['error'];
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al agregar usuario con ID: $e');
-      }
+      AppLogger.error('UserRepository', 'Fallo al agregar usuario con ID específico', e);
       return false;
     }
   }
 
-  /// Actualiza un usuario existente
+  /// Actualiza un cliente. Si no se puede, lanza una excepción con el motivo
+  /// ([GuardadoFallido], o el error de conexión / [TimeoutException]).
+  ///
+  /// La foto solo se toca si se manda una nueva, y es obligatoria: si no se
+  /// puede subir, no se guarda nada (antes se guardaba el resto con la foto
+  /// vieja). `UserModel.toJson()` incluye siempre `photo_url`, y varios
+  /// formularios arman el modelo sin ella, así que enviarla vacía borraba la
+  /// que ya estaba guardada. Como ninguna pantalla ofrece "quitar la foto",
+  /// aquí un `photo_url` vacío significa *no la cambies*, nunca *bórrala*.
+  Future<void> actualizarCliente(String id, UserModel user,
+      {File? photoFile}) async {
+    String? fotoAnterior;
+    String? fotoNueva;
+
+    if (photoFile != null) {
+      // La foto vigente se lee de la BD y no del modelo: quien llama pone
+      // `photoUrl` en null al mandar una foto nueva, de modo que el modelo
+      // ya no la trae.
+      fotoAnterior = (await getUserById(id))?.photoUrl ?? user.photoUrl;
+      // Con el id real del cliente como nombre.
+      fotoNueva = await _subirFoto(photoFile, id);
+      user = user.copyWith(photoUrl: fotoNueva);
+    }
+
+    final payload = user.toJson();
+    final photoUrl = payload['photo_url'] as String?;
+    if (photoUrl == null || photoUrl.isEmpty) {
+      payload.remove('photo_url');
+    }
+
+    final List<dynamic> filas;
+    try {
+      filas = await SupabaseService.client
+          .from('users')
+          .update(payload)
+          .eq('id', id)
+          .select('id')
+          .timeout(limiteAlGuardar);
+    } catch (e) {
+      await _borrarFotoSuelta(fotoNueva);
+      if (restriccionUnicaViolada(e) == 'idx_users_branch_rfid_card') {
+        throw const GuardadoFallido('Esa tarjeta ya es de otro cliente.');
+      }
+      rethrow;
+    }
+    if (filas.isEmpty) {
+      await _borrarFotoSuelta(fotoNueva);
+      throw const GuardadoFallido('No se pudo guardar el cliente.');
+    }
+
+    // La anterior se borra al final, con la nueva ya confirmada en la BD.
+    // Borrándola antes, un fallo en el update dejaba al cliente sin foto y
+    // apuntando a un objeto que ya no existe.
+    if (fotoNueva != null &&
+        fotoAnterior != null &&
+        fotoAnterior.isNotEmpty &&
+        fotoAnterior != fotoNueva) {
+      try {
+        await _storageProvider.deleteUserPhoto(fotoAnterior);
+      } catch (e) {
+        AppLogger.warning(
+            'UserRepository', 'No se pudo eliminar la foto anterior');
+        // Un objeto huérfano es preferible a fallar una actualización válida
+      }
+    }
+  }
+
+  /// Compatibilidad (Abonar, check-in): como [actualizarCliente], pero
+  /// devuelve false si falla.
   Future<bool> updateUser(String id, UserModel user, {File? photoFile}) async {
     try {
-      if (kDebugMode) {
-        print('🔄 Iniciando actualización de usuario en UserRepository');
-        print('🔄 ID: $id');
-        print('🔄 Usuario: ${user.name}');
-        print('🔄 ¿Tiene nueva foto? ${photoFile != null}');
-      }
-      
-      // Si se proporciona una nueva foto, primero subirla
-      if (photoFile != null) {
-        if (kDebugMode) {
-          print('🔄 Procesando nueva foto del usuario...');
-          print('🔄 Ruta de la foto: ${photoFile.path}');
-        }
-
-        // Verificar que el archivo existe ANTES de leer sus metadatos
-        // (photoFile.length() lanza PathNotFoundException si ya no existe)
-        if (!await photoFile.exists()) {
-          if (kDebugMode) {
-            print('❌ ERROR: El archivo de foto no existe físicamente: ${photoFile.path}');
-          }
-          // Continuamos sin actualizar la foto
-        } else {
-          if (kDebugMode) {
-            print('🔄 Tamaño: ${(await photoFile.length() / 1024).toStringAsFixed(2)} KB');
-          }
-
-          final photoUrl = await _storageProvider.uploadUserPhoto(
-            photoFile,
-            id, // Usar el ID real del usuario para la foto
-          );
-
-          if (photoUrl != null) {
-            if (kDebugMode) {
-              print('✅ Nueva foto subida correctamente: $photoUrl');
-            }
-            
-            // Si el usuario ya tenía una foto anterior, intentar eliminarla
-            if (user.photoUrl != null && user.photoUrl!.isNotEmpty) {
-              if (kDebugMode) {
-                print('🔄 Eliminando foto anterior: ${user.photoUrl}');
-              }
-              
-              try {
-                await _storageProvider.deleteUserPhoto(user.photoUrl!);
-              } catch (e) {
-                if (kDebugMode) {
-                  print('⚠️ No se pudo eliminar la foto anterior: $e');
-                }
-                // Continuamos aunque no se pueda eliminar la foto anterior
-              }
-            }
-            
-            // Actualizar el modelo de usuario con la URL de la nueva foto
-            user = user.copyWith(photoUrl: photoUrl);
-          } else {
-            if (kDebugMode) {
-              print('❌ Error al subir la nueva foto del usuario');
-            }
-            // Continuamos con la actualización del usuario aunque no se pudo subir la foto
-          }
-        }
-      }
-
-      if (kDebugMode) {
-        print('🔄 Enviando datos actualizados a la API...');
-        print('🔄 Datos: ${user.toJson()}');
-      }
-      
-      final response = await _apiProvider.update(id, user.toJson());
-      
-      if (kDebugMode) {
-        print('🔄 Respuesta de la API: $response');
-      }
-      
-      if (!response['error']) {
-        if (kDebugMode) {
-          print('✅ Usuario actualizado correctamente');
-        }
-        return true;
-      } else {
-        if (kDebugMode) {
-          print('❌ Error al actualizar usuario: ${response['message']}');
-        }
-        return false;
-      }
+      await actualizarCliente(id, user, photoFile: photoFile);
+      return true;
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ ERROR en UserRepository.updateUser: $e');
-        print('❌ Stack trace: ${StackTrace.current}');
-      }
+      AppLogger.error('UserRepository', 'Fallo al actualizar el usuario', e);
       return false;
     }
   }
@@ -474,13 +377,58 @@ class UserRepository {
   /// Elimina un usuario por su ID
   Future<bool> deleteUser(String id) async {
     try {
+      // La foto se lee ANTES del delete: después de borrar la fila ya no hay
+      // forma de saber qué objeto del bucket le pertenecía (el nombre del
+      // archivo no contiene el id real del usuario).
+      final foto = (await getUserById(id))?.photoUrl;
+
       final response = await _apiProvider.delete(id);
-      return !response['error'];
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error al eliminar usuario: $e');
+
+      if (response['error']) {
+        AppLogger.error('UserRepository', 'Fallo al eliminar el usuario');
+        return false;
       }
+
+      // Se borra al final, con la fila ya eliminada: si el delete fallara
+      // después de quitar la foto, el cliente quedaría apuntando a un objeto
+      // inexistente.
+      if (foto != null && foto.isNotEmpty) {
+        try {
+          await _storageProvider.deleteUserPhoto(foto);
+        } catch (e) {
+          AppLogger.warning('UserRepository', 'No se pudo eliminar la foto del usuario');
+          // Un objeto huérfano es preferible a reportar como fallida una
+          // eliminación que sí se completó en la base de datos
+        }
+      }
+
+      return true;
+    } catch (e) {
+      AppLogger.error('UserRepository', 'Fallo al eliminar el usuario', e);
       return false;
     }
   }
+}
+
+/// El número de cliente ya lo tiene OTRO cliente (no es un reintento del
+/// mismo alta). Quien llama genera otro número y vuelve a intentar.
+class NumeroDeClienteEnUso implements Exception {
+  const NumeroDeClienteEnUso();
+}
+
+/// Si [existente] (el que ya tiene ese número) es el mismo alta que [nuevo]:
+/// un intento anterior que sí se guardó aunque la respuesta no llegó.
+bool esElMismoAlta(UserModel existente, UserModel nuevo) {
+  String limpio(String? t) => (t ?? '').trim().toLowerCase();
+  return limpio(existente.name) == limpio(nuevo.name) &&
+      limpio(existente.phone) == limpio(nuevo.phone);
+}
+
+/// No se pudo saber de quién es una tarjeta (sin internet, o el servidor no
+/// contestó). No es lo mismo que una tarjeta sin registrar.
+class ErrorAlBuscarTarjeta implements Exception {
+  const ErrorAlBuscarTarjeta();
+
+  @override
+  String toString() => 'No se pudo buscar la tarjeta';
 }

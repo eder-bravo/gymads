@@ -1,12 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../../data/config/auth_config.dart';
 import '../../../data/models/staff_profile_model.dart';
 import '../../../data/providers/staff_profile_provider.dart';
+import '../../../core/permissions/staff_role.dart';
+import '../../../core/utils/snackbar_helper.dart';
+import '../../../core/utils/nombre_completo.dart';
+import '../../../data/services/cambio_de_perfil.dart';
+import '../../../data/services/cambios_en_vivo_service.dart';
+import '../../../data/services/google_play_services.dart';
 import '../../../data/services/tenant_context_service.dart';
-import '../../../data/services/branding_service.dart';
+import '../../../data/services/welcome_tour_service.dart';
 import '../../../routes/app_pages.dart';
 import 'register_controller.dart';
 
@@ -27,11 +38,87 @@ class AuthController extends GetxController {
   final RxnString errorMessage = RxnString();
   final RxBool obscurePassword = true.obs;
 
+  StreamSubscription<void>? _perfilEnVivo;
+
+  /// Revisiones del perfil encadenadas: dos avisos seguidos no se enciman.
+  Future<void> _revisandoPerfil = Future.value();
+
+  @override
+  void onInit() {
+    super.onInit();
+    // Si el dueño le cambia el rol o le retira el acceso a quien usa la app,
+    // se refleja al momento, sin cerrar sesión. También se revisa al
+    // reconectarse o al volver de un rato en segundo plano (CambiosEnVivo
+    // avisa entonces de todas las tablas).
+    _perfilEnVivo =
+        CambiosEnVivoService.cambiosEn({TablaEnVivo.miPerfil}).listen((_) {
+      _revisandoPerfil = _revisandoPerfil.then((_) => refrescarPerfil());
+    });
+  }
+
   @override
   void onClose() {
+    _perfilEnVivo?.cancel();
     emailController.dispose();
     passwordController.dispose();
     super.onClose();
+  }
+
+  /// Vuelve a leer el perfil de quien usa la app y aplica lo que cambió.
+  Future<void> refrescarPerfil() async {
+    final tenant = TenantContextService.to;
+    final actual = tenant.staffProfile;
+    final userId = _supabase.auth.currentUser?.id;
+    if (actual == null || userId == null) return;
+
+    final StaffProfileModel? nuevo;
+    try {
+      nuevo = await _staffProfileProvider.obtenerPerfil(userId);
+    } catch (e) {
+      // Sin red no se sabe nada: se revisa otra vez al reconectarse.
+      AppLogger.warning('AuthController', 'No se pudo revisar el perfil: $e');
+      return;
+    }
+    // La sesión pudo cambiar mientras se consultaba.
+    if (tenant.staffProfile?.id != actual.id) return;
+
+    switch (cambioDePerfil(actual, nuevo)) {
+      case CambioDePerfil.sinCambios:
+        return;
+      case CambioDePerfil.datos:
+        await tenant.setProfile(nuevo!);
+      case CambioDePerfil.rol:
+        await _aplicarRolNuevo(nuevo!);
+      case CambioDePerfil.sinAcceso:
+        AppLogger.warning('AuthController', 'El acceso fue retirado');
+        WelcomeTourService.to.cancelarRecorridoEnCurso();
+        await logout();
+        SnackbarHelper.info(
+            'Sin acceso', 'Tu acceso fue retirado. Pide un código nuevo.');
+    }
+  }
+
+  /// El rol cambió: de vuelta a Inicio con el menú (y el tour) del rol nuevo.
+  Future<void> _aplicarRolNuevo(StaffProfileModel nuevo) async {
+    // Un tour a medias apunta a pantallas que se van a cerrar; se corta sin
+    // darlo por visto.
+    WelcomeTourService.to.cancelarRecorridoEnCurso();
+
+    // Se regresa al Inicio que ya está debajo, en vez de abrir otro: con
+    // offAllNamed habría dos Inicios montados a la vez con las mismas claves
+    // de los pasos del tour.
+    Get.until((ruta) => ruta.settings.name == Routes.HOME || ruta.isFirst);
+    final ruta = Get.currentRoute;
+    if (ruta != Routes.HOME && ruta != Routes.PERMISOS) {
+      Get.offAllNamed(Routes.HOME);
+    }
+
+    // Después de regresar: con Inicio al frente, su redibujo (Obx sobre el
+    // perfil) arranca el tour de Inicio si este rol no lo ha visto.
+    await TenantContextService.to.setProfile(nuevo);
+
+    final rol = StaffRole.fromString(nuevo.role).label;
+    SnackbarHelper.info('Rol actualizado', 'Ahora tu rol es $rol');
   }
 
   /// Toggle password visibility
@@ -97,7 +184,7 @@ class AuthController extends GetxController {
         throw Exception('Error de autenticación');
       }
 
-      print('✅ Auth successful for: ${response.user!.email}');
+      AppLogger.info('AuthController', 'Auth successful for');
 
       // 2. Fetch staff_profile for this user
       final staffProfile = await _staffProfileProvider.getByUserId(
@@ -112,22 +199,12 @@ class AuthController extends GetxController {
         );
       }
 
-      print(
-          '✅ Staff profile loaded: ${staffProfile.displayName ?? staffProfile.userId}');
-      print('   Gym ID: ${staffProfile.gymId}');
-      print('   Branch ID: ${staffProfile.branchId}');
-      print('   Role: ${staffProfile.role}');
+      AppLogger.info('AuthController', 'Gym ID');
+      AppLogger.info('AuthController', 'Branch ID');
+      AppLogger.info('AuthController', 'Role');
 
       // 3. Set tenant context
       await TenantContextService.to.setProfile(staffProfile);
-
-      // 3b. Sync branding from DB (force to overwrite any stale local data)
-      BrandingService.to.syncFromDb(
-        dbGymName: staffProfile.gymName,
-        dbBrandColor: staffProfile.brandColor,
-        dbBrandFont: staffProfile.brandFont,
-        force: true,
-      );
 
       // 4. Clear form
       emailController.clear();
@@ -138,7 +215,7 @@ class AuthController extends GetxController {
 
       return true;
     } on AuthException catch (e) {
-      print('❌ Auth error: ${e.message}');
+      AppLogger.error('AuthController', 'Fallo de autenticación', e);
       if (e.message.contains('Invalid login credentials')) {
         errorMessage.value = 'Credenciales inválidas';
       } else if (e.message.contains('Email not confirmed')) {
@@ -148,7 +225,7 @@ class AuthController extends GetxController {
       }
       return false;
     } catch (e) {
-      print('❌ Login error: $e');
+      AppLogger.error('AuthController', 'Login error', e);
       errorMessage.value = e.toString().replaceAll('Exception: ', '');
       return false;
     } finally {
@@ -165,22 +242,47 @@ class AuthController extends GetxController {
 
     try {
       if (GetPlatform.isAndroid) {
-        return await _loginWithGoogleAndroid();
+        if (!await GooglePlayServices.disponibles) {
+          AppLogger.info(
+            'AuthController',
+            'Google Play Services no disponible; usando OAuth por navegador',
+          );
+          return await _loginWithGoogleNavegador();
+        }
+
+        try {
+          return await _loginWithGoogleNativo();
+        } on PlatformException catch (e) {
+          // Algunos Huawei incluyen rastros de GMS, pero Google Sign-In no
+          // puede completar el selector. En ese caso el navegador sí funciona.
+          if (e.code == 'sign_in_failed' ||
+              e.message?.contains('12500') == true) {
+            AppLogger.warning(
+              'AuthController',
+              'Google nativo no disponible; usando OAuth por navegador',
+            );
+            return await _loginWithGoogleNavegador();
+          }
+          rethrow;
+        }
+      } else if (GetPlatform.isIOS) {
+        return await _loginWithGoogleNativo();
       } else {
-        // iOS / other platforms — use Supabase OAuth flow
-        return await _loginWithGoogleiOS();
+        // Escritorio y web: flujo por navegador.
+        return await _loginWithGoogleNavegador();
       }
     } on AuthException catch (e) {
-      print('❌ [Google] AuthException: ${e.message}');
-      if (e.message.contains('host lookup') || e.message.contains('SocketException')) {
-        errorMessage.value = 'Sin conexión a internet. Verifica tu red e intenta de nuevo.';
+      AppLogger.error('AuthController', 'Fallo de autenticación', e);
+      if (e.message.contains('host lookup') ||
+          e.message.contains('SocketException')) {
+        errorMessage.value =
+            'Sin conexión a internet. Verifica tu red e intenta de nuevo.';
       } else {
         errorMessage.value = 'Error con Google: ${e.message}';
       }
       return false;
-    } catch (e, stackTrace) {
-      print('❌ [Google] Exception: $e');
-      print('❌ [Google] StackTrace: $stackTrace');
+    } catch (e) {
+      AppLogger.error('AuthController', 'Exception', e);
       final msg = e.toString();
       if (msg.contains('12500') || msg.contains('sign_in_failed')) {
         errorMessage.value =
@@ -202,25 +304,34 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Android: use google_sign_in plugin + signInWithIdToken
-  Future<bool> _loginWithGoogleAndroid() async {
-    print('🔵 [Google-Android] Starting Google Sign-In...');
+  /// Android e iOS: hoja nativa de Google + signInWithIdToken.
+  ///
+  /// Sin navegador de por medio, así que no hay ninguna URL de retorno que
+  /// validar. iOS estaba usando el flujo por navegador y acababa en
+  /// `http://localhost:3000`: Supabase rechazaba el `redirectTo` porque su
+  /// lista de Redirect URLs está vacía y caía al Site URL por defecto.
+  ///
+  /// En iOS el `idToken` sale audienciado al client ID del Info.plist
+  /// (`GIDClientID`) y en Android al `serverClientId`; ambos están dados de
+  /// alta en el proveedor de Google del proyecto, así que Supabase acepta los
+  /// dos.
+  Future<bool> _loginWithGoogleNativo() async {
+    AppLogger.info('AuthController', 'Starting Google Sign-In');
     final srvClientId = dotenv.env['GOOGLE_SERVER_CLIENT_ID'];
-    print('🔵 [Google-Android] serverClientId: $srvClientId');
     final googleSignIn = GoogleSignIn(
       serverClientId: srvClientId,
       scopes: ['email', 'profile'],
     );
 
-    print('🔵 [Google-Android] Calling signIn()...');
+    AppLogger.info('AuthController', 'Calling signIn');
     final googleUser = await googleSignIn.signIn();
     if (googleUser == null) {
-      print('🔵 [Google-Android] User cancelled sign-in');
+      AppLogger.info('AuthController', 'User cancelled sign-in');
       isLoading.value = false;
       return false;
     }
 
-    print('🔵 [Google-Android] Signed in as: ${googleUser.email}');
+    AppLogger.info('AuthController', 'Signed in as');
     final googleAuth = await googleUser.authentication;
     final idToken = googleAuth.idToken;
     final accessToken = googleAuth.accessToken;
@@ -230,7 +341,7 @@ class AuthController extends GetxController {
     }
 
     // Sign in to Supabase with Google token
-    print('🔵 [Google-Android] Calling Supabase signInWithIdToken...');
+    AppLogger.info('AuthController', 'Calling Supabase signInWithIdToken');
     final response = await _supabase.auth.signInWithIdToken(
       provider: OAuthProvider.google,
       idToken: idToken,
@@ -241,43 +352,43 @@ class AuthController extends GetxController {
       throw Exception('Error al autenticar con Google');
     }
 
-    return await _handleGoogleAuthResult(response.user!.id, googleUser.displayName, googleUser.email);
+    return await _handleGoogleAuthResult(
+        response.user!.id, googleUser.displayName, googleUser.email);
   }
 
-  /// iOS: use Supabase native OAuth flow (no google_sign_in plugin)
-  Future<bool> _loginWithGoogleiOS() async {
-    print('🔵 [Google-iOS] Starting Supabase OAuth flow...');
+  /// Huawei sin GMS, escritorio y web: flujo OAuth por navegador.
+  Future<bool> _loginWithGoogleNavegador() async {
+    AppLogger.info('AuthController', 'Starting Supabase OAuth flow');
+
+    // Se escucha antes de abrir el navegador para no perder un retorno rápido.
+    final authResult = _supabase.auth.onAuthStateChange.firstWhere((data) =>
+        data.event == AuthChangeEvent.signedIn && data.session != null);
 
     final success = await _supabase.auth.signInWithOAuth(
       OAuthProvider.google,
-      redirectTo: 'com.googleusercontent.apps.161338034924-4kfeihb6hgt7hf8f3ritrb1v6lukodv5://',
+      redirectTo: AuthConfig.oauthRedirectUrl,
+      queryParams: const {'prompt': 'select_account'},
     );
 
     if (!success) {
-      print('❌ [Google-iOS] OAuth flow failed to launch');
+      AppLogger.error('AuthController', 'OAuth flow failed to launch');
       throw Exception('No se pudo iniciar sesión con Google');
     }
 
-    print('🔵 [Google-iOS] OAuth launched, waiting for session...');
+    AppLogger.info('AuthController', 'OAuth launched, waiting for session');
 
-    // Listen for the auth state change when the OAuth redirect comes back
-    final session = await _supabase.auth.onAuthStateChange
-        .firstWhere((data) =>
-            data.event == AuthChangeEvent.signedIn &&
-            data.session != null)
-        .timeout(
-          const Duration(minutes: 2),
-          onTimeout: () => throw Exception('Tiempo de espera agotado'),
-        );
+    final session = await authResult.timeout(
+      const Duration(minutes: 2),
+      onTimeout: () => throw Exception('Tiempo de espera agotado'),
+    );
 
     final userId = session.session!.user.id;
-    print('✅ [Google-iOS] Supabase auth successful: $userId');
+    AppLogger.info('AuthController', 'Supabase auth successful');
 
     // Get user metadata from Supabase session
     final userMeta = session.session!.user.userMetadata;
-    final fullName = userMeta?['full_name'] as String? ??
-        userMeta?['name'] as String? ??
-        '';
+    final fullName =
+        userMeta?['full_name'] as String? ?? userMeta?['name'] as String? ?? '';
     final email = session.session!.user.email ?? '';
 
     return await _handleGoogleAuthResult(userId, fullName, email);
@@ -287,32 +398,24 @@ class AuthController extends GetxController {
   Future<bool> _handleGoogleAuthResult(
       String userId, String? displayName, String? email) async {
     // Check if user has staff_profile (existing gym owner)
-    print('🔵 [Google] Checking staff profile for $userId...');
+    AppLogger.info('AuthController', 'Checking staff profile for');
     final staffProfile = await _staffProfileProvider.getByUserId(userId);
 
     if (staffProfile != null && staffProfile.isActive) {
-      print('✅ [Google] Existing user, navigating to HOME...');
+      AppLogger.info('AuthController', 'Existing user, navigating to HOME');
       await TenantContextService.to.setProfile(staffProfile);
-      BrandingService.to.syncFromDb(
-        dbGymName: staffProfile.gymName,
-        dbBrandColor: staffProfile.brandColor,
-        dbBrandFont: staffProfile.brandFont,
-        force: true,
-      );
 
       emailController.clear();
       passwordController.clear();
       Get.offAllNamed(Routes.HOME);
       return true;
     } else {
-      print('🔵 [Google] New user, navigating to GOOGLE_COMPLETE...');
+      AppLogger.info(
+          'AuthController', 'New user, navigating to GOOGLE_COMPLETE');
       final registerCtrl = Get.put(RegisterController());
-      final gName = displayName ?? '';
-      final nameParts = gName.split(' ');
-      registerCtrl.firstNameController.text =
-          nameParts.isNotEmpty ? nameParts.first : '';
-      registerCtrl.lastNameController.text =
-          nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      final nombre = separarNombreCompleto(displayName);
+      registerCtrl.firstNameController.text = nombre.nombres;
+      registerCtrl.lastNameController.text = nombre.apellidos;
       registerCtrl.emailController.text = email ?? '';
       registerCtrl.isGoogleUser.value = true;
       registerCtrl.googleUserId = userId;
@@ -324,26 +427,11 @@ class AuthController extends GetxController {
 
   /// Logout current user
   Future<void> logout() async {
-    // Backup current branding to DB before clearing
-    try {
-      final gymId = TenantContextService.to.currentGymId;
-      if (gymId != null) {
-        await _supabase.from('gyms').update({
-          'brand_color': BrandingService.to.brandColorHex.value,
-          'brand_font': BrandingService.to.brandFontName.value,
-        }).eq('id', gymId);
-      }
-    } catch (e) {
-      print('⚠️ Error backing up branding: $e');
-    }
-
     try {
       await _supabase.auth.signOut();
     } catch (e) {
-      print('⚠️ Error signing out: $e');
+      AppLogger.warning('AuthController', 'Error signing out');
     }
-    // Clear branding so next account starts fresh
-    BrandingService.to.clearBranding();
     await TenantContextService.to.clearProfile();
     Get.offAllNamed(Routes.LOGIN);
   }
@@ -355,11 +443,11 @@ class AuthController extends GetxController {
     try {
       final session = _supabase.auth.currentSession;
       if (session == null) {
-        print('⚠️ No existing session');
+        AppLogger.warning('AuthController', 'No existing session');
         return false;
       }
 
-      print('📍 Found existing session for: ${session.user.email}');
+      AppLogger.info('AuthController', 'Found existing session for');
 
       // Verify staff_profile is still valid
       final staffProfile = await _staffProfileProvider.getByUserId(
@@ -367,7 +455,7 @@ class AuthController extends GetxController {
       );
 
       if (staffProfile == null || !staffProfile.isActive) {
-        print('⚠️ Staff profile no longer valid');
+        AppLogger.warning('AuthController', 'Staff profile no longer valid');
         await logout();
         return false;
       }
@@ -375,11 +463,9 @@ class AuthController extends GetxController {
       // Set tenant context
       await TenantContextService.to.setProfile(staffProfile);
 
-      print(
-          '✅ Session restored for ${staffProfile.displayName ?? session.user.email}');
       return true;
     } catch (e) {
-      print('❌ Error checking session: $e');
+      AppLogger.error('AuthController', 'Error checking session', e);
       return false;
     }
   }

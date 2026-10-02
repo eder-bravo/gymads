@@ -1,18 +1,34 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/permissions/permissions.dart';
+import '../../../core/permissions/staff_role.dart';
 import '../../../data/config/rfid_config.dart';
 import '../../../data/services/rfid_reader_service.dart';
+import '../../../data/services/background_rfid_service.dart';
+import '../../../data/services/storage_service.dart';
 import '../../../data/services/tenant_context_service.dart';
-import '../views/branding_settings_view.dart';
+import '../../../data/services/welcome_tour_service.dart';
+import '../../../data/services/image_cache_service.dart';
+import '../../../data/models/gym_settings_model.dart';
 import '../../../data/models/staff_profile_model.dart';
+import '../../../data/services/gym_settings_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/utils/screen_tour_mixin.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../routes/app_pages.dart';
+import '../../../data/services/lector_red_service.dart';
+import '../../../data/services/estado_configuracion_lector.dart';
+import '../../../data/services/regreso_del_lector.dart';
+import '../../../core/widgets/formulario.dart';
+import '../../../core/utils/fallo_al_guardar.dart';
+import '../views/cambiar_contrasena_view.dart';
 
-class ConfiguracionController extends GetxController {
+class ConfiguracionController extends GetxController with ScreenTourMixin {
   // Variables observables para la configuración
   final RxBool isLoading = false.obs;
 
@@ -24,7 +40,6 @@ class ConfiguracionController extends GetxController {
   final RxString lastName = ''.obs;
   final RxString gymName = ''.obs;
   final RxString branchName = ''.obs;
-  final RxString brandColor = '#10D5E8'.obs;
 
   // Variables para configuración del lector RFID
   final RxBool rfidConnectionStatus = false.obs;
@@ -38,9 +53,327 @@ class ConfiguracionController extends GetxController {
   final RxBool esp32Connected = false.obs;
   final RxString esp32StatusMessage = 'ESP32 desconectado'.obs;
 
+  // =================== VINCULACIÓN DEL LECTOR ===================
+  /// En qué estado está el lector respecto a ESTE gimnasio.
+  final Rx<EstadoLector> estadoLector = EstadoLector.sinConfigurar.obs;
+  final RxBool comprobandoLector = false.obs;
+
+  /// Esperando a que el lector vuelva a su WiFi tras salir de "Cambiar WiFi"
+  /// sin cambiarlo (ver [esperarRegresoDelLector]).
+  final RxBool reconectandoLector = false.obs;
+
+  /// Pidiéndole al lector que se ofrezca por Bluetooth ("Cambiar WiFi").
+  final RxBool preparandoLector = false.obs;
+
+  /// Si la última vez que contestó se estaba ofreciendo por Bluetooth.
+  bool _lectorSeOfrecia = false;
+
+  /// El lector que encontró la última búsqueda en la red cuando no es el de
+  /// este gimnasio (libre, o de otro): sobre él actúan "Vincular" y
+  /// "Formatear".
+  final Rxn<LectorEnRed> lectorEncontrado = Rxn<LectorEnRed>();
+
+  /// Pregunta al lector de [ip] (o al ya configurado) de quién es.
+  ///
+  /// El aparato no devuelve nunca el gym_id que tiene guardado —si lo hiciera,
+  /// el gimnasio de al lado podría copiarlo y suplantarlo—, así que contesta
+  /// con dos banderas: `claimed` (¿tiene dueño?) y `mine` (¿eres tú?).
+  Future<void> comprobarLector({String? ip}) async {
+    comprobandoLector.value = true;
+    try {
+      final info = await RfidConfig.getESP32Info(ip: ip);
+
+      if (info == null) {
+        estadoLector.value = EstadoLector.sinConexion;
+        esp32StatusMessage.value = 'El lector no responde';
+        return;
+      }
+
+      final bool vinculado = info['claimed'] == true;
+      final bool esMio = info['mine'] == true;
+      _lectorSeOfrecia = info['modo_config'] == true;
+
+      if (!vinculado) {
+        estadoLector.value = EstadoLector.libre;
+        esp32StatusMessage.value = 'Lector sin vincular';
+      } else if (esMio) {
+        estadoLector.value = EstadoLector.mio;
+        esp32StatusMessage.value = 'Vinculado a tu gimnasio';
+      } else {
+        estadoLector.value = EstadoLector.deOtroGimnasio;
+        esp32StatusMessage.value = 'Este lector es de otro gimnasio';
+      }
+    } finally {
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// Tras salir de "Cambiar WiFi" sin cambiarlo: el lector se está
+  /// reconectando a su red. Se dice eso en pantalla (no "no aparece") y se
+  /// le espera; en cuanto aparece se le pide volver a trabajar normal.
+  Future<void> esperarRegresoDelLectorEnRed() async {
+    reconectandoLector.value = true;
+    comprobandoLector.value = true;
+    try {
+      final lector = await esperarRegresoDelLector(
+        // La IP de siempre (el router casi siempre le devuelve la misma) y,
+        // cada tanto, toda la red por si le dio otra.
+        buscar: (intento) => intento % 4 == 3
+            ? RfidConfig.buscarEnRed()
+            : RfidConfig.consultarGuardado(),
+        terminar: RfidConfig.terminarModoConfiguracion,
+        seguir: () => !isClosed,
+      );
+      if (isClosed) return;
+
+      if (lector == null) {
+        estadoLector.value = EstadoLector.sinConexion;
+        return;
+      }
+      if (lector.baseUrl != RfidConfig.baseUrl) {
+        await RfidConfig.guardarLector(lector);
+      }
+      _lectorSeOfrecia = lector.modoConfig;
+      esp32IpAddress.value = lector.ip;
+      estadoLector.value = EstadoLector.mio;
+    } finally {
+      reconectandoLector.value = false;
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// "Cambiar WiFi": le pide al lector que se ofrezca por Bluetooth. False
+  /// si no se pudo (entonces no tiene caso abrir el asistente).
+  ///
+  /// Si no contesta al pedido pero ya se estaba ofreciendo (quedó así de un
+  /// "Cambiar WiFi" anterior), se sigue igual: el asistente lo encuentra por
+  /// Bluetooth. Ofreciéndose, su WiFi contesta a medias, y antes eso acababa
+  /// en "El lector no respondió" con el lector esperando justo a que lo
+  /// configuraran.
+  Future<bool> pedirModoConfiguracion() async {
+    preparandoLector.value = true;
+    comprobandoLector.value = true;
+    try {
+      if (await RfidConfig.abrirModoConfiguracion()) return true;
+      final lector = await RfidConfig.consultarGuardado();
+      if (lector?.configOcupada == true) throw const LectorOcupadoException();
+      return lector?.modoConfig ?? _lectorSeOfrecia;
+    } finally {
+      preparandoLector.value = false;
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// Reclama el lector para este gimnasio.
+  Future<void> vincularLector(String ip) async {
+    comprobandoLector.value = true;
+    try {
+      final resultado = await RfidConfig.vincular(ip);
+
+      switch (resultado) {
+        case VinculacionResultado.ok:
+          estadoLector.value = EstadoLector.mio;
+          lectorEncontrado.value = null;
+          esp32IpAddress.value = ip;
+          // El sondeo se había detenido al recibir el rechazo del lector, y
+          // no se reanuda solo. Sin esto el dueño vería "Listo" y el lector
+          // seguiría sin responder hasta reiniciar la app.
+          _reanudarSondeo();
+          SnackbarHelper.success(
+              'Listo', 'El lector quedó vinculado a tu gimnasio');
+          break;
+        case VinculacionResultado.deOtroGimnasio:
+          estadoLector.value = EstadoLector.deOtroGimnasio;
+          SnackbarHelper.error(
+              'No se pudo vincular',
+              'Ese lector ya pertenece a otro gimnasio. Su dueño tiene que '
+                  'liberarlo, o hay que reiniciarlo de fábrica con el botón.');
+          break;
+        case VinculacionResultado.sinConexion:
+          estadoLector.value = EstadoLector.sinConexion;
+          SnackbarHelper.error('Sin respuesta',
+              'El lector no contestó. Revisa que esté encendido y en la misma red.');
+          break;
+        case VinculacionResultado.sinSesion:
+          SnackbarHelper.error('Error', 'No hay un gimnasio en esta sesión.');
+          break;
+        case VinculacionResultado.error:
+          SnackbarHelper.error('Error', 'No se pudo vincular el lector.');
+          break;
+      }
+    } finally {
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// Formatea un lector que pertenece a otro gimnasio, para poder reclamarlo.
+  ///
+  /// Tras formatearlo se vuelve a consultar: quedará libre, y la pantalla
+  /// mostrará sola el botón de vincular. Así formatear y revincular son dos
+  /// toques seguidos en la misma pantalla, sin pasos sueltos por medio.
+  Future<void> formatearLector(String ip) async {
+    comprobandoLector.value = true;
+    try {
+      if (await RfidConfig.formatear(ip)) {
+        SnackbarHelper.success(
+            'Listo', 'El lector quedó libre. Ya puedes vincularlo.');
+      } else {
+        SnackbarHelper.error('Error',
+            'No se pudo formatear el lector. Revisa que responda en esa IP.');
+      }
+    } finally {
+      comprobandoLector.value = false;
+    }
+
+    // Fuera del finally: comprobarLector maneja su propia bandera y dejarlo
+    // dentro la pisaría a false antes de tiempo.
+    await comprobarLector(ip: ip);
+  }
+
+  /// Libera el lector para que otro gimnasio pueda reclamarlo.
+  Future<void> desvincularLector() async {
+    comprobandoLector.value = true;
+    try {
+      if (await RfidConfig.desvincular()) {
+        estadoLector.value = EstadoLector.sinConfigurar;
+        esp32IpAddress.value = '';
+        esp32Connected.value = false;
+        _detenerSondeo();
+        SnackbarHelper.success('Listo',
+            'El lector quedó libre y olvidó el WiFi. Ya puedes llevarlo a otro lugar.');
+      } else {
+        SnackbarHelper.error('Error', 'No se pudo desvincular el lector.');
+      }
+    } finally {
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// Vuelve a arrancar el sondeo del lector.
+  ///
+  /// `startScanning` ya limpia por dentro el motivo del rechazo anterior, así
+  /// que basta con llamarlo. Si el servicio no está registrado (el lector
+  /// nunca se activó en este dispositivo) no hay nada que reanudar.
+  void _reanudarSondeo() {
+    if (!Get.isRegistered<BackgroundRfidService>()) return;
+    final servicio = Get.find<BackgroundRfidService>();
+    servicio.stopScanning();
+    servicio.startScanning();
+  }
+
+  void _detenerSondeo() {
+    if (!Get.isRegistered<BackgroundRfidService>()) return;
+    Get.find<BackgroundRfidService>().stopScanning();
+  }
+
+  /// Busca lectores en la red de este teléfono, sin saber su IP.
+  ///
+  /// - El de este gimnasio: se deja configurado y listo.
+  /// - Uno libre (recién reseteado, o nunca vinculado): se ofrece vincularlo.
+  /// - Solo de otros gimnasios: se ofrece formatearlo.
+  Future<void> buscarLectorEnRed() async {
+    comprobandoLector.value = true;
+    try {
+      final encontrados = await RfidConfig.buscarTodosEnRed();
+      final mio = encontrados.firstWhereOrNull((l) => l.mine);
+
+      if (mio != null) {
+        await RfidConfig.guardarLector(mio);
+        _lectorSeOfrecia = mio.modoConfig;
+        lectorEncontrado.value = null;
+        esp32IpAddress.value = mio.ip;
+        estadoLector.value = EstadoLector.mio;
+        _reanudarSondeo();
+        SnackbarHelper.success(
+            'Listo', 'El lector de tu gimnasio está conectado');
+        return;
+      }
+
+      final libre = encontrados.firstWhereOrNull((l) => !l.claimed);
+      if (libre != null) {
+        lectorEncontrado.value = libre;
+        estadoLector.value = EstadoLector.libre;
+        return;
+      }
+
+      if (encontrados.isNotEmpty) {
+        lectorEncontrado.value = encontrados.first;
+        estadoLector.value = EstadoLector.deOtroGimnasio;
+        return;
+      }
+
+      lectorEncontrado.value = null;
+      estadoLector.value = RfidConfig.tieneLector
+          ? EstadoLector.sinConexion
+          : EstadoLector.sinConfigurar;
+      SnackbarHelper.error(
+          'No se encontró',
+          RfidConfig.tieneLector
+              ? 'Tu lector no aparece en esta red WiFi. Si su luz parpadea '
+                  'rápido, está esperando que lo configures.'
+              : 'No hay lectores en esta red WiFi. Si es nuevo, agrégalo con '
+                  '"Agregar lector".');
+    } finally {
+      comprobandoLector.value = false;
+    }
+  }
+
+  /// Tras configurar un lector por Bluetooth: lo deja como el de este
+  /// gimnasio y arranca el escaneo.
+  Future<void> lectorAgregado(LectorEnRed lector) async {
+    await RfidConfig.guardarLector(lector, esperarRegistro: false);
+    lectorEncontrado.value = null;
+    esp32IpAddress.value = lector.ip;
+    estadoLector.value = EstadoLector.mio;
+
+    // "Usar el lector" se enciende solo: acabas de agregar uno.
+    await RfidConfig.activarLector(true);
+    rfidEnabled.value = true;
+    rfidConnectionStatus.value = true;
+    connectionStatusMessage.value = 'Conectado y funcionando';
+    _reanudarSondeo();
+  }
+
   // Variables para configuración de audio
   final RxBool soundEnabled = true.obs;
   final RxDouble soundVolume = 0.8.obs;
+
+  // ─── Tour de bienvenida ───
+  final keyCuenta = GlobalKey();
+  final keyApariencia = GlobalKey();
+  final keyPrecios = GlobalKey();
+  final keyCategorias = GlobalKey();
+  final keyAccesos = GlobalKey();
+  final keyControlAccesos = GlobalKey();
+  final keyLector = GlobalKey();
+  final keyPermisos = GlobalKey();
+
+  /// Las opciones de administración solo existen para el dueño.
+  ///
+  /// Se conserva para las llamadas que aún la usan, pero lo nuevo pregunta por
+  /// el permiso concreto: con cinco roles, "es el dueño" ya no describe quién
+  /// puede tocar cada ajuste.
+  bool get isOwner => TenantContextService.to.isOwnerAdmin;
+
+  /// Si el usuario actual puede [permiso].
+  bool can(Permission permiso) => TenantContextService.to.can(permiso);
+
+  @override
+  String get tourId => AppTours.configuracion;
+
+  /// Los pasos del tour, con el mismo filtro que oculta cada opción: apuntar a
+  /// un widget que ese rol no tiene delante deja el tour señalando al vacío.
+  @override
+  List<GlobalKey> get tourSteps => [
+        keyCuenta,
+        keyApariencia,
+        if (can(Permission.gestionarPreciosAbonos)) keyPrecios,
+        if (can(Permission.gestionarCategorias)) keyCategorias,
+        if (can(Permission.gestionarAccesosStaff)) keyAccesos,
+        if (can(Permission.gestionarControlAccesos)) keyControlAccesos,
+        if (can(Permission.gestionarControlAccesos)) keyLector,
+        keyPermisos,
+      ];
 
   @override
   void onInit() {
@@ -49,10 +382,6 @@ class ConfiguracionController extends GetxController {
     _loadConfiguration();
   }
 
-  @override
-  void onClose() {
-    super.onClose();
-  }
 
   // =================== USER INFO FROM SESSION ===================
 
@@ -75,16 +404,7 @@ class ConfiguracionController extends GetxController {
     _loadGymInfo();
   }
 
-  String _formatRole(String? role) {
-    switch (role) {
-      case 'owner_admin':
-        return 'Dueño / Admin';
-      case 'branch_staff':
-        return 'Staff de Sucursal';
-      default:
-        return 'Admin';
-    }
-  }
+  String _formatRole(String? role) => StaffRole.fromString(role).label;
 
   Future<void> _loadGymInfo() async {
     try {
@@ -92,12 +412,11 @@ class ConfiguracionController extends GetxController {
       if (tenant.currentGymId != null) {
         final gymData = await Supabase.instance.client
             .from('gyms')
-            .select('name, brand_color')
+            .select('name')
             .eq('id', tenant.currentGymId!)
             .maybeSingle();
         if (gymData != null) {
           gymName.value = gymData['name'] as String? ?? '';
-          brandColor.value = gymData['brand_color'] as String? ?? '#10D5E8';
         }
       }
       if (tenant.currentBranchId != null) {
@@ -111,11 +430,12 @@ class ConfiguracionController extends GetxController {
         }
       }
     } catch (e) {
-      if (kDebugMode) print('⚠️ Could not load gym/branch names: $e');
+      AppLogger.warning('ConfiguracionController',
+          'No se pudo cargar la información del gimnasio');
     }
   }
 
-  // =================== UPDATE GYM BRANDING ===================
+  // =================== UPDATE GYM ===================
 
   Future<void> updateGymName(String value) async {
     final gymId = TenantContextService.to.currentGymId;
@@ -129,24 +449,27 @@ class ConfiguracionController extends GetxController {
       await _refreshTenantProfile();
       SnackbarHelper.success('¡Listo!', 'Nombre del gimnasio actualizado');
     } catch (e) {
-      if (kDebugMode) print('Error updating gym name: $e');
+      AppLogger.error('ConfiguracionController',
+          'Fallo al actualizar el nombre del gimnasio', e);
       SnackbarHelper.error('Error', 'No se pudo actualizar el nombre');
     }
   }
 
-  Future<void> updateBrandColor(String hexColor) async {
-    final gymId = TenantContextService.to.currentGymId;
-    if (gymId == null) return;
+  /// Renombra la sucursal actual. Solo el dueño puede hacerlo (política RLS
+  /// "Owner can update their branches").
+  Future<void> updateBranchName(String value) async {
+    final branchId = TenantContextService.to.currentBranchId;
+    if (branchId == null) return;
     try {
       await Supabase.instance.client
-          .from('gyms')
-          .update({'brand_color': hexColor}).eq('id', gymId);
-      brandColor.value = hexColor;
-      await _refreshTenantProfile();
-      SnackbarHelper.success('¡Listo!', 'Color de marca actualizado');
+          .from('branches')
+          .update({'name': value}).eq('id', branchId);
+      branchName.value = value;
+      SnackbarHelper.success('¡Listo!', 'Nombre de la sucursal actualizado');
     } catch (e) {
-      if (kDebugMode) print('Error updating brand color: $e');
-      SnackbarHelper.error('Error', 'No se pudo actualizar el color');
+      AppLogger.error('ConfiguracionController',
+          'Fallo al actualizar el nombre de la sucursal', e);
+      SnackbarHelper.error('Error', 'No se pudo actualizar el nombre');
     }
   }
 
@@ -156,7 +479,10 @@ class ConfiguracionController extends GetxController {
       if (userId == null) return;
       final response = await Supabase.instance.client
           .from('staff_profiles')
-          .select('*, gyms(name, brand_color, brand_font, created_at)')
+          // payment_mode es obligatorio: si se queda fuera del join llega
+          // null al caché y checkOnboarding reabre el asistente de
+          // configuración inicial ya completado.
+          .select('*, gyms(name, created_at, payment_mode)')
           .eq('user_id', userId)
           .eq('is_active', true)
           .maybeSingle();
@@ -165,7 +491,8 @@ class ConfiguracionController extends GetxController {
         await TenantContextService.to.setProfile(profile);
       }
     } catch (e) {
-      if (kDebugMode) print('Error refreshing tenant profile: $e');
+      AppLogger.error(
+          'ConfiguracionController', 'Fallo al refrescar el perfil', e);
     }
   }
 
@@ -199,19 +526,14 @@ class ConfiguracionController extends GetxController {
         'display_name': displayName,
       }).eq('user_id', userId);
 
-      // Refresh TenantContextService cache
-      final profileData = await Supabase.instance.client
-          .from('staff_profiles')
-          .select()
-          .eq('user_id', userId)
-          .single();
-
-      await TenantContextService.to
-          .setProfile(StaffProfileModel.fromJson(profileData));
+      // Refrescar el caché. Debe hacerse con el join de `gyms`, si no se
+      // pierden el nombre del gimnasio y su fecha de creación.
+      await _refreshTenantProfile();
 
       SnackbarHelper.success('Guardado', 'Información actualizada');
     } catch (e) {
-      if (kDebugMode) print('❌ Error updating profile: $e');
+      AppLogger.error(
+          'ConfiguracionController', 'Fallo al actualizar el perfil', e);
       SnackbarHelper.error('Error', 'No se pudo actualizar: $e');
     } finally {
       isLoading.value = false;
@@ -235,25 +557,41 @@ class ConfiguracionController extends GetxController {
       soundEnabled.value = prefs.getBool('sound_enabled') ?? true;
       soundVolume.value = prefs.getDouble('sound_volume') ?? 0.8;
 
-      // RFID — only scan if enabled
-      rfidEnabled.value = prefs.getBool('rfid_enabled') ?? false;
-      if (rfidEnabled.value && !_rfidScanCancelled) {
-        isRfidScanning.value = true;
-        connectionStatusMessage.value = 'Buscando lector RFID...';
-        await RfidConfig.loadConfig();
-        isRfidScanning.value = false;
-        if (!_rfidScanCancelled) {
-          await _checkRfidConnection();
-        }
-      } else if (!rfidEnabled.value) {
-        connectionStatusMessage.value = 'Desactivado';
-      }
+      // El estado del lector va aparte y sin esperarlo: si no contesta,
+      // buscarlo en la red tarda unos segundos, y no hay por qué frenar la
+      // pantalla de Configuración por eso.
+      unawaited(cargarEstadoLector());
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al cargar configuración: $e');
-      }
+      AppLogger.error(
+          'ConfiguracionController', 'Error al cargar configuración', e);
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// "Usar el lector de tarjetas" y su estado, para el gimnasio de la sesión.
+  ///
+  /// Ambas cosas son de ESTE gimnasio: antes el interruptor era uno solo
+  /// para el teléfono, y una cuenta recién creada lo encontraba encendido.
+  /// Si nunca se tocó, sigue a si el gimnasio tiene lector; por eso primero
+  /// se carga la configuración.
+  Future<void> cargarEstadoLector() async {
+    try {
+      isRfidScanning.value = true;
+      await RfidConfig.loadConfig();
+      rfidEnabled.value = await RfidConfig.lectorActivado();
+      isRfidScanning.value = false;
+
+      if (!rfidEnabled.value) {
+        connectionStatusMessage.value = 'Desactivado';
+      } else if (!_rfidScanCancelled) {
+        await _checkRfidConnection();
+      }
+    } catch (e) {
+      AppLogger.error(
+          'ConfiguracionController', 'Error al cargar el lector', e);
+    } finally {
+      isRfidScanning.value = false;
     }
   }
 
@@ -287,9 +625,6 @@ class ConfiguracionController extends GetxController {
           SnackbarHelper.success(
               'Conectado', 'ESP32 conectado exitosamente a $ipAddress');
         }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('esp32_ip_manual', ipAddress);
       } else {
         esp32Connected.value = false;
         esp32StatusMessage.value = 'No se pudo conectar a $ipAddress';
@@ -318,8 +653,7 @@ class ConfiguracionController extends GetxController {
 
       if (available) {
         esp32Connected.value = true;
-        esp32IpAddress.value =
-            RfidConfig.getCurrentIP() ?? RfidConfig.DEFAULT_ESP32_IP;
+        esp32IpAddress.value = RfidConfig.getCurrentIP() ?? '';
         esp32StatusMessage.value = 'ESP32 conectado: ${esp32IpAddress.value}';
       } else {
         esp32Connected.value = false;
@@ -365,9 +699,8 @@ class ConfiguracionController extends GetxController {
       isLoading.value = true;
       connectionStatusMessage.value = 'Buscando lector RFID...';
 
-      // Persist enabled state
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('rfid_enabled', true);
+      // Persist enabled state (de este gimnasio)
+      await RfidConfig.activarLector(true);
 
       await RfidConfig.loadConfig();
       if (_rfidScanCancelled) return;
@@ -439,9 +772,8 @@ class ConfiguracionController extends GetxController {
     isLoading.value = false;
     connectionStatusMessage.value = 'Desactivado';
 
-    // Persist disabled state
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('rfid_enabled', false);
+    // Persist disabled state (de este gimnasio)
+    await RfidConfig.activarLector(false);
   }
 
   // =================== MÉTODOS DE CONFIGURACIÓN ===================
@@ -459,7 +791,6 @@ class ConfiguracionController extends GetxController {
     }
   }
 
-
   // =================== MÉTODOS PARA NAVEGACIÓN DE CONFIGURACIÓN ===================
 
   /// Abrir configuración de cuenta — navega a CuentaView
@@ -467,35 +798,131 @@ class ConfiguracionController extends GetxController {
     Get.toNamed(Routes.CUENTA);
   }
 
-  /// Open application settings — full-screen branding page
-  void openAppSettings() {
-    Get.to(() => BrandingSettingsView());
+  /// Abrir configuración de precios de abonos (precio fijo por periodo)
+  void openAbonoPrices() {
+    Get.toNamed(Routes.ABONO_PRICES);
   }
 
-  /// Abrir administración de abonos fijos (planes de membresía)
-  void openMembershipPlans() {
-    Get.toNamed(Routes.MEMBERSHIP_PLANS);
+  void openCategorias() {
+    Get.toNamed(Routes.CATEGORIAS);
   }
 
-  /// Backup branding to DB (fire-and-forget)
-  Future<void> backupBranding(
-      {String? name, String? color, String? font}) async {
-    final gymId = TenantContextService.to.currentGymId;
-    if (gymId == null) return;
+  /// Accesos del personal. Solo para el dueño.
+  void openStaffAccesos() {
+    Get.toNamed(Routes.STAFF_ACCESOS);
+  }
+
+  /// Entradas y salidas de los clientes, y horario del gimnasio.
+  void openControlAccesos() {
+    Get.toNamed(Routes.CONTROL_ACCESOS);
+  }
+
+  /// El lector de tarjetas: a qué IP está y a qué gimnasio pertenece.
+  void openLector() {
+    Get.toNamed(Routes.LECTOR);
+  }
+
+  void openPermisos() {
+    Get.toNamed(Routes.PERMISOS, arguments: {'desdeConfiguracion': true});
+  }
+
+  // =================== CONTROL DE ACCESOS ===================
+
+  /// Copia editable de la configuración; se guarda al cambiar cada control.
+  final Rx<GymSettingsModel> accesosSettings = const GymSettingsModel().obs;
+  final RxBool isLoadingAccesos = false.obs;
+
+  Future<void> loadControlAccesos() async {
+    isLoadingAccesos.value = true;
     try {
-      final updates = <String, dynamic>{};
-      if (name != null) updates['name'] = name;
-      if (color != null) updates['brand_color'] = color;
-      if (font != null) updates['brand_font'] = font;
-      if (updates.isNotEmpty) {
-        await Supabase.instance.client
-            .from('gyms')
-            .update(updates)
-            .eq('id', gymId);
-      }
-    } catch (e) {
-      if (kDebugMode) print('⚠️ Could not backup branding to DB: $e');
+      accesosSettings.value = await GymSettingsService.to.refresh();
+    } finally {
+      isLoadingAccesos.value = false;
     }
+  }
+
+  /// Guarda y revierte la vista si la base lo rechaza, para que el
+  /// interruptor no se quede mostrando algo que no se llegó a guardar.
+  Future<void> _guardarAccesos(GymSettingsModel nuevos) async {
+    final anterior = accesosSettings.value;
+    accesosSettings.value = nuevos;
+
+    final ok = await GymSettingsService.to.save(nuevos);
+    if (!ok) {
+      accesosSettings.value = anterior;
+      SnackbarHelper.error('Error',
+          'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.');
+    }
+  }
+
+  Future<void> setRegistrarSalidas(bool valor) =>
+      _guardarAccesos(accesosSettings.value.copyWith(registrarSalidas: valor));
+
+  Future<void> setHoraApertura(HoraDelDia hora) =>
+      _guardarAccesos(accesosSettings.value.copyWith(horaApertura: hora));
+
+  Future<void> setHoraCierre(HoraDelDia hora) =>
+      _guardarAccesos(accesosSettings.value.copyWith(horaCierre: hora));
+
+  // =================== CONTRASEÑA ===================
+
+  /// Si la cuenta entra con correo y contraseña. Las de Google no tienen
+  /// contraseña, y el staff entra con código.
+  bool get tieneContrasena {
+    final usuario = Supabase.instance.client.auth.currentUser;
+    if (usuario == null || (usuario.email ?? '').isEmpty) return false;
+    final proveedores = usuario.appMetadata['providers'];
+    if (proveedores is List) return proveedores.contains('email');
+    return usuario.appMetadata['provider'] == 'email';
+  }
+
+  /// Cambia la contraseña. Devuelve el error para mostrar, o null si salió
+  /// bien.
+  ///
+  /// Primero vuelve a entrar con la actual: confirma que es la persona y deja
+  /// la sesión reciente, por si Supabase la exige para cambiarla.
+  Future<String?> cambiarContrasena(String actual, String nueva) async {
+    const generico = 'No se pudo cambiar la contraseña. Intenta de nuevo.';
+    final auth = Supabase.instance.client.auth;
+    final correo = auth.currentUser?.email;
+    if (correo == null || correo.isEmpty) {
+      return 'Esta cuenta no usa contraseña.';
+    }
+
+    try {
+      await auth
+          .signInWithPassword(email: correo, password: actual)
+          .timeout(limiteAlGuardar);
+    } on AuthException catch (e) {
+      if (e.statusCode == '400' || e.code == 'invalid_credentials') {
+        return 'La contraseña actual no es correcta';
+      }
+      return generico;
+    } catch (e) {
+      return mensajeDeFallo(e, generico: generico);
+    }
+
+    try {
+      await auth
+          .updateUser(UserAttributes(password: nueva))
+          .timeout(limiteAlGuardar);
+      return null;
+    } on AuthException catch (e) {
+      AppLogger.warning('ConfiguracionController',
+          'No se cambió la contraseña: ${e.code} ${e.message}');
+      return switch (e.code) {
+        'same_password' => 'La nueva debe ser distinta',
+        'weak_password' =>
+          'Esa contraseña es muy fácil de adivinar. Elige otra.',
+        _ => generico,
+      };
+    } catch (e) {
+      return mensajeDeFallo(e, generico: generico);
+    }
+  }
+
+  void abrirCambiarContrasena() {
+    Get.to(() => CambiarContrasenaView(cambiar: cambiarContrasena));
   }
 
   // =================== LOGOUT ===================
@@ -504,29 +931,19 @@ class ConfiguracionController extends GetxController {
   void logout() {
     Get.dialog(
       AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: const Text(
-          'Cerrar Sesión',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: const Text(
-          '¿Estás seguro que deseas cerrar la sesión?',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
+        scrollable: true,
+        title: const Text('Cerrar Sesión'),
+        content: const Text('¿Estás seguro que deseas cerrar la sesión?'),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
+          BotonCancelar(onPressed: () => Get.back()),
+          BotonGuardar(
+            texto: 'Cerrar sesión',
+            compacto: true,
+            color: AppColors.error,
             onPressed: () async {
               Get.back(); // close dialog
               await _performLogout();
             },
-            child: const Text(
-              'Cerrar Sesión',
-              style: TextStyle(color: AppColors.error),
-            ),
           ),
         ],
       ),
@@ -546,7 +963,7 @@ class ConfiguracionController extends GetxController {
       // Navigate to login
       Get.offAllNamed(Routes.LOGIN);
     } catch (e) {
-      if (kDebugMode) print('❌ Error during logout: $e');
+      AppLogger.error('ConfiguracionController', 'Fallo al cerrar sesión', e);
       SnackbarHelper.error('Error', 'Error al cerrar sesión: $e');
     } finally {
       isLoading.value = false;
@@ -566,7 +983,7 @@ class ConfiguracionController extends GetxController {
     // First confirmation
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
-        backgroundColor: AppColors.cardBackground,
+        scrollable: true,
         title: Row(
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.red[400], size: 28),
@@ -574,7 +991,7 @@ class ConfiguracionController extends GetxController {
             const Expanded(
               child: Text(
                 '¿Borrar todos los datos?',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 18),
+                style: TextStyle(fontSize: 18),
               ),
             ),
           ],
@@ -588,19 +1005,15 @@ class ConfiguracionController extends GetxController {
           '• El gimnasio y sus sucursales\n'
           '• Tu cuenta de usuario\n\n'
           'Esta acción NO se puede deshacer.',
-          style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+          style: TextStyle(height: 1.5),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
+          BotonCancelar(onPressed: () => Get.back(result: false)),
+          BotonGuardar(
+            texto: 'Sí, borrar todo',
+            compacto: true,
+            color: AppColors.error,
             onPressed: () => Get.back(result: true),
-            child: Text(
-              'Sí, borrar todo',
-              style: TextStyle(color: Colors.red[400], fontWeight: FontWeight.bold),
-            ),
           ),
         ],
       ),
@@ -619,13 +1032,38 @@ class ConfiguracionController extends GetxController {
     try {
       isLoading.value = true;
 
-      final result = await Supabase.instance.client
+      // Primero las fotos de los clientes: después de
+      // borrar el gimnasio ya no se sabe cuáles eran (las fotos no llevan el
+      // gimnasio en el nombre) y la sesión ya no puede borrarlas. Si algo no
+      // se borra, se corta aquí, con todo lo demás intacto, para reintentar.
+      if (!await StorageService.instance.borrarFotosDelGimnasio(gymId)) {
+        SnackbarHelper.error('Error',
+            'No se pudieron borrar las fotos. Revisa tu conexión e inténtalo de nuevo.');
+        return;
+      }
+
+      await Supabase.instance.client
           .rpc('delete_gym_cascade', params: {'p_gym_id': gymId});
 
-      if (kDebugMode) print('🗑️ delete_gym_cascade result: $result');
+      // La cuenta ya no existe en el servidor: cerrar sesión para no dejar
+      // el token guardado en el dispositivo.
+      try {
+        await Supabase.instance.client.auth.signOut();
+      } catch (e) {
+        AppLogger.warning(
+            'ConfiguracionController', 'No se pudo cerrar la sesión');
+      }
 
       // Clear local data
       await TenantContextService.to.clearProfile();
+
+      // Las fotos de clientes de un gimnasio borrado no deben quedar en disco
+      try {
+        await ImageCacheService.instance.clearAllCache();
+      } catch (e) {
+        AppLogger.warning('ConfiguracionController',
+            'No se pudo limpiar el caché de imágenes');
+      }
 
       // Navigate to login
       Get.offAllNamed(Routes.LOGIN);
@@ -636,9 +1074,12 @@ class ConfiguracionController extends GetxController {
             'Cuenta eliminada', 'Todos los datos han sido borrados');
       });
     } catch (e) {
-      if (kDebugMode) print('❌ Error deleting gym: $e');
-      SnackbarHelper.error(
-          'Error', 'No se pudieron borrar los datos: ${e.toString()}');
+      AppLogger.error(
+          'ConfiguracionController', 'Fallo al eliminar el gimnasio', e);
+      final mensaje = e.toString().contains('Only the gym owner')
+          ? 'Solo el dueño del gimnasio puede borrar los datos'
+          : 'No se pudieron borrar los datos. Revisa tu conexión e inténtalo de nuevo.';
+      SnackbarHelper.error('Error', mensaje);
     } finally {
       isLoading.value = false;
     }
@@ -648,28 +1089,29 @@ class ConfiguracionController extends GetxController {
 /// Dialog that requires typing the gym name to confirm deletion
 class _ConfirmDeleteDialog extends StatelessWidget {
   final String gymName;
-  _ConfirmDeleteDialog({required this.gymName});
+  const _ConfirmDeleteDialog({required this.gymName});
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final controller = TextEditingController();
     final isMatch = false.obs;
 
     return Obx(() => AlertDialog(
-          backgroundColor: AppColors.cardBackground,
-          title: const Text(
-            'Confirmar eliminación',
-            style: TextStyle(color: AppColors.textPrimary),
-          ),
+          scrollable: true,
+          title: const Text('Confirmar eliminación'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               RichText(
                 text: TextSpan(
-                  style: const TextStyle(color: AppColors.textSecondary, height: 1.5),
+                  style: TextStyle(
+                      color: c.textSecondary, height: 1.5),
                   children: [
-                    const TextSpan(text: 'Para confirmar, escribe el nombre de tu gimnasio:\n\n'),
+                    const TextSpan(
+                        text:
+                            'Para confirmar, escribe el nombre de tu gimnasio:\n\n'),
                     TextSpan(
                       text: gymName,
                       style: TextStyle(
@@ -683,10 +1125,11 @@ class _ConfirmDeleteDialog extends StatelessWidget {
               const SizedBox(height: 16),
               TextField(
                 controller: controller,
-                style: const TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: c.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Escribe el nombre aquí',
-                  hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+                  hintStyle: TextStyle(
+                      color: c.textSecondary.withOpacity(0.5)),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.red.withOpacity(0.3)),
@@ -696,29 +1139,42 @@ class _ConfirmDeleteDialog extends StatelessWidget {
                     borderSide: BorderSide(color: Colors.red[400]!),
                   ),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: c.superficie,
                 ),
                 onChanged: (val) {
-                  isMatch.value = val.trim().toLowerCase() == gymName.trim().toLowerCase();
+                  isMatch.value =
+                      val.trim().toLowerCase() == gymName.trim().toLowerCase();
                 },
               ),
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Get.back(result: false),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
+            BotonCancelar(onPressed: () => Get.back(result: false)),
+            BotonGuardar(
+              texto: 'Borrar permanentemente',
+              compacto: true,
+              color: AppColors.error,
               onPressed: isMatch.value ? () => Get.back(result: true) : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red[700],
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey[800],
-              ),
-              child: const Text('Borrar permanentemente'),
             ),
           ],
         ));
   }
+}
+
+/// Relación entre el lector configurado y el gimnasio de la sesión actual.
+enum EstadoLector {
+  /// Este gimnasio todavía no eligió ningún lector.
+  sinConfigurar,
+
+  /// Hay un lector y no tiene dueño: se puede reclamar.
+  libre,
+
+  /// Es de este gimnasio. El caso normal.
+  mio,
+
+  /// Existe, pero pertenece a otro gimnasio: no va a contestar los pases.
+  deOtroGimnasio,
+
+  /// No respondió: apagado, otra IP, u otra red.
+  sinConexion,
 }

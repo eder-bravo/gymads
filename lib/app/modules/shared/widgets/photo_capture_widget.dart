@@ -1,145 +1,220 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../views/circular_camera_view.dart';
+
+import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../core/widgets/cached_user_image.dart';
+import '../views/circular_camera_view.dart';
 
-class PhotoCaptureWidget extends StatelessWidget {
-  final Function(File) onPhotoTaken;
-  final String? currentPhotoUrl;
-
-  PhotoCaptureWidget({
+/// La foto del cliente en su formulario: la foto (o una silueta) y un botón
+/// que dice claramente qué hacer.
+///
+/// Antes era solo un círculo gris "tocable" con un texto gris casi invisible:
+/// no se entendía que ahí se tomaba la foto.
+class PhotoCaptureWidget extends StatefulWidget {
+  const PhotoCaptureWidget({
     super.key,
     required this.onPhotoTaken,
     this.currentPhotoUrl,
-    File? initialPhotoFile,
-  }) {
-    // Inicializar el estado reactivo con el archivo inicial si existe
-    _tempImageFile = Rx<File?>(initialPhotoFile);
-  }
+    this.initialPhotoFile,
+    this.obligatoria = false,
+    this.mostrarFalta = false,
+  });
 
-  // Estado reactivo para la imagen temporal
-  late final Rx<File?> _tempImageFile;
+  final Function(File) onPhotoTaken;
 
-  Future<void> _checkAndRequestCameraPermission() async {
-    final status = await Permission.camera.request();
-    if (status.isDenied) {
-      if (Get.context != null) {
-        showDialog(
-          context: Get.context!,
-          builder: (context) => AlertDialog(
-            title: const Text('Permiso de Cámara Requerido'),
-            content: const Text(
-              'Para tomar la foto del usuario, necesitamos acceso a la cámara.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Get.back(),
-                child: const Text('Cancelar'),
-              ),
-              TextButton(
-                onPressed: () => openAppSettings(),
-                child: const Text('Abrir Configuración'),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-  }
+  /// La foto que ya tiene el cliente (al editar).
+  final String? currentPhotoUrl;
 
-  Future<void> _takePicture() async {
-    await _checkAndRequestCameraPermission();
+  /// Una foto tomada que todavía no se guarda.
+  final File? initialPhotoFile;
 
-    try {
-      // Usar la vista de cámara circular
-      await Get.to<File>(
-        () => CircularCameraView(
-          onPhotoTaken: (File imageFile) {
-            _tempImageFile.value = imageFile;
-            onPhotoTaken(imageFile);
-            Get.back(); // Regresar automáticamente después de tomar la foto
-          },
-          onCancel: () {
-            Get.back(); // Solo regresar sin hacer nada
-          },
+  /// El botón lleva "*", como los demás campos obligatorios.
+  final bool obligatoria;
+
+  /// Se intentó guardar sin foto: el círculo y el aviso en rojo.
+  final bool mostrarFalta;
+
+  @override
+  State<PhotoCaptureWidget> createState() => _PhotoCaptureWidgetState();
+}
+
+class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
+  /// En el State: si la pantalla se redibuja, la foto tomada sigue a la vista.
+  late File? _foto = widget.initialPhotoFile;
+
+  bool get _tieneFoto =>
+      _foto != null || (widget.currentPhotoUrl?.isNotEmpty ?? false);
+
+  bool get _faltaFoto => widget.mostrarFalta && !_tieneFoto;
+
+  /// Sin permiso no se abre la cámara (fallaría en negro); se explica cómo
+  /// darlo.
+  Future<bool> _permisoDeCamara() async {
+    final c = context.colores;
+    final estado = await Permission.camera.request();
+    if (estado.isGranted || estado.isLimited) return true;
+    if (!mounted) return false;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: c.cardBackground,
+        title: Text('Se necesita la cámara',
+            style: TextStyle(color: c.textPrimary)),
+        content: Text(
+          'Para tomar la foto del cliente, permite el acceso a la cámara en '
+          'los ajustes del teléfono.',
+          style: TextStyle(color: c.textSecondary),
         ),
-        transition: Transition.rightToLeft,
-        duration: const Duration(milliseconds: 300),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Ahora no',
+                style: TextStyle(color: c.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              openAppSettings();
+            },
+            child: const Text('Abrir ajustes',
+                style: TextStyle(color: AppColors.accent)),
+          ),
+        ],
+      ),
+    );
+    return false;
+  }
+
+  Future<void> _tomarFoto() async {
+    if (!await _permisoDeCamara()) return;
+
+    File? tomada;
+    try {
+      // La cámara devuelve la foto solo cuando se toca "Usar foto".
+      tomada = await Get.to<File>(
+        () => CircularCameraView(
+          onPhotoTaken: (archivo) => Get.back(result: archivo),
+          onCancel: () => Get.back(),
+        ),
+        transition: Transition.downToUp,
+        duration: const Duration(milliseconds: 250),
       );
     } catch (e) {
-      // Fallback a ImagePicker si hay problemas con la cámara nativa
+      // Si la cámara propia falla, la del sistema.
       try {
-        final ImagePicker picker = ImagePicker();
-        final XFile? photo = await picker.pickImage(
+        final foto = await ImagePicker().pickImage(
           source: ImageSource.camera,
-          preferredCameraDevice: CameraDevice.front, // Frontal por defecto
+          preferredCameraDevice: CameraDevice.rear,
           imageQuality: 80,
         );
-
-        if (photo != null) {
-          final file = File(photo.path);
-          _tempImageFile.value = file;
-          onPhotoTaken(file);
-        }
-      } catch (fallbackError) {
+        if (foto != null) tomada = File(foto.path);
+      } catch (_) {
         SnackbarHelper.error(
-          'Error',
-          'No se pudo tomar la foto. Por favor, intenta de nuevo.',
-        );
+            'No se tomó la foto', 'No se pudo abrir la cámara. Intenta de nuevo.');
       }
     }
+
+    if (tomada == null || !mounted) return;
+    setState(() => _foto = tomada);
+    widget.onPhotoTaken(tomada);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          InkWell(
-            onTap: _takePicture,
-            child: Obx(() {
-              final tempFile = _tempImageFile.value;
-              return Container(
-                width: 150,
-                height: 150,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(75),
-                  border: Border.all(color: Colors.grey[400]!, width: 2),
-                ),
-                child: tempFile != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(75),
-                        child: Image.file(tempFile, fit: BoxFit.cover),
-                      )
-                    : currentPhotoUrl != null
-                        ? CachedUserImage(
-                            imageUrl: currentPhotoUrl,
-                            size: 150,
-                            isCircular: true,
-                          )
-                        : const Icon(
-                            Icons.camera_alt,
-                            size: 50,
-                            color: Colors.grey,
-                          ),
-              );
-            }),
+    // La foto al centro y un solo botón debajo: sin textos de explicación.
+    return Column(
+      children: [
+        _miniatura(),
+        const SizedBox(height: 6),
+        TextButton.icon(
+          onPressed: _tomarFoto,
+          icon: Icon(
+            _tieneFoto ? Icons.refresh : Icons.photo_camera_outlined,
+            size: 18,
           ),
-          const SizedBox(height: 8),
-          Obx(
-            () => Text(
-              _tempImageFile.value != null || currentPhotoUrl != null
-                  ? 'Toca para cambiar la foto'
-                  : 'Toca para tomar una foto',
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+          label: Text(_tieneFoto
+              ? 'Cambiar foto'
+              : (widget.obligatoria ? 'Tomar foto *' : 'Tomar foto')),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.accent,
+            textStyle:
+                const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ),
+        if (_faltaFoto)
+          const Text(
+            'Toma la foto del cliente',
+            style: TextStyle(color: AppColors.error, fontSize: 13),
+          ),
+      ],
+    );
+  }
+
+  Widget _miniatura() {
+    final c = context.colores;
+    const tamano = 112.0;
+    final foto = _foto;
+    final Widget contenido;
+    if (foto != null) {
+      contenido = Image.file(foto, fit: BoxFit.cover);
+    } else if (widget.currentPhotoUrl?.isNotEmpty ?? false) {
+      contenido = CachedUserImage(
+        imageUrl: widget.currentPhotoUrl,
+        size: tamano,
+        isCircular: true,
+      );
+    } else {
+      contenido = Icon(Icons.person,
+          size: 64, color: c.textSecondary.withOpacity(0.6));
+    }
+
+    return GestureDetector(
+      onTap: _tomarFoto,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: tamano,
+            height: tamano,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: c.superficie,
+            ),
+            // El aro va encima de la foto: como `decoration` se pintaba
+            // debajo, la foto lo tapaba en las diagonales y el círculo se
+            // veía mal recortado.
+            foregroundDecoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: _faltaFoto
+                    ? AppColors.error
+                    : _tieneFoto
+                        ? AppColors.accent
+                        : c.contraste.withOpacity(0.25),
+                width: 2,
+              ),
+            ),
+            child: contenido,
+          ),
+          // Se nota que ahí se toma la foto.
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                shape: BoxShape.circle,
+                border: Border.all(color: c.backgroundColor, width: 3),
+              ),
+              child: const Icon(Icons.photo_camera,
+                  size: 18, color: Colors.white),
             ),
           ),
         ],

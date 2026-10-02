@@ -7,6 +7,9 @@ import 'package:gymads/app/core/utils/phone_utils.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import '../controllers/clientes_controller.dart';
+import 'package:gymads/app/modules/abonar/controllers/abonar_controller.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
+import 'package:gymads/app/global_widgets/foto_ampliada.dart';
 
 class ClienteDetailView extends GetView<ClientesController> {
   final UserModel cliente;
@@ -18,43 +21,48 @@ class ClienteDetailView extends GetView<ClientesController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Detalles del Cliente'),
-      body: SingleChildScrollView(
+      // SafeArea: de lado, el notch tapaba el borde izquierdo de la ficha.
+      body: SafeArea(
+        child: SingleChildScrollView(
         child: Column(
           children: [
             // Cabecera con foto y nombre
-            _buildHeader(),
+            _buildHeader(context),
 
             const SizedBox(height: 16),
 
             // Tarjetas de información rápida
-            _buildQuickInfoCards(),
+            _buildQuickInfoCards(context),
 
             const SizedBox(height: 16),
 
             // Detalles generales (incluyendo los nuevos campos email y address)
-            _buildDetailCards(),
+            _buildDetailCards(context),
 
             const SizedBox(height: 16),
 
             // Botones de acción principales
-            _buildActionButtons(),
+            _buildActionButtons(context),
 
             const SizedBox(height: 32),
           ],
         ),
       ),
+      ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    final c = context.colores;
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: c.backgroundColor,
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(30),
           bottomRight: Radius.circular(30),
         ),
@@ -66,7 +74,19 @@ class ClienteDetailView extends GetView<ClientesController> {
           // Foto de perfil con animación Hero
           Hero(
             tag: 'avatar_${cliente.id}',
-            child: Container(
+            // Ver la nota en ClienteCard: sin esto las iniciales volaban
+            // subrayadas en amarillo.
+            flightShuttleBuilder: (context, animation, direction, desde, hacia) =>
+                Material(
+                    type: MaterialType.transparency,
+                    child: (hacia.widget as Hero).child),
+            child: GestureDetector(
+              // Tocar la foto la abre en grande.
+              onTap: (cliente.photoUrl?.isNotEmpty ?? false)
+                  ? () => mostrarFotoAmpliada(cliente.photoUrl!,
+                      nombre: cliente.name)
+                  : null,
+              child: Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
@@ -87,16 +107,17 @@ class ClienteDetailView extends GetView<ClientesController> {
                 size: 130,
               ),
             ),
+            ),
           ),
           const SizedBox(width: 16),
           // Nombre del cliente
           Flexible(
             child: Text(
               cliente.name,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: AppColors.titleColor,
+                color: c.titleColor,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -107,14 +128,15 @@ class ClienteDetailView extends GetView<ClientesController> {
     );
   }
 
-  Widget _buildQuickInfoCards() {
+  Widget _buildQuickInfoCards(BuildContext context) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           Expanded(
             child: Builder(
-              builder: (context) => _buildInfoCard(
+              builder: (context) => _buildInfoCard(context,
                 icon: Icons.phone_outlined,
                 title: 'Teléfono',
                 value: cliente.phone,
@@ -131,13 +153,13 @@ class ClienteDetailView extends GetView<ClientesController> {
               builder: (context) {
                 final bool vinculado = cliente.rfidCard != null &&
                     cliente.rfidCard!.trim().isNotEmpty;
-                return _buildInfoCard(
+                return _buildInfoCard(context,
                   icon: Icons.vpn_key_outlined,
                   title: 'Llavero/Tarjeta',
                   value: vinculado ? 'Vinculado' : 'No vinculado',
                   color: vinculado
                       ? AppColors.success
-                      : AppColors.textSecondary,
+                      : c.textSecondary,
                 );
               },
             ),
@@ -147,7 +169,7 @@ class ClienteDetailView extends GetView<ClientesController> {
     );
   }
 
-  Widget _buildInfoCard({
+  Widget _buildInfoCard(BuildContext context, {
     required IconData icon,
     required String title,
     required String value,
@@ -155,11 +177,12 @@ class ClienteDetailView extends GetView<ClientesController> {
     Widget? trailing,
     VoidCallback? onTap,
   }) {
+    final c = context.colores;
     final card = Container(
       height: 120, // Altura fija para que tengan el mismo tamaño
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: c.cardBackground,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: color.withOpacity(0.2),
@@ -183,9 +206,9 @@ class ClienteDetailView extends GetView<ClientesController> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -196,10 +219,10 @@ class ClienteDetailView extends GetView<ClientesController> {
           const Spacer(), // Empuja el texto hacia abajo
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: c.textPrimary,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -219,22 +242,22 @@ class ClienteDetailView extends GetView<ClientesController> {
     );
   }
 
-  Widget _buildDetailCards() {
+  Widget _buildDetailCards(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
           // Card de información de contacto extendida
-          _buildDetailCard(
+          _buildDetailCard(context,
             title: 'Contacto y Dirección',
             icon: Icons.contact_mail_outlined,
             children: [
-              _buildDetailRow(
+              _buildDetailRow(context,
                 'Correo',
                 cliente.email?.isNotEmpty == true ? cliente.email! : 'No registrado',
                 Icons.email_outlined,
               ),
-              _buildDetailRow(
+              _buildDetailRow(context,
                 'Dirección',
                 cliente.address?.isNotEmpty == true ? cliente.address! : 'No registrada',
                 Icons.location_on_outlined,
@@ -245,23 +268,23 @@ class ClienteDetailView extends GetView<ClientesController> {
           const SizedBox(height: 16),
 
           // Card de fechas importantes
-          _buildDetailCard(
+          _buildDetailCard(context,
             title: 'Fechas Importantes',
             icon: Icons.calendar_today_outlined,
             children: [
-              _buildDetailRow(
+              _buildDetailRow(context,
                 'Fecha de registro',
                 _formatDate(cliente.joinDate),
                 Icons.today_outlined,
               ),
               if (cliente.expirationDate != null)
-                _buildDetailRow(
+                _buildDetailRow(context,
                   'Hasta qué fecha puede entrar',
                   _formatDate(cliente.expirationDate!),
                   Icons.event_outlined,
                 ),
               if (cliente.lastPaymentDate != null)
-                _buildDetailRow(
+                _buildDetailRow(context,
                   'Último pago',
                   _formatDate(cliente.lastPaymentDate!),
                   Icons.payment_outlined,
@@ -277,19 +300,20 @@ class ClienteDetailView extends GetView<ClientesController> {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
-  Widget _buildDetailCard({
+  Widget _buildDetailCard(BuildContext context, {
     required String title,
     required IconData icon,
     required List<Widget> children,
   }) {
+    final c = context.colores;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: c.cardBackground,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.titleColor.withOpacity(0.1),
+          color: c.titleColor.withOpacity(0.1),
           width: 1,
         ),
       ),
@@ -301,18 +325,18 @@ class ClienteDetailView extends GetView<ClientesController> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.titleColor.withOpacity(0.1),
+                  color: c.titleColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: AppColors.titleColor, size: 20),
+                child: Icon(icon, color: c.titleColor, size: 20),
               ),
               const SizedBox(width: 12),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.titleColor,
+                  color: c.titleColor,
                 ),
               ),
             ],
@@ -324,19 +348,20 @@ class ClienteDetailView extends GetView<ClientesController> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, IconData icon) {
+  Widget _buildDetailRow(BuildContext context, String label, String value, IconData icon) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: AppColors.textSecondary),
+          Icon(icon, size: 16, color: c.textSecondary),
           const SizedBox(width: 8),
           Flexible(
             flex: 2,
             child: Text(
               label,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
+              style: TextStyle(
+                color: c.textSecondary,
                 fontSize: 14,
               ),
             ),
@@ -346,10 +371,10 @@ class ClienteDetailView extends GetView<ClientesController> {
             flex: 3,
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
-                color: AppColors.textPrimary,
+                color: c.textPrimary,
               ),
               textAlign: TextAlign.end,
             ),
@@ -359,7 +384,8 @@ class ClienteDetailView extends GetView<ClientesController> {
     );
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(BuildContext context) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -384,7 +410,7 @@ class ClienteDetailView extends GetView<ClientesController> {
                 child: _buildActionButton(
                   label: 'Editar',
                   icon: Icons.edit_outlined,
-                  color: AppColors.titleColor,
+                  color: c.titleColor,
                   onPressed: _editCliente,
                   isOutlined: true,
                 ),
@@ -395,7 +421,7 @@ class ClienteDetailView extends GetView<ClientesController> {
                   label: 'Eliminar',
                   icon: Icons.delete_outline,
                   color: AppColors.error,
-                  onPressed: _deleteCliente,
+                  onPressed: () => _deleteCliente(context),
                   isOutlined: true,
                 ),
               ),
@@ -472,19 +498,30 @@ class ClienteDetailView extends GetView<ClientesController> {
         addressController: controller.addressController,
         userNumberController: controller.userNumberController,
         rfidController: controller.rfidController,
+        tarjetaOriginal: cliente.rfidCard,
         currentPhotoUrl: cliente.photoUrl,
-        onSave: (updatedUser, photoFile) {
+        onSave: (updatedUser, photoFile) async {
           final user = updatedUser.copyWith(
             id: cliente.id,
             joinDate: cliente.joinDate,
             accessHistory: cliente.accessHistory,
             photoUrl: photoFile == null ? cliente.photoUrl : null,
+            // Conservar los datos de vigencia: el formulario no los edita y
+            // enviarlos vacíos borraría la vigencia del cliente en la BD.
+            expirationDate: cliente.expirationDate,
+            lastPaymentDate: cliente.lastPaymentDate,
+            isActive: cliente.isActive,
           );
 
-          controller.updateCliente(cliente.id!, user, photoFile: photoFile);
+          // Se cierra solo si se guardó: si falla (sin conexión, tarjeta de
+          // otro cliente) el formulario sigue abierto con lo escrito.
+          final guardado = await controller.updateCliente(cliente.id!, user,
+              photoFile: photoFile);
+          if (!guardado) return;
           Get.back(); // Cerrar el formulario
           Get.back(); // Volver a la lista de clientes
         },
+        guardando: controller.guardandoCliente,
         isEditing: true,
         fullScreen: true,
       ),
@@ -495,53 +532,41 @@ class ClienteDetailView extends GetView<ClientesController> {
   void _abonarCliente() {
     Get.back(); // Volver a la lista de clientes
     // Navegar al módulo de abonar pre-seleccionando al cliente, asumiendo ruta /abonar
-    Get.toNamed('/abonar', arguments: {'cliente': cliente});
+    Get.toNamed('/abonar', arguments: {
+      'cliente': cliente,
+      'alTerminar': AlTerminarAbono.volverAClientes,
+    });
   }
 
-  void _deleteCliente() {
+  void _deleteCliente(BuildContext context) {
+    final c = context.colores;
     Get.dialog(
       AlertDialog(
-        backgroundColor: AppColors.cardBackground,
+        scrollable: true,
+        backgroundColor: c.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Eliminar Cliente',
+        title: Text(
+          'Eliminar cliente',
           style: TextStyle(
-            color: AppColors.titleColor,
+            color: c.textPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
         content: Text(
           '¿Estás seguro de que deseas eliminar a ${cliente.name}?\n\nEsta acción no se puede deshacer.',
-          style: const TextStyle(color: AppColors.textPrimary),
+          style: TextStyle(color: c.textPrimary),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          ElevatedButton(
+          BotonCancelar(onPressed: () => Get.back()),
+          BotonGuardar(
+            texto: 'Eliminar',
+            compacto: true,
+            color: AppColors.error,
             onPressed: () {
               Get.back(); // Cerrar dialog
               Get.back(); // Volver a lista
               controller.deleteCliente(cliente.id!);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
           ),
         ],
       ),

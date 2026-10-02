@@ -1,6 +1,10 @@
 import 'package:get/get.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get_storage/get_storage.dart';
+import '../../core/permissions/permissions.dart';
+import '../../core/permissions/staff_role.dart';
 import '../models/staff_profile_model.dart';
+import 'gym_settings_service.dart';
 
 /// Service that manages the current tenant context (gym/branch)
 ///
@@ -26,8 +30,31 @@ class TenantContextService extends GetxService {
   /// Current branch ID
   String? get currentBranchId => _staffProfile.value?.branchId;
 
-  /// Current user role ('owner_admin' or 'branch_staff')
+  /// Current user role, as stored in the database.
   String? get currentRole => _staffProfile.value?.role;
+
+  /// El rol del usuario actual. Sin perfil se asume el rol más limitado.
+  StaffRole get rol => StaffRole.fromString(_staffProfile.value?.role);
+
+  /// Si el usuario actual puede hacer [permiso].
+  ///
+  /// Es la única forma correcta de decidir qué mostrar. Sin sesión no se
+  /// puede nada: la respuesta es siempre false.
+  bool can(Permission permiso) {
+    if (_staffProfile.value == null) return false;
+    return kPermisosPorRol[rol]?.contains(permiso) ?? false;
+  }
+
+  /// Si el usuario actual puede entregar o modificar accesos con el rol [otro].
+  ///
+  /// Espeja a `public.puede_gestionar_rol()`: hace falta el permiso y, además,
+  /// mandar sobre ese rol. Así un encargado no puede nombrar a otro encargado.
+  bool puedeGestionarRol(StaffRole otro) =>
+      can(Permission.gestionarAccesosStaff) && rol.mandaSobre(otro);
+
+  /// Los roles que este usuario puede entregar al crear un acceso.
+  List<StaffRole> get rolesAsignables =>
+      StaffRole.asignables.where(puedeGestionarRol).toList();
 
   /// Display name of current staff
   String? get displayName => _staffProfile.value?.displayName;
@@ -47,14 +74,8 @@ class TenantContextService extends GetxService {
   /// Check if current user is branch_staff
   bool get isBranchStaff => _staffProfile.value?.isBranchStaff ?? false;
 
-  /// Gym name (for branding)
+  /// Gym name
   String? get gymName => _staffProfile.value?.gymName;
-
-  /// Gym brand color hex (e.g. '#10D5E8')
-  String? get brandColor => _staffProfile.value?.brandColor;
-
-  /// Gym brand font name
-  String? get brandFont => _staffProfile.value?.brandFont;
 
   /// Fecha de creación de la cuenta (gimnasio). Si no está disponible la
   /// fecha del gimnasio, se usa la del perfil de staff como respaldo.
@@ -88,6 +109,13 @@ class TenantContextService extends GetxService {
   Future<void> clearProfile() async {
     _staffProfile.value = null;
     await _storage.remove(_profileKey);
+
+    // Punto único por el que pasan todos los cierres de sesión: si no se
+    // limpia aquí, el siguiente gimnasio heredaría el horario y el modo de
+    // salidas del anterior.
+    if (Get.isRegistered<GymSettingsService>()) {
+      GymSettingsService.to.clear();
+    }
   }
 
   /// Load cached profile from local storage
@@ -98,7 +126,7 @@ class TenantContextService extends GetxService {
         _staffProfile.value = StaffProfileModel.fromJson(cached);
       }
     } catch (e) {
-      print('⚠️ Error loading cached profile: $e');
+      AppLogger.warning('TenantContextService', 'Error loading cached profile');
       await clearProfile();
     }
     return _staffProfile.value;

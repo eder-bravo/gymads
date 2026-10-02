@@ -16,6 +16,7 @@ class ClienteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     // Formatear fecha de expiración
     final dateFormatter = DateFormat('dd/MM/yyyy');
     final String expirationDateText = cliente.expirationDate != null
@@ -70,7 +71,7 @@ class ClienteCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           child: Ink(
             decoration: BoxDecoration(
-              color: AppColors.cardBackground,
+              color: c.cardBackground,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: primaryColor.withOpacity(0.5),
@@ -112,7 +113,7 @@ class ClienteCard extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.backgroundColor,
+                            color: c.backgroundColor,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: primaryColor, width: 1),
                           ),
@@ -149,6 +150,10 @@ class ClienteCard extends StatelessWidget {
                       // Avatar del cliente con caché optimizado
                       Hero(
                         tag: 'avatar_${cliente.id}',
+                        // Con estilo de texto propio: al volar entre la lista
+                        // y la ficha, las iniciales (cliente sin foto) salían
+                        // subrayadas en amarillo.
+                        flightShuttleBuilder: _vueloConEstilo,
                         child: Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
@@ -177,20 +182,20 @@ class ClienteCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
+                                color: c.textPrimary,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 8),
 
-                            _buildInfoRow(
+                            _buildInfoRow(context,
                               Icons.event_available_rounded,
                               'Puede entrar hasta: $expirationDateText',
                               primaryColor,
                             ),
                             const SizedBox(height: 8),
-                            _buildInfoRow(
+                            _buildInfoRow(context,
                               Icons.phone_rounded,
                               cliente.phone,
                               primaryColor,
@@ -210,8 +215,9 @@ class ClienteCard extends StatelessWidget {
   }
 
   // Widget para filas de información
-  Widget _buildInfoRow(IconData icon, String text, Color color,
+  Widget _buildInfoRow(BuildContext context, IconData icon, String text, Color color,
       {bool allowWrap = false}) {
+    final c = context.colores;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -223,7 +229,7 @@ class ClienteCard extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 14, color: c.textSecondary),
             maxLines: allowWrap ? 2 : 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -232,4 +238,19 @@ class ClienteCard extends StatelessWidget {
     );
   }
 
+}
+
+/// El avatar mientras vuela entre la lista y la ficha, dentro de un
+/// `Material`: fuera de la pantalla no hay estilo de texto y Flutter subraya
+/// en amarillo las iniciales de un cliente sin foto.
+Widget _vueloConEstilo(
+  BuildContext flightContext,
+  Animation<double> animation,
+  HeroFlightDirection direction,
+  BuildContext fromContext,
+  BuildContext toContext,
+) {
+  // Como hace Flutter por defecto: vuela la versión del destino.
+  final hero = toContext.widget as Hero;
+  return Material(type: MaterialType.transparency, child: hero.child);
 }

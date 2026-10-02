@@ -11,11 +11,15 @@ extension ResponsiveContext on BuildContext {
   /// Devuelve la altura de la pantalla
   double get screenHeight => screenSize.height;
   
-  /// Verifica si el dispositivo es una tablet (ancho > 600)
-  bool get isTablet => screenWidth > 600;
+  /// Verifica si el dispositivo es una tablet.
+  ///
+  /// Se mira el lado CORTO, no el ancho: un teléfono de lado mide más de 600
+  /// de ancho, y tratarlo como tablet le ponía textos y rejillas de tablet en
+  /// una pantalla sin altura.
+  bool get isTablet => screenSize.shortestSide >= 600;
   
-  /// Verifica si el dispositivo es un teléfono pequeño (ancho < 360)
-  bool get isSmallPhone => screenWidth < 360;
+  /// Verifica si el dispositivo es un teléfono pequeño (lado corto < 360)
+  bool get isSmallPhone => screenSize.shortestSide < 360;
   
   /// Verifica si el dispositivo está en modo landscape
   bool get isLandscape => screenWidth > screenHeight;
@@ -125,7 +129,10 @@ class AdaptivePadding extends StatelessWidget {
   }
 }
 
-/// Función para calcular un valor responsivo basado en el ancho de pantalla
+/// Función para calcular un valor responsivo según el tipo de dispositivo.
+///
+/// El tipo sale del lado CORTO de la pantalla, no del ancho: así girar el
+/// teléfono no cambia tamaños de letra ni espaciados a los de tablet.
 double getResponsiveValue({
   required BuildContext context,
   required double defaultValue,
@@ -133,13 +140,13 @@ double getResponsiveValue({
   double? desktopValue,
   double? smallPhoneValue,
 }) {
-  final width = MediaQuery.of(context).size.width;
-  
-  if (width > 1200) {
+  final lado = MediaQuery.sizeOf(context).shortestSide;
+
+  if (lado >= 900) {
     return desktopValue ?? tabletValue ?? defaultValue;
-  } else if (width > 600) {
+  } else if (lado >= 600) {
     return tabletValue ?? defaultValue;
-  } else if (width < 360) {
+  } else if (lado < 360) {
     return smallPhoneValue ?? defaultValue;
   } else {
     return defaultValue;
@@ -148,20 +155,21 @@ double getResponsiveValue({
 
 /// Clase con valores responsive predefinidos
 class ResponsiveValues {
-  /// Verifica si el dispositivo es una tablet (ancho > 600)
+  /// Verifica si el dispositivo es una tablet (lado corto >= 600, así un
+  /// teléfono de lado sigue contando como teléfono).
   static bool isTablet(BuildContext context) {
-    return MediaQuery.of(context).size.width > 600;
+    return MediaQuery.sizeOf(context).shortestSide >= 600;
   }
   
   /// Verifica si el dispositivo es un teléfono móvil estándar
   static bool isMobile(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    return width <= 600 && width >= 360;
+    final lado = MediaQuery.sizeOf(context).shortestSide;
+    return lado < 600 && lado >= 360;
   }
   
-  /// Verifica si el dispositivo es un teléfono pequeño (ancho < 360)
+  /// Verifica si el dispositivo es un teléfono pequeño (lado corto < 360)
   static bool isSmallPhone(BuildContext context) {
-    return MediaQuery.of(context).size.width < 360;
+    return MediaQuery.sizeOf(context).shortestSide < 360;
   }
   
   /// Devuelve la altura de la pantalla

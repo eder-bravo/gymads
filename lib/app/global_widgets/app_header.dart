@@ -4,8 +4,8 @@ import 'package:gymads/core/theme/app_colors.dart';
 /// AppBar estándar de la aplicación.
 ///
 /// Único lugar donde se define el estilo del header: título alineado a la
-/// izquierda, fondo [AppColors.primary] y sin sombra. Al ir en el `appBar`
-/// del Scaffold queda fijo: el contenido hace scroll debajo sin moverlo.
+/// izquierda, fondo y colores del tema (`appBarTheme`, en claro u oscuro) y
+/// sin sombra. Al ir en el `appBar` del Scaffold queda fijo: el contenido hace scroll debajo sin moverlo.
 class GymAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;
@@ -33,9 +33,6 @@ class GymAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       centerTitle: false,
       titleSpacing: 16,
-      backgroundColor: AppColors.primary,
-      foregroundColor: AppColors.textPrimary,
-      elevation: 0,
       leading: leading,
       actions: actions,
       bottom: bottom,
@@ -62,20 +59,24 @@ class AppSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return TextField(
       controller: controller,
       onChanged: onChanged,
       keyboardType: keyboardType,
-      style: const TextStyle(color: AppColors.textPrimary),
+      style: TextStyle(color: c.textPrimary),
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: const TextStyle(color: AppColors.textHint),
-        prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-        filled: true,
-        fillColor: AppColors.containerBackground,
-        border: OutlineInputBorder(
+        prefixIcon: const Icon(Icons.search),
+        // Relleno, borde y foco como todos los campos (tema); solo más
+        // redondeado, porque es un buscador.
+        enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: c.borde),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.accent, width: 2),
         ),
         contentPadding: EdgeInsets.zero,
       ),
@@ -83,51 +84,86 @@ class AppSearchField extends StatelessWidget {
   }
 }
 
+/// Datos de un chip de categoría. Tipo de transporte propio para que este
+/// archivo siga siendo genérico y no dependa de los modelos de producto.
+class CategoryChipData {
+  final String id;
+  final String label;
+  final IconData icon;
+
+  const CategoryChipData({
+    required this.id,
+    required this.label,
+    required this.icon,
+  });
+}
+
 /// Filtro de categorías estándar de la aplicación (chips horizontales).
 ///
 /// Diseño base tomado de Inventario: mismos colores, forma y comportamiento
 /// en cualquier vista que necesite filtrar una lista por categoría.
+///
+/// El chip "Todas" vale `null`, no un texto: antes era el literal 'Todas' y
+/// una categoría llamada así rompía el filtro para siempre. Como `null` no
+/// puede ser un id, la colisión ya es imposible.
 class CategoryFilterChips extends StatelessWidget {
-  final List<String> categories;
-  final String selected;
-  final ValueChanged<String> onSelected;
+  final List<CategoryChipData> categories;
+  final String? selectedId;
+  final ValueChanged<String?> onSelected;
   final String allLabel;
+  final IconData allIcon;
 
   const CategoryFilterChips({
     super.key,
     required this.categories,
-    required this.selected,
+    required this.selectedId,
     required this.onSelected,
     this.allLabel = 'Todas',
+    this.allIcon = Icons.apps,
   });
 
   @override
   Widget build(BuildContext context) {
-    final items = [allLabel, ...categories];
+    final c = context.colores;
+    final items = <CategoryChipData>[
+      CategoryChipData(id: '', label: allLabel, icon: allIcon),
+      ...categories,
+    ];
+
     return SizedBox(
       height: 50,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        children: items.map((category) {
-          final isSelected = selected == category;
+        children: items.map((item) {
+          final isAll = item.id.isEmpty;
+          final isSelected = isAll ? selectedId == null : selectedId == item.id;
+
           return Container(
             margin: const EdgeInsets.only(right: 8),
             child: FilterChip(
+              avatar: Icon(
+                item.icon,
+                size: 18,
+                color:
+                    isSelected ? c.textPrimary : c.textSecondary,
+              ),
               label: Text(
-                category,
+                item.label,
                 style: TextStyle(
                   color: isSelected
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
+                      ? c.textPrimary
+                      : c.textSecondary,
                   fontWeight:
                       isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
               selected: isSelected,
-              onSelected: (_) => onSelected(category),
-              backgroundColor: AppColors.cardBackground,
+              // Sin esto Material sustituye el avatar por una palomita al
+              // seleccionar, y el icono desaparece justo al mirarlo.
+              showCheckmark: false,
+              onSelected: (_) => onSelected(isAll ? null : item.id),
+              backgroundColor: c.cardBackground,
               selectedColor: AppColors.accent,
-              checkmarkColor: AppColors.textPrimary,
               side: BorderSide(
                 color: isSelected
                     ? AppColors.accent

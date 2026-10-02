@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
+import 'package:gymads/app/core/utils/category_icons.dart';
 import '../controllers/inventario_controller.dart';
+import 'stock_adjust_dialog.dart';
 
 class ProductFormView extends GetView<InventarioController> {
   const ProductFormView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final arguments = Get.arguments as Map<String, dynamic>? ?? {};
     final bool isEditing = arguments['isEditing'] ?? false;
     final formKey = GlobalKey<FormState>();
@@ -17,9 +21,10 @@ class ProductFormView extends GetView<InventarioController> {
     final descriptionController = TextEditingController();
     final priceController = TextEditingController();
     final stockController = TextEditingController();
+    final barcodeController = TextEditingController();
 
-    // Use an Rx variable so the dropdown stays reactive
-    final selectedCategory = RxnString(null);
+    // Id de la categoría, no el nombre: así renombrarla no desenlaza nada.
+    final selectedCategoryId = RxnString(null);
 
     // Si estamos editando, llenar los campos con los datos del producto actual
     if (isEditing && controller.currentProduct.value != null) {
@@ -28,82 +33,73 @@ class ProductFormView extends GetView<InventarioController> {
       descriptionController.text = product.description;
       priceController.text = product.price.toString();
       stockController.text = product.stock.toString();
-      selectedCategory.value = product.category;
+      barcodeController.text = product.barcode ?? '';
+      selectedCategoryId.value = product.categoryId;
+    } else if (arguments['barcode'] is String) {
+      // Llega desde "Código no registrado" al escanear en el inventario.
+      barcodeController.text = arguments['barcode'] as String;
     }
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+      backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
-        title: isEditing ? 'Editar Producto' : 'Nuevo Producto',
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.textPrimary),
-          onPressed: () {
-            controller.resetForm();
-            Get.back();
-          },
-        ),
-        actions: [
-          Obx(() {
-            return TextButton(
-              onPressed: controller.isLoading.value
+        title: isEditing ? 'Editar producto' : 'Nuevo producto',
+        leading: Obx(() => IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Cerrar',
+              onPressed: controller.guardandoProducto.value
                   ? null
                   : () {
-                      if (formKey.currentState!.validate()) {
-                        controller.saveProduct({
-                          'name': nameController.text,
-                          'description': descriptionController.text,
-                          'category': selectedCategory.value ?? '',
-                          'price': priceController.text,
-                          'stock': stockController.text,
-                        });
-                      }
+                      controller.resetForm();
+                      Get.back();
                     },
-              child: controller.isLoading.value
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: AppColors.accent,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : Text(
-                      isEditing ? 'Actualizar' : 'Guardar',
-                      style: const TextStyle(
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            );
-          }),
-        ],
+            )),
+      ),
+      // Como en los demás formularios: el botón para guardar, fijo abajo.
+      bottomNavigationBar: PieDeFormulario(
+        child: Obx(() => BotonGuardar(
+              texto: isEditing ? 'Guardar cambios' : 'Guardar producto',
+              guardando: controller.guardandoProducto.value,
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  controller.saveProduct({
+                    'name': nameController.text,
+                    'description': descriptionController.text,
+                    'category_id': selectedCategoryId.value,
+                    'price': priceController.text,
+                    'barcode': barcodeController.text,
+                    // Al editar el stock no se toca aquí.
+                    if (!isEditing) 'stock': stockController.text,
+                  });
+                }
+              },
+            )),
       ),
       body: SafeArea(
         child: Form(
           key: formKey,
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Sección de información básica
-                _buildSectionCard(
-                  title: 'Información Básica',
-                  icon: Icons.info_outline,
+                _seccion(
+                  title: 'Datos del producto',
                   children: [
                     TextFormField(
                       controller: nameController,
-                      style: const TextStyle(color: AppColors.textPrimary),
+                      style: TextStyle(color: c.textPrimary),
                       decoration: const InputDecoration(
                         labelText: 'Nombre del producto *',
                         hintText: 'Ej: Proteína Whey 1kg',
-                        prefixIcon:
-                            Icon(Icons.shopping_bag, color: AppColors.accent),
+                        prefixIcon: Icon(Icons.shopping_bag),
                       ),
                       textCapitalization: TextCapitalization.words,
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(
-                            r'[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s.,\-()]')),
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s.,\-()]')),
                         LengthLimitingTextInputFormatter(100),
                       ],
                       validator: (value) {
@@ -119,15 +115,15 @@ class ProductFormView extends GetView<InventarioController> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: descriptionController,
-                      style: const TextStyle(color: AppColors.textPrimary),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: c.textPrimary),
+                      decoration: InputDecoration(
                         labelText: 'Descripción',
-                        hintText: 'Describe las características del producto...',
-                        prefixIcon:
-                            Icon(Icons.description, color: AppColors.accent),
+                        hintText:
+                            'Describe las características del producto...',
+                        prefixIcon: const Icon(Icons.description),
                         helperText: 'Opcional - Máximo 500 caracteres',
-                        helperStyle: TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
+                        helperStyle:
+                            TextStyle(fontSize: 11, color: c.textSecondary),
                       ),
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
@@ -139,41 +135,42 @@ class ProductFormView extends GetView<InventarioController> {
 
                     // Category dropdown — reactive with Obx
                     Obx(() {
-                      final cats = controller.categories;
-                      final currentVal = selectedCategory.value;
+                      // Solo las activas se pueden asignar a un producto.
+                      final cats = controller.activeCategories;
+                      final currentVal = selectedCategoryId.value;
 
-                      // Ensure value is valid in list
-                      final validValue = cats.any((c) => c.name == currentVal)
+                      // Red de seguridad por si la categoría se borró estando
+                      // el formulario abierto (con ids esto ya es raro).
+                      final validValue = cats.any((c) => c.id == currentVal)
                           ? currentVal
                           : null;
 
                       return DropdownButtonFormField<String>(
                         value: validValue,
-                        style: const TextStyle(color: AppColors.textPrimary),
-                        decoration: InputDecoration(
+                        style: TextStyle(color: c.textPrimary),
+                        decoration: const InputDecoration(
                           labelText: 'Categoría *',
-                          prefixIcon:
-                              const Icon(Icons.category, color: AppColors.accent),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.add_circle_outline,
-                                color: AppColors.accent, size: 22),
-                            tooltip: 'Crear categoría',
-                            onPressed: () => _showCreateCategoryDialog(),
-                          ),
+                          prefixIcon: Icon(Icons.category),
                         ),
-                        dropdownColor: AppColors.cardBackground,
+                        dropdownColor: c.cardBackground,
                         items: cats.map((category) {
                           return DropdownMenuItem<String>(
-                            value: category.name,
-                            child: Text(
-                              category.name,
-                              style:
-                                  const TextStyle(color: AppColors.textPrimary),
+                            value: category.id,
+                            child: Row(
+                              children: [
+                                Icon(CategoryIcons.resolve(category.icon),
+                                    size: 18, color: AppColors.accent),
+                                const SizedBox(width: 10),
+                                Text(
+                                  category.name,
+                                  style: TextStyle(color: c.textPrimary),
+                                ),
+                              ],
                             ),
                           );
                         }).toList(),
                         onChanged: (value) {
-                          selectedCategory.value = value;
+                          selectedCategoryId.value = value;
                         },
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -183,10 +180,10 @@ class ProductFormView extends GetView<InventarioController> {
                         },
                         hint: Text(
                           cats.isEmpty
-                              ? 'Crea una categoría primero'
+                              ? 'Crea categorías desde Configuración'
                               : 'Selecciona una categoría',
                           style: TextStyle(
-                              color: AppColors.textSecondary.withOpacity(0.6)),
+                              color: c.textSecondary.withOpacity(0.6)),
                         ),
                       );
                     }),
@@ -196,30 +193,30 @@ class ProductFormView extends GetView<InventarioController> {
                 const SizedBox(height: 24),
 
                 // Sección de precio
-                _buildSectionCard(
+                _seccion(
                   title: 'Precio',
-                  icon: Icons.attach_money,
                   children: [
                     TextFormField(
                       controller: priceController,
-                      style: const TextStyle(
-                          color: AppColors.textPrimary, fontSize: 22, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold),
                       decoration: InputDecoration(
                         labelText: 'Precio de venta *',
                         hintText: '0.00',
-                        prefixIcon: const Icon(Icons.monetization_on,
-                            color: AppColors.accent),
+                        prefixIcon: const Icon(Icons.monetization_on),
                         prefixText: '\$ ',
-                        prefixStyle: TextStyle(
+                        prefixStyle: const TextStyle(
                             color: AppColors.accent,
                             fontSize: 22,
                             fontWeight: FontWeight.bold),
                         helperText: 'Precio unitario en MXN',
-                        helperStyle: const TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
+                        helperStyle:
+                            TextStyle(fontSize: 11, color: c.textSecondary),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(
                             RegExp(r'^\d+\.?\d{0,2}')),
@@ -244,48 +241,88 @@ class ProductFormView extends GetView<InventarioController> {
 
                 const SizedBox(height: 24),
 
-                // Sección de stock
-                _buildSectionCard(
-                  title: 'Stock Inicial',
-                  icon: Icons.inventory_2_outlined,
+                // Código de barras: el del fabricante, para poder escanear el
+                // producto y ajustar su stock sin buscarlo en la lista.
+                _seccion(
+                  title: 'Código de barras',
                   children: [
                     TextFormField(
-                      controller: stockController,
-                      style: const TextStyle(
-                          color: AppColors.textPrimary, fontSize: 22, fontWeight: FontWeight.bold),
+                      controller: barcodeController,
+                      style: TextStyle(color: c.textPrimary),
                       decoration: InputDecoration(
-                        labelText: 'Cantidad disponible *',
-                        hintText: '0',
-                        prefixIcon: const Icon(Icons.inventory,
-                            color: AppColors.accent),
-                        suffixText: 'unidades',
-                        suffixStyle: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 14),
-                        helperText: 'Unidades en existencia',
-                        helperStyle: const TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
+                        labelText: 'Código (opcional)',
+                        hintText: 'Escanéalo del envase o escríbelo',
+                        prefixIcon: const Icon(Icons.qr_code),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.qr_code_scanner),
+                          tooltip: 'Escanear',
+                          onPressed: () async {
+                            final codigo = await controller.escanearCodigo(
+                              titulo: 'Código del producto',
+                              instruccion:
+                                  'Apunta al código de barras del envase',
+                            );
+                            if (codigo != null) barcodeController.text = codigo;
+                          },
+                        ),
                       ),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(6),
-                      ],
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Ingresa la cantidad';
-                        }
-                        final stock = int.tryParse(value);
-                        if (stock == null || stock < 0) {
-                          return 'Debe ser 0 o mayor';
-                        }
-                        if (stock > 999999) {
-                          return 'Stock muy alto';
-                        }
-                        return null;
-                      },
                     ),
                   ],
                 ),
+
+                const SizedBox(height: 24),
+
+                // Sección de stock.
+                //
+                // Al editar es de solo lectura: este campo se cargaba al abrir
+                // la pantalla y se reenviaba tal cual, así que cambiar el
+                // precio devolvía el stock a como estaba y borraba las ventas
+                // hechas mientras tanto. El stock solo se mueve por diferencia,
+                // desde "Ajustar stock".
+                if (isEditing)
+                  _buildStockSoloLectura(context)
+                else
+                  _seccion(
+                    title: 'Stock inicial',
+                    children: [
+                      TextFormField(
+                        controller: stockController,
+                        style: TextStyle(
+                            color: c.textPrimary,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold),
+                        decoration: InputDecoration(
+                          labelText: 'Cantidad disponible *',
+                          hintText: '0',
+                          prefixIcon: const Icon(Icons.inventory),
+                          suffixText: 'unidades',
+                          suffixStyle:
+                              TextStyle(color: c.textSecondary, fontSize: 14),
+                          helperText: 'Unidades en existencia',
+                          helperStyle:
+                              TextStyle(fontSize: 11, color: c.textSecondary),
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(6),
+                        ],
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Ingresa la cantidad';
+                          }
+                          final stock = int.tryParse(value);
+                          if (stock == null || stock < 0) {
+                            return 'Debe ser 0 o mayor';
+                          }
+                          if (stock > 999999) {
+                            return 'Stock muy alto';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
 
                 const SizedBox(height: 24),
               ],
@@ -296,113 +333,74 @@ class ProductFormView extends GetView<InventarioController> {
     );
   }
 
-  void _showCreateCategoryDialog() {
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
+  /// Stock del producto en edición: se muestra, no se escribe. Para moverlo
+  /// está "Ajustar", que trabaja por diferencia.
+  Widget _buildStockSoloLectura(BuildContext context) {
+    final c = context.colores;
+    return Obx(() {
+      final product = controller.currentProduct.value;
+      if (product == null) return const SizedBox.shrink();
 
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: const Text(
-          'Nueva Categoría',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Nombre *',
-                hintText: 'Ej: Suplementos',
-                prefixIcon: Icon(Icons.label, color: AppColors.accent),
-              ),
-              textCapitalization: TextCapitalization.words,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descCtrl,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Descripción (opcional)',
-                prefixIcon: Icon(Icons.notes, color: AppColors.accent),
-              ),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nameCtrl.text.trim().isNotEmpty) {
-                controller.saveCategory(
-                    nameCtrl.text.trim(), descCtrl.text.trim());
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Crear'),
-          ),
-        ],
-      ),
-    );
-  }
+      final faltante = product.stock < 0;
 
-  Widget _buildSectionCard({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.accent.withOpacity(0.15)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      return _seccion(
+        title: 'Stock',
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      faltante
+                          ? 'Faltan ${-product.stock}'
+                          : '${product.stock}',
+                      style: TextStyle(
+                        color: faltante ? AppColors.error : c.textPrimary,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      faltante
+                          ? 'unidades vendidas sin existencias'
+                          : 'unidades en existencia',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: c.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-                child: Icon(icon, color: AppColors.accent, size: 20),
               ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
+              OutlinedButton.icon(
+                onPressed: () => showStockAdjustDialog(product),
+                icon: const Icon(Icons.sync_alt, size: 18),
+                label: const Text('Ajustar'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          ...children,
         ],
-      ),
+      );
+    });
+  }
+
+  /// Un grupo de campos, con su título: igual que en los demás formularios.
+  Widget _seccion({
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TituloSeccion(title),
+        ...children,
+      ],
     );
   }
 }

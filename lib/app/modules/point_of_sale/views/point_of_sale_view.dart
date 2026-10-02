@@ -1,217 +1,368 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../controllers/point_of_sale_controller.dart';
 import '../../../data/models/product_model.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
+import '../../../core/utils/category_icons.dart';
+import '../../../core/widgets/tour_step.dart';
+import '../../../core/widgets/cabecera_con_lista.dart';
+import '../../../core/widgets/refrescable.dart';
 import '../../../global_widgets/app_header.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
+import 'package:gymads/app/core/widgets/metodo_de_pago.dart';
+import '../widgets/lista_carrito.dart';
 
 class PointOfSaleView extends GetView<PointOfSaleController> {
   const PointOfSaleView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
-      appBar: const GymAppBar(title: 'Punto de Venta'),
+      backgroundColor: c.backgroundColor,
+      appBar: GymAppBar(
+        title: 'Punto de Venta',
+        actions: [
+          TourStep(
+            tourKey: controller.keyEscanear,
+            isFirstStep: true,
+            title: 'Escanear productos',
+            description: 'Escanea productos y se agregan solos al carrito.',
+            borderRadius: 24,
+            child: IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              onPressed: controller.escanearAlCarrito,
+              tooltip: 'Escanear productos',
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: controller.refrescar,
+            tooltip: 'Actualizar',
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // Barra de búsqueda
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: AppSearchField(
-                hintText: 'Buscar productos...',
-                onChanged: controller.searchProducts,
+            Expanded(
+              child: CabeceraConLista(
+                cabecera: [
+                  // Barra de búsqueda
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                    child: TourStep(
+                      tourKey: controller.keyBuscar,
+                      title: 'Buscador',
+                      description: 'Busca por nombre o código.',
+                      child: AppSearchField(
+                        hintText: 'Buscar productos...',
+                        onChanged: controller.searchProducts,
+                      ),
+                    ),
+                  ),
+
+                  // Filtro de categorías
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: TourStep(
+                      tourKey: controller.keyCategorias,
+                      title: 'Categorías',
+                      description: 'Filtra los productos por categoría.',
+                      child: Obx(() => CategoryFilterChips(
+                            categories: controller.activeCategories
+                                .map((c) => CategoryChipData(
+                                      id: c.id,
+                                      label: c.name,
+                                      icon: CategoryIcons.resolve(c.icon),
+                                    ))
+                                .toList(),
+                            selectedId: controller.selectedCategoryId,
+                            onSelected: controller.setSelectedCategory,
+                          )),
+                    ),
+                  ),
+                ],
+                // Grid de productos
+                lista: TourStep(
+                  tourKey: controller.keyProductos,
+                  title: 'Tus productos',
+                  description:
+                      'Toca un producto para agregarlo. Déjalo presionado para fijarlo arriba.',
+                  child: Obx(() {
+                    if (controller.isLoading) {
+                      return const Center(
+                        child:
+                            CircularProgressIndicator(color: AppColors.accent),
+                      );
+                    }
+
+                    final products = controller.filteredProducts;
+
+                    if (products.isEmpty) {
+                      return Refrescable.centrado(
+                        onRefresh: controller.refrescar,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.inventory_2_outlined,
+                                size: 64, color: c.textSecondary),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No hay productos disponibles',
+                              style: TextStyle(color: c.textSecondary),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return Refrescable(
+                      onRefresh: controller.refrescar,
+                      child: GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        // Columnas según el ancho disponible (2 en un teléfono
+                        // vertical, más de lado o en tablet) y alto fijo según
+                        // el contenido. Con una proporción ancho/alto, una
+                        // tarjeta ancha y baja no cabía.
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 220,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          mainAxisExtent: 220,
+                        ),
+                        itemCount: products.length,
+                        itemBuilder: (context, index) {
+                          return _buildProductCard(context, products[index]);
+                        },
+                      ),
+                    );
+                  }),
+                ),
               ),
             ),
 
-            // Filtro de categorías
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Obx(() => CategoryFilterChips(
-                    categories:
-                        controller.categories.map((c) => c.name).toList(),
-                    selected: controller.selectedCategory,
-                    onSelected: controller.setSelectedCategory,
-                  )),
-            ),
-
-            // Lista de productos
-            Expanded(
-              child: Obx(() {
-                if (controller.isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.accent),
-                  );
-                }
-
-                final products = controller.filteredProducts;
-
-                if (products.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.inventory_2_outlined,
-                            size: 64, color: AppColors.textSecondary),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No hay productos disponibles',
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  itemCount: products.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final product = products[index];
-                    return _buildProductItem(product);
-                  },
-                );
-              }),
-            ),
-
             // Panel inferior fijo del carrito
-            _buildCartPanel(context),
+            TourStep(
+              tourKey: controller.keyCarrito,
+              title: 'Carrito y cobro',
+              description:
+                  'El total de la venta. Aquí eliges cómo te pagan y cobras.',
+              isLastStep: true,
+              child: _buildCartPanel(context),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProductItem(Product product) {
+  Widget _buildProductCard(BuildContext context, Product product) {
+    final c = context.colores;
     return Obx(() {
       final cartItem = controller.cartItems.firstWhereOrNull(
         (item) => item.productId == product.id,
       );
       final quantity = cartItem?.quantity ?? 0;
+      final inCart = quantity > 0;
+      final pinned = controller.isPinned(product.id);
 
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(16),
-          border: quantity > 0
-              ? Border.all(color: AppColors.accent, width: 2)
-              : null,
-        ),
-        child: Row(
-          children: [
-            // Icono del producto
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.containerBackground,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.inventory_2,
-                color: AppColors.textSecondary,
-                size: 24,
-              ),
+      return GestureDetector(
+        // Fijar arriba es un atajo de mostrador, por eso va en la pulsación
+        // larga: no estorba al toque normal, que es agregar a la venta.
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          controller.togglePinned(product);
+        },
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: c.cardBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: inCart
+                  ? AppColors.accent
+                  : AppColors.accent.withOpacity(0.12),
+              width: inCart ? 2 : 1,
             ),
-            const SizedBox(width: 12),
-
-            // Info del producto
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Ícono de categoría + badge de stock
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    product.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      color: AppColors.textPrimary,
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: c.containerBackground,
+                      shape: BoxShape.circle,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    child: Icon(
+                      CategoryIcons.resolve(
+                          controller.categoryById[product.categoryId]?.icon),
+                      color: AppColors.accent,
+                      size: 20,
+                    ),
                   ),
-                  const SizedBox(height: 4),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        '\$${product.price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Stock: ${product.stock}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: product.stock > 5
-                              ? AppColors.textSecondary
-                              : AppColors.warning,
-                        ),
-                      ),
+                      if (pinned) ...[
+                        const Icon(Icons.push_pin,
+                            size: 14, color: AppColors.accent),
+                        const SizedBox(width: 6),
+                      ],
+                      _buildStockBadge(product.stock),
                     ],
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 10),
 
-            // Controles de cantidad
-            if (quantity > 0) ...[
-              IconButton(
-                onPressed: () => controller.updateCartItemQuantity(
-                  product.id,
-                  quantity - 1,
-                ),
-                icon: const Icon(Icons.remove_circle_outline),
-                color: AppColors.textSecondary,
-                iconSize: 28,
-              ),
-              Container(
-                constraints: const BoxConstraints(minWidth: 32),
-                child: Text(
-                  '$quantity',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppColors.textPrimary,
-                  ),
+              // Nombre
+              Text(
+                product.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: c.textPrimary,
                 ),
               ),
-              IconButton(
-                onPressed: () => controller.addProductToCart(product),
-                icon: const Icon(Icons.add_circle),
-                color: AppColors.accent,
-                iconSize: 28,
+              const Spacer(),
+
+              // Precio
+              Text(
+                '\$${product.price.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                  color: AppColors.accent,
+                ),
               ),
-            ] else
-              IconButton(
-                onPressed: () => controller.addProductToCart(product),
-                icon: const Icon(Icons.add_circle),
-                color: AppColors.accent,
-                iconSize: 32,
-              ),
-          ],
+              const SizedBox(height: 10),
+
+              // Control de cantidad
+              _buildQuantityControl(context, product, quantity),
+            ],
+          ),
         ),
       );
     });
   }
 
+  Widget _buildStockBadge(int stock) {
+    // Tres estados: agotado o en negativo (faltante), bajo, y normal.
+    final Color color = stock <= 0
+        ? AppColors.error
+        : (stock <= 5 ? AppColors.warning : AppColors.success);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '$stock',
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuantityControl(
+      BuildContext context, Product product, int quantity) {
+    final c = context.colores;
+    if (quantity == 0) {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => controller.addProductToCart(product),
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Agregar'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.accent,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: c.containerBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: () => controller.updateCartItemQuantity(
+              product.id,
+              quantity - 1,
+            ),
+            icon: const Icon(Icons.remove, size: 18),
+            color: c.textSecondary,
+            padding: EdgeInsets.zero,
+            splashRadius: 18,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          ),
+          Text(
+            '$quantity',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: c.textPrimary,
+            ),
+          ),
+          IconButton(
+            onPressed: () => controller.addProductToCart(product),
+            icon: const Icon(Icons.add, size: 18),
+            color: AppColors.accent,
+            padding: EdgeInsets.zero,
+            splashRadius: 18,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCartPanel(BuildContext context) {
+    final c = context.colores;
     return Obx(() {
-      final itemCount = controller.cartItems.length;
+      final unidades = controller.totalUnidades;
       final total = controller.finalAmount;
+      final isEmpty = controller.cartItems.isEmpty;
 
       return Container(
-        padding: const EdgeInsets.all(16),
+        padding:
+            EdgeInsets.symmetric(horizontal: 16, vertical: isEmpty ? 14 : 16),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+          color: c.cardBackground,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.2),
@@ -222,89 +373,122 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         ),
         child: SafeArea(
           top: false,
-          child: Row(
-            children: [
-              // Info del carrito
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+          child: isEmpty
+              ? Center(
+                  child: Text(
+                    'Selecciona productos para cobrar',
+                    style: TextStyle(color: c.textSecondary, fontSize: 13),
+                  ),
+                )
+              : Row(
                   children: [
-                    Text(
-                      '$itemCount ${itemCount == 1 ? 'producto' : 'productos'}',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.shopping_bag_outlined,
+                          color: AppColors.accent),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Info del carrito
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$unidades ${unidades == 1 ? 'producto' : 'productos'}',
+                            style: TextStyle(
+                              color: c.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '\$${total.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                              color: c.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Total: \$${total.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                        color: AppColors.textPrimary,
+
+                    // Botón limpiar
+                    IconButton(
+                      onPressed: () => controller.clearCart(),
+                      icon: const Icon(Icons.delete_outline),
+                      color: c.textSecondary,
+                      tooltip: 'Vaciar carrito',
+                    ),
+                    const SizedBox(width: 4),
+
+                    // Botón cobrar
+                    ElevatedButton(
+                      onPressed: () => _showPaymentDialog(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cobrar',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-
-              // Botón limpiar
-              if (itemCount > 0)
-                TextButton(
-                  onPressed: () => controller.clearCart(),
-                  child: const Text(
-                    'Limpiar',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                ),
-              const SizedBox(width: 8),
-
-              // Botón cobrar
-              ElevatedButton(
-                onPressed:
-                    itemCount > 0 ? () => _showPaymentDialog(context) : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: const Text(
-                  'Cobrar',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       );
     });
   }
 
+  /// Campos de la hoja de cobro: más claros que el fondo y con borde, para
+  /// que se vean aunque la pantalla tenga poco brillo. El relleno de antes
+  /// (14,14,14) era casi igual al de la hoja (18,18,18).
+  /// El relleno, el borde y el foco naranja vienen del tema, como en todos
+  /// los formularios.
+  InputDecoration _decoracionCampoCobro({String? hintText}) {
+    return InputDecoration(
+      hintText: hintText,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
   void _showPaymentDialog(BuildContext context) {
+    final c = context.colores;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      // Sin esto, de lado la hoja llega hasta debajo de la barra de estado.
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        decoration: const BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: c.cardBackground,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Padding(
+        // Desplazable: de lado, o con el teclado abierto para la referencia,
+        // el resumen y los métodos de pago no caben.
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -316,7 +500,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -324,36 +508,83 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               const SizedBox(height: 20),
 
               // Título
-              const Text(
-                'Confirmar Pago',
+              Text(
+                'Cobrar',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: c.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
 
-              // Resumen rápido
+              // Aviso de faltantes: el cobro sigue adelante, pero el stock de
+              // estos productos quedará en negativo.
+              Obx(() {
+                final sinExistencias = controller.itemsSinExistencias;
+                if (sinExistencias.isEmpty) return const SizedBox.shrink();
+                final cuantos = sinExistencias.length;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border:
+                        Border.all(color: AppColors.error.withOpacity(0.35)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: AppColors.error, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          cuantos == 1
+                              ? '${sinExistencias.first.productName} quedará como faltante'
+                              : '$cuantos productos quedarán como faltantes',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+
+              // Lo que se está cobrando, para revisarlo antes de cobrar.
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
                 decoration: BoxDecoration(
-                  color: AppColors.containerBackground,
+                  color: c.containerBackground,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Obx(() => Column(
                       children: [
-                        _buildSummaryRow(
-                            '${controller.cartItems.length} productos',
-                            '\$${controller.totalAmount.toStringAsFixed(2)}'),
+                        ListaCarrito(
+                          items: controller.cartItems.toList(),
+                          onCambiarCantidad: (item, cantidad) async {
+                            await controller.updateCartItemQuantity(
+                                item.productId, cantidad);
+                            // Sin productos ya no hay nada que cobrar.
+                            if (controller.cartItems.isEmpty &&
+                                context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          },
+                        ),
                         if (controller.discountAmount > 0) ...[
                           const SizedBox(height: 8),
-                          _buildSummaryRow('Descuento',
+                          _buildSummaryRow(context, 'Descuento',
                               '-\$${controller.discountAmount.toStringAsFixed(2)}'),
                         ],
                         const Divider(height: 24),
                         _buildSummaryRow(
+                          context,
                           'TOTAL',
                           '\$${controller.finalAmount.toStringAsFixed(2)}',
                           isBold: true,
@@ -364,38 +595,15 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
               const SizedBox(height: 20),
 
               // Método de pago
-              const Text(
+              Text(
                 'Método de pago',
                 style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: c.textSecondary,
                   fontSize: 14,
                 ),
               ),
-              const SizedBox(height: 8),
-              Obx(() => DropdownButtonFormField<String>(
-                    value: controller.selectedPaymentMethod,
-                    dropdownColor: AppColors.cardBackground,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: AppColors.containerBackground,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                    ),
-                    items: controller.paymentMethods.map((method) {
-                      return DropdownMenuItem(
-                        value: method,
-                        child: Text(_getPaymentMethodName(method)),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      if (value != null) controller.setPaymentMethod(value);
-                    },
-                  )),
+              const SizedBox(height: 10),
+              _buildPaymentMethodChips(context),
               const SizedBox(height: 16),
 
               // Campo monto recibido (solo efectivo)
@@ -404,28 +612,28 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Monto recibido',
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: c.textSecondary,
                           fontSize: 14,
                         ),
                       ),
                       const SizedBox(height: 8),
                       TextField(
-                        style: const TextStyle(color: AppColors.textPrimary),
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d+\.?\d{0,2}')),
+                        ],
+                        style: TextStyle(color: c.textPrimary, fontSize: 18),
+                        decoration: _decoracionCampoCobro(
+                          hintText: 'Cuánto te entregó',
+                        ).copyWith(
                           prefixText: '\$ ',
-                          prefixStyle: const TextStyle(color: AppColors.accent),
-                          filled: true,
-                          fillColor: AppColors.containerBackground,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
+                          prefixStyle: const TextStyle(
+                              color: AppColors.accent, fontSize: 18),
                         ),
                         onChanged: (value) {
                           final amount = double.tryParse(value) ?? 0.0;
@@ -450,48 +658,27 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                 return const SizedBox.shrink();
               }),
 
+              // Folio / referencia (tarjeta y transferencia): escrita o
+              // escaneada del comprobante.
+              Obx(() => controller.usaReferenciaPago
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: CampoReferenciaPago(controlador: controller),
+                    )
+                  : const SizedBox.shrink()),
+
               // Botón procesar
-              Obx(() => ElevatedButton(
-                    onPressed: controller.canProcessSale() &&
-                            !controller.isProcessingPayment
+              Obx(() => BotonGuardar(
+                    texto: 'Cobrar venta',
+                    guardando: controller.isProcessingPayment,
+                    onPressed: controller.canProcessSale()
                         ? () => _processSale(context)
                         : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.success,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    child: controller.isProcessingPayment
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            'Procesar Venta',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
                   )),
               const SizedBox(height: 12),
 
               // Botón cancelar
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'Cancelar',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              ),
+              BotonCancelar(onPressed: () => Navigator.pop(context)),
             ],
           ),
         ),
@@ -499,14 +686,24 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
+  Widget _buildPaymentMethodChips(BuildContext context) {
+    return Obx(() => SelectorMetodoPago(
+          metodos: controller.paymentMethods,
+          elegido: controller.selectedPaymentMethod,
+          onElegir: controller.setPaymentMethod,
+        ));
+  }
+
+  Widget _buildSummaryRow(BuildContext context, String label, String value,
+      {bool isBold = false}) {
+    final c = context.colores;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
           style: TextStyle(
-            color: isBold ? AppColors.textPrimary : AppColors.textSecondary,
+            color: isBold ? c.textPrimary : c.textSecondary,
             fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
             fontSize: isBold ? 18 : 14,
           ),
@@ -514,30 +711,13 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         Text(
           value,
           style: TextStyle(
-            color: isBold ? AppColors.accent : AppColors.textPrimary,
+            color: isBold ? AppColors.accent : c.textPrimary,
             fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
             fontSize: isBold ? 18 : 14,
           ),
         ),
       ],
     );
-  }
-
-  String _getPaymentMethodName(String method) {
-    switch (method) {
-      case 'efectivo':
-        return 'Efectivo';
-      case 'tarjeta_debito':
-        return 'Tarjeta de Débito';
-      case 'tarjeta_credito':
-        return 'Tarjeta de Crédito';
-      case 'transferencia':
-        return 'Transferencia';
-      case 'mixto':
-        return 'Mixto';
-      default:
-        return method;
-    }
   }
 
   void _processSale(BuildContext context) async {

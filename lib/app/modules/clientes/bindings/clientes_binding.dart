@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/data/providers/supabase/supabase_api_provider.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/providers/ingreso_provider.dart';
@@ -43,7 +44,7 @@ class ClientesBinding extends Bindings {
             ingresoService: Get.isRegistered<IngresoService>() ? Get.find<IngresoService>() : null,
           );
         } catch (e) {
-          print('❌ Error creando ClientesController: $e');
+          AppLogger.error('ClientesBinding', 'Error creando ClientesController', e);
           // Fallback mínimo
           return ClientesController(
             userRepository: Get.find<UserRepository>(),

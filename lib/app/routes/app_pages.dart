@@ -12,7 +12,9 @@ import '../modules/clientes/views/clientes_view.dart';
 import '../modules/configuracion/bindings/configuracion_binding.dart';
 import '../modules/configuracion/views/configuracion_view.dart';
 import '../modules/configuracion/views/cuenta_view.dart';
-import '../modules/configuracion/views/membership_plans_view.dart';
+import '../modules/configuracion/views/abono_prices_view.dart';
+import '../modules/configuracion/views/control_accesos_view.dart';
+import '../modules/configuracion/views/lector_view.dart';
 import '../modules/home/bindings/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/ingresos/bindings/ingresos_binding.dart';
@@ -28,6 +30,17 @@ import '../modules/point_of_sale/bindings/point_of_sale_binding.dart';
 import '../modules/point_of_sale/views/point_of_sale_view.dart';
 
 import '../modules/auth/views/google_complete_register_view.dart';
+import '../modules/onboarding/bindings/onboarding_binding.dart';
+import '../modules/onboarding/views/payment_mode_view.dart';
+import '../modules/categorias/bindings/categorias_binding.dart';
+import '../modules/categorias/views/categorias_view.dart';
+import '../modules/staff_accesos/bindings/staff_accesos_binding.dart';
+import '../modules/staff_accesos/views/staff_accesos_view.dart';
+import '../modules/auth/views/staff_code_view.dart';
+import '../modules/auth/controllers/staff_code_controller.dart';
+import '../modules/permisos/bindings/permisos_binding.dart';
+import '../modules/permisos/permisos_middleware.dart';
+import '../modules/permisos/views/permisos_view.dart';
 
 part 'app_routes.dart';
 
@@ -67,6 +80,13 @@ class AppPages {
       name: _Paths.HOME,
       page: () => const HomeView(),
       binding: HomeBinding(),
+      // La primera vez en el teléfono, antes de Inicio se piden los permisos.
+      middlewares: [PermisosMiddleware()],
+    ),
+    GetPage(
+      name: _Paths.PERMISOS,
+      page: () => const PermisosView(),
+      binding: PermisosBinding(),
     ),
     GetPage(
       name: _Paths.CLIENTES,
@@ -109,8 +129,8 @@ class AppPages {
       binding: ConfiguracionBinding(),
     ),
     GetPage(
-      name: _Paths.MEMBERSHIP_PLANS,
-      page: () => const MembershipPlansView(),
+      name: _Paths.ABONO_PRICES,
+      page: () => const AbonoPricesView(),
       binding: ConfiguracionBinding(),
     ),
     GetPage(
@@ -122,6 +142,38 @@ class AppPages {
       name: _Paths.ACCESS_LOGS,
       page: () => const AccessLogsView(),
       binding: AccessLogsBinding(),
+    ),
+    GetPage(
+      name: _Paths.ONBOARDING_PAYMENT_MODE,
+      page: () => const PaymentModeView(),
+      binding: OnboardingBinding(),
+    ),
+    GetPage(
+      name: _Paths.CATEGORIAS,
+      page: () => const CategoriasView(),
+      binding: CategoriasBinding(),
+    ),
+    GetPage(
+      name: _Paths.STAFF_ACCESOS,
+      page: () => const StaffAccesosView(),
+      binding: StaffAccesosBinding(),
+    ),
+    GetPage(
+      name: _Paths.CONTROL_ACCESOS,
+      page: () => const ControlAccesosView(),
+      binding: ConfiguracionBinding(),
+    ),
+    GetPage(
+      name: _Paths.LECTOR,
+      page: () => const LectorView(),
+      binding: ConfiguracionBinding(),
+    ),
+    GetPage(
+      name: _Paths.STAFF_CODE,
+      page: () => const StaffCodeView(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<StaffCodeController>(() => StaffCodeController());
+      }),
     ),
   ];
 }

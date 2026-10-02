@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart';
+import '../../data/services/fotos_de_clientes.dart';
 import '../../data/services/storage_service.dart';
 
 /// Widget optimizado para mostrar imágenes de usuarios con caché automático
@@ -56,6 +57,8 @@ class _CachedUserImageState extends State<CachedUserImage> {
   Future<void> _resolve() async {
     final stored = widget.imageUrl;
     if (stored == null || stored.isEmpty) return;
+    // Ya descargada en este teléfono: se dibuja desde el disco, sin enlace.
+    if (FotosDeClientes.to?.archivo(stored) != null) return;
     _cacheKey = StorageService.instance.stableKey(stored);
     setState(() => _resolving = true);
     final url = await StorageService.instance.signedUrl(stored);
@@ -75,6 +78,27 @@ class _CachedUserImageState extends State<CachedUserImage> {
     // Si no hay URL, mostrar avatar por defecto
     if (widget.imageUrl == null || widget.imageUrl!.isEmpty) {
       return _buildDefaultAvatar();
+    }
+
+    // Ya descargada (FotosDeClientes): al instante, sin pedir nada por
+    // internet ni pasar por el círculo de carga. Antes, aun con la foto en el
+    // teléfono, primero se pedía el enlace firmado y se veía un parpadeo.
+    final guardada = FotosDeClientes.to?.archivo(widget.imageUrl);
+    if (guardada != null) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: isCircular ? BoxShape.circle : BoxShape.rectangle,
+          borderRadius: isCircular ? null : BorderRadius.circular(8),
+          color: widget.backgroundColor ?? Colors.grey[300],
+          image: DecorationImage(
+            image: FotosDeClientes.proveedor(guardada),
+            fit: fit,
+            alignment: Alignment.center,
+          ),
+        ),
+      );
     }
 
     // Mientras se resuelve la URL firmada, mostrar placeholder de carga
@@ -103,9 +127,7 @@ class _CachedUserImageState extends State<CachedUserImage> {
       },
       placeholder: (context, url) => _buildLoadingPlaceholder(),
       errorWidget: (context, url, error) {
-        if (kDebugMode) {
-          print('❌ Error cargando imagen: $url - $error');
-        }
+        AppLogger.error('CachedUserImage', 'Error cargando imagen', error);
         return _buildDefaultAvatar();
       },
       // Clave de caché estable = path del objeto (no la URL firmada que rota)

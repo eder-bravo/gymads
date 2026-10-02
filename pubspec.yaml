@@ -23,6 +23,11 @@ dependencies:
   camera: ^0.10.5+9
   image_picker: ^1.0.7
   permission_handler: ^11.1.0
+  # Escaneo de códigos de barras en vivo (inventario)
+  mobile_scanner: ^7.4.2
+  # Reconocimiento de texto sobre la foto del comprobante (referencia de pago).
+  # Funciona sin conexión: el modelo corre en el propio teléfono.
+  google_mlkit_text_recognition: ^0.16.0
   flutter_dotenv: ^5.2.1
   supabase_flutter: ^2.8.4
   just_audio: ^0.9.39
@@ -38,13 +43,42 @@ dependencies:
   cached_network_image: ^3.3.1
   fluttertoast: ^8.2.4
   get_storage: ^2.1.1
-  google_fonts: ^8.0.2
+  showcaseview: ^5.1.0
   google_sign_in: ^6.1.6
+  win32_registry: ^2.1.0
+  pdf: ^3.11.1
+  printing: ^5.13.4
+  bonsoir: ^7.1.4
+  flutter_local_notifications: ^22.3.1
+  flutter_foreground_task: ^10.0.0
+  device_info_plus: ^12.4.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# Iconos de la app: `dart run flutter_launcher_icons`
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  android: true
+  adaptive_icon_background: "assets/icon/icon_background.png"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+    image_path: "assets/images/logo_app.png"
+    background_color: "#1A1AFD"
+    theme_color: "#1A1AFD"
+  windows:
+    generate: true
+    image_path: "assets/images/logo_app.png"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "assets/images/logo_app.png"
 
 flutter:
   uses-material-design: true
@@ -55,3 +89,4 @@ flutter:
     - assets/icons/
     - assets/images/
     - assets/audio/
+    - assets/fonts/

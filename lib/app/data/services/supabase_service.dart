@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
@@ -27,23 +28,22 @@ class SupabaseService {
       }
 
       if (kDebugMode && SupabaseConfig.debugMode) {
-        print('✅ Sesión activa: ${session.user.email}');
+        AppLogger.info('SupabaseService', 'Sesión activa');
       }
 
       // Verificar acceso a la tabla users
       await client.from('users').select('count').limit(1).maybeSingle();
 
       if (kDebugMode && SupabaseConfig.debugMode) {
-        print('✅ Conexión a la base de datos verificada');
+        AppLogger.info('SupabaseService', 'Conexión a la base de datos verificada');
       }
     } catch (e) {
       if (kDebugMode && SupabaseConfig.debugMode) {
-        print('❌ Error al verificar la conexión: $e');
+        AppLogger.error('SupabaseService', 'Error al verificar la conexión', e);
 
         if (e is PostgrestException) {
-          print('  - Código: ${e.code}');
-          print('  - Detalles: ${e.details}');
-        }
+          AppLogger.info('SupabaseService', 'Código: ${e.code}');
+                  }
       }
       rethrow;
     }
@@ -60,7 +60,7 @@ class SupabaseService {
       final provider = SupabaseStorageProvider();
       return await provider.uploadUserPhoto(file, userId);
     } catch (e) {
-      if (kDebugMode) print('❌ Error en uploadUserPhoto (método obsoleto): $e');
+      AppLogger.error('SupabaseService', 'Fallo al subir la foto', e);
       return null;
     }
   }
@@ -72,7 +72,7 @@ class SupabaseService {
       final provider = SupabaseStorageProvider();
       return await provider.deleteUserPhoto(photoUrl);
     } catch (e) {
-      if (kDebugMode) print('❌ Error en deleteUserPhoto (método obsoleto): $e');
+      AppLogger.error('SupabaseService', 'Fallo al eliminar la foto', e);
       return false;
     }
   }

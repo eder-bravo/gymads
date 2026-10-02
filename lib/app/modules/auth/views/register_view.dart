@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/register_controller.dart';
+import '../widgets/horario_selector.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 
 /// Registration view — single-form with email/password + Google option
 class RegisterView extends GetView<RegisterController> {
@@ -8,19 +10,10 @@ class RegisterView extends GetView<RegisterController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1a1a2e),
-              Color(0xFF16213e),
-              Color(0xFF0f3460),
-            ],
-          ),
-        ),
+        decoration: BoxDecoration(gradient: c.fondoAcceso),
         child: SafeArea(
           child: Column(
             children: [
@@ -28,7 +21,7 @@ class RegisterView extends GetView<RegisterController> {
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-                  child: _buildForm(),
+                  child: _buildForm(context),
                 ),
               ),
             ],
@@ -39,16 +32,17 @@ class RegisterView extends GetView<RegisterController> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final c = context.colores;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(
         children: [
           IconButton(
             onPressed: () => Get.back(),
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+            icon: Icon(Icons.arrow_back_ios, color: c.contraste),
           ),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -57,15 +51,15 @@ class RegisterView extends GetView<RegisterController> {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: c.contraste,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Configura tu gimnasio en minutos',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white60,
+                    color: c.contraste.withOpacity(0.60),
                   ),
                 ),
               ],
@@ -76,46 +70,65 @@ class RegisterView extends GetView<RegisterController> {
     );
   }
 
-  Widget _buildForm() {
+  Widget _buildForm(BuildContext context) {
+    final c = context.colores;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Google Sign-In button
-        _buildGoogleButton(),
+        _buildGoogleButton(context),
         const SizedBox(height: 20),
 
         // Divider
-        _buildDivider(),
+        _buildDivider(context),
         const SizedBox(height: 20),
 
         // Personal info card
-        _buildCard(
+        _buildCard(context,
           title: 'Datos Personales',
           icon: Icons.person_outline,
           children: [
-            _buildTextField(
+            _buildTextField(context,
               controller: controller.firstNameController,
               label: 'Nombre(s)',
               icon: Icons.person,
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 14),
-            _buildTextField(
+            _buildTextField(context,
               controller: controller.lastNameController,
               label: 'Apellidos',
               icon: Icons.person_outline,
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 14),
-            _buildTextField(
+            _buildTextField(context,
               controller: controller.emailController,
               label: 'Correo electrónico',
               icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
+              onChanged: controller.revisarCorreo,
             ),
+            // Un error de dedo en el dominio (gmial.com): se sugiere, no se
+            // impide.
+            Obx(() {
+              final sugerida = controller.sugerenciaCorreo.value;
+              if (sugerida == null) return const SizedBox.shrink();
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: controller.usarSugerenciaCorreo,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  child: Text('¿Quisiste decir $sugerida?'),
+                ),
+              );
+            }),
             const SizedBox(height: 14),
-            Obx(() => _buildTextField(
+            Obx(() => _buildTextField(context,
                   controller: controller.passwordController,
                   label: 'Contraseña',
                   icon: Icons.lock_outline,
@@ -126,7 +139,7 @@ class RegisterView extends GetView<RegisterController> {
                       controller.obscurePassword.value
                           ? Icons.visibility_off
                           : Icons.visibility,
-                      color: Colors.white54,
+                      color: c.contraste.withOpacity(0.54),
                       size: 20,
                     ),
                     onPressed: () => controller.obscurePassword.value =
@@ -134,7 +147,7 @@ class RegisterView extends GetView<RegisterController> {
                   ),
                 )),
             const SizedBox(height: 14),
-            Obx(() => _buildTextField(
+            Obx(() => _buildTextField(context,
                   controller: controller.confirmPasswordController,
                   label: 'Confirmar contraseña',
                   icon: Icons.lock_outline,
@@ -145,7 +158,7 @@ class RegisterView extends GetView<RegisterController> {
                       controller.obscureConfirmPassword.value
                           ? Icons.visibility_off
                           : Icons.visibility,
-                      color: Colors.white54,
+                      color: c.contraste.withOpacity(0.54),
                       size: 20,
                     ),
                     onPressed: () => controller.obscureConfirmPassword.value =
@@ -157,24 +170,30 @@ class RegisterView extends GetView<RegisterController> {
         const SizedBox(height: 16),
 
         // Gym info card
-        _buildCard(
+        _buildCard(context,
           title: 'Tu Gimnasio',
           icon: Icons.fitness_center,
           children: [
-            _buildTextField(
+            _buildTextField(context,
               controller: controller.gymNameController,
               label: 'Nombre del gimnasio',
               icon: Icons.store,
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 14),
-            _buildTextField(
+            _buildTextField(context,
               controller: controller.locationController,
               label: 'Ubicación',
               icon: Icons.location_on_outlined,
               textInputAction: TextInputAction.done,
               hint: 'Ej: Col. Centro, Monterrey',
             ),
+            const SizedBox(height: 14),
+            Obx(() => HorarioSelector(
+                  apertura: controller.horaApertura.value,
+                  cierre: controller.horaCierre.value,
+                  onChanged: controller.setHorario,
+                )),
           ],
         ),
         const SizedBox(height: 24),
@@ -192,20 +211,20 @@ class RegisterView extends GetView<RegisterController> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
+            Text(
               '¿Ya tienes cuenta? ',
-              style: TextStyle(color: Colors.white60, fontSize: 14),
+              style: TextStyle(color: c.contraste.withOpacity(0.60), fontSize: 14),
             ),
             GestureDetector(
               onTap: () => Get.back(),
               child: const Text(
                 'Iniciar sesión',
                 style: TextStyle(
-                  color: Colors.blueAccent,
+                  color: AppColors.accent,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   decoration: TextDecoration.underline,
-                  decorationColor: Colors.blueAccent,
+                  decorationColor: AppColors.accent,
                 ),
               ),
             ),
@@ -219,7 +238,8 @@ class RegisterView extends GetView<RegisterController> {
   // REUSABLE WIDGETS
   // ==========================================
 
-  Widget _buildGoogleButton() {
+  Widget _buildGoogleButton(BuildContext context) {
+    final c = context.colores;
     return Obx(() => SizedBox(
           height: 52,
           child: OutlinedButton(
@@ -227,11 +247,11 @@ class RegisterView extends GetView<RegisterController> {
                 ? null
                 : controller.registerWithGoogle,
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.white24),
+              side: BorderSide(color: c.contraste.withOpacity(0.24)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
-              backgroundColor: Colors.white.withOpacity(0.05),
+              backgroundColor: c.contraste.withOpacity(0.05),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -251,10 +271,10 @@ class RegisterView extends GetView<RegisterController> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                Text(
                   'Registrarse con Google',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: c.contraste,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
@@ -265,40 +285,42 @@ class RegisterView extends GetView<RegisterController> {
         ));
   }
 
-  Widget _buildDivider() {
+  Widget _buildDivider(BuildContext context) {
+    final c = context.colores;
     return Row(
       children: [
-        Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+        Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             'o regístrate con email',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
+              color: c.contraste.withOpacity(0.5),
               fontSize: 13,
             ),
           ),
         ),
-        Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+        Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
       ],
     );
   }
 
-  Widget _buildCard({
+  Widget _buildCard(BuildContext context, {
     required String title,
     required IconData icon,
     required List<Widget> children,
   }) {
+    final c = context.colores;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: c.tarjetaAcceso,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: c.contraste.withOpacity(0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: c.sombra,
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -309,14 +331,14 @@ class RegisterView extends GetView<RegisterController> {
         children: [
           Row(
             children: [
-              Icon(icon, color: Colors.blueAccent, size: 22),
+              Icon(icon, color: AppColors.accent, size: 22),
               const SizedBox(width: 10),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: c.contraste,
                 ),
               ),
             ],
@@ -328,7 +350,7 @@ class RegisterView extends GetView<RegisterController> {
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildTextField(BuildContext context, {
     required TextEditingController controller,
     required String label,
     required IconData icon,
@@ -337,34 +359,28 @@ class RegisterView extends GetView<RegisterController> {
     bool obscureText = false,
     Widget? suffixIcon,
     String? hint,
+    ValueChanged<String>? onChanged,
   }) {
+    final c = context.colores;
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       obscureText: obscureText,
-      style: const TextStyle(color: Colors.white, fontSize: 15),
+      style: TextStyle(color: c.contraste, fontSize: 15),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-        prefixIcon: Icon(icon, color: Colors.white54, size: 20),
+        hintStyle: TextStyle(color: c.contraste.withOpacity(0.3), fontSize: 13),
+        prefixIcon: Icon(icon, color: c.contraste.withOpacity(0.54), size: 20),
         suffixIcon: suffixIcon,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.blueAccent),
-        ),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      onChanged: (_) => this.controller.clearError(),
+      onChanged: (valor) {
+        this.controller.clearError();
+        onChanged?.call(valor);
+      },
     );
   }
 
@@ -398,7 +414,7 @@ class RegisterView extends GetView<RegisterController> {
           child: ElevatedButton(
             onPressed: controller.isLoading.value ? null : _onRegister,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
+              backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),

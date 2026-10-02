@@ -1,36 +1,62 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/permissions/permissions.dart';
+import '../../../core/widgets/tour_step.dart';
 
-import '../../../data/services/branding_service.dart';
+import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/background_welcome_dialog.dart';
+import '../widgets/fondo_estirable.dart';
 
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
 
+  /// Se redibuja cuando cambia el perfil: si el dueño le cambia el rol a
+  /// quien usa la app, el menú (y el tour de Inicio) pasan a ser los del rol
+  /// nuevo sin cerrar sesión.
   @override
   Widget build(BuildContext context) {
-    final bool isTablet = MediaQuery.of(context).size.width > 600;
+    return Obx(() {
+      TenantContextService.to.staffProfileRx.value;
+      return _pantalla(context);
+    });
+  }
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
+  Widget _pantalla(BuildContext context) {
+    final c = context.colores;
+    // `sizeOf` y no `of`: este último crea dependencia con el MediaQueryData
+    // entero —`viewInsets` incluido—, así que la animación del teclado
+    // reconstruía esta pantalla en cada frame aunque estuviera oculta debajo.
+    final bool isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+
+    // Asistente inicial / tour de bienvenida. Va aquí además de en onReady
+    // porque al volver del asistente GetX puede reutilizar el controlador; la
+    // comprobación es idempotente y barata una vez resuelta.
+    //
+    // Solo con Inicio en primer plano: esta vista sigue montada bajo las
+    // pantallas que se apilan encima, y desde ahí no le toca decidir nada.
+    if (Get.currentRoute == Routes.HOME) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.checkOnboarding();
+      });
+    }
+
+    final pantalla = Scaffold(
+      backgroundColor: c.backgroundColor,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-        ),
+        // Los íconos de la barra de estado los pone el tema según el modo.
       ),
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
+          physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics()),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -47,7 +73,7 @@ class HomeView extends GetView<HomeController> {
                   style: TextStyle(
                     fontSize: isTablet ? 22 : 18,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -65,7 +91,7 @@ class HomeView extends GetView<HomeController> {
                   style: TextStyle(
                     fontSize: isTablet ? 22 : 18,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -73,17 +99,23 @@ class HomeView extends GetView<HomeController> {
               const SizedBox(height: 12),
               _buildQuickActions(context, isTablet),
 
-              const SizedBox(height: 16),
-              _buildSettingsTile(context, isTablet),
-
-              const SizedBox(height: 24),
+              const SizedBox(height: 14),
             ],
           ),
         ),
       ),
       // Diálogo de bienvenida RFID en segundo plano
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: const BackgroundWelcomeDialog(),
+    );
+
+    // El aviso del lector (bienvenida, salida, tarjeta no registrada) va
+    // ENCIMA de toda la pantalla. Antes iba en el hueco del botón flotante:
+    // el Scaffold lo acomodaba como un botón, con margen abajo, y la pantalla
+    // negra quedaba subida, con la X escondida bajo la barra de estado.
+    return Stack(
+      children: [
+        pantalla,
+        const Positioned.fill(child: BackgroundWelcomeDialog()),
+      ],
     );
   }
 
@@ -91,27 +123,36 @@ class HomeView extends GetView<HomeController> {
   // HEADER
   // ─────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, bool isTablet) {
+    final c = context.colores;
     final topPadding = MediaQuery.of(context).padding.top;
-    return Obx(() {
-      final brandColor = BrandingService.to.brandColor;
-
-      return Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(
-          isTablet ? 32 : 24,
-          topPadding + (isTablet ? 18 : 14),
-          isTablet ? 32 : 24,
-          isTablet ? 16 : 14,
+    return TourStep(
+      tourKey: controller.keyHeader,
+      title: '¡Te damos la bienvenida!',
+      description:
+          'Este es tu panel principal: desde aquí llegas a todo lo del día a día.',
+      borderRadius: 28,
+      isFirstStep: true,
+      // El fondo crece hacia arriba lo que se jala la pantalla (el rebote):
+      // antes la cabecera bajaba entera y dejaba una franja vacía arriba.
+      child: FondoEstirable(
+        // Lo que se ve arriba al jalar: el borde de arriba del degradado.
+        colorArriba: LinearGradient(
+          stops: const [0.0, 0.55, 1.0],
+          colors: [
+            c.cabeceraDesde,
+            c.cabeceraHasta,
+            AppColors.brand.withOpacity(0.28),
+          ],
         ),
-        decoration: BoxDecoration(
+        decoracion: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             stops: const [0.0, 0.55, 1.0],
             colors: [
-              const Color(0xFF11151F),
-              const Color(0xFF1A2332),
-              brandColor.withOpacity(0.28),
+              c.cabeceraDesde,
+              c.cabeceraHasta,
+              AppColors.brand.withOpacity(0.28),
             ],
           ),
           borderRadius: const BorderRadius.only(
@@ -120,40 +161,62 @@ class HomeView extends GetView<HomeController> {
           ),
           boxShadow: [
             BoxShadow(
-              color: brandColor.withOpacity(0.12),
+              color: AppColors.brand.withOpacity(0.12),
               blurRadius: 28,
               offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: brandColor.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(
+            isTablet ? 32 : 24,
+            topPadding + (isTablet ? 18 : 14),
+            isTablet ? 32 : 24,
+            isTablet ? 16 : 14,
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.brand.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.dashboard_rounded,
+                  color: AppColors.brand,
+                  size: isTablet ? 26 : 22,
+                ),
               ),
-              child: Icon(
-                Icons.dashboard_rounded,
-                color: brandColor,
-                size: isTablet ? 26 : 22,
+              const SizedBox(width: 14),
+              Text(
+                'Inicio',
+                style: TextStyle(
+                  fontSize: isTablet ? 26 : 22,
+                  fontWeight: FontWeight.w800,
+                  color: c.contraste,
+                  letterSpacing: 0.5,
+                ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Text(
-              'Inicio',
-              style: TextStyle(
-                fontSize: isTablet ? 26 : 22,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      );
-    });
+      ),
+    );
+  }
+
+  /// Si el rol actual puede entrar a esta entrada del menú.
+  ///
+  /// Los módulos que no corresponden se OCULTAN, no se muestran en gris: un
+  /// candado en pantalla solo invita a pedir la llave. El permiso de cada uno
+  /// está en `HomeController.permisoPorModulo`, que es la misma tabla con la
+  /// que se filtran los pasos del tour.
+  bool _permitido(_EntradaMenu entrada) {
+    final Permission? permiso = HomeController.permisoPorModulo[entrada.label];
+    // Una entrada sin permiso declarado se muestra: olvidarse de añadirlo no
+    // debe esconder una función a todo el mundo en silencio.
+    return permiso == null || controller.can(permiso);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -167,6 +230,8 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Gestión de miembros',
         gradient: const [Color(0xFF667eea), Color(0xFF764ba2)],
         onTap: controller.goToClientes,
+        showcaseKey: controller.keyClientes,
+        tourDescription: 'Tus miembros y cuándo vence su abono.',
       ),
       _ModuleItem(
         icon: Icons.payments_outlined,
@@ -174,6 +239,8 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Cobrar membresías',
         gradient: const [Color(0xFFf093fb), Color(0xFFf5576c)],
         onTap: controller.goToAbonar,
+        showcaseKey: controller.keyAbonar,
+        tourDescription: 'Cobra y renueva membresías.',
       ),
       _ModuleItem(
         icon: Icons.storefront_outlined,
@@ -181,6 +248,8 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Punto de venta',
         gradient: const [Color(0xFF4facfe), Color(0xFF00f2fe)],
         onTap: controller.goToPointOfSale,
+        showcaseKey: controller.keyVender,
+        tourDescription: 'Vende bebidas, suplementos y demás productos.',
       ),
       _ModuleItem(
         icon: Icons.inventory_2_outlined,
@@ -188,26 +257,40 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Productos y stock',
         gradient: const [Color(0xFF43e97b), Color(0xFF38f9d7)],
         onTap: controller.goToInventario,
+        showcaseKey: controller.keyInventario,
+        tourDescription:
+            'Administra tus productos y controla el stock disponible.',
       ),
-    ];
+    ].where(_permitido).toList();
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
-      child: GridView.builder(
-        padding: EdgeInsets.zero,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: isTablet ? 4 : 2,
-          crossAxisSpacing: isTablet ? 16 : 12,
-          mainAxisSpacing: isTablet ? 16 : 12,
-          childAspectRatio: isTablet ? 1.1 : 1.05,
-        ),
-        itemCount: modules.length,
-        itemBuilder: (context, index) {
-          return _ModuleCard(module: modules[index]);
-        },
-      ),
+      // Columnas según el ANCHO disponible (un teléfono de lado cabe en 4),
+      // y alto fijo según el contenido de la tarjeta. Con una proporción
+      // ancho/alto, las tarjetas angostas quedaban más bajas que su contenido.
+      child: LayoutBuilder(
+          builder: (context, constraints) => GridView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: constraints.maxWidth >= 600 ? 4 : 2,
+                  crossAxisSpacing: isTablet ? 16 : 12,
+                  mainAxisSpacing: isTablet ? 16 : 12,
+                  mainAxisExtent: isTablet ? 180 : 165,
+                ),
+                itemCount: modules.length,
+                itemBuilder: (context, index) {
+                  final module = modules[index];
+                  return TourStep(
+                    tourKey: module.showcaseKey,
+                    title: module.label,
+                    description: module.tourDescription,
+                    borderRadius: 20,
+                    child: _ModuleCard(module: module),
+                  );
+                },
+              )),
     );
   }
 
@@ -220,8 +303,11 @@ class HomeView extends GetView<HomeController> {
         icon: Icons.receipt_long_outlined,
         label: 'Ingresos',
         subtitle: 'Historial de pagos',
-        color: const Color(0xFFFFB74D),
+        color: context.colores.titleColor,
         onTap: controller.goToPaymentRegistration,
+        showcaseKey: controller.keyIngresos,
+        tourDescription:
+            'Consulta el historial de todos los pagos y ventas registrados.',
       ),
       _QuickAction(
         icon: Icons.door_sliding_outlined,
@@ -229,8 +315,24 @@ class HomeView extends GetView<HomeController> {
         subtitle: 'Registro de accesos',
         color: const Color(0xFF81C784),
         onTap: controller.goToAccessLogs,
+        showcaseKey: controller.keyEntradas,
+        tourDescription: 'Revisa quién entró al gimnasio y a qué hora.',
       ),
-    ];
+    ].where(_permitido).toList()
+      // Configuración va con las demás opciones, con la misma tarjeta y el
+      // mismo espacio (antes iba aparte, más abajo y con otro diseño). Todos
+      // los roles la ven.
+      ..add(_QuickAction(
+        icon: Icons.settings_outlined,
+        label: 'Configuración',
+        subtitle: 'Cuenta, precios y lector',
+        color: Theme.of(context).brightness == Brightness.light
+            ? const Color(0xFF546E7A)
+            : const Color(0xFFB0BEC5),
+        onTap: () => Get.toNamed(Routes.CONFIGURACION),
+        showcaseKey: controller.keyConfiguracion,
+        tourDescription: 'Tu cuenta, precios, categorías, lector y permisos.',
+      ));
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
@@ -238,68 +340,16 @@ class HomeView extends GetView<HomeController> {
         children: actions.map((action) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: _QuickActionTile(action: action),
+            child: TourStep(
+              tourKey: action.showcaseKey,
+              title: action.label,
+              description: action.tourDescription,
+              borderRadius: 16,
+              isLastStep: action.showcaseKey == controller.keyConfiguracion,
+              child: _QuickActionTile(action: action),
+            ),
           );
         }).toList(),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // SETTINGS (acceso a configuración en la zona inferior)
-  // ─────────────────────────────────────────────────────────
-  Widget _buildSettingsTile(BuildContext context, bool isTablet) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => Get.toNamed(Routes.CONFIGURACION),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.06),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.settings_outlined,
-                    color: Colors.white70,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Text(
-                    'Configuración',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: Colors.white.withOpacity(0.2),
-                  size: 16,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -309,12 +359,21 @@ class HomeView extends GetView<HomeController> {
 // DATA MODELS
 // ═════════════════════════════════════════════════════════════
 
-class _ModuleItem {
+/// Lo único que necesita el filtro de permisos: la etiqueta con la que se
+/// busca el permiso de la entrada en `HomeController.permisoPorModulo`.
+abstract class _EntradaMenu {
+  String get label;
+}
+
+class _ModuleItem implements _EntradaMenu {
   final IconData icon;
+  @override
   final String label;
   final String subtitle;
   final List<Color> gradient;
   final VoidCallback onTap;
+  final GlobalKey showcaseKey;
+  final String tourDescription;
 
   const _ModuleItem({
     required this.icon,
@@ -322,15 +381,20 @@ class _ModuleItem {
     required this.subtitle,
     required this.gradient,
     required this.onTap,
+    required this.showcaseKey,
+    required this.tourDescription,
   });
 }
 
-class _QuickAction {
+class _QuickAction implements _EntradaMenu {
   final IconData icon;
+  @override
   final String label;
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
+  final GlobalKey showcaseKey;
+  final String tourDescription;
 
   const _QuickAction({
     required this.icon,
@@ -338,6 +402,8 @@ class _QuickAction {
     required this.subtitle,
     required this.color,
     required this.onTap,
+    required this.showcaseKey,
+    required this.tourDescription,
   });
 }
 
@@ -378,8 +444,9 @@ class _ModuleCardState extends State<_ModuleCard>
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final m = widget.module;
-    final isTablet = MediaQuery.of(context).size.width > 600;
+    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
 
     return AnimatedBuilder(
       animation: _scaleAnim,
@@ -451,19 +518,23 @@ class _ModuleCardState extends State<_ModuleCard>
                 // Text
                 Text(
                   m.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: isTablet ? 17 : 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                     letterSpacing: 0.3,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   m.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: isTablet ? 13 : 11,
-                    color: AppColors.textSecondary.withOpacity(0.7),
+                    color: c.textSecondary.withOpacity(0.7),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -493,6 +564,7 @@ class _QuickActionTileState extends State<_QuickActionTile> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     final a = widget.action;
 
     return GestureDetector(
@@ -508,7 +580,7 @@ class _QuickActionTileState extends State<_QuickActionTile> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           decoration: BoxDecoration(
-            color: AppColors.cardBackground,
+            color: c.cardBackground,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: a.color.withOpacity(0.12),
@@ -541,10 +613,10 @@ class _QuickActionTileState extends State<_QuickActionTile> {
                   children: [
                     Text(
                       a.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: c.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -552,7 +624,7 @@ class _QuickActionTileState extends State<_QuickActionTile> {
                       a.subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary.withOpacity(0.7),
+                        color: c.textSecondary.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -562,7 +634,7 @@ class _QuickActionTileState extends State<_QuickActionTile> {
               // Arrow
               Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Colors.white.withOpacity(0.2),
+                color: c.contraste.withOpacity(0.2),
                 size: 16,
               ),
             ],

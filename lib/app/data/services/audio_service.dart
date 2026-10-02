@@ -1,5 +1,5 @@
 import 'package:just_audio/just_audio.dart';
-import 'package:flutter/foundation.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 
 /// Servicio para manejar la reproducción de audio en la aplicación
 class AudioService {
@@ -11,9 +11,7 @@ class AudioService {
   /// Reproduce el sonido de bienvenida cuando un usuario escanea exitosamente
   static Future<void> playWelcomeSound() async {
     try {
-      if (kDebugMode) {
-        print('🔊 Reproduciendo sonido de bienvenida...');
-      }
+      AppLogger.info('AudioService', 'Reproduciendo sonido de bienvenida');
       
       // Detener si estaba reproduciendo
       await _welcomePlayer.stop();
@@ -31,22 +29,16 @@ class AudioService {
       await _welcomePlayer.seek(Duration.zero);
       _welcomePlayer.play(); // Sin await para no bloquear
       
-      if (kDebugMode) {
-        print('✅ Sonido de bienvenida reproducido correctamente');
-      }
+      AppLogger.info('AudioService', 'Sonido de bienvenida reproducido correctamente');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al reproducir sonido de bienvenida: $e');
-      }
+      AppLogger.error('AudioService', 'Error al reproducir sonido de bienvenida', e);
     }
   }
   
   /// Reproduce un sonido de error
   static Future<void> playErrorSound() async {
     try {
-      if (kDebugMode) {
-        print('🔊 Reproduciendo sonido de error...');
-      }
+      AppLogger.info('AudioService', 'Reproduciendo sonido de error');
       
       await _errorPlayer.stop();
       
@@ -61,22 +53,16 @@ class AudioService {
       await _errorPlayer.seek(Duration.zero);
       _errorPlayer.play();
       
-      if (kDebugMode) {
-        print('✅ Sonido de error reproducido correctamente');
-      }
+      AppLogger.info('AudioService', 'Sonido de error reproducido correctamente');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al reproducir sonido de error: $e');
-      }
+      AppLogger.error('AudioService', 'Error al reproducir sonido de error', e);
     }
   }
   
   /// Reproduce el sonido de acceso denegado cuando el usuario no está registrado
   static Future<void> playDeniedSound() async {
     try {
-      if (kDebugMode) {
-        print('🔊 Reproduciendo sonido de acceso denegado...');
-      }
+      AppLogger.info('AudioService', 'Reproduciendo sonido de acceso denegado');
       
       await _deniedPlayer.stop();
       
@@ -93,22 +79,16 @@ class AudioService {
       await _deniedPlayer.seek(Duration.zero);
       _deniedPlayer.play();
       
-      if (kDebugMode) {
-        print('✅ Sonido de acceso denegado reproducido correctamente');
-      }
+      AppLogger.info('AudioService', 'Sonido de acceso denegado reproducido correctamente');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al reproducir sonido de acceso denegado: $e');
-      }
+      AppLogger.error('AudioService', 'Error al reproducir sonido de acceso denegado', e);
     }
   }
   
   /// Reproduce un sonido de éxito con configuración específica
   static Future<void> playSuccessSound() async {
     try {
-      if (kDebugMode) {
-        print('🔊 Reproduciendo sonido de éxito...');
-      }
+      AppLogger.info('AudioService', 'Reproduciendo sonido de éxito');
       
       await _successPlayer.stop();
       
@@ -123,13 +103,9 @@ class AudioService {
       await _successPlayer.seek(Duration.zero);
       _successPlayer.play();
       
-      if (kDebugMode) {
-        print('✅ Sonido de éxito reproducido correctamente');
-      }
+      AppLogger.info('AudioService', 'Sonido de éxito reproducido correctamente');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al reproducir sonido de éxito: $e');
-      }
+      AppLogger.error('AudioService', 'Error al reproducir sonido de éxito', e);
     }
   }
   
@@ -142,13 +118,9 @@ class AudioService {
         _errorPlayer.stop(),
         _successPlayer.stop(),
       ]);
-      if (kDebugMode) {
-        print('🔇 Todo el audio detenido');
-      }
+      AppLogger.info('AudioService', 'Todo el audio detenido');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al detener audio: $e');
-      }
+      AppLogger.error('AudioService', 'Error al detener audio', e);
     }
   }
   
@@ -161,13 +133,9 @@ class AudioService {
         _errorPlayer.dispose(),
         _successPlayer.dispose(),
       ]);
-      if (kDebugMode) {
-        print('🗑️ Recursos de audio liberados');
-      }
+      AppLogger.info('AudioService', 'Recursos de audio liberados');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al liberar recursos de audio: $e');
-      }
+      AppLogger.error('AudioService', 'Error al liberar recursos de audio', e);
     }
   }
   
@@ -181,13 +149,9 @@ class AudioService {
         _errorPlayer.setVolume(v),
         _successPlayer.setVolume(v),
       ]);
-      if (kDebugMode) {
-        print('🔊 Volumen general configurado a: ${(v * 100).toInt()}%');
-      }
+      AppLogger.info('AudioService', 'Volumen general configurado a: ${(v * 100).toInt()}%');
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error al configurar volumen: $e');
-      }
+      AppLogger.error('AudioService', 'Error al configurar volumen', e);
     }
   }
 }

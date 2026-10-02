@@ -1,10 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
+import '../../../../core/theme/siempre_oscuro.dart';
+import '../utils/recorte_circulo.dart';
 
 class CircularCameraView extends StatefulWidget {
   final Function(File) onPhotoTaken;
@@ -27,6 +30,14 @@ class _CircularCameraViewState extends State<CircularCameraView>
   bool _isInitialized = false;
   bool _isTakingPicture = false;
   String? _errorMessage;
+
+  /// La foto recién tomada, a la espera de "Usar foto" o "Repetir". Antes se
+  /// usaba en cuanto se disparaba, sin poder verla.
+  File? _fotoTomada;
+
+  /// El tamaño de la pantalla de la cámara: con él se sabe dónde estaba el
+  /// círculo guía para recortar la foto.
+  Size? _vista;
 
   @override
   void initState() {
@@ -98,7 +109,8 @@ class _CircularCameraViewState extends State<CircularCameraView>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error al inicializar la cámara: ${e.toString()}';
+          _errorMessage = 'No se pudo abrir la cámara. Revisa que la app '
+              'tenga permiso para usarla e intenta de nuevo.';
         });
       }
     }
@@ -133,6 +145,17 @@ class _CircularCameraViewState extends State<CircularCameraView>
       final File resultFile = File(targetPath);
       await File(photoFile.path).copy(targetPath);
 
+      // Se guarda solo lo que se veía dentro del círculo: la foto completa
+      // salía alejada y descentrada respecto a lo que se encuadró.
+      final vista = _vista;
+      if (vista != null) {
+        await recortarFotoAlCirculo(
+          targetPath,
+          vista: vista,
+          aspectoVistaPrevia: _aspectoVistaPrevia(),
+        );
+      }
+
       if (await resultFile.exists() && mounted) {
         // Limpiar archivo temporal original
         try {
@@ -141,17 +164,16 @@ class _CircularCameraViewState extends State<CircularCameraView>
           // Ignorar errores al eliminar archivos temporales
         }
 
-        // Nota: La foto se guarda completa. Si necesitas recorte circular,
-        // se puede implementar en el procesamiento posterior
-        widget.onPhotoTaken(resultFile);
+        // Se muestra para confirmarla; se entrega con "Usar foto".
+        setState(() => _fotoTomada = resultFile);
       } else {
         throw Exception('No se pudo guardar la foto');
       }
     } catch (e) {
       if (mounted) {
         SnackbarHelper.error(
-          'Error',
-          'No se pudo tomar la foto: ${e.toString()}',
+          'No se tomó la foto',
+          'No se pudo tomar la foto. Intenta de nuevo.',
         );
       }
     } finally {
@@ -165,18 +187,121 @@ class _CircularCameraViewState extends State<CircularCameraView>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SiempreOscuro(
+        child: Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: _buildBody(),
       ),
+    ));
+  }
+
+  /// Descarta la foto tomada y vuelve a la cámara.
+  Future<void> _repetir() async {
+    final foto = _fotoTomada;
+    setState(() => _fotoTomada = null);
+    try {
+      await foto?.delete();
+    } catch (_) {}
+  }
+
+  /// La foto tomada, para confirmarla antes de usarla.
+  Widget _vistaPrevia(File foto) {
+    return Column(
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(24, 24, 24, 16),
+          child: Text(
+            '¿Se ve bien la foto?',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Center(
+            child: LayoutBuilder(builder: (context, limites) {
+              final lado =
+                  (limites.biggest.shortestSide * 0.85).clamp(160.0, 360.0);
+              return Container(
+                width: lado,
+                height: lado,
+                clipBehavior: Clip.antiAlias,
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                // El aro encima de la foto, para que no la tape.
+                foregroundDecoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 4),
+                ),
+                child: Image.file(foto, fit: BoxFit.cover),
+              );
+            }),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _repetir,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Repetir'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white70),
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    textStyle: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => widget.onPhotoTaken(foto),
+                  icon: const Icon(Icons.check),
+                  label: const Text('Usar foto'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    textStyle: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
+  }
+
+  /// La proporción (ancho/alto) con que `CameraPreview` dibuja la cámara.
+  double _aspectoVistaPrevia() {
+    final valor = _controller!.value;
+    final giro = valor.lockedCaptureOrientation ?? valor.deviceOrientation;
+    final deLado = giro == DeviceOrientation.landscapeLeft ||
+        giro == DeviceOrientation.landscapeRight;
+    return deLado ? valor.aspectRatio : 1 / valor.aspectRatio;
   }
 
   Widget _buildBody() {
     if (_errorMessage != null) {
       return _buildErrorWidget();
     }
+
+    final fotoTomada = _fotoTomada;
+    if (fotoTomada != null) return _vistaPrevia(fotoTomada);
 
     if (!_isInitialized || _controller == null) {
       return const Center(
@@ -186,7 +311,7 @@ class _CircularCameraViewState extends State<CircularCameraView>
             CircularProgressIndicator(color: Colors.white),
             SizedBox(height: 16),
             Text(
-              'Inicializando cámara...',
+              'Abriendo la cámara…',
               style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ],
@@ -194,6 +319,13 @@ class _CircularCameraViewState extends State<CircularCameraView>
       );
     }
 
+    return LayoutBuilder(builder: (context, espacio) {
+      _vista = espacio.biggest;
+      return _camara();
+    });
+  }
+
+  Widget _camara() {
     return Stack(
       children: [
         // Vista previa de la cámara que llena toda la pantalla
@@ -213,10 +345,33 @@ class _CircularCameraViewState extends State<CircularCameraView>
           ),
         ),
 
-        // Botón cerrar - Posicionado arriba fuera del área de la cámara
+        // Qué hacer, arriba.
         Positioned(
-          top: 40, // Más arriba que antes
-          left: 20,
+          top: 22,
+          left: 72,
+          right: 72,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'Centra la cara del cliente en el círculo',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+
+        // Botón cerrar
+        Positioned(
+          top: 16,
+          left: 16,
           child: Container(
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.6),
@@ -251,8 +406,8 @@ class _CircularCameraViewState extends State<CircularCameraView>
                     width: 4,
                   ),
                   color: _isTakingPicture
-                      ? Colors.grey.withOpacity(0.5)
-                      : Colors.white.withOpacity(0.3),
+                      ? AppColors.accent.withOpacity(0.5)
+                      : AppColors.accent,
                 ),
                 child: _isTakingPicture
                     ? const Center(
@@ -288,7 +443,7 @@ class _CircularCameraViewState extends State<CircularCameraView>
             ),
             const SizedBox(height: 16),
             const Text(
-              'Error de Cámara',
+              'No se pudo abrir la cámara',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 24,
@@ -334,14 +489,11 @@ class _CircularCameraViewState extends State<CircularCameraView>
 class CircularMaskPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final double centerX = size.width / 2;
-    // Ajustar el centro vertical para mejor posicionamiento
-    final double centerY =
-        size.height * 0.45; // Ligeramente más arriba del centro
-
-    // Calcular el radio basado en la altura de la pantalla para mejor precisión
-    // Usar un factor que tenga más relación con la captura real
-    final double radius = (size.height * 0.25).clamp(120.0, 200.0);
+    // El mismo círculo con que se recorta la foto (recorte_circulo.dart).
+    final guia = circuloGuia(size);
+    final double centerX = guia.center.dx;
+    final double centerY = guia.center.dy;
+    final double radius = guia.width / 2;
 
     // Crear path para el círculo
     final Path circlePath = Path()
@@ -390,7 +542,7 @@ class CircularMaskPainter extends CustomPainter {
       ..color = Colors.white.withOpacity(0.8)
       ..style = PaintingStyle.fill;
 
-    final double dotRadius = 2.5;
+    const double dotRadius = 2.5;
     final double guideRadius = radius * 0.75;
 
     // Puntos de guía (ojos y boca aproximadamente)

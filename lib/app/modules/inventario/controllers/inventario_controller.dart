@@ -1,11 +1,26 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:gymads/app/core/permissions/permissions.dart';
+import 'package:gymads/app/core/widgets/escaner_codigo_view.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/fallo_al_guardar.dart';
+import 'package:gymads/app/core/utils/auth_utils.dart';
+import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/repositories/product_repository.dart';
+import 'package:gymads/app/data/services/tenant_context_service.dart';
+import 'package:gymads/app/data/services/welcome_tour_service.dart';
+import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/app/core/widgets/formulario.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 
-class InventarioController extends GetxController {
-  final ProductRepository productRepository = ProductRepository();
+class InventarioController extends GetxController
+    with ScreenTourMixin, RecargaEnVivoMixin {
+  // `late` a propósito: el repositorio abre el cliente de Supabase al
+  // construirse, y como campo directo obligaba a tener Supabase inicializado
+  // solo por crear el controller.
+  late final ProductRepository productRepository = ProductRepository();
 
   // Método helper para mostrar snackbars de forma segura
   void _showSnackbarSafe(String title, String message,
@@ -29,8 +44,8 @@ class InventarioController extends GetxController {
           );
         }
       } catch (e) {
-        // Si falla, simplemente logueamos el mensaje
-        print('${isError ? '❌' : (isWarning ? '⚠️' : '✅')} $title: $message');
+        AppLogger.error(
+            'InventarioController', 'No se pudo mostrar la notificación', e);
       }
     });
   }
@@ -42,7 +57,12 @@ class InventarioController extends GetxController {
 
   // Estado para la búsqueda
   final RxString searchQuery = ''.obs;
-  final RxString selectedCategory = 'Todas'.obs;
+
+  /// Id de la categoría filtrada. `null` significa "todas".
+  final RxnString selectedCategoryId = RxnString();
+
+  /// Muestra solo lo que hay que reponer (stock negativo).
+  final RxBool soloFaltantes = false.obs;
 
   // Estado para el formulario
   final Rx<Product?> currentProduct = Rx<Product?>(null);
@@ -61,12 +81,50 @@ class InventarioController extends GetxController {
   final TextEditingController notesController = TextEditingController();
   final TextEditingController priceController = TextEditingController();
 
+  // ─── Tour de bienvenida ───
+  final keyEscanear = GlobalKey();
+  final keyAgregar = GlobalKey();
+  final keyCategorias = GlobalKey();
+  final keyBuscar = GlobalKey();
+  final keyLista = GlobalKey();
+
+  @override
+  String get tourId => AppTours.inventario;
+
+  /// Si el usuario actual puede [permiso]. La vista decide con esto qué
+  /// botones dibuja: el precio es de quien gestiona el inventario, el stock
+  /// también lo mueve el staff.
+  bool can(Permission permiso) => TenantContextService.to.can(permiso);
+
+  /// Los pasos del tour, sin los botones que este rol no tiene delante.
+  ///
+  /// El orden sigue al de la pantalla: en la barra superior Categorías va
+  /// antes que Agregar, y al revés el recorrido saltaba hacia atrás.
+  @override
+  List<GlobalKey> get tourSteps => [
+        if (can(Permission.ajustarStock)) keyEscanear,
+        if (can(Permission.gestionarCategorias)) keyCategorias,
+        if (can(Permission.gestionarProductos)) keyAgregar,
+        keyBuscar,
+        keyLista,
+      ];
+
   @override
   void onInit() {
     super.onInit();
     loadProducts();
     loadCategories();
     loadInventoryStats();
+    // Existencias que bajan con una venta en otro teléfono, productos y
+    // categorías nuevos: aparecen solos.
+    recargarAlCambiar(
+      {TablaEnVivo.productos, TablaEnVivo.categorias},
+      () => Future.wait([
+        loadCategories(),
+        loadProducts(silencioso: true),
+        loadInventoryStats(),
+      ]),
+    );
   }
 
   @override
@@ -79,58 +137,120 @@ class InventarioController extends GetxController {
 
   void resetForm() {
     currentProduct.value = null;
+    _idProductoNuevo = null;
     isEditing.value = false;
     quantityController.clear();
     notesController.clear();
     priceController.clear();
   }
 
-  Future<void> loadProducts() async {
-    isLoading.value = true;
+  /// [silencioso]: sin spinner ni mensajes de error (recarga automática).
+  Future<void> loadProducts({bool silencioso = false}) async {
+    if (!silencioso) isLoading.value = true;
     try {
       products.value = await productRepository.getAllProducts();
       filterProducts();
     } catch (e) {
-      print('Error al cargar productos: $e');
-      _showSnackbarSafe('Error', 'No se pudieron cargar los productos',
-          isError: true);
+      AppLogger.error('InventarioController', 'Error al cargar productos', e);
+      if (!silencioso) {
+        _showSnackbarSafe('Error', 'No se pudieron cargar los productos',
+            isError: true);
+      }
     } finally {
-      isLoading.value = false;
+      if (!silencioso) isLoading.value = false;
     }
   }
 
   Future<void> loadCategories() async {
     try {
-      print('🔵 [Inventario] Loading categories...');
+      // Se cargan también las inactivas: hacen falta para resolver el nombre
+      // de un producto cuya categoría se desactivó.
       categories.value = await productRepository.getAllCategories();
-      print('🔵 [Inventario] Loaded ${categories.length} categories');
-      for (final c in categories) {
-        print('   → ${c.name} (${c.id})');
-      }
+      filterProducts();
     } catch (e) {
-      print('❌ Error al cargar categorías: $e');
+      AppLogger.error('InventarioController', 'Error al cargar categorías', e);
     }
+  }
+
+  /// Categorías que se pueden elegir al crear o filtrar.
+  List<ProductCategory> get activeCategories =>
+      categories.where((c) => c.isActive).toList();
+
+  /// Búsqueda por id para resolver el nombre y el icono de un producto.
+  Map<String, ProductCategory> get categoryById => {
+        for (final c in categories) c.id: c,
+      };
+
+  String categoryNameFor(Product product) =>
+      categoryById[product.categoryId]?.name ?? 'Sin categoría';
+
+  /// Recarga todo. El botón de refrescar solo llamaba a `loadProducts`, así
+  /// que una categoría creada en otro dispositivo nunca aparecía.
+  Future<void> refreshAll() async {
+    await Future.wait([
+      loadCategories(),
+      loadProducts(),
+      loadInventoryStats(),
+    ]);
   }
 
   Future<void> loadInventoryStats() async {
     try {
       inventoryStats.value = await productRepository.getInventoryStats();
     } catch (e) {
-      print('Error al cargar estadísticas: $e');
+      AppLogger.error(
+          'InventarioController', 'Error al cargar estadísticas', e);
     }
+  }
+
+  /// Busca un producto por su código de barras, en memoria.
+  ///
+  /// La lista ya viene entera de `getAllProducts()`, así que no hace falta ir
+  /// a la red: escanear y encontrar es instantáneo.
+  Product? productoPorBarcode(String codigo) {
+    final buscado = codigo.trim();
+    if (buscado.isEmpty) return null;
+    for (final producto in products) {
+      if (producto.barcode == buscado) return producto;
+    }
+    return null;
+  }
+
+  /// Abre la cámara y devuelve el código leído, o null si se canceló.
+  Future<String?> escanearCodigo({String? titulo, String? instruccion}) async {
+    return await Get.to<String>(
+      () => EscanerCodigoView(
+        titulo: titulo ?? 'Escanear código',
+        instruccion: instruccion ?? 'Apunta al código de barras del producto',
+      ),
+    );
   }
 
   void filterProducts() {
     filteredProducts.value = products.where((product) {
+      // El código entra en la búsqueda para poder teclearlo cuando el
+      // escáner no lee (envase arrugado, poca luz) sin cambiar de pantalla.
       bool matchesSearch = searchQuery.isEmpty ||
           product.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          product.description.toLowerCase().contains(searchQuery.toLowerCase());
+          product.description
+              .toLowerCase()
+              .contains(searchQuery.toLowerCase()) ||
+          (product.barcode ?? '').contains(searchQuery.trim());
 
-      bool matchesCategory = selectedCategory.value == 'Todas' ||
-          product.category == selectedCategory.value;
+      bool matchesCategory = selectedCategoryId.value == null ||
+          product.categoryId == selectedCategoryId.value;
 
-      return matchesSearch && matchesCategory;
+      bool matchesFaltante = !soloFaltantes.value || product.stock < 0;
+
+      return matchesSearch && matchesCategory && matchesFaltante;
     }).toList();
+  }
+
+  /// Muestra solo los productos con faltante. Lo activa el aviso de
+  /// "vendidos sin existencias" para ir directo a lo que hay que reponer.
+  void toggleSoloFaltantes() {
+    soloFaltantes.value = !soloFaltantes.value;
+    filterProducts();
   }
 
   void setSearchQuery(String query) {
@@ -138,74 +258,101 @@ class InventarioController extends GetxController {
     filterProducts();
   }
 
-  void setSelectedCategory(String category) {
-    selectedCategory.value = category;
+  void setSelectedCategory(String? categoryId) {
+    selectedCategoryId.value = categoryId;
     filterProducts();
   }
 
+  /// Si hay un producto guardándose. Aparte de [isLoading] (que es de la
+  /// lista): el botón "Guardar" se desactiva y un segundo toque no manda
+  /// otro guardado.
+  final guardandoProducto = false.obs;
+
+  /// El id del producto nuevo, uno por formulario: si un intento se guardó
+  /// pero la respuesta no llegó (mala señal), el reintento lleva el mismo id
+  /// y se reconoce como el mismo producto en vez de fallar.
+  String? _idProductoNuevo;
+
   Future<void> saveProduct(Map<String, dynamic> productData) async {
-    isLoading.value = true;
+    if (guardandoProducto.value) return;
+    guardandoProducto.value = true;
 
     try {
       final now = DateTime.now();
 
       if (isEditing.value && currentProduct.value != null) {
-        // Actualizar producto existente
+        // Actualizar producto existente.
+        // El stock no viaja aquí: se mueve solo por deltas desde "Ajustar
+        // stock". `updateProduct` tampoco lo envía, así que una venta hecha
+        // mientras esta pantalla estaba abierta no se pierde.
+        // El formulario manda '' cuando se borró el código. `copyWith` con
+        // `??` no puede volver a null, de ahí `limpiarBarcode`.
+        final barcodeEditado = (productData['barcode'] as String?)?.trim();
+
         final updatedProduct = currentProduct.value!.copyWith(
           name: productData['name'],
           description: productData['description'],
-          category: productData['category'],
+          categoryId: productData['category_id'],
           price: double.parse(productData['price']),
-          stock: int.parse(productData['stock']),
           isActive: true,
+          barcode: (barcodeEditado?.isEmpty ?? true) ? null : barcodeEditado,
+          limpiarBarcode: barcodeEditado?.isEmpty ?? false,
           updatedAt: now,
         );
 
         final result = await productRepository.updateProduct(updatedProduct);
 
-        if (result != null) {
-          int index = products.indexWhere((p) => p.id == result.id);
-          if (index >= 0) {
-            products[index] = result;
-            products.refresh();
-          }
-
-          Get.back();
-          _showSnackbarSafe('Éxito', 'Producto actualizado correctamente');
+        int index = products.indexWhere((p) => p.id == result.id);
+        if (index >= 0) {
+          products[index] = result;
+          products.refresh();
         }
+
+        Get.back();
+        _showSnackbarSafe('Éxito', 'Producto actualizado correctamente');
       } else {
         // Crear nuevo producto
         final newProduct = Product(
-          id: const Uuid().v4(),
+          id: _idProductoNuevo ??= const Uuid().v4(),
           name: productData['name'],
           description: productData['description'],
-          category: productData['category'],
+          categoryId: productData['category_id'],
           price: double.parse(productData['price']),
           stock: int.parse(productData['stock']),
           isActive: true,
+          barcode: ((productData['barcode'] as String?)?.trim().isEmpty ?? true)
+              ? null
+              : (productData['barcode'] as String).trim(),
           createdAt: now,
           updatedAt: now,
         );
 
         final result = await productRepository.createProduct(newProduct);
+        _idProductoNuevo = null;
 
-        if (result != null) {
-          products.add(result);
-          products.refresh();
+        if (!products.any((p) => p.id == result.id)) products.add(result);
+        products.refresh();
 
-          Get.back();
-          _showSnackbarSafe('Éxito', 'Producto creado correctamente');
-        }
+        Get.back();
+        _showSnackbarSafe('Éxito', 'Producto creado correctamente');
       }
 
       filterProducts();
       loadInventoryStats();
+    } on BarcodeDuplicadoException catch (e) {
+      // Se atrapa aparte del error genérico: "ese código ya es de otro
+      // producto" es accionable; "no se pudo guardar" no dice qué arreglar.
+      _showSnackbarSafe('Código repetido', e.mensaje, isError: true);
     } catch (e) {
-      print('Error al guardar producto: $e');
-      _showSnackbarSafe('Error', 'No se pudo guardar el producto',
-          isError: true);
+      AppLogger.error('InventarioController', 'Error al guardar producto', e);
+      _showSnackbarSafe(
+        'No se guardó',
+        mensajeDeFallo(e,
+            generico: 'No se pudo guardar el producto. Intenta de nuevo.'),
+        isError: true,
+      );
     } finally {
-      isLoading.value = false;
+      guardandoProducto.value = false;
     }
   }
 
@@ -246,7 +393,8 @@ class InventarioController extends GetxController {
         _showSnackbarSafe('Éxito', 'Producto desactivado correctamente');
       }
     } catch (e) {
-      print('Error al desactivar producto: $e');
+      AppLogger.error(
+          'InventarioController', 'Error al desactivar producto', e);
       _showSnackbarSafe('Error', 'No se pudo desactivar el producto',
           isError: true);
     }
@@ -257,32 +405,26 @@ class InventarioController extends GetxController {
       // Mostrar confirmación antes de eliminar permanentemente
       final confirmed = await Get.dialog<bool>(
         AlertDialog(
-          title: Text(
-            'Eliminar Producto',
+          scrollable: true,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Eliminar producto',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Colors.red[700],
             ),
           ),
-          content: Text(
-            '¿Estás seguro de que deseas eliminar este producto permanentemente?\n\nEsta acción no se puede deshacer.',
-            style: TextStyle(fontSize: 16),
+          content: const Text(
+            '¿Seguro que quieres eliminar este producto? Esta acción no se '
+            'puede deshacer.',
+            style: TextStyle(fontSize: 15),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Get.back(result: false),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            ),
-            ElevatedButton(
+            BotonCancelar(onPressed: () => Get.back(result: false)),
+            BotonGuardar(
+              texto: 'Eliminar',
+              compacto: true,
+              color: AppColors.error,
               onPressed: () => Get.back(result: true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Eliminar'),
             ),
           ],
         ),
@@ -306,7 +448,7 @@ class InventarioController extends GetxController {
         }
       }
     } catch (e) {
-      print('Error al eliminar producto: $e');
+      AppLogger.error('InventarioController', 'Error al eliminar producto', e);
       _showSnackbarSafe('Error', 'No se pudo eliminar el producto',
           isError: true);
     }
@@ -318,99 +460,92 @@ class InventarioController extends GetxController {
       transactions.value =
           await productRepository.getProductTransactions(productId);
     } catch (e) {
-      print('Error al cargar transacciones: $e');
+      AppLogger.error(
+          'InventarioController', 'Error al cargar transacciones', e);
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> recordTransaction(String productId, String productName) async {
-    if (quantityController.text.isEmpty) {
-      _showSnackbarSafe('Error', 'Debes ingresar una cantidad', isError: true);
-      return;
-    }
+  // ══════════════════════════════════════════════════════════
+  // AJUSTE DE STOCK
+  // ══════════════════════════════════════════════════════════
 
-    isLoading.value = true;
+  /// Suma [delta] al stock del producto y deja constancia del movimiento.
+  ///
+  /// Siempre es un delta, nunca un valor absoluto: así "tengo 9 y entran 5"
+  /// da 14, y reponer sobre un faltante lo salda solo (-3 + 10 = 7).
+  ///
+  /// Devuelve el stock resultante, o null si falló.
+  Future<int?> ajustarStock(Product product, int delta,
+      {String? nota, double? precioUnitario}) async {
+    if (delta == 0) return product.stock;
+
     try {
-      final int quantity = int.parse(quantityController.text);
-      final String notes = notesController.text;
-      final double unitPrice = priceController.text.isNotEmpty
-          ? double.parse(priceController.text)
-          : 0.0;
-
       final transaction = ProductTransaction(
         id: const Uuid().v4(),
-        productId: productId,
-        productName: productName,
-        type: selectedTransactionType.value,
-        quantity: quantity,
-        unitPrice: unitPrice,
-        notes: notes,
-        staffUser: 'Admin', // Esto debería venir del usuario logueado
+        productId: product.id,
+        productName: product.name,
+        type: delta > 0 ? TransactionType.entrada : TransactionType.salida,
+        quantity: delta.abs(),
+        unitPrice: precioUnitario ?? 0.0,
+        notes: nota ?? '',
+        staffUser: AuthUtils.getStaffIdentifier(),
         transactionDate: DateTime.now(),
         createdAt: DateTime.now(),
       );
 
-      final result = await productRepository.recordTransaction(transaction);
-
-      if (result) {
-        // Recargar el producto y las transacciones
-        await loadProducts();
-        await loadProductTransactions(productId);
-        await loadInventoryStats();
-
-        quantityController.clear();
-        notesController.clear();
-        priceController.clear();
-
-        Get.back(); // Cerrar el diálogo
-
-        _showSnackbarSafe('Éxito', 'Transacción registrada correctamente');
+      final nuevoStock = await productRepository.recordTransaction(transaction);
+      if (nuevoStock == null) {
+        _showSnackbarSafe('Error', 'No se pudo actualizar el stock',
+            isError: true);
+        return null;
       }
+
+      // Refleja el nuevo stock sin recargar toda la lista: el ajuste rápido
+      // con +/- se dispara muchas veces seguidas.
+      final index = products.indexWhere((p) => p.id == product.id);
+      if (index >= 0) {
+        products[index] = products[index].copyWith(stock: nuevoStock);
+        products.refresh();
+      }
+
+      // El formulario de edición muestra el stock desde aquí; sin esto
+      // seguiría enseñando el valor de antes del ajuste.
+      if (currentProduct.value?.id == product.id) {
+        currentProduct.value =
+            currentProduct.value!.copyWith(stock: nuevoStock);
+      }
+      filterProducts();
+      loadInventoryStats();
+
+      return nuevoStock;
     } catch (e) {
-      print('Error al registrar transacción: $e');
-      _showSnackbarSafe('Error', 'No se pudo registrar la transacción',
+      AppLogger.error('InventarioController', 'Error al ajustar stock', e);
+      _showSnackbarSafe('Error', 'No se pudo actualizar el stock',
           isError: true);
-    } finally {
-      isLoading.value = false;
+      return null;
     }
   }
 
-  Future<void> saveCategory(String name, String description) async {
-    if (name.isEmpty) {
-      _showSnackbarSafe('Error', 'El nombre de la categoría es obligatorio',
-          isError: true);
-      return;
-    }
+  // ══════════════════════════════════════════════════════════
+  // FALTANTES
+  //
+  // Un stock negativo son unidades que se vendieron sin existencias. No se
+  // guarda en ninguna parte: se deriva del propio stock, así que desaparece
+  // solo cuando se repone.
+  // ══════════════════════════════════════════════════════════
 
-    isLoading.value = true;
-    try {
-      final now = DateTime.now();
+  List<Product> get productosConFaltante =>
+      products.where((p) => p.stock < 0).toList();
 
-      final newCategory = ProductCategory(
-        id: const Uuid().v4(),
-        name: name,
-        description: description,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      );
+  /// Unidades que se deben en total.
+  int get unidadesFaltantes =>
+      productosConFaltante.fold(0, (suma, p) => suma - p.stock);
 
-      final result = await productRepository.createCategory(newCategory);
+  /// Lo que valen esas unidades a precio de venta.
+  double get valorFaltante => productosConFaltante.fold(
+      0.0, (suma, p) => suma + (-p.stock) * p.price);
 
-      if (result != null) {
-        categories.add(result);
-        categories.refresh();
-
-        Get.back();
-        _showSnackbarSafe('Éxito', 'Categoría creada correctamente');
-      }
-    } catch (e) {
-      print('Error al guardar categoría: $e');
-      _showSnackbarSafe('Error', 'No se pudo guardar la categoría',
-          isError: true);
-    } finally {
-      isLoading.value = false;
-    }
-  }
+  bool get hayFaltantes => productosConFaltante.isNotEmpty;
 }

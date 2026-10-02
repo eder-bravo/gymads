@@ -1,7 +1,11 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
+import '../../../core/permissions/permissions.dart';
+import '../../../data/services/tenant_context_service.dart';
+import '../../../data/services/welcome_tour_service.dart';
 import '../../../routes/app_pages.dart';
 import '../../auth/controllers/auth_controller.dart';
-
 
 class HomeController extends GetxController {
   // Estado observable para controlar cuando se está creando un usuario
@@ -9,6 +13,65 @@ class HomeController extends GetxController {
 
   // Lista observable de mensajes de estado
   final RxList<String> statusMessages = <String>[].obs;
+
+  // ─── Tour de bienvenida ───
+  // Las claves viven aquí y no en el build porque HomeView reconstruye sus
+  // listas de módulos en cada frame; creadas ahí serían inestables.
+  final keyHeader = GlobalKey();
+  final keyClientes = GlobalKey();
+  final keyAbonar = GlobalKey();
+  final keyVender = GlobalKey();
+  final keyInventario = GlobalKey();
+  final keyIngresos = GlobalKey();
+  final keyEntradas = GlobalKey();
+  final keyConfiguracion = GlobalKey();
+
+  bool _checkingOnboarding = false;
+
+  /// Pantallas que forman el asistente inicial.
+  ///
+  /// "Costos fijos" lleva a la de precios, que es su segundo paso, y hasta que
+  /// no se confirman los precios el `payment_mode` sigue nulo. Sin tener las
+  /// dos en cuenta, cualquier reconstrucción de Inicio (por ejemplo al abrirse
+  /// el teclado) vuelve a empujar el asistente encima y le roba el foco al
+  /// campo que se está escribiendo.
+  static const Set<String> _rutasAsistente = {
+    Routes.ONBOARDING_PAYMENT_MODE,
+    Routes.ABONO_PRICES,
+  };
+
+  /// Si el usuario actual puede [permiso]. Es lo que decide qué módulos se
+  /// dibujan en Inicio; la vista lo consulta para armar sus listas.
+  bool can(Permission permiso) => TenantContextService.to.can(permiso);
+
+  /// El permiso que abre cada módulo del menú, en el orden en que se dibujan.
+  ///
+  /// Vive aquí y no en la vista porque el tour necesita el mismo criterio: si
+  /// las dos listas se separan, el tour termina apuntando a widgets que ese
+  /// rol no tiene delante.
+  static const Map<String, Permission> permisoPorModulo = {
+    'Clientes': Permission.gestionarClientes,
+    'Abonar': Permission.cobrarAbonos,
+    'Vender': Permission.vender,
+    'Inventario': Permission.verInventario,
+    'Ingresos': Permission.verIngresos,
+    'Entradas': Permission.verAccesos,
+  };
+
+  /// Los pasos del tour, saltándose los módulos que este rol no ve.
+  ///
+  /// Un paso apuntando a un widget que no existe deja el tour colgado, así que
+  /// se filtra con el mismo permiso que oculta la tarjeta.
+  List<GlobalKey> get _tourSteps => [
+        keyHeader,
+        if (can(Permission.gestionarClientes)) keyClientes,
+        if (can(Permission.cobrarAbonos)) keyAbonar,
+        if (can(Permission.vender)) keyVender,
+        if (can(Permission.verInventario)) keyInventario,
+        if (can(Permission.verIngresos)) keyIngresos,
+        if (can(Permission.verAccesos)) keyEntradas,
+        keyConfiguracion,
+      ];
 
   // Función para obtener el saludo según la hora
   String getGreeting() {
@@ -25,6 +88,47 @@ class HomeController extends GetxController {
   @override
   void onReady() {
     super.onReady();
+    checkOnboarding();
+  }
+
+  /// Decide si el gimnasio necesita el asistente inicial o el tour.
+  ///
+  /// Un `payment_mode` nulo solo ocurre en gimnasios recién registrados: la
+  /// migración dejó a todos los anteriores en 'libre'. El tour, en cambio, se
+  /// dispara por la bandera local que solo escribe el asistente, de modo que
+  /// los gimnasios que ya existían nunca lo ven.
+  ///
+  /// Es idempotente y se puede llamar en cada frame: se invoca tanto desde
+  /// `onReady` como desde HomeView, porque al volver del asistente con
+  /// `Get.offAllNamed` GetX puede reutilizar este controlador y entonces
+  /// `onReady` ya no vuelve a dispararse.
+  Future<void> checkOnboarding() async {
+    if (_checkingOnboarding) return;
+    _checkingOnboarding = true;
+    try {
+      final tenant = TenantContextService.to;
+      if (tenant.currentGymId == null) return;
+
+      // Solo el dueño puede escribir en `gyms` (política RLS), así que a nadie
+      // más se le puede pedir completar el asistente.
+      if (tenant.isOwnerAdmin && tenant.staffProfile?.paymentMode == null) {
+        if (!_rutasAsistente.contains(Get.currentRoute)) {
+          Get.toNamed(Routes.ONBOARDING_PAYMENT_MODE);
+        }
+        return;
+      }
+
+      // Solo con Inicio realmente en pantalla. HomeView sigue montada debajo
+      // del asistente y se reconstruye mientras este se cierra, así que sin
+      // esta guarda el tour llegaría a arrancar apuntando a unos widgets que
+      // `Get.offAllNamed` está a punto de destruir: se cerraría solo, sin
+      // enseñar nada.
+      if (Get.currentRoute != Routes.HOME) return;
+
+      await WelcomeTourService.to.startIfPending(AppTours.home, _tourSteps);
+    } finally {
+      _checkingOnboarding = false;
+    }
   }
 
   // Funciones para manejar las opciones del menú

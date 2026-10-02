@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gymads/app/data/models/gym_settings_model.dart';
+import '../../../data/config/auth_config.dart';
 import '../../../data/providers/staff_profile_provider.dart';
+import '../../../data/services/google_play_services.dart';
 import '../../../data/services/tenant_context_service.dart';
-import '../../../data/services/branding_service.dart';
 import '../../../routes/app_pages.dart';
+import 'package:gymads/app/core/utils/correo_valido.dart';
+import 'package:gymads/app/core/utils/nombre_completo.dart';
 
 /// Controller for registration (creating a new gym account)
 ///
@@ -25,6 +31,17 @@ class RegisterController extends GetxController {
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
   final gymNameController = TextEditingController();
+
+  /// Horario del gimnasio. Nace con el valor más común para que quien no lo
+  /// toque no alargue el registro; se guarda junto con el gimnasio.
+  final horaApertura = const HoraDelDia(6, 0).obs;
+  final horaCierre = const HoraDelDia(22, 0).obs;
+
+  void setHorario(HoraDelDia apertura, HoraDelDia cierre) {
+    horaApertura.value = apertura;
+    horaCierre.value = cierre;
+  }
+
   final locationController = TextEditingController();
 
   // State
@@ -89,14 +106,22 @@ class RegisterController extends GetxController {
     return null;
   }
 
-  String? validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'El correo es requerido';
-    }
-    if (!GetUtils.isEmail(value)) {
-      return 'Ingresa un correo válido';
-    }
-    return null;
+  /// Que tenga forma de correo y sea de un proveedor real (correo_valido.dart).
+  String? validateEmail(String? value) => validarCorreoDeRegistro(value);
+
+  /// "¿Quisiste decir juan@gmail.com?" mientras se escribe el correo.
+  final sugerenciaCorreo = RxnString();
+
+  void revisarCorreo(String valor) =>
+      sugerenciaCorreo.value = sugerenciaDeCorreo(valor);
+
+  void usarSugerenciaCorreo() {
+    final sugerida = sugerenciaCorreo.value;
+    if (sugerida == null) return;
+    emailController.text = sugerida;
+    emailController.selection =
+        TextSelection.collapsed(offset: sugerida.length);
+    sugerenciaCorreo.value = null;
   }
 
   String? validatePassword(String? value) {
@@ -145,24 +170,52 @@ class RegisterController extends GetxController {
 
     try {
       if (GetPlatform.isAndroid) {
-        await _registerWithGoogleAndroid();
+        if (!await GooglePlayServices.disponibles) {
+          AppLogger.info(
+            'RegisterController',
+            'Google Play Services no disponible; usando OAuth por navegador',
+          );
+          await _registerWithGoogleNavegador();
+        } else {
+          try {
+            await _registerWithGoogleNativo();
+          } on PlatformException catch (e) {
+            if (e.code == 'sign_in_failed' ||
+                e.message?.contains('12500') == true) {
+              AppLogger.warning(
+                'RegisterController',
+                'Google nativo no disponible; usando OAuth por navegador',
+              );
+              await _registerWithGoogleNavegador();
+            } else {
+              rethrow;
+            }
+          }
+        }
+      } else if (GetPlatform.isIOS) {
+        await _registerWithGoogleNativo();
       } else {
-        // iOS / other platforms — use Supabase OAuth flow
-        await _registerWithGoogleiOS();
+        // Escritorio y web: flujo por navegador.
+        await _registerWithGoogleNavegador();
       }
     } on AuthException catch (e) {
-      print('❌ Google auth error: ${e.message}');
+      AppLogger.error(
+          'RegisterController', 'Fallo de autenticación con Google', e);
       errorMessage.value = 'Error con Google: ${e.message}';
     } catch (e) {
-      print('❌ Google sign-in error: $e');
+      AppLogger.error('RegisterController', 'Google sign-in error', e);
       errorMessage.value = e.toString().replaceAll('Exception: ', '');
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Android: use google_sign_in plugin
-  Future<void> _registerWithGoogleAndroid() async {
+  /// Android e iOS: hoja nativa de Google + signInWithIdToken.
+  ///
+  /// Mismo motivo que en el inicio de sesión: por navegador, iOS terminaba en
+  /// `http://localhost:3000` porque el proyecto no tiene ninguna Redirect URL
+  /// permitida y Supabase caía a su Site URL.
+  Future<void> _registerWithGoogleNativo() async {
     final googleSignIn = GoogleSignIn(
       serverClientId: dotenv.env['GOOGLE_SERVER_CLIENT_ID'],
       scopes: ['email', 'profile'],
@@ -199,34 +252,34 @@ class RegisterController extends GetxController {
     );
   }
 
-  /// iOS: use Supabase native OAuth flow
-  Future<void> _registerWithGoogleiOS() async {
-    print('🔵 [Google-iOS] Starting Supabase OAuth flow for registration...');
+  /// Huawei sin GMS, escritorio y web: flujo OAuth por navegador.
+  Future<void> _registerWithGoogleNavegador() async {
+    AppLogger.info(
+        'RegisterController', 'Starting Supabase OAuth flow for registration');
+
+    // Se escucha antes de abrir el navegador para no perder un retorno rápido.
+    final authResult = _supabase.auth.onAuthStateChange.firstWhere((data) =>
+        data.event == AuthChangeEvent.signedIn && data.session != null);
 
     final success = await _supabase.auth.signInWithOAuth(
       OAuthProvider.google,
-      redirectTo: 'com.googleusercontent.apps.161338034924-4kfeihb6hgt7hf8f3ritrb1v6lukodv5://',
+      redirectTo: AuthConfig.oauthRedirectUrl,
+      queryParams: const {'prompt': 'select_account'},
     );
 
     if (!success) {
       throw Exception('No se pudo iniciar sesión con Google');
     }
 
-    // Listen for the auth state change when the OAuth redirect comes back
-    final session = await _supabase.auth.onAuthStateChange
-        .firstWhere((data) =>
-            data.event == AuthChangeEvent.signedIn &&
-            data.session != null)
-        .timeout(
-          const Duration(minutes: 2),
-          onTimeout: () => throw Exception('Tiempo de espera agotado'),
-        );
+    final session = await authResult.timeout(
+      const Duration(minutes: 2),
+      onTimeout: () => throw Exception('Tiempo de espera agotado'),
+    );
 
     final userId = session.session!.user.id;
     final userMeta = session.session!.user.userMetadata;
-    final fullName = userMeta?['full_name'] as String? ??
-        userMeta?['name'] as String? ??
-        '';
+    final fullName =
+        userMeta?['full_name'] as String? ?? userMeta?['name'] as String? ?? '';
     final email = session.session!.user.email ?? '';
 
     await _handleGoogleRegResult(userId, fullName, email);
@@ -235,25 +288,17 @@ class RegisterController extends GetxController {
   /// Common handler after Google auth in registration
   Future<void> _handleGoogleRegResult(
       String userId, String? displayName, String? email) async {
-    print('✅ Google auth successful: $userId');
+    AppLogger.info('RegisterController', 'Google auth successful');
 
     final staffProfile = await _staffProfileProvider.getByUserId(userId);
 
     if (staffProfile != null && staffProfile.isActive) {
       await TenantContextService.to.setProfile(staffProfile);
-      BrandingService.to.syncFromDb(
-        dbGymName: staffProfile.gymName,
-        dbBrandColor: staffProfile.brandColor,
-        dbBrandFont: staffProfile.brandFont,
-        force: true,
-      );
       Get.offAllNamed(Routes.HOME);
     } else {
-      final gName = displayName ?? '';
-      final nameParts = gName.split(' ');
-      firstNameController.text = nameParts.isNotEmpty ? nameParts.first : '';
-      lastNameController.text =
-          nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      final nombre = separarNombreCompleto(displayName);
+      firstNameController.text = nombre.nombres;
+      lastNameController.text = nombre.apellidos;
       emailController.text = email ?? '';
 
       isGoogleUser.value = true;
@@ -294,22 +339,23 @@ class RegisterController extends GetxController {
         'p_last_name': lastNameController.text.trim(),
         'p_gym_name': gymNameController.text.trim(),
         'p_main_branch_name': locationController.text.trim(),
+        'p_hora_apertura': horaApertura.value.toSql(),
+        'p_hora_cierre': horaCierre.value.toSql(),
       });
 
-      print('✅ Gym registered via Google flow');
+      AppLogger.info('RegisterController', 'Gym registered via Google flow');
 
       // Auto-login
       final staffProfile = await _staffProfileProvider.getByUserId(userId);
 
       if (staffProfile != null && staffProfile.isActive) {
         await TenantContextService.to.setProfile(staffProfile);
-        BrandingService.to.setGymTitle(gymNameController.text.trim());
         Get.offAllNamed(Routes.HOME);
       } else {
         throw Exception('Error creando el perfil');
       }
     } catch (e) {
-      print('❌ Complete registration error: $e');
+      AppLogger.error('RegisterController', 'Complete registration error', e);
       errorMessage.value = e.toString().replaceAll('Exception: ', '');
     } finally {
       isLoading.value = false;
@@ -326,7 +372,7 @@ class RegisterController extends GetxController {
 
     try {
       // 1. Create auth user
-      print('📝 Creating auth user...');
+      AppLogger.info('RegisterController', 'Creating auth user');
       final authResponse = await _supabase.auth.signUp(
         email: emailController.text.trim(),
         password: passwordController.text,
@@ -341,10 +387,10 @@ class RegisterController extends GetxController {
       }
 
       final userId = authResponse.user!.id;
-      print('✅ Auth user created: $userId');
+      AppLogger.info('RegisterController', 'Auth user created');
 
       // 2. Call the register_gym_owner RPC function
-      print('🏋️ Registering gym via RPC...');
+      AppLogger.info('RegisterController', 'Registering gym via RPC');
 
       await _supabase.rpc('register_gym_owner', params: {
         'p_user_id': userId,
@@ -352,32 +398,40 @@ class RegisterController extends GetxController {
         'p_last_name': lastNameController.text.trim(),
         'p_gym_name': gymNameController.text.trim(),
         'p_main_branch_name': locationController.text.trim(),
+        'p_hora_apertura': horaApertura.value.toSql(),
+        'p_hora_cierre': horaCierre.value.toSql(),
       });
 
-      print('✅ Gym registered');
+      AppLogger.info('RegisterController', 'Gym registered');
 
       // 3. Auto-login: fetch staff profile and set tenant context
-      print('🔑 Auto-login: fetching staff profile...');
+      AppLogger.info(
+          'RegisterController', 'Auto-login: fetching staff profile');
       final staffProfile = await _staffProfileProvider.getByUserId(userId);
 
       if (staffProfile != null && staffProfile.isActive) {
         await TenantContextService.to.setProfile(staffProfile);
-        BrandingService.to.setGymTitle(gymNameController.text.trim());
         Get.offAllNamed(Routes.HOME);
       } else {
         // Fallback: staff profile not ready yet, go to login
-        print('⚠️ Staff profile not ready, redirecting to login');
+        AppLogger.warning('RegisterController',
+            'Staff profile not ready, redirecting to login');
         Get.offAllNamed(Routes.LOGIN);
       }
     } on AuthException catch (e) {
-      print('❌ Auth error: ${e.message}');
+      AppLogger.error('RegisterController', 'Fallo de autenticación', e);
       if (e.message.contains('already registered')) {
         errorMessage.value = 'Este correo ya está registrado';
+      } else if (e.message.contains('correo_no_permitido') ||
+          e.message.contains('Database error saving new user')) {
+        // La base de datos lo rechazó (la misma regla, por si la cuenta se
+        // intentó crear sin pasar por la validación de la pantalla).
+        errorMessage.value = mensajeCorreoNoPermitido;
       } else {
         errorMessage.value = 'Error: ${e.message}';
       }
     } catch (e) {
-      print('❌ Registration error: $e');
+      AppLogger.error('RegisterController', 'Registration error', e);
       errorMessage.value = e.toString().replaceAll('Exception: ', '');
     } finally {
       isLoading.value = false;

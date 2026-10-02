@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../data/services/camera_service.dart';
+import '../../../../core/theme/siempre_oscuro.dart';
 
 class CameraView extends StatefulWidget {
   const CameraView({super.key});
@@ -41,7 +42,8 @@ class _CameraViewState extends State<CameraView> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return Scaffold(
+    return SiempreOscuro(
+        child: Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
@@ -91,6 +93,6 @@ class _CameraViewState extends State<CameraView> {
           ],
         ),
       ),
-    );
+    ));
   }
 }

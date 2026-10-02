@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/supabase_config.dart';
+import '../../services/storage_service.dart';
 import '../../services/supabase_service.dart';
 import '../../../core/services/image_compression_service.dart';
 
@@ -22,7 +24,7 @@ class SupabaseStorageProvider {
     try {
       if (!await file.exists()) {
         if (kDebugMode && SupabaseConfig.debugMode) {
-          print('❌ El archivo no existe: ${file.path}');
+          AppLogger.error('SupabaseStorageProvider', 'El archivo no existe');
         }
         return null;
       }
@@ -43,7 +45,7 @@ class SupabaseStorageProvider {
       );
       
       if (kDebugMode && SupabaseConfig.debugMode) {
-        print('✅ Archivo subido correctamente: $fullPath');
+        AppLogger.info('SupabaseStorageProvider', 'Archivo subido correctamente');
       }
       
       // Generar URL pública
@@ -51,7 +53,7 @@ class SupabaseStorageProvider {
       return publicUrl;
     } catch (e) {
       if (kDebugMode && SupabaseConfig.debugMode) {
-        print('❌ Error al subir archivo: $e');
+        AppLogger.error('SupabaseStorageProvider', 'Error al subir archivo', e);
       }
       return null;
     }
@@ -65,7 +67,7 @@ class SupabaseStorageProvider {
   Future<String?> uploadUserPhoto(File photoFile, String userId) async {
     try {
       if (kDebugMode && SupabaseConfig.debugMode) {
-        print('🖼️  Comprimiendo y optimizando imagen para usuario $userId...');
+        AppLogger.info('SupabaseStorageProvider', 'Comprimiendo y optimizando imagen para usuario');
       }
 
       // Comprimir y optimizar la imagen antes de subir
@@ -79,9 +81,9 @@ class SupabaseStorageProvider {
         final originalSize = await photoFile.length();
         final optimizedSize = await optimizedFile.length();
         final reduction = ((1 - optimizedSize / originalSize) * 100).toStringAsFixed(1);
-        print('📊 Reducción de tamaño: $reduction%');
-        print('   Original: ${(originalSize / 1024).toStringAsFixed(2)} KB');
-        print('   Optimizada: ${(optimizedSize / 1024).toStringAsFixed(2)} KB');
+        AppLogger.info('SupabaseStorageProvider', 'Reducción de tamaño: $reduction%');
+        AppLogger.info('SupabaseStorageProvider', 'Original: ${(originalSize / 1024).toStringAsFixed(2)} KB');
+        AppLogger.info('SupabaseStorageProvider', 'Optimizada: ${(optimizedSize / 1024).toStringAsFixed(2)} KB');
       }
 
       // Subir la imagen optimizada
@@ -97,9 +99,7 @@ class SupabaseStorageProvider {
           await optimizedFile.delete();
         }
       } catch (e) {
-        if (kDebugMode) {
-          print('⚠️  No se pudo eliminar archivo temporal: $e');
-        }
+        AppLogger.warning('SupabaseStorageProvider', 'No se pudo eliminar archivo temporal');
       }
 
       // Limpiar la foto original capturada (vive en Application Documents,
@@ -109,15 +109,13 @@ class SupabaseStorageProvider {
           await photoFile.delete();
         }
       } catch (e) {
-        if (kDebugMode) {
-          print('⚠️  No se pudo eliminar la foto original: $e');
-        }
+        AppLogger.warning('SupabaseStorageProvider', 'No se pudo eliminar la foto original');
       }
 
       return result;
     } catch (e) {
       if (kDebugMode && SupabaseConfig.debugMode) {
-        print('❌ Error al procesar y subir foto de usuario: $e');
+        AppLogger.error('SupabaseStorageProvider', 'Error al procesar y subir foto de usuario', e);
       }
       return null;
     }
@@ -128,34 +126,16 @@ class SupabaseStorageProvider {
   /// @param url URL completa del archivo a eliminar
   /// @return true si la eliminación fue exitosa, false en caso contrario
   Future<bool> deleteFile(String url) async {
-    try {
-      // Extraer la ruta relativa del archivo desde la URL
-      final segments = url.split('${SupabaseConfig.bucketName}/');
-      if (segments.length < 2) {
-        if (kDebugMode && SupabaseConfig.debugMode) {
-          print('❌ Formato de URL inválido: $url');
-        }
-        return false;
-      }
-      
-      final filePath = segments[1];
-      
-      // Eliminar el archivo
-      await SupabaseService.client.storage.from(SupabaseConfig.bucketName).remove([filePath]);
-      
-      if (kDebugMode && SupabaseConfig.debugMode) {
-        print('✅ Archivo eliminado correctamente: $filePath');
-      }
-      
-      return true;
-    } catch (e) {
-      if (kDebugMode && SupabaseConfig.debugMode) {
-        print('❌ Error al eliminar archivo: $e');
-      }
+    // Con el mismo lector de rutas que usa la app para mostrar las fotos: el
+    // corte por texto que había aquí dejaba una ruta vacía y no borraba nada.
+    if (StorageService.instance.objeto(url) == null) {
+      AppLogger.warning(
+          'SupabaseStorageProvider', 'No se reconoce el archivo a eliminar');
       return false;
     }
+    return StorageService.instance.borrar([url]);
   }
-  
+
   /// Elimina una foto de usuario
   /// 
   /// @param photoUrl URL completa de la foto a eliminar

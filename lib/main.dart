@@ -1,19 +1,28 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:gymads/app/core/utils/app_logger.dart';
+import 'package:gymads/app/core/utils/material_localizations_12h.dart';
 import 'package:gymads/app/bindings/initial_binding.dart';
 import 'package:gymads/app/data/config/rfid_config.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
+import 'package:gymads/app/data/services/gym_settings_service.dart';
 import 'package:gymads/app/data/services/image_cache_service.dart';
 import 'package:gymads/app/data/services/rfid_reader_service.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
-import 'package:gymads/app/data/services/branding_service.dart';
+import 'package:gymads/app/data/services/welcome_tour_service.dart';
+import 'package:gymads/app/data/services/windows_oauth_protocol.dart';
 import 'package:gymads/app/modules/auth/controllers/auth_controller.dart';
 import 'package:gymads/app/routes/app_pages.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/app/data/services/fotos_de_clientes.dart';
+import 'package:gymads/app/data/services/avisos_sistema_service.dart';
+import 'package:gymads/app/data/services/permisos_app.dart';
+import 'package:gymads/app/data/services/tema_service.dart';
+import 'package:gymads/core/theme/app_theme.dart';
 
 /// GlobalKey para acceder al ScaffoldMessenger desde cualquier parte de la app
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
@@ -29,8 +38,19 @@ void main() async {
   // Asegura la inicialización de los bindings de Flutter
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Permite que el navegador devuelva el resultado de Google a la app de
+  // Windows. En las demás plataformas no hace nada.
+  WindowsOAuthProtocol.register();
+
   // Initialize GetStorage for local caching
   await GetStorage.init();
+
+  // Modo claro u oscuro elegido en este teléfono (por defecto, el del
+  // teléfono). Antes del primer cuadro, para que no parpadee.
+  Get.put(TemaService(), permanent: true);
+
+  // Si en este teléfono ya se pidieron los permisos (pantalla antes de Inicio).
+  await PermisosApp.cargar();
 
   // Inicializa Supabase (cliente principal) - SOLO UNA VEZ
   await Supabase.initialize(
@@ -38,34 +58,42 @@ void main() async {
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
     debug: true,
   );
-  print('✅ Supabase inicializado correctamente');
+  AppLogger.info('Main', 'Supabase inicializado correctamente');
 
   // Initialize TenantContextService
   Get.put(TenantContextService(), permanent: true);
   await TenantContextService.to.init();
-  print('✅ TenantContextService inicializado');
+  AppLogger.info('Main', 'TenantContextService inicializado');
 
-  // Initialize BrandingService (local-first)
-  Get.put(BrandingService(), permanent: true);
-  await BrandingService.to.init();
-  print('✅ BrandingService inicializado');
+  // Actualización automática: lo que cambia otro teléfono del gimnasio se ve
+  // sin refrescar. Sigue a la sesión (abre y cierra el canal solo).
+  Get.put(CambiosEnVivoService(), permanent: true);
+
+  // Las fotos de los clientes, descargadas de antemano en este teléfono (y al
+  // día con lo que agregan los demás): el aviso del lector sale ya con ella.
+  Get.put(FotosDeClientes(), permanent: true);
+
+  // Notificaciones de los pases del lector con la app en segundo plano. El
+  // permiso se pide después, solo en el teléfono que atiende el lector.
+  await AvisosSistema.init();
+
+  // Configuración de accesos (salidas y horario). Se registra sin cargar:
+  // hace falta el gimnasio, que llega con la sesión.
+  Get.put(GymSettingsService(), permanent: true);
+
+  // Tour de bienvenida: debe quedar registrado antes de que se construya
+  // cualquier widget Showcase de Inicio.
+  Get.put(WelcomeTourService(), permanent: true).init();
 
   // Check for existing session
   final authController = Get.put(AuthController(), permanent: true);
   final hasSession = await authController.checkSession();
 
   if (hasSession) {
-    print('✅ Sesión existente restaurada');
-    // Seed branding from DB if no local data exists (first login on device)
-    final profile = TenantContextService.to.staffProfile;
-    BrandingService.to.syncFromDb(
-      dbGymName: profile?.gymName,
-      dbBrandColor: profile?.brandColor,
-      dbBrandFont: profile?.brandFont,
-    );
+    AppLogger.info('Main', 'Sesión existente restaurada');
     _initialRoute = Routes.HOME;
   } else {
-    print('📍 No hay sesión, mostrando login');
+    AppLogger.info('Main', 'No hay sesión, mostrando login');
     _initialRoute = Routes.LOGIN;
   }
 
@@ -73,21 +101,15 @@ void main() async {
   final imageCacheService = ImageCacheService.instance;
   await imageCacheService.initialize();
   Get.put(imageCacheService, permanent: true);
-  print('✅ Servicio de caché de imágenes inicializado');
+  AppLogger.info('Main', 'Servicio de caché de imágenes inicializado');
 
-  // Inicializa la configuración del lector RFID SOLO si está activado
-  final prefs = await SharedPreferences.getInstance();
-  final rfidEnabled = prefs.getBool('rfid_enabled') ?? false;
-  if (rfidEnabled) {
-    await RfidConfig.loadConfig();
-    print('✅ Configuración RFID cargada');
-  } else {
-    print('⏭️ RFID desactivado, omitiendo configuración');
-  }
+  // El lector NO se carga aquí: si no contesta, buscarlo en la red tarda
+  // unos segundos y retrasaría la apertura de la app. Lo carga el servicio
+  // de escaneo (y _initRfidServiceIfEnabled) ya con la app abierta.
 
   // Registra el servicio de RFID de forma perezosa
   Get.lazyPut<BackgroundRfidService>(() => BackgroundRfidService());
-  print('✅ BackgroundRfidService registrado');
+  AppLogger.info('Main', 'BackgroundRfidService registrado');
 
   // Inicia la aplicación
   runApp(const MyApp());
@@ -111,28 +133,42 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initRfidServiceIfEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rfidEnabled = prefs.getBool('rfid_enabled') ?? false;
-    if (!rfidEnabled) {
-      print('⏭️ RFID desactivado, omitiendo servicio de escaneo');
+    // Hablarle al lector dispara avisos del sistema (red local en iPhone,
+    // notificaciones): se espera a que se pidan todos juntos en su pantalla.
+    await PermisosApp.listos;
+
+    // "Usar el lector" es de cada gimnasio. Si nunca se tocó, sigue a si el
+    // gimnasio tiene lector: por eso primero se carga la configuración.
+    await RfidConfig.loadConfig();
+    if (!await RfidConfig.lectorActivado()) {
+      AppLogger.info('Main', 'RFID desactivado, omitiendo servicio de escaneo');
       return;
     }
 
     // Inicia el servicio RFID después de que el primer frame se renderice
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      print('⚙️ Post-frame: Iniciando servicio RFID...');
+      AppLogger.info('Main', 'Post-frame: Iniciando servicio RFID');
       try {
         final bool connected = await RfidReaderService.startReading();
         if (connected) {
-          print('✅ RFID conectado. Iniciando escaneo en segundo plano...');
-          Get.find<BackgroundRfidService>().startScanning();
-          print('✅ Servicio de escaneo RFID iniciado correctamente.');
+          AppLogger.info(
+              'Main', 'RFID conectado. Iniciando escaneo en segundo plano');
+          final servicio = Get.find<BackgroundRfidService>();
+          await servicio.startScanning();
+          // startScanning() no arranca si a este teléfono no le tocan los
+          // avisos; decir "iniciado" en ese caso escondía el motivo real.
+          if (servicio.isScanning.value) {
+            AppLogger.info(
+                'Main', 'Servicio de escaneo RFID iniciado correctamente');
+          } else {
+            AppLogger.info('Main',
+                'Este teléfono no recibe los avisos del lector: ${servicio.motivoSinAvisos.value ?? 'sin motivo'}');
+          }
         } else {
-          print('⚠️ No se pudo conectar al lector RFID.');
+          AppLogger.warning('Main', 'No se pudo conectar al lector RFID');
         }
-      } catch (e, stack) {
-        print('❌ ERROR al iniciar servicio RFID: $e');
-        print('Stack: $stack');
+      } catch (e) {
+        AppLogger.error('Main', 'Fallo al iniciar el servicio RFID', e);
       }
     });
   }
@@ -146,7 +182,11 @@ class _MyAppState extends State<MyApp> {
       getPages: AppPages.routes,
       initialBinding: InitialBinding(),
       locale: const Locale('es'),
+      debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
+        // Va primero: Flutter usa el primer delegado que soporte el idioma,
+        // y este es el español con el reloj en 12 h (a.m./p.m.).
+        MaterialLocalizations12h.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -155,10 +195,17 @@ class _MyAppState extends State<MyApp> {
         Locale('es'),
         Locale('en'),
       ],
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
+      // Tocar fuera de un campo cierra el teclado, en toda la app. El
+      // numérico del iPhone no tiene tecla para cerrarse. Los botones y
+      // campos siguen recibiendo su toque: este solo gana cuando nadie más
+      // lo quiere.
+      builder: (context, child) => GestureDetector(
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: child,
       ),
+      theme: AppTheme.claro,
+      darkTheme: AppTheme.oscuro,
+      themeMode: TemaService.to.modo.value,
     );
   }
 }

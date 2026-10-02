@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/register_controller.dart';
+import '../widgets/horario_selector.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 
 /// Screen shown to Google Sign-In users who don't have a gym yet.
 /// They only need to provide gym name + location.
@@ -9,19 +11,10 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colores;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1a1a2e),
-              Color(0xFF16213e),
-              Color(0xFF0f3460),
-            ],
-          ),
-        ),
+        decoration: BoxDecoration(gradient: c.fondoAcceso),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -34,28 +27,28 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                     width: 100,
                     height: 100,
                     decoration: BoxDecoration(
-                      color: Colors.blueAccent.withOpacity(0.15),
+                      color: AppColors.accent.withOpacity(0.15),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.blueAccent.withOpacity(0.3),
+                        color: AppColors.accent.withOpacity(0.3),
                         width: 2,
                       ),
                     ),
                     child: const Icon(
                       Icons.fitness_center,
                       size: 48,
-                      color: Colors.blueAccent,
+                      color: AppColors.accent,
                     ),
                   ),
                   const SizedBox(height: 28),
 
                   // Title
-                  const Text(
+                  Text(
                     '¡Bienvenido a GymOne!',
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: c.contraste,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -66,7 +59,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                     'Solo necesitamos los datos de tu gimnasio para empezar',
                     style: TextStyle(
                       fontSize: 15,
-                      color: Colors.white.withOpacity(0.6),
+                      color: c.contraste.withOpacity(0.6),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -77,21 +70,21 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.06),
+                      color: c.contraste.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.account_circle,
-                            color: Colors.white54, size: 20),
+                            color: c.contraste.withOpacity(0.54), size: 20),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                                 '${controller.firstNameController.text} ${controller.lastNameController.text}'
                                     .trim(),
-                                style: const TextStyle(
-                                  color: Colors.white70,
+                                style: TextStyle(
+                                  color: c.contraste.withOpacity(0.70),
                                   fontSize: 14,
                                 ),
                               ),
@@ -107,13 +100,13 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                     constraints: const BoxConstraints(maxWidth: 450),
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: c.tarjetaAcceso,
                       borderRadius: BorderRadius.circular(20),
                       border:
-                          Border.all(color: Colors.white.withOpacity(0.1)),
+                          Border.all(color: c.contraste.withOpacity(0.1)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: c.sombra,
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -123,15 +116,15 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Row(
-                          children: const [
-                            Icon(Icons.store, color: Colors.blueAccent, size: 22),
-                            SizedBox(width: 10),
+                          children: [
+                            const Icon(Icons.store, color: AppColors.accent, size: 22),
+                            const SizedBox(width: 10),
                             Text(
                               'Tu Gimnasio',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: c.contraste,
                               ),
                             ),
                           ],
@@ -139,7 +132,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                         const SizedBox(height: 20),
 
                         // Gym name
-                        _buildTextField(
+                        _buildTextField(context,
                           controller: controller.gymNameController,
                           label: 'Nombre del gimnasio',
                           icon: Icons.fitness_center,
@@ -148,13 +141,21 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                         const SizedBox(height: 16),
 
                         // Location
-                        _buildTextField(
+                        _buildTextField(context,
                           controller: controller.locationController,
                           label: 'Ubicación',
                           icon: Icons.location_on_outlined,
                           textInputAction: TextInputAction.done,
                           hint: 'Ej: Col. Centro, Monterrey',
                         ),
+                        const SizedBox(height: 16),
+
+                        // Horario
+                        Obx(() => HorarioSelector(
+                              apertura: controller.horaApertura.value,
+                              cierre: controller.horaCierre.value,
+                              onChanged: controller.setHorario,
+                            )),
                         const SizedBox(height: 24),
 
                         // Error + Button (single Obx to avoid GetX issues)
@@ -199,7 +200,7 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
                                       ? null
                                       : controller.completeGoogleRegistration,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blueAccent,
+                                    backgroundColor: AppColors.accent,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
@@ -247,34 +248,24 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildTextField(BuildContext context, {
     required TextEditingController controller,
     required String label,
     required IconData icon,
     TextInputAction? textInputAction,
     String? hint,
   }) {
+    final c = context.colores;
     return TextField(
       controller: controller,
       textInputAction: textInputAction,
-      style: const TextStyle(color: Colors.white, fontSize: 15),
+      style: TextStyle(color: c.contraste, fontSize: 15),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         hintStyle:
-            TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-        prefixIcon: Icon(icon, color: Colors.white54, size: 20),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.blueAccent),
-        ),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
+            TextStyle(color: c.contraste.withOpacity(0.3), fontSize: 13),
+        prefixIcon: Icon(icon, color: c.contraste.withOpacity(0.54), size: 20),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),

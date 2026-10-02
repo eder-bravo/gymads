@@ -17,6 +17,12 @@ class IngresoModel {
   final String usuarioStaff;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  /// Folio / referencia de la operación (tarjeta y transferencia)
+  final String? referenciaPago;
+
+  /// Los productos de una venta del punto de venta (`items_detalle`). Vacío
+  /// en los cobros de membresía.
+  final List<ItemVendido> items;
 
   IngresoModel({
     this.id,
@@ -36,6 +42,8 @@ class IngresoModel {
     required this.usuarioStaff,
     this.createdAt,
     this.updatedAt,
+    this.referenciaPago,
+    this.items = const [],
   });
 
   /// Factory para crear desde JSON
@@ -65,9 +73,11 @@ class IngresoModel {
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at'])
           : null,
-      updatedAt: json['updated_at'] != null 
+      updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'])
           : null,
+      referenciaPago: json['referencia_pago'],
+      items: ItemVendido.listaDesdeJson(json['items_detalle']),
     );
   }
 
@@ -91,6 +101,7 @@ class IngresoModel {
       'usuario_staff': usuarioStaff,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
+      'referencia_pago': referenciaPago,
     };
   }
 
@@ -113,6 +124,7 @@ class IngresoModel {
     String? usuarioStaff,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? referenciaPago,
   }) {
     return IngresoModel(
       id: id ?? this.id,
@@ -132,6 +144,7 @@ class IngresoModel {
       usuarioStaff: usuarioStaff ?? this.usuarioStaff,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      referenciaPago: referenciaPago ?? this.referenciaPago,
     );
   }
 
@@ -146,6 +159,8 @@ class IngresoModel {
         return 'Venta de producto';
       case 'abono':
         return 'Abono';
+      case 'visita':
+        return 'Visita';
       default:
         return concepto;
     }
@@ -158,6 +173,10 @@ class IngresoModel {
         return 'Efectivo';
       case 'tarjeta':
         return 'Tarjeta';
+      case 'tarjeta_debito':
+        return 'Tarjeta de Débito';
+      case 'tarjeta_credito':
+        return 'Tarjeta de Crédito';
       case 'transferencia':
         return 'Transferencia';
       default:
@@ -236,4 +255,85 @@ class EstadisticasIngresos {
       ultimosIngresos: [],
     );
   }
+}
+
+/// Un producto dentro de una venta (así lo guarda el punto de venta en
+/// `ingresos.items_detalle`).
+class ItemVendido {
+  const ItemVendido({
+    this.productoId,
+    required this.nombre,
+    required this.cantidad,
+    required this.precioUnitario,
+    required this.total,
+  });
+
+  final String? productoId;
+  final String nombre;
+  final int cantidad;
+  final double precioUnitario;
+  final double total;
+
+  factory ItemVendido.fromJson(Map<String, dynamic> json) {
+    final cantidad = (json['quantity'] as num?)?.toInt() ?? 0;
+    final precio = (json['unit_price'] as num?)?.toDouble() ?? 0;
+    return ItemVendido(
+      productoId: (json['product_id'] as String?)?.isNotEmpty == true
+          ? json['product_id'] as String
+          : null,
+      nombre: (json['product_name'] as String?)?.trim().isNotEmpty == true
+          ? json['product_name'] as String
+          : 'Producto',
+      cantidad: cantidad,
+      precioUnitario: precio,
+      total: (json['total'] as num?)?.toDouble() ?? precio * cantidad,
+    );
+  }
+
+  /// Lee `items_detalle`, que puede no venir (cobros de membresía).
+  static List<ItemVendido> listaDesdeJson(dynamic valor) {
+    if (valor is! List) return const [];
+    return [
+      for (final item in valor)
+        if (item is Map<String, dynamic>) ItemVendido.fromJson(item),
+    ];
+  }
+}
+
+/// Cuánto se vendió de un producto en un periodo.
+class ProductoVendido {
+  const ProductoVendido({
+    required this.nombre,
+    required this.cantidad,
+    required this.monto,
+  });
+
+  final String nombre;
+  final int cantidad;
+  final double monto;
+}
+
+/// Junta los productos de [ventas] por producto: piezas y monto, de lo más
+/// vendido a lo menos. Se agrupa por id (si el producto se renombró, cuenta
+/// como el mismo) y se muestra el nombre más reciente.
+List<ProductoVendido> resumirProductosVendidos(List<IngresoModel> ventas) {
+  final porProducto = <String, ProductoVendido>{};
+  // Las ventas vienen de la más reciente a la más vieja: el primer nombre
+  // que se ve es el más reciente.
+  for (final venta in ventas) {
+    for (final item in venta.items) {
+      final clave = item.productoId ?? item.nombre.toLowerCase();
+      final previo = porProducto[clave];
+      porProducto[clave] = ProductoVendido(
+        nombre: previo?.nombre ?? item.nombre,
+        cantidad: (previo?.cantidad ?? 0) + item.cantidad,
+        monto: (previo?.monto ?? 0) + item.total,
+      );
+    }
+  }
+  return porProducto.values.toList()
+    ..sort((a, b) {
+      final porCantidad = b.cantidad.compareTo(a.cantidad);
+      return porCantidad != 0 ? porCantidad : b.monto.compareTo(a.monto);
+    });
 }

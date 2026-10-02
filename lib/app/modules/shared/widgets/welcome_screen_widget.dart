@@ -12,6 +12,10 @@ class WelcomeScreenWidget extends StatefulWidget {
   final bool isVisible;
   final bool isExpired;
   final bool isNotFound;
+
+  /// Despide en vez de saludar. Solo llega en true si el gimnasio tiene el
+  /// registro de salidas activado.
+  final bool isSalida;
   final VoidCallback? onClose;
   final VoidCallback? onAbonar;
   final VoidCallback? onEditar;
@@ -26,6 +30,7 @@ class WelcomeScreenWidget extends StatefulWidget {
     required this.isVisible,
     this.isExpired = false,
     this.isNotFound = false,
+    this.isSalida = false,
     this.onClose,
     this.onAbonar,
     this.onEditar,
@@ -74,39 +79,55 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
     if (!widget.isVisible) return const SizedBox.shrink();
 
     // Determinar si es una tableta basado en el ancho de la pantalla
-    final bool isTabletSize = MediaQuery.of(context).size.width > 600;
-    final bool isSmallPhone = MediaQuery.of(context).size.width < 360;
+    final bool isTabletSize = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final bool isSmallPhone = MediaQuery.sizeOf(context).shortestSide < 360;
 
-    return _buildWelcomeScreen(context, isTabletSize, isSmallPhone);
+    // Con estilo de texto propio: en Inicio el aviso va encima de todo,
+    // fuera del Scaffold, y sin esto Flutter subraya cada texto en amarillo.
+    return Material(
+      type: MaterialType.transparency,
+      child: _buildWelcomeScreen(context, isTabletSize, isSmallPhone),
+    );
   }
 
   Widget _buildWelcomeScreen(BuildContext context, bool isTabletSize, bool isSmallPhone) {
+    final c = context.colores;
     // Tamaños responsivos para pantalla de bienvenida
-    final titleSize = isTabletSize
-        ? 60.0
-        : (isSmallPhone ? 36.0 : 48.0);
+    // Con el teléfono de lado la pantalla es muy baja: la foto y el título,
+    // a tamaño normal, empujaban los días restantes fuera de la vista. Se
+    // reduce todo en proporción para que el aviso se lea sin desplazarse.
+    final escala = MediaQuery.sizeOf(context).height < 500 ? 0.55 : 1.0;
+
+    final titleSize = (isTabletSize
+            ? 60.0
+            : (isSmallPhone ? 36.0 : 48.0)) *
+        escala;
     
-    final nameSize = isTabletSize
-        ? 42.0
-        : (isSmallPhone ? 28.0 : 36.0);
+    final nameSize = (isTabletSize
+            ? 42.0
+            : (isSmallPhone ? 28.0 : 36.0)) *
+        escala;
     
     final infoTextSize = isTabletSize
         ? 24.0
         : (isSmallPhone ? 18.0 : 20.0);
     
     // Tamaño del círculo con foto
-    final photoSize = isTabletSize
-        ? 320.0
-        : (isSmallPhone ? 180.0 : 250.0);
+    final photoSize = (isTabletSize
+            ? 320.0
+            : (isSmallPhone ? 180.0 : 250.0)) *
+        escala;
 
-    return Container(
-      color: Colors.black.withOpacity(0.95),
+    final contenido = Container(
+      // Fondo sólido: al 95 % se transparentaba Inicio por detrás (sus
+      // títulos y el borde de las tarjetas se veían como rayas).
+      color: c.backgroundColor,
       child: Center(
         child: AnimatedBuilder(
           animation: _animationController,
           builder: (context, child) {
             // Valor fijo para la escala
-            final scale = 1.0;
+            const scale = 1.0;
             
             // Ligero movimiento ondulante
             final animValue = _animationController.value * pi * 2;
@@ -135,14 +156,24 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                             opacity: safeOpacity,
                             child: Transform.translate(
                               offset: Offset(0, 20 * (1 - value)),
-                              child: Text(
-                                widget.isNotFound 
-                                    ? 'Tarjeta No Registrada' 
-                                    : (widget.isExpired ? 'Membresía Vencida' : '¡Bienvenido!'),
+                              // Centrado y con margen: "Tarjeta No
+                              // Registrada" se parte en dos líneas.
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16),
+                                child: Text(
+                                widget.isNotFound
+                                    ? 'Tarjeta No Registrada'
+                                    : widget.isExpired
+                                        ? 'Membresía Vencida'
+                                        : widget.isSalida
+                                            ? '¡Hasta pronto!'
+                                            : '¡Bienvenido!',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: widget.isNotFound ? (isTabletSize ? 50.0 : (isSmallPhone ? 30.0 : 40.0)) : titleSize,
+                                  fontSize: widget.isNotFound ? (isTabletSize ? 50.0 : (isSmallPhone ? 30.0 : 40.0)) * escala : titleSize,
                                   fontWeight: FontWeight.bold,
-                                  color: widget.isNotFound ? Colors.redAccent : (widget.isExpired ? Colors.redAccent : Colors.white),
+                                  color: widget.isNotFound ? Colors.redAccent : (widget.isExpired ? Colors.redAccent : c.contraste),
                                   shadows: [
                                     Shadow(
                                       color: Colors.black.withOpacity(0.5),
@@ -152,11 +183,12 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   ],
                                 ),
                               ),
+                              ),
                             ),
                           );
                         }
                       ),
-                      SizedBox(height: isTabletSize ? 40 : 32),
+                      SizedBox(height: (isTabletSize ? 40 : 32) * escala),
                       
                       // Foto del usuario con efecto de aura
                       TweenAnimationBuilder<double>(
@@ -176,7 +208,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   height: (photoSize + 20) * value,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: (widget.isNotFound || widget.isExpired ? Colors.red : AppColors.primary).withOpacity(0.2),
+                                    color: (widget.isNotFound || widget.isExpired ? Colors.red : c.backgroundColor).withOpacity(0.2),
                                   ),
                                 ),
                                 // Aura interior
@@ -195,12 +227,12 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white,
+                                      color: c.contraste,
                                       width: 4,
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: (widget.isNotFound || widget.isExpired ? Colors.red : AppColors.primary).withOpacity(0.5),
+                                        color: (widget.isNotFound || widget.isExpired ? Colors.red : c.backgroundColor).withOpacity(0.5),
                                         spreadRadius: 5,
                                         blurRadius: 15,
                                       ),
@@ -226,11 +258,11 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                             )
                                           : CircleAvatar(
                                               radius: photoSize/2 * value,
-                                              backgroundColor: widget.isExpired ? Colors.red : AppColors.primary,
+                                              backgroundColor: widget.isExpired ? Colors.red : c.backgroundColor,
                                               child: Icon(
                                                 Icons.person,
                                                 size: photoSize/3 * value,
-                                                color: Colors.white,
+                                                color: widget.isExpired ? Colors.white : c.contraste,
                                               ),
                                             )),
                                 ),
@@ -241,32 +273,34 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                       ),
                       SizedBox(height: isSmallPhone ? 20 : 24),
                       
-                      // Nombre del usuario con animación de entrada
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        duration: const Duration(milliseconds: 1200),
-                        curve: Curves.easeOutQuart,
-                        builder: (context, value, child) {
-                          final safeOpacity = value.clamp(0.0, 1.0);
-                          return Opacity(
-                            opacity: safeOpacity,
-                            child: Transform.translate(
-                              offset: Offset(0, 30 * (1 - value)),
-                              child: Text(
-                                widget.isNotFound ? 'ID: ${widget.userName}' : widget.userName,
-                                style: TextStyle(
-                                  fontSize: widget.isNotFound ? (nameSize * 0.7) : nameSize,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                      if (!widget.isNotFound) ...[
+                        // Nombre del usuario con animación de entrada
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.0, end: 1.0),
+                          duration: const Duration(milliseconds: 1200),
+                          curve: Curves.easeOutQuart,
+                          builder: (context, value, child) {
+                            final safeOpacity = value.clamp(0.0, 1.0);
+                            return Opacity(
+                              opacity: safeOpacity,
+                              child: Transform.translate(
+                                offset: Offset(0, 30 * (1 - value)),
+                                child: Text(
+                                  widget.userName,
+                                  style: TextStyle(
+                                    fontSize: nameSize,
+                                    fontWeight: FontWeight.bold,
+                                    color: c.contraste,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                textAlign: TextAlign.center,
                               ),
-                            ),
-                          );
-                        }
-                      ),
-                      SizedBox(height: isSmallPhone ? 12 : 16),
-                      
+                            );
+                          }
+                        ),
+                        SizedBox(height: isSmallPhone ? 12 : 16),
+                      ],
+
                       if (!widget.isNotFound)
                       // Días restantes con animación de entrada
                       TweenAnimationBuilder<double>(
@@ -285,7 +319,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   vertical: isTabletSize ? 12 : 8
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
+                                  color: c.contraste.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(15),
                                 ),
                                 child: Column(
@@ -296,7 +330,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                       children: [
                                         Icon(
                                           Icons.event_available,
-                                          color: Colors.white,
+                                          color: c.contraste,
                                           size: isTabletSize ? 28 : 24,
                                         ),
                                         SizedBox(width: isTabletSize ? 12 : 8),
@@ -304,7 +338,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                           widget.isExpired ? '0 días restantes' : '${widget.daysLeft} días restantes',
                                           style: TextStyle(
                                             fontSize: infoTextSize,
-                                            color: Colors.white,
+                                            color: c.contraste,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
@@ -317,7 +351,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                           'Hasta qué fecha puede entrar: ${DateFormat('dd/MM/yyyy').format(widget.expirationDate!)}',
                                           style: TextStyle(
                                             fontSize: infoTextSize * 0.85,
-                                            color: Colors.white.withOpacity(0.9),
+                                            color: c.contraste.withOpacity(0.9),
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
@@ -348,7 +382,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                   fontSize: isTabletSize
                                       ? 20.0
                                       : (isSmallPhone ? 14.0 : 16.0),
-                                  color: Colors.white.withOpacity(0.8),
+                                  color: c.contraste.withOpacity(0.8),
                                   fontStyle: FontStyle.italic,
                                 ),
                                 textAlign: TextAlign.center,
@@ -401,10 +435,10 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                 if (!widget.isNotFound && widget.onEditar != null)
                                   ElevatedButton.icon(
                                     onPressed: widget.onEditar,
-                                    icon: const Icon(Icons.edit, color: Colors.white),
-                                    label: const Text('Editar', style: TextStyle(color: Colors.white)),
+                                    icon: Icon(Icons.edit, color: c.contraste),
+                                    label: Text('Editar', style: TextStyle(color: c.contraste)),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.white.withOpacity(0.2),
+                                      backgroundColor: c.contraste.withOpacity(0.2),
                                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
@@ -424,6 +458,41 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
           },
         ),
       ),
+    );
+
+    // Sin [onClose] (la pantalla de check-in lo controla por su cuenta) se
+    // muestra tal cual.
+    final cerrar = widget.onClose;
+    if (cerrar == null) return contenido;
+
+    // Se quita al momento, pero solo con la X: un toque en otro lado (al
+    // acomodar el teléfono, o el cliente que se asoma) no debe cerrarlo. Se
+    // cierra solo pasados unos segundos.
+    return Stack(
+      children: [
+        contenido,
+        Positioned(
+          top: 0,
+          right: 0,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: IconButton(
+                onPressed: cerrar,
+                tooltip: 'Cerrar',
+                icon: const Icon(Icons.close, size: 28),
+                color: c.contraste,
+                style: IconButton.styleFrom(
+                  backgroundColor: c.contraste.withOpacity(0.2),
+                  side: BorderSide(color: c.contraste.withOpacity(0.35)),
+                  minimumSize: const Size(52, 52),
+                  shape: const CircleBorder(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

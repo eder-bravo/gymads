@@ -1,5 +1,17 @@
 -- Actualización de la tabla access_logs para incluir el campo access_type
 -- Este script debe ejecutarse en Supabase SQL Editor
+--
+-- ⚠️  ADVERTENCIA (2026-08-17): este script NO está versionado como
+--   migración y las dos vistas que crea (daily_access_stats,
+--   users_currently_inside) quedaban SECURITY DEFINER — RLS Advisor
+--   lo marcó CRITICAL. Se verificó una fuga real: cualquiera con la
+--   anon key, sin sesión, podía leer quién está dentro de cualquier
+--   gimnasio. Corregido en
+--   supabase/migrations/20260817213253_fix_security_definer_views.sql
+--   (ALTER VIEW ... SET (security_invoker = on)).
+--   Si vuelves a correr este script (p. ej. en una BD nueva), corre
+--   también esa migración justo después, o las vistas volverán a
+--   quedar sin `security_invoker` y el hueco se reabre.
 
 -- Agregar la columna access_type si no existe
 ALTER TABLE public.access_logs 

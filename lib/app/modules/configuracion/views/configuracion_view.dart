@@ -278,7 +278,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
       // Sección de acciones peligrosas
       _buildDangerousActions(),
     ];
-    if (!PlataformaApp.escritorio) return Column(children: opciones);
+    if (!PlataformaApp.pantallaGrande) return Column(children: opciones);
     // En escritorio las opciones van en dos columnas en vez de una lista
     // larga de tarjetas separadas; las acciones peligrosas quedan aparte,
     // debajo y a todo lo ancho.

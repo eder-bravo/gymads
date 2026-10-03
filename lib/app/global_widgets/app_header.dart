@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:gymads/core/theme/app_colors.dart';
+import '../core/utils/plataforma_app.dart';
 import '../core/widgets/diseno_escritorio.dart';
+import '../core/widgets/menu_lateral.dart';
 
 /// AppBar estándar de la aplicación.
 ///
@@ -28,6 +30,24 @@ class GymAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final margen = AnchoContenido.margen(context);
+    // En pantalla grande las acciones llevan texto: con letra muy grande en
+    // una ventana angosta se encogen antes que salirse de la barra.
+    final acciones = actions == null ||
+            actions!.isEmpty ||
+            !PlataformaApp.pantallaGrande
+        ? actions
+        : [
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: (MediaQuery.sizeOf(context).width - margen * 2) * 0.7,
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerEnd,
+                child: Row(mainAxisSize: MainAxisSize.min, children: actions!),
+              ),
+            ),
+          ];
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: margen),
       child: AppBar(
@@ -38,7 +58,11 @@ class GymAppBar extends StatelessWidget implements PreferredSizeWidget {
         centerTitle: false,
         titleSpacing: 16,
         leading: leading,
-        actions: actions,
+        // En escritorio la barra lateral lleva de una sección a otra: la
+        // pantalla principal de cada sección no necesita flecha atrás.
+        automaticallyImplyLeading: !(ConMenuLateral.en(context) &&
+            MenuLateral.esRaiz(ModalRoute.of(context)?.settings.name)),
+        actions: acciones,
         bottom: bottom,
       ),
     );

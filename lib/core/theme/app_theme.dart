@@ -56,7 +56,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       dialogTheme: DialogThemeData(
-        constraints: PlataformaApp.escritorio
+        constraints: PlataformaApp.pantallaGrande
             ? const BoxConstraints(maxWidth: 600)
             : null,
         backgroundColor: c.cardBackground,
@@ -69,7 +69,7 @@ class AppTheme {
         contentTextStyle: TextStyle(color: c.textSecondary, fontSize: 15),
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        constraints: PlataformaApp.escritorio
+        constraints: PlataformaApp.pantallaGrande
             ? const BoxConstraints(maxWidth: 640)
             : null,
         backgroundColor: c.cardBackground,

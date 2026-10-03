@@ -151,7 +151,7 @@ class ClienteDetailView extends GetView<ClientesController> {
               color: AppColors.info,
               // En escritorio dice qué pasa al hacer clic; el dedo de
               // "toca aquí" no aplica con mouse.
-              trailing: PlataformaApp.escritorio
+              trailing: PlataformaApp.pantallaGrande
                   ? const Text('Llamar o WhatsApp',
                       style: TextStyle(
                           color: AppColors.info,
@@ -227,7 +227,7 @@ class ClienteDetailView extends GetView<ClientesController> {
               ),
               if (trailing != null)
                 // En escritorio el aviso es texto: que se ajuste al ancho.
-                PlataformaApp.escritorio ? Flexible(child: trailing) : trailing,
+                PlataformaApp.pantallaGrande ? Flexible(child: trailing) : trailing,
             ],
           ),
           const SizedBox(height: 12),
@@ -419,7 +419,7 @@ class ClienteDetailView extends GetView<ClientesController> {
     final c = context.colores;
     // En escritorio, una fila de botones a la derecha, la acción principal al
     // final, como en las ventanas del sistema.
-    if (PlataformaApp.escritorio) {
+    if (PlataformaApp.pantallaGrande) {
       return Padding(
         padding: const EdgeInsets.all(16),
         child: Wrap(
@@ -504,7 +504,7 @@ class ClienteDetailView extends GetView<ClientesController> {
   }) {
     return Container(
       width: isFullWidth ? double.infinity : null,
-      constraints: PlataformaApp.escritorio
+      constraints: PlataformaApp.pantallaGrande
           ? const BoxConstraints(minHeight: 44, minWidth: 140)
           : const BoxConstraints(minHeight: 52),
       child: isOutlined

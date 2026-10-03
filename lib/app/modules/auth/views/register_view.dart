@@ -317,7 +317,7 @@ class RegisterView extends GetView<RegisterController> {
     final c = context.colores;
     // En escritorio el texto toma su ancho y las dos líneas se reparten el
     // resto: con el texto en un espacio fijo quedaba recargado a un lado.
-    if (PlataformaApp.escritorio) {
+    if (PlataformaApp.pantallaGrande) {
       return Row(
         children: [
           Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),

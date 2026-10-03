@@ -33,7 +33,7 @@ typedef RegistrarVisita = Future<String?> Function(DatosVisita datos);
 /// el monto, que se puede cambiar.
 Future<void> abrirCobrarVisita({double? precioDia}) async {
   final double? cobrada;
-  if (PlataformaApp.escritorio) {
+  if (PlataformaApp.pantallaGrande) {
     // En una ventana no hay ruta que libere el controlador al cerrarse.
     Get.put(CobrarVisitaController(precioDia: precioDia));
     try {

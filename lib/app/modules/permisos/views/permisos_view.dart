@@ -16,6 +16,8 @@ class PermisosView extends GetView<PermisosController> {
   Widget build(BuildContext context) {
     final c = context.colores;
     return ScaffoldAdaptable(
+      // Al abrir la app por primera vez todavía no hay barra lateral.
+      conMenu: controller.desdeConfiguracion,
       anchoMaximo: 760,
       backgroundColor: c.backgroundColor,
       appBar: controller.desdeConfiguracion
@@ -62,7 +64,7 @@ class PermisosView extends GetView<PermisosController> {
                         'Empareja los lectores Bluetooth desde el sistema. '
                         '${!kIsWeb && defaultTargetPlatform == TargetPlatform.windows ? 'En Windows habilita la cámara para aplicaciones de escritorio desde Privacidad; no aparece un diálogo de permiso.' : ''}')),
               const SizedBox(height: 16),
-              if (PlataformaApp.escritorio)
+              if (PlataformaApp.pantallaGrande)
                 _botonesEscritorio(context, contestado)
               else
                 ..._botones(context, contestado),
@@ -136,7 +138,10 @@ class PermisosView extends GetView<PermisosController> {
         notas.add('Los bloqueados solo se pueden activar desde los ajustes '
             'del sistema.');
       }
-      botones.add(abrirAjustes);
+      // En tableta, como en el teléfono: solo si algo quedó bloqueado.
+      if (controller.hayBloqueados || PlataformaApp.escritorio) {
+        botones.add(abrirAjustes);
+      }
       if (controller.desdeConfiguracion && controller.hayNegados) {
         botones.add(principal('Permitir', pidiendo ? null : controller.permitir,
             cargando: pidiendo));

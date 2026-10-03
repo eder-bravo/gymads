@@ -50,7 +50,7 @@ class PhoneUtils {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 12),
-              if (!PlataformaApp.escritorio) ...[
+              if (!PlataformaApp.pantallaGrande) ...[
                 Container(
                   width: 40,
                   height: 4,

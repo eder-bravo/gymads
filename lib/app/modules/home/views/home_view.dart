@@ -1,23 +1,26 @@
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/permissions/permissions.dart';
 import '../../../core/utils/plataforma_app.dart';
+import '../../../core/widgets/menu_lateral.dart';
 import '../../../core/widgets/tour_step.dart';
 
 import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
+import '../../abonar/controllers/abonar_controller.dart';
+import '../../abonar/views/cobrar_visita_view.dart';
 import '../../abonar/vigencia.dart';
+import '../../ingresos/widgets/detalle_ingreso_sheet.dart';
 import '../controllers/home_controller.dart';
 import '../controllers/resumen_del_dia.dart';
 import '../widgets/background_welcome_dialog.dart';
 import '../widgets/fondo_estirable.dart';
 
-part 'inicio_escritorio.dart';
+part 'inicio_tableta.dart';
+part 'panel_del_dia.dart';
 
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
@@ -100,80 +103,89 @@ class HomeView extends GetView<HomeController> {
           ),
         );
 
-    // La cabecera llena la ventana; las opciones van en la columna de 1200
-    // (solo cambia en escritorio: en el teléfono no hay columna).
-    final pantalla = ScaffoldAdaptable(
-      anchoMaximo: double.infinity,
-      backgroundColor: c.backgroundColor,
-      extendBodyBehindAppBar: true,
-      // En escritorio no hay barra de estado, y esta barra transparente
-      // quedaba encima de la cabecera: se tragaba el clic en Configuración.
-      appBar: _usaBento(context)
-          ? null
-          : AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              // Los íconos de la barra de estado los pone el tema según el modo.
-            ),
-      body: SafeArea(
-        top: false,
-        child: _usaBento(context)
-            // En escritorio la cabecera va arriba y la rejilla de módulos y
-            // números de hoy llena el alto que queda.
-            ? CustomScrollView(
-                physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics()),
-                slivers: [
-                  SliverToBoxAdapter(child: _buildHeader(context, isTablet)),
-                  // El alto que queda bajo la cabecera, fijo aunque se
-                  // desplace o rebote. Con poca altura o texto grande, la
-                  // rejilla conserva un mínimo y se desplaza.
-                  SliverLayoutBuilder(
-                    builder: (context, limites) {
-                      final escala =
-                          MediaQuery.textScalerOf(context).scale(14) / 14;
-                      final alto = (limites.viewportMainAxisExtent -
-                              limites.precedingScrollExtent -
-                              48)
-                          .clamp(440.0 * escala, double.infinity);
-                      return SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          child: SizedBox(
-                            height: alto,
-                            child: ContenidoEscritorio(
-                              anchoMaximo: _anchoContenido,
+    // En escritorio, la barra lateral y el panel del día. En tableta y
+    // teléfono la cabecera llena la pantalla y las opciones van debajo (en
+    // tableta, en una columna de 1200 como mucho).
+    final Widget pantalla = _usaPanel(context)
+        ? _escritorio(context)
+        : ScaffoldAdaptable(
+            anchoMaximo: double.infinity,
+            backgroundColor: c.backgroundColor,
+            extendBodyBehindAppBar: true,
+            // En tableta esta barra transparente quedaba encima de la cabecera: se
+            // tragaba el toque en Configuración.
+            appBar: _usaBento(context)
+                ? null
+                : AppBar(
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    // Los íconos de la barra de estado los pone el tema según el modo.
+                  ),
+            body: SafeArea(
+              top: false,
+              child: _usaBento(context)
+                  // En tableta la cabecera va arriba y los números de hoy y la
+                  // rejilla de módulos llenan el alto que queda.
+                  ? CustomScrollView(
+                      physics: const BouncingScrollPhysics(
+                          parent: AlwaysScrollableScrollPhysics()),
+                      slivers: [
+                        SliverToBoxAdapter(
+                            child: _buildHeader(context, isTablet)),
+                        // El alto que queda bajo la cabecera, fijo aunque se
+                        // desplace o rebote. Con poca altura o texto grande, la
+                        // rejilla conserva un mínimo y se desplaza; en vertical no
+                        // pasa de un máximo, para no hacer tarjetas enormes.
+                        SliverLayoutBuilder(
+                          builder: (context, limites) {
+                            final escala =
+                                MediaQuery.textScalerOf(context).scale(14) / 14;
+                            final alto = (limites.viewportMainAxisExtent -
+                                    limites.precedingScrollExtent -
+                                    48)
+                                .clamp(440.0 * escala, 620.0 * escala);
+                            return SliverToBoxAdapter(
                               child: Padding(
                                 padding:
-                                    const EdgeInsets.symmetric(horizontal: 24),
-                                child: _inicioEscritorio(context),
+                                    const EdgeInsets.symmetric(vertical: 24),
+                                child: SizedBox(
+                                  height: alto,
+                                  child: ContenidoEscritorio(
+                                    anchoMaximo: _anchoContenido,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 24),
+                                      child: _inicioTableta(context),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-                ],
-              )
-            : SingleChildScrollView(
-                physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics()),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ─── Header con gradiente ───
-                    _buildHeader(context, isTablet),
+                        // Debajo, lo de hoy en listas: en vertical llena lo que
+                        // antes quedaba vacío.
+                        SliverToBoxAdapter(child: _actividadTableta(context)),
+                      ],
+                    )
+                  : SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(
+                          parent: AlwaysScrollableScrollPhysics()),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ─── Header con gradiente ───
+                          _buildHeader(context, isTablet),
 
-                    const SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
-                    opciones(),
-                  ],
-                ),
-              ),
-      ),
-      // Diálogo de bienvenida RFID en segundo plano
-    );
+                          opciones(),
+                        ],
+                      ),
+                    ),
+            ),
+            // Diálogo de bienvenida RFID en segundo plano
+          );
 
     // El aviso del lector (bienvenida, salida, tarjeta no registrada) va
     // ENCIMA de toda la pantalla. Antes iba en el hueco del botón flotante:
@@ -193,8 +205,8 @@ class HomeView extends GetView<HomeController> {
   Widget _buildHeader(BuildContext context, bool isTablet) {
     final c = context.colores;
     final topPadding = MediaQuery.of(context).padding.top;
-    // En escritorio el texto se alinea con la columna de opciones.
-    final margen = PlataformaApp.escritorio
+    // En tableta el texto se alinea con la columna de opciones.
+    final margen = _usaBento(context)
         ? ((MediaQuery.sizeOf(context).width - _anchoContenido) / 2)
             .clamp(0.0, double.infinity)
         : 0.0;
@@ -249,7 +261,7 @@ class HomeView extends GetView<HomeController> {
             isTablet ? 16 : 14,
           ),
           child: _usaBento(context)
-              ? _cabeceraEscritorio(context)
+              ? _cabeceraTableta(context)
               : Wrap(
                   spacing: 14,
                   runSpacing: 12,
@@ -283,9 +295,9 @@ class HomeView extends GetView<HomeController> {
     );
   }
 
-  /// La cabecera de escritorio: el título, la fecha de hoy y Configuración
+  /// La cabecera de tableta: el título, la fecha de hoy y Configuración
   /// (que en la rejilla no ocupa una tarjeta).
-  Widget _cabeceraEscritorio(BuildContext context) {
+  Widget _cabeceraTableta(BuildContext context) {
     final c = context.colores;
     final hoy = fechaLarga(DateTime.now(), conDia: true);
     return Row(
@@ -309,8 +321,8 @@ class HomeView extends GetView<HomeController> {
             letterSpacing: 0.5,
           ),
         ),
-        // La fecha ocupa el espacio libre, pegada al engrane: los dos quedan
-        // al borde derecho de la rejilla.
+        // La fecha ocupa el espacio libre, pegada a Configuración: las dos
+        // quedan al borde derecho de la rejilla.
         Expanded(
           child: Text(
             hoy[0].toUpperCase() + hoy.substring(1),
@@ -330,13 +342,18 @@ class HomeView extends GetView<HomeController> {
           description: 'Tu cuenta, precios, categorías, lector y permisos.',
           borderRadius: 14,
           isLastStep: true,
-          child: IconButton(
+          // Con su nombre: un engrane solo no se entiende a la primera.
+          child: TextButton.icon(
             onPressed: controller.goToConfiguracion,
-            tooltip: 'Configuración (${_textoAtajo(',')})',
-            icon: const Icon(Icons.settings_outlined),
-            color: c.contraste,
-            style: IconButton.styleFrom(
+            icon: const Icon(Icons.settings_outlined, size: 22),
+            label: const Text('Configuración'),
+            style: TextButton.styleFrom(
+              foregroundColor: c.contraste,
               backgroundColor: c.contraste.withOpacity(0.08),
+              minimumSize: const Size(0, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              textStyle:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -347,71 +364,185 @@ class HomeView extends GetView<HomeController> {
     );
   }
 
-  /// La rejilla de escritorio con los módulos de este rol y sus números de
-  /// hoy. Vender, el del mostrador, va primero y en grande.
-  Widget _inicioEscritorio(BuildContext context) {
+  ResumenDelDia _resumen() => Get.isRegistered<ResumenDelDia>()
+      ? Get.find<ResumenDelDia>()
+      : Get.put(ResumenDelDia());
+
+  /// Pide lo de hoy que este rol puede ver.
+  void _recargar(ResumenDelDia resumen) => resumen.cargar(
+        ingresos: controller.can(Permission.verIngresos),
+        entradas: controller.can(Permission.verAccesos),
+        vencen: controller.can(Permission.gestionarClientes),
+        precio: controller.can(Permission.cobrarAbonos),
+      );
+
+  /// Los números de hoy: cobrado, entradas y membresías por vencer. Cada uno
+  /// abre su pantalla. En tableta son pasos del recorrido; en escritorio esos
+  /// pasos están en la barra lateral.
+  List<_DatoDeHoy> _datosDeHoy(BuildContext context, ResumenDelDia resumen,
+      {required bool conPasos}) {
     final c = context.colores;
-    final resumen = Get.isRegistered<ResumenDelDia>()
-        ? Get.find<ResumenDelDia>()
-        : Get.put(ResumenDelDia());
+    return [
+      if (controller.can(Permission.verIngresos))
+        _DatoDeHoy(
+          label: 'Ingresos',
+          detalle: 'Cobrado hoy',
+          icon: Icons.receipt_long_outlined,
+          color: c.titleColor,
+          valor: () {
+            final v = resumen.ingresos.value;
+            return v == null ? null : pesos(v);
+          },
+          onTap: controller.goToPaymentRegistration,
+          showcaseKey: conPasos ? controller.keyIngresos : null,
+          tourDescription:
+              'Lo cobrado hoy. Toca para ver todos los pagos y ventas.',
+        ),
+      if (controller.can(Permission.verAccesos))
+        _DatoDeHoy(
+          label: 'Entradas',
+          detalle: 'Hoy',
+          icon: Icons.door_sliding_outlined,
+          color: const Color(0xFF81C784),
+          valor: () => resumen.entradas.value?.toString(),
+          onTap: controller.goToAccessLogs,
+          showcaseKey: conPasos ? controller.keyEntradas : null,
+          tourDescription:
+              'Cuántos entraron hoy. Toca para ver quién y a qué hora.',
+        ),
+      if (controller.can(Permission.gestionarClientes))
+        _DatoDeHoy(
+          label: 'Por vencer',
+          detalle: 'Próximos ${ResumenDelDia.diasPorVencer} días',
+          icon: Icons.event_busy_outlined,
+          color: AppColors.warning,
+          valor: () => resumen.vencen.value?.toString(),
+          onTap: controller.goToClientes,
+        ),
+    ];
+  }
+
+  /// La rejilla de tableta con los módulos de este rol, cada uno con un dato
+  /// del día, y los números de hoy arriba. Vender, el del mostrador, va
+  /// primero y en grande.
+  Widget _inicioTableta(BuildContext context) {
+    final resumen = _resumen();
+    String? cuantos(int? n, String uno, String varios) =>
+        n == null ? null : (n == 1 ? uno : varios.replaceFirst('#', '$n'));
     const orden = ['Vender', 'Abonar', 'Clientes', 'Inventario'];
-    final modulos = _modulos()
-      ..sort(
-          (a, b) => orden.indexOf(a.label).compareTo(orden.indexOf(b.label)));
-    final verIngresos = controller.can(Permission.verIngresos);
-    final verEntradas = controller.can(Permission.verAccesos);
-    final verClientes = controller.can(Permission.gestionarClientes);
-    return _InicioEscritorio(
+    final modulos = [
+      for (final m in _modulos())
+        switch (m.label) {
+          'Vender' => m.conDato(() =>
+              cuantos(resumen.ventas.value, '1 venta hoy', '# ventas hoy')),
+          'Abonar' => m.conDato(() => cuantos(resumen.abonos.value,
+              '1 membresía cobrada hoy', '# membresías cobradas hoy')),
+          'Clientes' => m.conDato(() => cuantos(resumen.activos.value,
+              '1 con membresía vigente', '# con membresía vigente')),
+          _ => m,
+        },
+    ]..sort((a, b) => orden.indexOf(a.label).compareTo(orden.indexOf(b.label)));
+    return _InicioTableta(
       modulos: modulos,
       cargando: resumen.cargando,
-      recargar: () => resumen.cargar(
-        ingresos: verIngresos,
-        entradas: verEntradas,
-        vencen: verClientes,
-      ),
-      abrirConfiguracion: controller.goToConfiguracion,
-      datos: [
-        if (verIngresos)
-          _DatoDeHoy(
-            label: 'Ingresos',
-            detalle: 'Cobrado hoy',
-            icon: Icons.receipt_long_outlined,
-            color: c.titleColor,
-            valor: () {
-              final v = resumen.ingresos.value;
-              return v == null ? null : pesos(v);
-            },
-            onTap: controller.goToPaymentRegistration,
-            showcaseKey: controller.keyIngresos,
-            tourDescription:
-                'Lo cobrado hoy. Haz clic para ver todos los pagos y ventas.',
-          ),
-        if (verEntradas)
-          _DatoDeHoy(
-            label: 'Entradas',
-            detalle: 'Hoy',
-            icon: Icons.door_sliding_outlined,
-            color: const Color(0xFF81C784),
-            valor: () => resumen.entradas.value?.toString(),
-            onTap: controller.goToAccessLogs,
-            showcaseKey: controller.keyEntradas,
-            tourDescription:
-                'Cuántos entraron hoy. Haz clic para ver quién y a qué hora.',
-          ),
-        if (verClientes)
-          _DatoDeHoy(
-            label: 'Por vencer',
-            detalle:
-                'Membresías en los próximos ${ResumenDelDia.diasPorVencer} días',
-            icon: Icons.event_busy_outlined,
-            color: AppColors.warning,
-            valor: () => resumen.vencen.value?.toString(),
-            onTap: controller.goToClientes,
-            conAtajo: false,
-          ),
-      ],
+      recargar: () => _recargar(resumen),
+      datos: _datosDeHoy(context, resumen, conPasos: true),
     );
   }
+
+  /// Las listas del día bajo la rejilla de tableta.
+  Widget _actividadTableta(BuildContext context) {
+    final listas = _listasDelDia(context, controller, _resumen());
+    if (listas.isEmpty) return const SizedBox.shrink();
+    final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
+    return ContenidoEscritorio(
+      anchoMaximo: _anchoContenido,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+        child: LayoutBuilder(
+          builder: (context, limites) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _TituloDelPanel('Actividad'),
+              const SizedBox(height: 12),
+              _rejillaDeTarjetas(
+                listas,
+                porFila: limites.maxWidth >= 1000 ? 3 : 2,
+                alto: (68 + _filasPorLista * 58) * escala,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Inicio de escritorio: la barra lateral (con los pasos del recorrido) y
+  /// el panel del día.
+  Widget _escritorio(BuildContext context) {
+    final resumen = _resumen();
+    return ScaffoldAdaptable(
+      anchoMaximo: 1280,
+      backgroundColor: context.colores.backgroundColor,
+      menu: MenuLateral(pasos: _pasosDelMenu()),
+      body: _PanelDelDia(
+        home: controller,
+        resumen: resumen,
+        datos: _datosDeHoy(context, resumen, conPasos: false),
+        recargar: () => _recargar(resumen),
+        pasoCabecera: (cabecera) => TourStep(
+          tourKey: controller.keyHeader,
+          title: '¡Te damos la bienvenida!',
+          description: 'Este es tu panel del día: lo cobrado, quién entró y '
+              'quién vence pronto. Las secciones están a la izquierda.',
+          borderRadius: 16,
+          isFirstStep: true,
+          child: cabecera,
+        ),
+      ),
+    );
+  }
+
+  /// Los pasos del recorrido de Inicio en la barra lateral, en su orden.
+  Map<String, PasoDelMenu> _pasosDelMenu() => {
+        Routes.CLIENTES: PasoDelMenu(
+          clave: controller.keyClientes,
+          titulo: 'Clientes',
+          descripcion: 'Tus miembros y cuándo vence su abono.',
+        ),
+        Routes.ABONAR: PasoDelMenu(
+          clave: controller.keyAbonar,
+          titulo: 'Abonar',
+          descripcion: 'Cobra y renueva membresías.',
+        ),
+        Routes.POINT_OF_SALE: PasoDelMenu(
+          clave: controller.keyVender,
+          titulo: 'Vender',
+          descripcion: 'Vende bebidas, suplementos y demás productos.',
+        ),
+        Routes.INVENTARIO: PasoDelMenu(
+          clave: controller.keyInventario,
+          titulo: 'Inventario',
+          descripcion:
+              'Administra tus productos y controla el stock disponible.',
+        ),
+        Routes.INGRESOS: PasoDelMenu(
+          clave: controller.keyIngresos,
+          titulo: 'Ingresos',
+          descripcion: 'Todo lo cobrado: abonos, visitas y ventas.',
+        ),
+        Routes.ACCESS_LOGS: PasoDelMenu(
+          clave: controller.keyEntradas,
+          titulo: 'Entradas',
+          descripcion: 'Quién entró y a qué hora.',
+        ),
+        Routes.CONFIGURACION: PasoDelMenu(
+          clave: controller.keyConfiguracion,
+          titulo: 'Configuración',
+          descripcion: 'Tu cuenta, precios, categorías, lector y permisos.',
+          ultimo: true,
+        ),
+      };
 
   /// Si el rol actual puede entrar a esta entrada del menú.
   ///
@@ -609,6 +740,9 @@ class _ModuleItem implements _EntradaMenu {
   final GlobalKey showcaseKey;
   final String tourDescription;
 
+  /// Un dato del día para la tarjeta de tableta (null si no hay).
+  final String? Function()? dato;
+
   const _ModuleItem({
     required this.icon,
     required this.label,
@@ -617,7 +751,19 @@ class _ModuleItem implements _EntradaMenu {
     required this.onTap,
     required this.showcaseKey,
     required this.tourDescription,
+    this.dato,
   });
+
+  _ModuleItem conDato(String? Function() dato) => _ModuleItem(
+        icon: icon,
+        label: label,
+        subtitle: subtitle,
+        gradient: gradient,
+        onTap: onTap,
+        showcaseKey: showcaseKey,
+        tourDescription: tourDescription,
+        dato: dato,
+      );
 }
 
 class _QuickAction implements _EntradaMenu {

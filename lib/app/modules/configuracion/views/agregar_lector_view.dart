@@ -58,7 +58,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                        maxWidth: PlataformaApp.escritorio ? 560 : 480),
+                        maxWidth: PlataformaApp.pantallaGrande ? 560 : 480),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -113,9 +113,9 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
             _encabezado(
               context,
               titulo: 'Lector encontrado',
-              texto: PlataformaApp.escritorio
+              texto: PlataformaApp.pantallaGrande
                   ? 'Preparando las redes WiFi que puedes elegir. '
-                      'Deja el equipo cerca del lector.'
+                      'Deja el ${PlataformaApp.equipo} cerca del lector.'
                   : 'Preparando las redes WiFi que puedes elegir. '
                       'Mantén el teléfono cerca del lector.',
             ));
@@ -134,8 +134,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
               texto: controller.esperandoRespuesta.value
                   ? 'El lector está conectándose al WiFi. En cuanto responda, '
                       'terminará la configuración. Mantén el lector encendido.'
-                  : PlataformaApp.escritorio
-                      ? 'Deja el equipo cerca y el lector encendido.'
+                  : PlataformaApp.pantallaGrande
+                      ? 'Deja el ${PlataformaApp.equipo} cerca y el lector encendido.'
                       : 'Mantén el teléfono cerca y el lector encendido.',
             ));
       case PasoAgregar.comprobando:
@@ -170,8 +170,8 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
               ? 'Hay más de un lector cerca. Elige el tuyo.'
               : controller.mensaje.value ??
                   (cambiarWifi
-                      ? (PlataformaApp.escritorio
-                          ? 'Deja el equipo cerca del lector.'
+                      ? (PlataformaApp.pantallaGrande
+                          ? 'Deja el ${PlataformaApp.equipo} cerca del lector.'
                           : 'Mantén el teléfono cerca del lector.')
                       : 'Conecta el lector a la corriente y deja el ${PlataformaApp.equipo} '
                           'cerca.'),
@@ -232,7 +232,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
         else
           for (final red in redes) _filaRed(context, red),
         const SizedBox(height: 8),
-        if (PlataformaApp.escritorio)
+        if (PlataformaApp.pantallaGrande)
           // En escritorio, con texto grande los dos botones bajan de
           // renglón en vez de salirse de la pantalla.
           Wrap(
@@ -405,7 +405,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
           _aviso(context, controller.avisoFinal.value!),
         ],
         const SizedBox(height: 24),
-        if (PlataformaApp.escritorio)
+        if (PlataformaApp.pantallaGrande)
           FilaDeBotones(children: [
             OutlinedButton.icon(
               onPressed: () => Get.back(),
@@ -444,7 +444,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (PlataformaApp.escritorio) ...[
+        if (PlataformaApp.pantallaGrande) ...[
           // En escritorio el motivo va en un recuadro, como los demás
           // avisos, y no como un párrafo suelto bajo el título.
           _encabezado(
@@ -492,7 +492,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
             ),
           ),
         ],
-        if (PlataformaApp.escritorio) _botonSalir(context, 'Salir'),
+        if (PlataformaApp.pantallaGrande) _botonSalir(context, 'Salir'),
       ],
     );
   }
@@ -622,7 +622,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
   /// En escritorio cada paso tiene una salida a la vista: "Cancelar" (o
   /// "Salir" si falló), además de la flecha de la barra, que no todos ven.
   Widget _conSalida(BuildContext context, Widget paso) {
-    if (!PlataformaApp.escritorio) return paso;
+    if (!PlataformaApp.pantallaGrande) return paso;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [paso, _botonSalir(context, 'Cancelar')],
@@ -649,7 +649,7 @@ class AgregarLectorView extends GetView<AgregarLectorController> {
 
   Widget _botonPrincipal(String texto, IconData icono, VoidCallback? onTap) {
     // En escritorio, del ancho de su texto y centrado.
-    if (PlataformaApp.escritorio) {
+    if (PlataformaApp.pantallaGrande) {
       return Center(
         child: ElevatedButton.icon(
           onPressed: onTap,

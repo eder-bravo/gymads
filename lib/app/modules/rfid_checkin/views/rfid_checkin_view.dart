@@ -121,19 +121,19 @@ class RfidCheckinView extends GetView<RfidCheckinController> {
                                 // En escritorio, los colores del tema: el rojo
                                 // pálido fijo se perdía en modo oscuro.
                                 decoration: BoxDecoration(
-                                  color: PlataformaApp.escritorio
+                                  color: PlataformaApp.pantallaGrande
                                       ? AppColors.error.withOpacity(0.12)
                                       : Colors.red.shade100,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                      color: PlataformaApp.escritorio
+                                      color: PlataformaApp.pantallaGrande
                                           ? AppColors.error.withOpacity(0.4)
                                           : Colors.red.shade300),
                                 ),
                                 child: Text(
                                   controller.errorMessage.value,
                                   style: TextStyle(
-                                    color: PlataformaApp.escritorio
+                                    color: PlataformaApp.pantallaGrande
                                         ? AppColors.error
                                         : Colors.red.shade800,
                                     fontSize: isTabletSize

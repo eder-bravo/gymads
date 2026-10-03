@@ -21,6 +21,8 @@ class PaymentModeView extends GetView<OnboardingController> {
     return PopScope(
       canPop: false,
       child: ScaffoldAdaptable(
+        // Antes de terminar de configurar el gimnasio: sin barra lateral.
+        conMenu: false,
         anchoMaximo: 800,
         backgroundColor: c.backgroundColor,
         appBar: const GymAppBar(

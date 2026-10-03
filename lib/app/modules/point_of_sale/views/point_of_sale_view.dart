@@ -52,7 +52,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       body: SafeArea(
         child: LayoutBuilder(builder: (context, constraints) {
           final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
-          final lateral = PlataformaApp.escritorio &&
+          final lateral = PlataformaApp.pantallaGrande &&
               constraints.maxWidth >= 1100 * escala &&
               constraints.maxHeight >= 420;
           return Flex(
@@ -214,7 +214,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       // el borde se aviva al pasar por encima.
       return AlPasarMouse(
           builder: (context, encima) => GestureDetector(
-                onTap: PlataformaApp.escritorio
+                onTap: PlataformaApp.pantallaGrande
                     ? () => controller.addProductToCart(product)
                     : null,
                 // Fijar arriba es un atajo de mostrador, por eso va en la pulsación
@@ -447,7 +447,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   style: TextStyle(color: c.textSecondary, fontSize: 13)))
           : LayoutBuilder(builder: (context, constraints) {
               final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
-              if (PlataformaApp.escritorio &&
+              if (PlataformaApp.pantallaGrande &&
                   constraints.maxWidth < 560 * escala) {
                 return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -571,7 +571,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Handle
-              if (!PlataformaApp.escritorio) ...[
+              if (!PlataformaApp.pantallaGrande) ...[
                 Center(
                   child: Container(
                     width: 40,
@@ -747,7 +747,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
 
               // En escritorio, "Cancelar" y "Cobrar venta" lado a lado y a
               // la derecha, como en cualquier ventana.
-              if (PlataformaApp.escritorio)
+              if (PlataformaApp.pantallaGrande)
                 Wrap(
                   alignment: WrapAlignment.end,
                   crossAxisAlignment: WrapCrossAlignment.center,

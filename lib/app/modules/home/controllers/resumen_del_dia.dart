@@ -1,65 +1,153 @@
 import 'package:get/get.dart';
 
 import '../../../core/utils/app_logger.dart';
+import '../../../data/models/access_log_model.dart';
+import '../../../data/models/ingreso_model.dart';
+import '../../../data/models/user_model.dart';
 import '../../../data/providers/ingreso_provider.dart';
+import '../../../data/repositories/abono_prices_repository.dart';
 import '../../../data/repositories/user_repository.dart';
 import '../../../data/services/access_log_service.dart';
+import '../../../data/services/cambios_en_vivo_service.dart';
 
-/// Los números del día que Inicio muestra en escritorio: cuánto se cobró,
-/// cuántas entradas hubo y cuántas membresías vencen en la semana.
+/// Lo que pasó hoy en el gimnasio, para Inicio en pantalla grande: los
+/// cobros, las entradas y las membresías que vencen en la semana, con sus
+/// totales y las listas para el panel del día.
 ///
 /// Cada dato se carga por separado: si uno falla, los demás se muestran. Solo
 /// se pide lo que el rol puede ver (el permiso lo decide quien llama).
-class ResumenDelDia extends GetxController {
+class ResumenDelDia extends GetxController with RecargaEnVivoMixin {
   ResumenDelDia({
-    Future<double> Function()? ingresosDeHoy,
-    Future<int> Function()? entradasDeHoy,
-    Future<int> Function()? porVencer,
-  })  : _ingresosDeHoy = ingresosDeHoy ?? _sumarIngresosDeHoy,
-        _entradasDeHoy = entradasDeHoy ?? _contarEntradasDeHoy,
-        _porVencer = porVencer ?? _contarPorVencer;
+    Future<List<IngresoModel>> Function()? cobrosDeHoy,
+    Future<List<AccessLogModel>> Function()? accesosDeHoy,
+    Future<List<UserModel>> Function()? clientes,
+    Future<double?> Function()? precioDelDia,
+  })  : _cobrosDeHoy = cobrosDeHoy ?? _leerCobrosDeHoy,
+        _accesosDeHoy = accesosDeHoy ?? AccessLogService.getTodayAccesses,
+        _clientes = clientes ?? _leerClientes,
+        _precioDelDia = precioDelDia ?? _leerPrecioDelDia;
 
-  final Future<double> Function() _ingresosDeHoy;
-  final Future<int> Function() _entradasDeHoy;
-  final Future<int> Function() _porVencer;
-
-  /// null mientras carga o si no se pudo obtener.
-  final ingresos = RxnDouble();
-  final entradas = RxnInt();
-  final vencen = RxnInt();
-  final cargando = false.obs;
+  final Future<List<IngresoModel>> Function() _cobrosDeHoy;
+  final Future<List<AccessLogModel>> Function() _accesosDeHoy;
+  final Future<List<UserModel>> Function() _clientes;
+  final Future<double?> Function() _precioDelDia;
 
   /// Días hacia adelante que cuentan como "por vencer".
   static const diasPorVencer = 7;
+
+  // Totales: null mientras carga o si no se pudo obtener.
+  final ingresos = RxnDouble();
+  final entradas = RxnInt();
+  final vencen = RxnInt();
+
+  /// Ventas de productos de hoy (para el recuadro de Vender en tableta).
+  final ventas = RxnInt();
+
+  /// Membresías cobradas hoy (para el recuadro de Abonar en tableta).
+  final abonos = RxnInt();
+
+  /// Clientes con membresía vigente (para el recuadro de Clientes).
+  final activos = RxnInt();
+
+  // Listas del panel, de lo más reciente a lo más viejo.
+  final cobros = <IngresoModel>[].obs;
+  final ultimasEntradas = <AccessLogModel>[].obs;
+
+  /// Por fecha de vencimiento: primero quien vence antes.
+  final porVencer = <UserModel>[].obs;
+
+  /// Precio de una visita de un día, para "Cobrar visita".
+  final precioDia = RxnDouble();
+
+  final cargando = false.obs;
+
+  bool _enVivo = false;
 
   Future<void> cargar({
     required bool ingresos,
     required bool entradas,
     required bool vencen,
+    bool precio = false,
   }) async {
     if (cargando.value) return;
     cargando.value = true;
-    await Future.wait([
-      if (ingresos) _uno('ingresos', _ingresosDeHoy, this.ingresos),
-      if (entradas) _uno('entradas', _entradasDeHoy, this.entradas),
-      if (vencen) _uno('por vencer', _porVencer, this.vencen),
-    ]);
+    await _cargar(ingresos, entradas, vencen, precio);
     cargando.value = false;
+    // Un cobro o una entrada en otro equipo (o en el lector) aparece solo.
+    if (!_enVivo) {
+      _enVivo = true;
+      recargarAlCambiar({
+        if (ingresos) TablaEnVivo.ingresos,
+        if (entradas) TablaEnVivo.accesos,
+        if (vencen) TablaEnVivo.clientes,
+      }, () => _cargar(ingresos, entradas, vencen, false));
+    }
   }
 
-  Future<void> _uno<T>(
-      String nombre, Future<T> Function() leer, Rx<T?> destino) async {
+  Future<void> _cargar(bool ingresos, bool entradas, bool vencen, bool precio) =>
+      Future.wait([
+        if (ingresos) _uno('cobros', _cargarCobros),
+        if (entradas) _uno('entradas', _cargarEntradas),
+        if (vencen) _uno('clientes', _cargarClientes),
+        if (precio)
+          _uno('precio', () async => precioDia.value = await _precioDelDia()),
+      ]);
+
+  Future<void> _uno(String nombre, Future<void> Function() cargar) async {
     try {
-      destino.value = await leer();
+      await cargar();
     } catch (e) {
       AppLogger.error('ResumenDelDia', 'No se pudo cargar $nombre', e);
     }
   }
 
-  static Future<double> _sumarIngresosDeHoy() async {
+  Future<void> _cargarCobros() async {
+    final lista = [...await _cobrosDeHoy()]
+      ..sort((a, b) => b.fecha.compareTo(a.fecha));
+    cobros.assignAll(lista);
+    ingresos.value = lista.fold<double>(0, (suma, i) => suma + i.montoFinal);
+    ventas.value = lista.where((i) => i.concepto == 'producto').length;
+    abonos.value = lista
+        .where((i) => const {'abono', 'renovacion', 'registro', 'nuevo_registro'}
+            .contains(i.concepto))
+        .length;
+  }
+
+  Future<void> _cargarEntradas() async {
+    final lista = (await _accesosDeHoy())
+        .where((a) => a.accessType == 'entrada')
+        .toList()
+      ..sort((a, b) => b.accessTime.compareTo(a.accessTime));
+    ultimasEntradas.assignAll(lista);
+    entradas.value = lista.length;
+  }
+
+  Future<void> _cargarClientes() async {
+    final ahora = DateTime.now();
+    final todos = await _clientes();
+    final limite = ahora.add(const Duration(days: diasPorVencer));
+    final proximos = todos
+        .where((c) =>
+            c.isActive &&
+            c.expirationDate != null &&
+            !c.expirationDate!.isBefore(ahora) &&
+            !c.expirationDate!.isAfter(limite))
+        .toList()
+      ..sort((a, b) => a.expirationDate!.compareTo(b.expirationDate!));
+    porVencer.assignAll(proximos);
+    vencen.value = proximos.length;
+    activos.value = todos
+        .where((c) =>
+            c.isActive &&
+            c.expirationDate != null &&
+            !c.expirationDate!.isBefore(ahora))
+        .length;
+  }
+
+  static Future<List<IngresoModel>> _leerCobrosDeHoy() {
     final ahora = DateTime.now();
     final inicio = DateTime(ahora.year, ahora.month, ahora.day);
-    final ingresos = await IngresoProvider().getIngresos(
+    return IngresoProvider().getIngresos(
       fechaInicio: inicio,
       // El filtro incluye el final: un instante antes de medianoche.
       fechaFin: inicio
@@ -67,30 +155,13 @@ class ResumenDelDia extends GetxController {
           .subtract(const Duration(milliseconds: 1)),
       limit: 1000,
     );
-    return ingresos.fold<double>(0, (suma, i) => suma + i.montoFinal);
   }
 
-  static Future<int> _contarEntradasDeHoy() async {
-    final accesos = await AccessLogService.getTodayAccesses();
-    return accesos.where((a) => a.accessType == 'entrada').length;
-  }
+  static Future<List<UserModel>> _leerClientes() =>
+      Get.find<UserRepository>().getAllUsers();
 
-  static Future<int> _contarPorVencer() async {
-    final clientes = await Get.find<UserRepository>().getAllUsers();
-    return contarPorVencer(
-        clientes.map((c) => (c.isActive, c.expirationDate)), DateTime.now());
-  }
-
-  /// Membresías activas que vencen de hoy a [diasPorVencer] días.
-  static int contarPorVencer(
-      Iterable<(bool activo, DateTime? vence)> clientes, DateTime ahora) {
-    final limite = ahora.add(const Duration(days: diasPorVencer));
-    return clientes
-        .where((c) =>
-            c.$1 &&
-            c.$2 != null &&
-            !c.$2!.isBefore(ahora) &&
-            !c.$2!.isAfter(limite))
-        .length;
+  static Future<double?> _leerPrecioDelDia() async {
+    final precio = (await AbonoPricesRepository().getPrices()).priceDay;
+    return precio != null && precio > 0 ? precio : null;
   }
 }

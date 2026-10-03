@@ -27,7 +27,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
       appBar: GymAppBar(
         title: 'Accesos del personal',
         // En escritorio la acción va arriba, con texto, junto al título.
-        actions: PlataformaApp.escritorio
+        actions: PlataformaApp.pantallaGrande
             ? [
                 AccionDeBarra(
                   texto: 'Nuevo acceso',
@@ -38,7 +38,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
               ]
             : null,
       ),
-      floatingActionButton: PlataformaApp.escritorio
+      floatingActionButton: PlataformaApp.pantallaGrande
           ? null
           : FloatingActionButton.extended(
               backgroundColor: AppColors.accent,

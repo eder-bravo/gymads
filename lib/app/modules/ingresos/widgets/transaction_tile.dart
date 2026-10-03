@@ -120,7 +120,7 @@ class TransactionTile extends StatelessWidget {
                       fontSize: 17,
                       // En escritorio, cifras del mismo ancho: los importes
                       // se alinean de una fila a otra.
-                      fontFeatures: PlataformaApp.escritorio
+                      fontFeatures: PlataformaApp.pantallaGrande
                           ? const [FontFeature.tabularFigures()]
                           : null,
                     ),

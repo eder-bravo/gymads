@@ -289,7 +289,7 @@ class IngresosController extends GetxController
   /// En escritorio con separador de miles ("\$1,234.50"), que se lee de un
   /// vistazo en la pantalla grande. El teléfono conserva su formato.
   String formatCurrency(double amount) {
-    if (PlataformaApp.escritorio) {
+    if (PlataformaApp.pantallaGrande) {
       return NumberFormat.currency(
               locale: 'es_MX', symbol: '\$', decimalDigits: 2)
           .format(amount);
@@ -300,7 +300,7 @@ class IngresosController extends GetxController
   /// "1 transacción", "3 transacciones" (en escritorio; el teléfono conserva
   /// su texto).
   String transacciones(int n) =>
-      PlataformaApp.escritorio && n == 1 ? '1 transacción' : '$n transacciones';
+      PlataformaApp.pantallaGrande && n == 1 ? '1 transacción' : '$n transacciones';
 
   // ══════════════════════════════════════════════════════════
   // REPORTE EN PDF

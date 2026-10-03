@@ -172,7 +172,7 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
       appBar: GymAppBar(
         title: 'Nuevo acceso',
         // En la ventana de escritorio, una X para cerrar (no una flecha).
-        leading: PlataformaApp.escritorio
+        leading: PlataformaApp.pantallaGrande
             ? IconButton(
                 icon: const Icon(Icons.close),
                 tooltip: 'Cerrar',

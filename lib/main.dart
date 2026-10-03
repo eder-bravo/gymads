@@ -2,10 +2,12 @@
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/material_localizations_12h.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
+import 'package:gymads/app/core/widgets/menu_lateral.dart';
 import 'package:gymads/app/bindings/initial_binding.dart';
 import 'package:gymads/app/data/config/rfid_config.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
@@ -185,6 +187,16 @@ class _MyAppState extends State<MyApp> {
       initialRoute: _initialRoute,
       getPages: AppPages.routes,
       initialBinding: InitialBinding(),
+      // En escritorio se cambia de sección desde la barra lateral: un fundido
+      // corto en lugar del deslizamiento del teléfono.
+      defaultTransition: PlataformaApp.escritorio ? Transition.fadeIn : null,
+      // La barra lateral sabe de qué sección es cada pantalla de detalle.
+      navigatorObservers: [
+        if (PlataformaApp.escritorio) MenuLateral.observador,
+      ],
+      transitionDuration: PlataformaApp.escritorio
+          ? const Duration(milliseconds: 160)
+          : null,
       locale: const Locale('es'),
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [

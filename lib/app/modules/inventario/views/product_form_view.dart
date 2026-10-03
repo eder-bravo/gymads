@@ -15,7 +15,7 @@ import 'stock_adjust_dialog.dart';
 /// inventario; en el teléfono, su pantalla. [argumentos] son los mismos de la
 /// ruta (`isEditing`, `barcode`).
 Future<void> abrirFormularioProducto([Map<String, dynamic>? argumentos]) async {
-  if (PlataformaApp.escritorio) {
+  if (PlataformaApp.pantallaGrande) {
     await abrirFormulario(() => ProductFormView(argumentos: argumentos));
   } else {
     await Get.toNamed(Routes.PRODUCT_FORM, arguments: argumentos);
@@ -316,7 +316,7 @@ class _ProductFormViewState extends State<ProductFormView> {
                         hintText: 'Escanéalo del envase o escríbelo',
                         prefixIcon: const Icon(Icons.qr_code),
                         // En escritorio el botón dice qué hace.
-                        suffixIcon: PlataformaApp.escritorio
+                        suffixIcon: PlataformaApp.pantallaGrande
                             ? Padding(
                                 padding: const EdgeInsets.only(right: 6),
                                 child: TextButton.icon(

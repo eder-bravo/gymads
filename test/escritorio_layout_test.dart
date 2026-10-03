@@ -10,6 +10,9 @@ import 'package:get/get.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:gymads/app/core/permissions/permissions.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
+import 'package:gymads/app/core/widgets/menu_lateral.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
+import 'package:gymads/app/routes/app_pages.dart';
 import 'package:gymads/app/modules/configuracion/views/agregar_lector_view.dart';
 import 'package:gymads/app/modules/configuracion/controllers/agregar_lector_controller.dart';
 import 'package:gymads/app/data/services/lector_ble_service.dart';
@@ -22,7 +25,6 @@ import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/global_widgets/cliente_card.dart';
 import 'package:gymads/app/global_widgets/cliente_form_dialog.dart';
 import 'package:gymads/app/modules/home/controllers/home_controller.dart';
-import 'package:gymads/app/modules/home/controllers/resumen_del_dia.dart';
 import 'package:gymads/app/modules/home/views/home_view.dart';
 import 'package:gymads/app/modules/inventario/controllers/inventario_controller.dart';
 import 'package:gymads/app/modules/inventario/views/inventario_view.dart';
@@ -30,6 +32,8 @@ import 'package:gymads/app/modules/point_of_sale/controllers/point_of_sale_contr
 import 'package:gymads/app/modules/point_of_sale/views/point_of_sale_view.dart';
 import 'package:gymads/app/modules/point_of_sale/widgets/lista_carrito.dart';
 import 'package:gymads/core/theme/app_theme.dart';
+
+import 'herramientas/resumen_de_prueba.dart';
 
 const _escritorio =
     TargetPlatformVariant({TargetPlatform.macOS, TargetPlatform.windows});
@@ -88,11 +92,59 @@ class _Asistente extends AgregarLectorController {
   void onReady() {}
 }
 
+/// Una sesión abierta con todos los permisos: con ella aparece la barra
+/// lateral de escritorio.
 class _Tenant extends GetxService implements TenantContextService {
   @override
   final staffProfileRx = Rx<StaffProfileModel?>(null);
   @override
+  bool get isAuthenticated => true;
+  @override
+  bool can(Permission permiso) => true;
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// La app con Inicio y una pantalla sencilla por sección, para navegar con
+/// la barra lateral.
+Future<void> _mostrarApp(WidgetTester tester, {bool claro = false}) async {
+  tester.view.physicalSize = const Size(1920, 1000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final tema = claro ? AppTheme.claro : AppTheme.oscuro;
+  GetPage seccion(String ruta, String titulo) => GetPage(
+        name: ruta,
+        page: () => ScaffoldAdaptable(
+          appBar: GymAppBar(title: titulo),
+          body: Text('Pantalla de $titulo'),
+        ),
+      );
+  await tester.pumpWidget(GetMaterialApp(
+    theme: _capturas
+        ? tema.copyWith(
+            textTheme: tema.textTheme.apply(fontFamily: 'Roboto'),
+            primaryTextTheme: tema.primaryTextTheme.apply(fontFamily: 'Roboto'),
+          )
+        : tema,
+    builder: (context, child) => RepaintBoundary(
+      key: _imagen,
+      child: VentanaEscritorio(child: child!),
+    ),
+    initialRoute: Routes.HOME,
+    navigatorObservers: [MenuLateral.observador],
+    getPages: [
+      GetPage(name: Routes.HOME, page: () => const HomeView()),
+      seccion(Routes.CLIENTES, 'Clientes'),
+      seccion(Routes.ABONAR, 'Abonar'),
+      seccion(Routes.POINT_OF_SALE, 'Vender'),
+      seccion(Routes.INVENTARIO, 'Inventario'),
+      seccion(Routes.CATEGORIAS, 'Categorías'),
+      seccion(Routes.INGRESOS, 'Ingresos'),
+      seccion(Routes.ACCESS_LOGS, 'Entradas'),
+      seccion(Routes.CONFIGURACION, 'Configuración'),
+    ],
+  ));
+  await tester.pumpAndSettle();
 }
 
 List<Product> _productos() => List.generate(
@@ -182,12 +234,8 @@ void main() {
     }
   });
   setUp(() {
-    // Inicio de escritorio muestra los números de hoy: datos fijos de prueba.
-    Get.put(ResumenDelDia(
-      ingresosDeHoy: () async => 4350,
-      entradasDeHoy: () async => 38,
-      porVencer: () async => 5,
-    ));
+    // Inicio de escritorio muestra lo de hoy: datos fijos de prueba.
+    Get.put(resumenDePrueba());
     tour = ShowcaseView.register();
     WelcomeTourService.recorridoEnCurso.value = false;
     EscanerFisicoService.configuracion.value = const ConfiguracionEscaner();
@@ -202,8 +250,9 @@ void main() {
     Get.put<TenantContextService>(_Tenant());
     Get.put<HomeController>(_Inicio());
     await _mostrar(tester, const HomeView());
-    expect(tester.getTopLeft(find.text('Ingresos')).dy,
-        tester.getTopLeft(find.text('Entradas')).dy);
+    // Los números de hoy en una fila.
+    expect(tester.getTopLeft(find.text('\$4,350')).dy,
+        tester.getTopLeft(find.text('38')).dy);
     await _capturar(tester, 'inicio-amplio');
     for (final size in [
       const Size(1280, 720),
@@ -400,41 +449,145 @@ void main() {
     await _capturar(tester, 'inicio-maximizada');
   }, variant: _escritorio);
 
-  testWidgets('inicio de escritorio: rejilla, números de hoy y atajos',
+  testWidgets('escritorio: barra lateral, panel del día y atajos',
       (tester) async {
     Get.put<TenantContextService>(_Tenant());
     final inicio = Get.put<HomeController>(_Inicio()) as _Inicio;
     // Sombras reales para la captura (en pruebas se dibujan como un borde).
     debugDisableShadows = !_capturas;
-    await _mostrar(tester, const HomeView());
+    await _mostrarApp(tester);
     await _tamano(tester, const Size(2560, 1410));
+    expect(find.byType(MenuLateral), findsOneWidget);
+    // Los números de hoy.
     expect(find.text('\$4,350'), findsOneWidget);
     expect(find.text('38'), findsOneWidget);
     expect(find.text('5'), findsOneWidget);
-    // Vender es la tarjeta grande: más ancha que Abonar.
-    final vender = tester.getRect(find.text('Vender'));
-    final abonar = tester.getRect(find.text('Abonar'));
-    expect(vender.height, greaterThan(abonar.height));
+    // Cada sección en la barra, con su nombre.
+    for (final seccion in [
+      'Inicio',
+      'Clientes',
+      'Abonar',
+      'Vender',
+      'Inventario',
+      'Ingresos',
+      'Entradas',
+      'Configuración',
+    ]) {
+      expect(find.text(seccion), findsWidgets, reason: seccion);
+    }
+    // Accesos rápidos y actividad de hoy.
+    expect(find.text('Un día · \$50.00'), findsOneWidget);
+    expect(find.text('Últimas entradas'), findsOneWidget);
+    expect(find.text('Últimos cobros'), findsOneWidget);
+    expect(find.text('Vencen esta semana'), findsOneWidget);
+    expect(find.text('Laura Gómez'), findsOneWidget);
+    expect(find.text('Vence hoy'), findsOneWidget);
+    expect(find.text('Vence mañana'), findsOneWidget);
+    // Lo más reciente primero; las vencidas y lejanas no aparecen.
+    expect(find.text('Venta de producto'), findsOneWidget);
+    expect(find.text('Lucía Vargas'), findsNothing);
+    expect(find.text('Andrés Molina'), findsNothing);
+    expect(find.text('Cobrar'), findsNWidgets(5));
+    await _capturar(tester, 'inicio-panel');
+
+    await tester.tap(find.text('Nueva venta'));
+    await tester.tap(find.text('38'));
+    await tester.pump();
+    expect(inicio.abiertos, ['Vender', 'Entradas']);
+
+    // Clic en la barra: la sección se abre encima de Inicio, resaltada y sin
+    // flecha atrás.
+    await tester.tap(find.text('Vender'));
+    await tester.pumpAndSettle();
+    expect(Get.currentRoute, Routes.POINT_OF_SALE);
+    expect(find.text('Pantalla de Vender'), findsOneWidget);
+    expect(find.byType(BackButton), findsNothing);
+    final vender = tester.widget<Text>(find.text('Vender').last);
+    expect(vender.style!.fontWeight, FontWeight.w700);
+    await _capturar(tester, 'seccion-con-barra');
+
     final mac = defaultTargetPlatform == TargetPlatform.macOS;
     final modificador =
         mac ? LogicalKeyboardKey.meta : LogicalKeyboardKey.control;
-    await tester.sendKeyDownEvent(modificador);
-    await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
-    await tester.sendKeyEvent(LogicalKeyboardKey.digit6);
-    await tester.sendKeyUpEvent(modificador);
-    // El engrane de la cabecera responde al clic (nada lo tapa).
-    await tester.tap(find.byIcon(Icons.settings_outlined));
-    await tester.pump();
-    expect(inicio.abiertos, ['Vender', 'Entradas', 'Configuración']);
-    expect(tester.takeException(), isNull);
-    await _capturar(tester, 'inicio-bento');
-    await _mostrar(tester, const HomeView(), claro: true);
+    Future<void> atajo(LogicalKeyboardKey tecla) async {
+      await tester.sendKeyDownEvent(modificador);
+      await tester.sendKeyEvent(tecla);
+      await tester.sendKeyUpEvent(modificador);
+      await tester.pumpAndSettle();
+    }
+
+    // ⌘/Ctrl + 5 es la quinta sección (Inventario); coma, Configuración.
+    await atajo(LogicalKeyboardKey.digit5);
+    expect(Get.currentRoute, Routes.INVENTARIO);
+    // Una subpantalla sigue marcando su sección y sí lleva flecha atrás.
+    Get.toNamed(Routes.CATEGORIAS);
+    await tester.pumpAndSettle();
+    expect(find.byType(BackButton), findsOneWidget);
+    expect(tester.widget<Text>(find.text('Inventario').last).style!.fontWeight,
+        FontWeight.w700);
+    // Una pantalla sin nombre (un detalle) marca la sección de la que se
+    // abrió, aunque Inicio, debajo, se redibuje al cambiar la ventana.
+    Get.to(() => const ScaffoldAdaptable(body: Text('Detalle')));
+    await tester.pumpAndSettle();
+    await _tamano(tester, const Size(2400, 1350));
+    expect(tester.widget<Text>(find.text('Inventario').last).style!.fontWeight,
+        FontWeight.w700);
+    expect(tester.widget<Text>(find.text('Inicio').last).style!.fontWeight,
+        FontWeight.w500);
     await _tamano(tester, const Size(2560, 1410));
-    await _capturar(tester, 'inicio-bento-claro');
+    await atajo(LogicalKeyboardKey.comma);
+    expect(Get.currentRoute, Routes.CONFIGURACION);
+    // Al volver a Inicio no quedan pantallas apiladas.
+    await atajo(LogicalKeyboardKey.digit1);
+    expect(Get.currentRoute, Routes.HOME);
+    expect(find.text('Accesos rápidos'), findsOneWidget);
+    expect(Navigator.of(tester.element(find.text('Accesos rápidos'))).canPop(),
+        isFalse);
+    expect(tester.takeException(), isNull);
+
+    await _mostrarApp(tester, claro: true);
+    await _tamano(tester, const Size(2560, 1410));
+    await _capturar(tester, 'inicio-panel-claro');
     await _tamano(tester, VentanaEscritorio.minimo);
     expect(tester.takeException(), isNull);
+    await _capturar(tester, 'inicio-panel-minimo');
     await tester.pumpWidget(const SizedBox());
     debugDisableShadows = true;
+  }, variant: _escritorio);
+
+  testWidgets(
+      'volver a Inicio reemplazando la pila no pide datos a mitad del dibujo',
+      (tester) async {
+    Get.put<TenantContextService>(_Tenant());
+    Get.put<HomeController>(_Inicio());
+    await _mostrarApp(tester);
+    // Así regresan a Inicio los permisos de la primera vez y el asistente de
+    // modo de cobro: por un momento hay dos Inicio montados.
+    Get.toNamed(Routes.CLIENTES);
+    await tester.pumpAndSettle();
+    Get.offAllNamed(Routes.HOME);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    Get.offAllNamed(Routes.HOME);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('\$4,350'), findsOneWidget);
+  }, variant: _escritorio);
+
+  testWidgets('la barra lateral no va en ventanas modales', (tester) async {
+    Get.put<TenantContextService>(_Tenant());
+    await _mostrar(tester, const ScaffoldAdaptable(body: SizedBox.expand()));
+    expect(find.byType(MenuLateral), findsOneWidget);
+    abrirFormulario(
+        () => const ScaffoldAdaptable(body: Text('Formulario de prueba')));
+    await tester.pumpAndSettle();
+    expect(find.text('Formulario de prueba'), findsOneWidget);
+    expect(find.byType(MenuLateral), findsOneWidget);
+    // Sin sesión tampoco hay barra.
+    await tester.pumpWidget(const SizedBox());
+    Get.reset();
+    await _mostrar(tester, const ScaffoldAdaptable(body: SizedBox.expand()));
+    expect(find.byType(MenuLateral), findsNothing);
   }, variant: _escritorio);
 
   testWidgets('venta e inventario maximizados, sin desbordes', (tester) async {

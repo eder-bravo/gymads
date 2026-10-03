@@ -1,17 +1,54 @@
-# GymOne en macOS y Windows
+# GymOne en macOS, Windows y tabletas
 
-Rama de trabajo: `feat/version_escritorio`. Revisión: 1 de octubre de 2026.
+Rama de trabajo: `feat/version_escritorio`. Revisión: 3 de octubre de 2026.
 Las versiones exactas resueltas están en `pubspec.lock`.
+
+## Escritorio, tableta y teléfono
+
+Hay tres diseños, y el del teléfono no cambia:
+
+- **Escritorio** (macOS y Windows, `PlataformaApp.escritorio`): barra lateral
+  con las secciones, Inicio como panel del día, mouse y teclado.
+- **Tableta** (iPad o Android con 720 puntos o más por su lado corto,
+  `PlataformaApp.tableta`): Inicio con rejilla "bento", sin barra lateral,
+  pensado para el toque. Las tabletas chicas (7–8") usan el diseño del
+  teléfono.
+- **Teléfono**: idéntico a como estaba, textos incluidos.
+
+`PlataformaApp.pantallaGrande` (escritorio o tableta) decide lo de pantalla
+grande: anchos de lectura, ventanas modales, acciones con texto, letra mínima,
+dos columnas e importes con separador de miles. Lo del mouse y el teclado
+(pasar el mouse, atajos, "Haz clic", arrastrar, escáner físico, cámara de la
+computadora) sigue con `PlataformaApp.escritorio`. En tableta los textos dicen
+"Toca" y hablan del "dispositivo"; la ventana modal de un formulario se
+acorta cuando aparece el teclado en pantalla.
 
 ## Diseño de escritorio
 
-macOS y Windows mantienen los colores, degradados, tipografía, formas y la
-navegación de la app (Inicio → pantallas). El contenido tiene anchos máximos
+macOS y Windows mantienen los colores, degradados, tipografía y formas de la
+app. Se navega con la **barra lateral** (`core/widgets/menu_lateral.dart`),
+siempre abierta y con el nombre de cada sección: Inicio, Clientes, Abonar,
+Vender, Inventario, Ingresos y Entradas, con Configuración abajo. La sección
+actual se resalta (una pantalla de detalle marca la sección de la que se
+abrió) y cada rol ve solo las secciones de sus permisos. ⌘/Ctrl + 1…7 abre
+cada sección y ⌘/Ctrl + coma, Configuración; cada renglón muestra su atajo.
+
+La barra va dentro de `ScaffoldAdaptable`, no encima del navegador: así los
+diálogos la cubren y el recorrido de bienvenida la encuentra. No aparece en
+ventanas modales, en el inicio de sesión, en el asistente de modo de cobro ni
+en los permisos de la primera vez. Al cambiar de sección se regresa a Inicio y
+la sección se abre encima, con un fundido corto: Inicio queda siempre debajo,
+que es donde sale el aviso de pantalla completa del lector. Las pantallas
+principales de cada sección no llevan flecha atrás; sus subpantallas sí. Con
+texto muy grande en la ventana mínima, los botones de la barra superior se
+encogen y las acciones de una ficha bajan a su propio renglón
+(`FichaConAcciones`) en vez de salirse.
+
+El contenido tiene anchos máximos
 según su uso: formularios de 720–800 puntos, configuración de 880, historiales
 (ingresos y entradas) de 960 e inicio/listados de 1200. El fondo llena la
 ventana y las barras, los campos, los botones al pie y las acciones flotantes
-quedan alineados con el contenido. La cabecera de Inicio ocupa todo el ancho
-y alinea su título con la columna de opciones.
+quedan alineados con el contenido.
 
 Patrones propios de escritorio (en el teléfono no cambian):
 
@@ -25,8 +62,8 @@ Patrones propios de escritorio (en el teléfono no cambian):
 - **Botón principal a la derecha**: `PieDeFormulario` y `BotonGuardar` toman
   el ancho de su texto (mínimo 200) en vez de cruzar la pantalla. El detalle
   de cliente agrupa Eliminar, Editar y Abonar en una fila.
-- **Mouse**: cursor de mano y borde resaltado al pasar sobre los accesos de
-  Inicio; clic derecho fija un producto en venta; las categorías se arrastran
+- **Mouse**: cursor de mano y borde resaltado al pasar sobre los accesos y
+  números de Inicio; clic derecho fija un producto en venta; las categorías se arrastran
   directamente para reordenarlas. Sin "jalar para refrescar": cada pantalla
   tiene su botón de recargar. En venta, un clic en la ficha agrega el
   producto y su borde se resalta al pasar el mouse (`AlPasarMouse`).
@@ -81,47 +118,69 @@ escritorio; el teléfono queda idéntico):
   "Subir" y "Bajar" como alternativa a arrastrar categorías, la cámara con
   ancho de lectura y el error técnico en "Ver detalles".
 
-`test/escritorio_compacto_test.dart` genera capturas de 37 pantallas,
+`test/escritorio_compacto_test.dart` genera capturas de 38 pantallas,
 diálogos y pasos del asistente: escritorio maximizado (`pantallas/`), laptop
-(`laptop/`) y teléfono (`build/capturas_movil/<carpeta>`). Las del teléfono
-se generan aparte (`--plain-name 390`) y se comparan con
-`test/herramientas/comparar_capturas.py ANTES DESPUES 0`: tras esta revisión
-las 72 pantallas que existen en el teléfono quedaron idénticas píxel a píxel
-(solo cambió la cámara de escritorio, que el teléfono no usa).
+(`laptop/`), tableta acostada y de pie (`build/capturas_tableta/horizontal` y
+`vertical`, iPad de 1180×820) y teléfono (`build/capturas_movil/<carpeta>`).
+Cada tamaño se genera en su propia ejecución (`--plain-name 2560`, `1280`,
+`1180`, `820` o `390`): `AppTheme` fija la densidad con la plataforma de la
+primera prueba. Las del teléfono se comparan con
+`test/herramientas/comparar_capturas.py ANTES DESPUES 0`: tras la revisión de
+escritorio y tableta, las 74 capturas del teléfono quedaron idénticas píxel a
+píxel (solo cambian la cámara de escritorio, que el teléfono no usa, y la
+fecha del filtro de Ingresos y Entradas según el día). El Inicio del teléfono
+se comparó además con el del último commit: idéntico.
 
-**Inicio de escritorio** (`home/views/inicio_escritorio.dart`) es una rejilla
-"bento" que llena la ventana, siguiendo la recomendación de ui-ux-pro-max
-para tableros:
+**Inicio de escritorio: el panel del día** (`home/views/panel_del_dia.dart`).
+Las opiniones de las pruebas con el equipo fueron que una pantalla con cuatro
+botones grandes no es costumbre en escritorio y dejaba mucho vacío. Inicio
+muestra ahora lo de hoy:
 
-- Vender, el módulo del mostrador, en una tarjeta grande; Abonar, Clientes e
-  Inventario alrededor, con los degradados del teléfono, el ícono como marca
-  de agua y una ligera ampliación al pasar el mouse. Si el rol no ve algún
-  módulo, la rejilla se reacomoda (1 a 4 tarjetas).
-- Debajo, los números de hoy (`ResumenDelDia`): ingresos cobrados, entradas
-  y membresías que vencen en 7 días. Cada uno solo aparece con su permiso
-  (ver ingresos, ver accesos, gestionar clientes), se vuelve a pedir cada vez
-  que Inicio regresa al frente y abre su pantalla con un clic. Si un dato no
-  carga se muestra "—" sin afectar a los demás.
-- Configuración pasa a un botón en la cabecera, junto a la fecha.
-- Atajos: ⌘/Ctrl + 1…6 abren las tarjetas en orden de lectura y
-  ⌘/Ctrl + coma abre Configuración. Cada tarjeta muestra su atajo.
+- Arriba, los números de hoy (`ResumenDelDia`): ingresos cobrados, entradas y
+  membresías que vencen en 7 días. Cada uno abre su pantalla.
+- Accesos rápidos: Nueva venta, Cobrar abono, Cobrar visita (con el precio
+  del día) y Nuevo cliente.
+- Actividad: últimas entradas (quién y a qué hora), últimos cobros (un clic
+  abre su detalle) y quién vence esta semana, con un botón "Cobrar" que abre
+  Abonar con ese cliente y regresa a Inicio. Cada lista tiene "Ver todo".
 
-El recorrido de bienvenida conserva sus pasos: los números de ingresos y
-entradas y el botón de Configuración llevan las claves de antes. En una
-ventana de menos de 720 puntos se usa la lista del teléfono.
+Todo se pide según los permisos del rol, se vuelve a pedir cada vez que Inicio
+regresa al frente o con "Actualizar", y se actualiza solo cuando otro equipo
+(o el lector) registra un cobro o una entrada. Si un dato no carga se muestra
+"—" sin afectar a los demás. El recorrido de bienvenida empieza en la cabecera
+del panel y sigue por las secciones de la barra lateral. En una ventana de
+menos de 720 puntos (solo posible sin el mínimo nativo) se usa la lista del
+teléfono.
 
-Los textos hablan del equipo y no del teléfono (`PlataformaApp.equipo`):
-apariencia "Según el sistema", "Recibir avisos en este equipo", el asistente
-del lector y los mensajes de Bluetooth. Los permisos de Bluetooth remiten a
-Ajustes del Sistema › Privacidad y seguridad › Bluetooth. Las instrucciones
+**Inicio de tableta** (`home/views/inicio_tableta.dart`) conserva la rejilla
+"bento" que gustó en las pruebas, con los ajustes que pidieron: los números de
+hoy van arriba, cada recuadro dice algo del día ("3 ventas hoy", "2
+membresías cobradas hoy", "120 con membresía vigente"), la rejilla tiene un
+alto máximo y debajo va la misma actividad del panel de escritorio, que en
+vertical llena lo que antes quedaba vacío. Configuración es un botón con su
+nombre en la cabecera. Sin atajos ni efectos de mouse.
+
+Los textos hablan del equipo y no del teléfono (`PlataformaApp.equipo`:
+"equipo" en escritorio, "dispositivo" en tableta): apariencia "Según el
+sistema", "Recibir avisos en este equipo", el asistente del lector y los
+mensajes de Bluetooth. Los permisos de Bluetooth remiten a Ajustes del
+Sistema › Privacidad y seguridad › Bluetooth. En escritorio las instrucciones
 de los recorridos dicen "Haz clic" en lugar de "Toca".
 
 `test/escritorio_layout_test.dart` verifica ambos destinos simulados con
 ventanas de 1920×1000 hasta el mínimo, texto hasta el 200 %, cambios de
-cantidad, cobro, lectura física tras redimensionar y el formulario como
-ventana modal. Para generar capturas opcionales del render de Flutter con
+cantidad, cobro, lectura física tras redimensionar, el formulario como
+ventana modal y la barra lateral (clic, atajos, sección resaltada, sin flecha
+atrás, Inicio siempre debajo). `test/tableta_test.dart` cubre la detección de
+tableta, el Inicio de tableta de pie, acostado y con texto al 200 %, y la
+ventana modal con el teclado en pantalla; `test/resumen_del_dia_test.dart`,
+los datos del día; y `test/inicio_navegacion_test.dart`, Inicio en teléfono,
+tableta y escritorio al entrar y salir de secciones, al girar o
+redimensionar y al regresar con `Get.offAllNamed` (permisos y modo de cobro),
+cuando por un momento hay dos Inicio montados. Por eso Inicio pide los datos
+del día al terminar el cuadro y no mientras se dibuja. Para generar capturas opcionales del render de Flutter con
 datos de prueba, ejecutar ese archivo (o `test/escritorio_compacto_test.dart`,
-que guarda las 26 pantallas maximizadas, en claro y oscuro y con sombras
+que guarda las 38 pantallas maximizadas, en claro y oscuro y con sombras
 reales, en `build/capturas_escritorio/pantallas`) con
 `--dart-define=CAPTURAS_ESCRITORIO=true` y `FUENTES_CAPTURA` apuntando a
 `bin/cache/artifacts/material_fonts` del SDK de Flutter. Se guardan en
@@ -150,15 +209,16 @@ requieren detener la app y volver a ejecutarla; hot restart no los aplica.
 Las pantallas conservan sus variantes compactas (resúmenes en varias filas,
 fichas con el importe debajo del nombre, botón de cobro en su propia fila)
 para texto grande y para el respaldo de `VentanaEscritorio`.
-`test/escritorio_compacto_test.dart` cubre 26 pantallas/estados, el
+`test/escritorio_compacto_test.dart` cubre 38 pantallas/estados (con la barra lateral), el
 formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 534 pruebas aprobadas de la batería completa
-(la falla restante es la preexistente de `test/widget_test.dart`), análisis
-sin incidencias nuevas y compilación de macOS, con capturas a 2560×1410
-(`*-maximizada.png`). En macOS la app abrió en 1280×800 centrada. La compilación nativa de Windows queda pendiente de una
+Verificación de esta revisión: 555 pruebas aprobadas de la batería completa,
+análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
+ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
+`test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`
+actualizó el paquete `printing` (cambió la firma de `layoutPdf`). En macOS la app abrió en 1280×800 centrada. La compilación nativa de Windows queda pendiente de una
 computadora Windows.
 
 ## Escáner de códigos de barras

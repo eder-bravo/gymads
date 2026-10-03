@@ -49,12 +49,16 @@ import 'package:gymads/app/modules/configuracion/views/agregar_lector_view.dart'
 import 'package:gymads/app/modules/configuracion/controllers/agregar_lector_controller.dart';
 import 'package:gymads/app/data/services/lector_ble_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'herramientas/resumen_de_prueba.dart';
 import 'package:get/get.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:gymads/app/core/permissions/permissions.dart';
 import 'package:gymads/app/data/models/access_log_model.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
+import 'package:gymads/app/data/models/staff_profile_model.dart';
+import 'package:gymads/app/modules/home/controllers/home_controller.dart';
+import 'package:gymads/app/modules/home/views/home_view.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/background_rfid_service.dart';
@@ -130,6 +134,11 @@ class _Configuracion extends ConfiguracionController {
 }
 
 class _Tenant extends GetxService implements TenantContextService {
+  // Con sesión abierta: en escritorio aparece la barra lateral.
+  @override
+  bool get isAuthenticated => true;
+  @override
+  final staffProfileRx = Rx<StaffProfileModel?>(null);
   @override
   String? get currentGymId => null;
   @override
@@ -138,6 +147,15 @@ class _Tenant extends GetxService implements TenantContextService {
   bool can(Permission permiso) => true;
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _Inicio extends HomeController {
+  @override
+  void onReady() {}
+  @override
+  Future<void> checkOnboarding() async {}
+  @override
+  bool can(Permission permiso) => true;
 }
 
 class _Lector extends BackgroundRfidService {
@@ -480,6 +498,11 @@ void main() {
   });
 
   final pantallas = <String, Widget Function()>{
+    'Inicio': () {
+      Get.put<HomeController>(_Inicio());
+      Get.put(resumenDePrueba());
+      return const HomeView();
+    },
     'Cámara sin dispositivo': () =>
         DesktopCameraView(onPhotoTaken: (_) {}, onCancel: () {}),
     'Permisos pendientes': () {
@@ -694,6 +717,18 @@ void main() {
         tamano: const Size(390, 844),
         plataforma: TargetPlatform.android
       ),
+      // iPad de 11" acostado y de pie. También se generan aparte
+      // (--plain-name 1180 y --plain-name 820).
+      (
+        carpeta: 'build/capturas_tableta/horizontal',
+        tamano: const Size(1180, 820),
+        plataforma: TargetPlatform.iOS
+      ),
+      (
+        carpeta: 'build/capturas_tableta/vertical',
+        tamano: const Size(820, 1180),
+        plataforma: TargetPlatform.iOS
+      ),
     ];
     for (final modo in modos) {
       for (final claro in [false, true]) {
@@ -715,6 +750,17 @@ void main() {
                     key: imagen, child: VentanaEscritorio(child: child!)),
                 home: entry.value()));
             await tester.pumpAndSettle();
+            // Las imágenes (el logo de la barra lateral) se decodifican fuera
+            // del reloj de prueba. Las del teléfono se dejan como su línea
+            // base.
+            if (modo.plataforma != TargetPlatform.android) {
+              await tester.runAsync(() async {
+                for (final e in find.byType(Image).evaluate()) {
+                  await precacheImage((e.widget as Image).image, e);
+                }
+              });
+              await tester.pumpAndSettle();
+            }
             await tester.runAsync(() async {
               final boundary = imagen.currentContext!.findRenderObject()!
                   as RenderRepaintBoundary;

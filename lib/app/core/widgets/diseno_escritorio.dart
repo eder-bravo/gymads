@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../data/services/tenant_context_service.dart';
+import '../../../core/theme/app_colors.dart';
 import '../utils/plataforma_app.dart';
+import 'menu_lateral.dart';
 
 /// La ventana de escritorio. Hace dos cosas:
 ///
@@ -88,7 +91,7 @@ class ContenidoEscritorio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!PlataformaApp.escritorio) return child;
+    if (!PlataformaApp.pantallaGrande) return child;
     return Align(
       alignment: Alignment.topCenter,
       heightFactor: 1,
@@ -113,6 +116,8 @@ class ScaffoldAdaptable extends StatelessWidget {
     this.extendBodyBehindAppBar = false,
     this.resizeToAvoidBottomInset,
     this.anchoMaximo = 1120,
+    this.conMenu = true,
+    this.menu,
   });
 
   final PreferredSizeWidget? appBar;
@@ -124,8 +129,68 @@ class ScaffoldAdaptable extends StatelessWidget {
   final bool? resizeToAvoidBottomInset;
   final double anchoMaximo;
 
+  /// En escritorio, la barra lateral de secciones. false en pantallas de
+  /// antes de entrar (permisos iniciales, modo de cobro).
+  final bool conMenu;
+
+  /// Una barra con los pasos del recorrido (solo Inicio).
+  final MenuLateral? menu;
+
+  /// Escritorio, con sesión y fuera de una ventana modal. En una ventana
+  /// angosta (solo posible sin el mínimo nativo) la barra aplastaría el
+  /// contenido: no se pone.
+  bool _muestraMenu(BuildContext context) {
+    if (!PlataformaApp.escritorio || !conMenu) return false;
+    if (MediaQuery.sizeOf(context).width < 720) return false;
+    if (context.dependOnInheritedWidgetOfExactType<_EnVentana>() != null) {
+      return false;
+    }
+    try {
+      return Get.isRegistered<TenantContextService>() &&
+          TenantContextService.to.isAuthenticated;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => AnchoContenido(
+  Widget build(BuildContext context) {
+    final pantalla = _pantalla(context);
+    if (!_muestraMenu(context)) return pantalla;
+    final datos = MediaQuery.of(context);
+    final c = context.colores;
+    return CallbackShortcuts(
+      bindings: MenuLateral.atajos(),
+      // El foco queda en la pantalla para que los atajos funcionen sin hacer
+      // clic antes.
+      child: Focus(
+        autofocus: true,
+        // Con fondo: la línea entre la barra y el contenido es translúcida.
+        child: ColoredBox(
+          color: backgroundColor ?? Theme.of(context).scaffoldBackgroundColor,
+          child: Row(
+            children: [
+              menu ?? const MenuLateral(),
+              VerticalDivider(width: 1, thickness: 1, color: c.divisor),
+              Expanded(
+                // El contenido mide su propia área: así sus anchos máximos y
+                // márgenes se calculan sin la barra.
+                child: MediaQuery(
+                  data: datos.copyWith(
+                    size: Size(datos.size.width - MenuLateral.ancho - 1,
+                        datos.size.height),
+                  ),
+                  child: ConMenuLateral(child: pantalla),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pantalla(BuildContext context) => AnchoContenido(
         anchoMaximo: anchoMaximo,
         child: Scaffold(
           appBar: appBar,
@@ -145,6 +210,15 @@ class ScaffoldAdaptable extends StatelessWidget {
       );
 }
 
+/// Marca lo que va dentro de una [VentanaFormulario]: ahí no va la barra
+/// lateral.
+class _EnVentana extends InheritedWidget {
+  const _EnVentana({required super.child});
+
+  @override
+  bool updateShouldNotify(_EnVentana oldWidget) => false;
+}
+
 class AnchoContenido extends InheritedWidget {
   const AnchoContenido({
     super.key,
@@ -155,7 +229,7 @@ class AnchoContenido extends InheritedWidget {
   final double anchoMaximo;
 
   static double margen(BuildContext context) {
-    if (!PlataformaApp.escritorio) return 0;
+    if (!PlataformaApp.pantallaGrande) return 0;
     final ancho = context
         .dependOnInheritedWidgetOfExactType<AnchoContenido>()
         ?.anchoMaximo;
@@ -176,7 +250,7 @@ class _AccionEnContenido extends FloatingActionButtonLocation {
   @override
   Offset getOffset(ScaffoldPrelayoutGeometry geometry) {
     final offset = FloatingActionButtonLocation.endFloat.getOffset(geometry);
-    if (!PlataformaApp.escritorio) return offset;
+    if (!PlataformaApp.pantallaGrande) return offset;
     final margen = ((geometry.scaffoldSize.width - anchoMaximo) / 2)
         .clamp(0, double.infinity);
     return Offset(offset.dx - margen, offset.dy);
@@ -204,7 +278,7 @@ class ListaAdaptable extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
         builder: (context, constraints) {
           final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
-          final columnas = PlataformaApp.escritorio
+          final columnas = PlataformaApp.pantallaGrande
               ? (constraints.maxWidth / (anchoTarjeta * escala))
                   .floor()
                   .clamp(1, 3)
@@ -296,13 +370,50 @@ class FilaConDetalle extends StatelessWidget {
             // Importes y estados al borde derecho de la ficha, alineados de
             // una fila a otra, en vez de flotar a media fila.
             Flexible(
-                child: PlataformaApp.escritorio
+                child: PlataformaApp.pantallaGrande
                     ? Align(
                         alignment: AlignmentDirectional.topEnd, child: detalle)
                     : detalle)
           ],
         ]);
       });
+}
+
+/// Una ficha con sus acciones a la derecha. En pantalla grande, si no caben
+/// junto al nombre (texto grande en una ventana angosta), las acciones bajan a
+/// su propio renglón en vez de aplastarlo. En el teléfono, la fila de siempre.
+class FichaConAcciones extends StatelessWidget {
+  const FichaConAcciones({
+    super.key,
+    required this.datos,
+    required this.acciones,
+    this.anchoMinimo = 520,
+  });
+
+  /// Lo que va antes de las acciones en la fila.
+  final List<Widget> datos;
+  final Widget acciones;
+
+  /// Ancho (con texto al 100 %) desde el que las acciones van en la fila.
+  final double anchoMinimo;
+
+  @override
+  Widget build(BuildContext context) {
+    final fila = Row(children: [...datos, acciones]);
+    if (!PlataformaApp.pantallaGrande) return fila;
+    return LayoutBuilder(builder: (context, limites) {
+      final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
+      if (limites.maxWidth >= anchoMinimo * escala) return fila;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: datos),
+          const SizedBox(height: 10),
+          Align(alignment: AlignmentDirectional.centerEnd, child: acciones),
+        ],
+      );
+    });
+  }
 }
 
 /// Hoja inferior en el teléfono; en escritorio, ventana centrada de ancho
@@ -319,7 +430,7 @@ Future<T?> mostrarHojaAdaptable<T>(
   Color? backgroundColor,
   ShapeBorder? shape,
 }) {
-  if (!PlataformaApp.escritorio) {
+  if (!PlataformaApp.pantallaGrande) {
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: isScrollControlled,
@@ -358,7 +469,7 @@ Future<T?> mostrarHojaAdaptable<T>(
 ///
 /// Un clic fuera no la cierra: se perdería lo escrito.
 Future<T?> abrirFormulario<T>(Widget Function() pagina) async {
-  if (!PlataformaApp.escritorio) {
+  if (!PlataformaApp.pantallaGrande) {
     return await Get.to<T>(pagina, fullscreenDialog: true);
   }
   return Get.dialog<T>(VentanaFormulario(child: pagina()),
@@ -385,9 +496,11 @@ class VentanaFormulario extends StatelessWidget {
   Widget build(BuildContext context) {
     const margen = 24.0;
     final disponible = MediaQuery.sizeOf(context);
+    // En tableta el teclado en pantalla le quita alto a la ventana.
+    final teclado = MediaQuery.viewInsetsOf(context).bottom;
     final tamano = Size(
       math.max(0, math.min(ancho, disponible.width - margen * 2)),
-      math.max(0, math.min(alto, disponible.height - margen * 2)),
+      math.max(0, math.min(alto, disponible.height - teclado - margen * 2)),
     );
     return Dialog(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -403,6 +516,9 @@ class VentanaFormulario extends StatelessWidget {
             size: tamano,
             padding: EdgeInsets.zero,
             viewPadding: EdgeInsets.zero,
+            // El Dialog ya sube por encima del teclado: adentro no se
+            // vuelve a descontar.
+            viewInsets: EdgeInsets.zero,
           ),
           // Escape cierra igual que la X (y respeta un "no salir mientras
           // guarda" de la pantalla).
@@ -411,7 +527,7 @@ class VentanaFormulario extends StatelessWidget {
               const SingleActivator(LogicalKeyboardKey.escape): () =>
                   Navigator.of(context).maybePop(),
             },
-            child: Focus(autofocus: true, child: child),
+            child: Focus(autofocus: true, child: _EnVentana(child: child)),
           ),
         ),
       ),
@@ -454,7 +570,7 @@ class _AlPasarMouseState extends State<AlPasarMouse> {
 /// Tamaño de letra legible: en escritorio, ningún texto informativo queda por
 /// debajo de 14 (ayudas, etiquetas, notas). En el teléfono no cambia.
 double legible(double tamano) =>
-    PlataformaApp.escritorio ? math.max(tamano, 14) : tamano;
+    PlataformaApp.pantallaGrande ? math.max(tamano, 14) : tamano;
 
 /// La acción principal de una pantalla, en su barra superior. En escritorio
 /// es un botón con texto ("Nuevo cliente"); en el teléfono, [movil] tal cual.
@@ -479,7 +595,7 @@ class AccionDeBarra extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!PlataformaApp.escritorio) return movil;
+    if (!PlataformaApp.pantallaGrande) return movil;
     if (secundaria) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -548,7 +664,7 @@ class AccionesDeFila extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!PlataformaApp.escritorio) return movil;
+    if (!PlataformaApp.pantallaGrande) return movil;
     final esquema = Theme.of(context).colorScheme;
     Color color(AccionDeFila a) =>
         a.peligrosa ? esquema.error : esquema.primary;

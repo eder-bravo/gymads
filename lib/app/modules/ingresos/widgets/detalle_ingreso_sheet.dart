@@ -48,7 +48,7 @@ Future<void> _mostrarHoja(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (PlataformaApp.escritorio)
+          if (PlataformaApp.pantallaGrande)
             const SizedBox(height: 20)
           else
             Center(

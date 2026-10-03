@@ -197,7 +197,9 @@ class _EscenaConexionState extends State<EscenaConexion>
         EtapaConexion.conectandoBluetooth =>
           'Conectando el ${PlataformaApp.equipo} con el lector',
         EtapaConexion.eligiendoWifi => PlataformaApp.escritorio
-            ? 'Equipo y lector conectados'
+            ? (PlataformaApp.escritorio
+                ? 'Equipo y lector conectados'
+                : 'Dispositivo y lector conectados')
             : 'Teléfono y lector conectados',
         EtapaConexion.conectandoWifi => 'El lector se conecta al WiFi',
         EtapaConexion.comprobando => 'Buscando el lector en el WiFi',
@@ -287,7 +289,11 @@ class _EscenaConexionState extends State<EscenaConexion>
               // El aparato que configura: la computadora en escritorio.
               nodo(
                   0,
-                  PlataformaApp.escritorio ? Icons.computer : Icons.smartphone,
+                  PlataformaApp.escritorio
+                      ? Icons.computer
+                      : PlataformaApp.tableta
+                          ? Icons.tablet_mac
+                          : Icons.smartphone,
                   telefono),
               nodo(1, Icons.nfc, lector),
               nodo(2, Icons.router_outlined, wifi),
@@ -570,7 +576,7 @@ class _Paso extends StatelessWidget {
             nombre,
             style: TextStyle(
               color: estado == EstadoPaso.pendiente ? c.textSecondary : color,
-              fontSize: PlataformaApp.escritorio ? 14 : 12,
+              fontSize: PlataformaApp.pantallaGrande ? 14 : 12,
               fontWeight: estado == EstadoPaso.enCurso
                   ? FontWeight.w700
                   : FontWeight.w500,

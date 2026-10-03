@@ -137,7 +137,7 @@ class _LectorViewState extends State<LectorView> {
     if (controller.comprobandoLector.value) return const SizedBox.shrink();
 
     final estado = controller.estadoLector.value;
-    if (PlataformaApp.escritorio) return _accionesEscritorio(estado);
+    if (PlataformaApp.pantallaGrande) return _accionesEscritorio(estado);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -461,7 +461,7 @@ class _LectorViewState extends State<LectorView> {
                       fontSize: 15,
                       fontWeight: FontWeight.w600)),
               // En escritorio se explica qué cambia al activarlo.
-              subtitle: PlataformaApp.escritorio
+              subtitle: PlataformaApp.pantallaGrande
                   ? Text(
                       'Los clientes registran su entrada al pasar su '
                       'tarjeta o llavero.',
@@ -506,7 +506,7 @@ class _LectorViewState extends State<LectorView> {
                     color: c.textPrimary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600)),
-            subtitle: PlataformaApp.escritorio
+            subtitle: PlataformaApp.pantallaGrande
                 ? Text(
                     'Muestra aquí la bienvenida de cada cliente que pase su '
                     'tarjeta.',

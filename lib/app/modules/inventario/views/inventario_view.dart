@@ -144,7 +144,9 @@ class InventarioView extends GetView<InventarioController> {
             title: 'Tus productos',
             description: PlataformaApp.escritorio
                 ? 'Haz clic en un producto para editarlo, o en "Stock" para ajustar sus existencias.'
-                : 'Toca un producto para editarlo o ajustar su stock.',
+                : PlataformaApp.tableta
+                    ? 'Toca un producto para editarlo, o "Stock" para ajustar sus existencias.'
+                    : 'Toca un producto para editarlo o ajustar su stock.',
             isLastStep: controller.esUltimoPasoDelTour(controller.keyLista),
             child: _buildProductList(context),
           ),
@@ -515,7 +517,7 @@ class InventarioView extends GetView<InventarioController> {
 
   Widget _buildProductCard(BuildContext context, Product product) {
     final c = context.colores;
-    if (PlataformaApp.escritorio) return _fichaEscritorio(context, product);
+    if (PlataformaApp.pantallaGrande) return _fichaEscritorio(context, product);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: c.cardBackground,

@@ -30,7 +30,7 @@ class EmailConfirmationView extends StatelessWidget {
               // pantalla grande el texto y los botones no cruzan la ventana.
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                    maxWidth: PlataformaApp.escritorio ? 560 : double.infinity),
+                    maxWidth: PlataformaApp.pantallaGrande ? 560 : double.infinity),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

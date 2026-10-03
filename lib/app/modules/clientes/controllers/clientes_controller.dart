@@ -85,6 +85,10 @@ class ClientesController extends GetxController
         final rfid = Get.arguments['new_rfid'];
         showAddDialog(initialRfid: rfid);
       }
+      // "Nuevo cliente" del panel de Inicio en escritorio.
+      if (Get.arguments is Map && Get.arguments['nuevo_cliente'] == true) {
+        showAddDialog();
+      }
     });
   }
 

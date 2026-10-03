@@ -92,10 +92,10 @@ class AbonarView extends GetView<AbonarController> {
                   side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
                   // En escritorio, del ancho de su texto y a la derecha:
                   // la búsqueda del cliente es lo principal de la pantalla.
-                  minimumSize: PlataformaApp.escritorio
+                  minimumSize: PlataformaApp.pantallaGrande
                       ? const Size(0, 48)
                       : const Size.fromHeight(48),
-                  padding: PlataformaApp.escritorio
+                  padding: PlataformaApp.pantallaGrande
                       ? const EdgeInsets.symmetric(horizontal: 20)
                       : null,
                   shape: RoundedRectangleBorder(
@@ -104,7 +104,7 @@ class AbonarView extends GetView<AbonarController> {
                       fontSize: 15, fontWeight: FontWeight.w600),
                 ),
               );
-              return PlataformaApp.escritorio
+              return PlataformaApp.pantallaGrande
                   ? Align(alignment: Alignment.centerRight, child: boton)
                   : boton;
             }),
@@ -398,7 +398,7 @@ class AbonarView extends GetView<AbonarController> {
             ],
           ),
         ),
-        if (PlataformaApp.escritorio)
+        if (PlataformaApp.pantallaGrande)
           TextButton.icon(
             onPressed: controller.clearSelection,
             icon: const Icon(Icons.swap_horiz, size: 18),
@@ -744,7 +744,7 @@ class AbonarView extends GetView<AbonarController> {
     return PieDeFormulario(
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: PlataformaApp.escritorio
+        crossAxisAlignment: PlataformaApp.pantallaGrande
             ? CrossAxisAlignment.end
             : CrossAxisAlignment.center,
         children: [

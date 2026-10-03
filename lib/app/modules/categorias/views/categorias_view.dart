@@ -25,7 +25,7 @@ class CategoriasView extends GetView<CategoriasController> {
       appBar: GymAppBar(
         title: 'Categorías',
         // En escritorio la acción va arriba, con texto, junto al título.
-        actions: PlataformaApp.escritorio
+        actions: PlataformaApp.pantallaGrande
             ? [
                 AccionDeBarra(
                   texto: 'Nueva categoría',
@@ -36,7 +36,7 @@ class CategoriasView extends GetView<CategoriasController> {
               ]
             : null,
       ),
-      floatingActionButton: PlataformaApp.escritorio
+      floatingActionButton: PlataformaApp.pantallaGrande
           ? null
           : FloatingActionButton.extended(
               backgroundColor: AppColors.accent,
@@ -130,7 +130,10 @@ class CategoriasView extends GetView<CategoriasController> {
                   PlataformaApp.escritorio
                       ? 'Arrastra una categoría para cambiar su orden, o usa '
                           '"Más" › Subir o Bajar.'
-                      : 'Mantén pulsada una categoría para cambiar su orden.',
+                      : PlataformaApp.tableta
+                          ? 'Mantén pulsada una categoría para cambiar su '
+                              'orden, o usa "Más" › Subir o Bajar.'
+                          : 'Mantén pulsada una categoría para cambiar su orden.',
                   style: TextStyle(
                     color: c.textSecondary.withOpacity(0.7),
                     fontSize: legible(12),
@@ -186,8 +189,8 @@ class CategoriasView extends GetView<CategoriasController> {
       ),
       child: Opacity(
         opacity: isInactive ? 0.55 : 1,
-        child: Row(
-          children: [
+        child: FichaConAcciones(
+          datos: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -246,68 +249,68 @@ class CategoriasView extends GetView<CategoriasController> {
                 ],
               ),
             ),
-            AccionesDeFila(
-              visibles: [
+          ],
+          acciones: AccionesDeFila(
+            visibles: [
+              AccionDeFila(
+                texto: 'Editar',
+                icono: Icons.edit_outlined,
+                onPressed: () => _onMenuAction(context, 'edit', category),
+              ),
+            ],
+            mas: [
+              // Mover sin arrastrar: para quien no maneja bien el mouse.
+              if (_indice(category) > 0)
                 AccionDeFila(
-                  texto: 'Editar',
-                  icono: Icons.edit_outlined,
-                  onPressed: () => _onMenuAction(context, 'edit', category),
+                  texto: 'Subir',
+                  icono: Icons.arrow_upward,
+                  onPressed: () => controller.reorder(
+                      _indice(category), _indice(category) - 1),
                 ),
-              ],
-              mas: [
-                // Mover sin arrastrar: para quien no maneja bien el mouse.
-                if (_indice(category) > 0)
-                  AccionDeFila(
-                    texto: 'Subir',
-                    icono: Icons.arrow_upward,
-                    onPressed: () => controller.reorder(
-                        _indice(category), _indice(category) - 1),
-                  ),
-                if (_indice(category) < controller.categories.length - 1)
-                  AccionDeFila(
-                    texto: 'Bajar',
-                    icono: Icons.arrow_downward,
-                    // ReorderableListView cuenta el destino con el
-                    // elemento aún en su sitio: dos lugares más abajo.
-                    onPressed: () => controller.reorder(
-                        _indice(category), _indice(category) + 2),
-                  ),
+              if (_indice(category) < controller.categories.length - 1)
                 AccionDeFila(
-                  texto: isInactive ? 'Reactivar' : 'Desactivar',
-                  icono: isInactive
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  onPressed: () => _onMenuAction(context, 'toggle', category),
+                  texto: 'Bajar',
+                  icono: Icons.arrow_downward,
+                  // ReorderableListView cuenta el destino con el
+                  // elemento aún en su sitio: dos lugares más abajo.
+                  onPressed: () => controller.reorder(
+                      _indice(category), _indice(category) + 2),
+                ),
+              AccionDeFila(
+                texto: isInactive ? 'Reactivar' : 'Desactivar',
+                icono: isInactive
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                onPressed: () => _onMenuAction(context, 'toggle', category),
+              ),
+              if (controller.puedeGestionar)
+                AccionDeFila(
+                  texto: 'Eliminar',
+                  icono: Icons.delete_outline,
+                  peligrosa: true,
+                  onPressed: () => _onMenuAction(context, 'delete', category),
+                ),
+            ],
+            movil: PopupMenuButton<String>(
+              color: c.cardBackground,
+              icon: Icon(Icons.more_vert,
+                  color: c.textSecondary.withOpacity(0.8)),
+              onSelected: (value) => _onMenuAction(context, value, category),
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'edit', child: Text('Editar')),
+                PopupMenuItem(
+                  value: 'toggle',
+                  child: Text(isInactive ? 'Reactivar' : 'Desactivar'),
                 ),
                 if (controller.puedeGestionar)
-                  AccionDeFila(
-                    texto: 'Eliminar',
-                    icono: Icons.delete_outline,
-                    peligrosa: true,
-                    onPressed: () => _onMenuAction(context, 'delete', category),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Eliminar',
+                        style: TextStyle(color: AppColors.error)),
                   ),
               ],
-              movil: PopupMenuButton<String>(
-                color: c.cardBackground,
-                icon: Icon(Icons.more_vert,
-                    color: c.textSecondary.withOpacity(0.8)),
-                onSelected: (value) => _onMenuAction(context, value, category),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'edit', child: Text('Editar')),
-                  PopupMenuItem(
-                    value: 'toggle',
-                    child: Text(isInactive ? 'Reactivar' : 'Desactivar'),
-                  ),
-                  if (controller.puedeGestionar)
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Text('Eliminar',
-                          style: TextStyle(color: AppColors.error)),
-                    ),
-                ],
-              ),
             ),
-          ],
+          ),
         ),
       ),
     );

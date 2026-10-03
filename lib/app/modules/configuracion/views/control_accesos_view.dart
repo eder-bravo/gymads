@@ -92,7 +92,7 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
   Widget _buildSectionLabel(String label, {String? escritorio}) {
     final c = context.colores;
     // En escritorio, el mismo título de sección que los formularios.
-    if (PlataformaApp.escritorio) return TituloSeccion(escritorio ?? label);
+    if (PlataformaApp.pantallaGrande) return TituloSeccion(escritorio ?? label);
     return Text(
       label,
       style: TextStyle(
@@ -187,7 +187,7 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
           ),
         ),
         // En escritorio dice qué hace; en el teléfono, el lápiz de siempre.
-        trailing: PlataformaApp.escritorio
+        trailing: PlataformaApp.pantallaGrande
             ? TextButton.icon(
                 onPressed: () => _elegirHora(context, hora, onSelect),
                 icon: const Icon(Icons.schedule, size: 18),

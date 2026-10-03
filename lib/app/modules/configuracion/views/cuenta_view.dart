@@ -178,7 +178,7 @@ class CuentaView extends GetView<ConfiguracionController> {
                           // En escritorio, del ancho de su texto: un botón
                           // rojo de lado a lado parece la acción principal.
                           width:
-                              PlataformaApp.escritorio ? null : double.infinity,
+                              PlataformaApp.pantallaGrande ? null : double.infinity,
                           child: OutlinedButton.icon(
                             onPressed: controller.isLoading.value
                                 ? null
@@ -203,7 +203,7 @@ class CuentaView extends GetView<ConfiguracionController> {
                               padding: EdgeInsets.symmetric(
                                   vertical: 12,
                                   horizontal:
-                                      PlataformaApp.escritorio ? 24 : 0),
+                                      PlataformaApp.pantallaGrande ? 24 : 0),
                             ),
                           ),
                         ),
@@ -220,7 +220,7 @@ class CuentaView extends GetView<ConfiguracionController> {
 
   Widget _buildProfileHeader(BuildContext context) {
     final c = context.colores;
-    if (PlataformaApp.escritorio) return _cabeceraEscritorio(context);
+    if (PlataformaApp.pantallaGrande) return _cabeceraEscritorio(context);
     return Card(
       elevation: 4,
       color: c.cardBackground,
@@ -347,7 +347,7 @@ class CuentaView extends GetView<ConfiguracionController> {
       {String? escritorio}) {
     final c = context.colores;
     // En escritorio, el mismo título de sección que los formularios.
-    if (PlataformaApp.escritorio) return TituloSeccion(escritorio ?? label);
+    if (PlataformaApp.pantallaGrande) return TituloSeccion(escritorio ?? label);
     return Text(
       label,
       style: TextStyle(
@@ -400,7 +400,7 @@ class CuentaView extends GetView<ConfiguracionController> {
             ),
           ),
         ),
-        trailing: editable && onEdit != null && PlataformaApp.escritorio
+        trailing: editable && onEdit != null && PlataformaApp.pantallaGrande
             // En escritorio, "Editar" con texto: un lápiz suelto no dice
             // qué hace.
             ? TextButton.icon(
@@ -483,7 +483,7 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
     final newValue = _textController.text.trim();
     if (newValue.isEmpty) {
       // En escritorio se dice por qué no se guarda; antes no pasaba nada.
-      if (PlataformaApp.escritorio) {
+      if (PlataformaApp.pantallaGrande) {
         setState(() => _error = 'Escribe ${widget.title.toLowerCase()}.');
       }
       return;
@@ -513,7 +513,7 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
         style: TextStyle(color: c.textPrimary),
         decoration: InputDecoration(labelText: widget.title, errorText: _error),
         // En escritorio, Enter guarda.
-        onSubmitted: PlataformaApp.escritorio ? (_) => _handleSave() : null,
+        onSubmitted: PlataformaApp.pantallaGrande ? (_) => _handleSave() : null,
       ),
       actions: [
         BotonCancelar(onPressed: _isSaving ? null : () => Get.back()),

@@ -150,7 +150,7 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                     child: ConstrainedBox(
                   constraints: BoxConstraints(
                       maxWidth:
-                          PlataformaApp.escritorio ? 900 : double.infinity),
+                          PlataformaApp.pantallaGrande ? 900 : double.infinity),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

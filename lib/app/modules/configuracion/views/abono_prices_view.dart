@@ -72,7 +72,7 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                     detalle: 'Deja vacío el periodo que no ofrezcas.'),
                 // En escritorio, dos por fila: un precio no necesita un
                 // campo de lado a lado de la ventana.
-                if (PlataformaApp.escritorio)
+                if (PlataformaApp.pantallaGrande)
                   ResumenAdaptable(anchoMinimo: 300, espacio: 16, children: [
                     _priceField(context,
                         controller: controller.dayController,

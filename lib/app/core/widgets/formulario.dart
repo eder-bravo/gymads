@@ -72,7 +72,7 @@ class BotonGuardar extends StatelessWidget {
         disabledForegroundColor: Colors.white.withOpacity(0.85),
         minimumSize: compacto
             ? const Size(0, 44)
-            : PlataformaApp.escritorio
+            : PlataformaApp.pantallaGrande
                 ? const Size(200, 46)
                 : const Size.fromHeight(48),
         padding: EdgeInsets.symmetric(horizontal: compacto ? 18 : 24),
@@ -126,7 +126,7 @@ class PieDeFormulario extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          child: PlataformaApp.escritorio
+          child: PlataformaApp.pantallaGrande
               ? Align(
                   alignment: Alignment.centerRight,
                   heightFactor: 1,

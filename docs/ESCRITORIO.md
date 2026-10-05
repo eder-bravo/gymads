@@ -205,6 +205,14 @@ muestra ahora lo de hoy:
   abre su detalle) y quién vence esta semana, con un botón "Cobrar" que abre
   Abonar con ese cliente y regresa a Inicio. Cada lista tiene "Ver todo".
 
+Las horas de entradas y cobros se muestran tal como se guardaron, igual que
+en Entradas e Ingresos: la app guarda la hora del gimnasio sin zona y la base
+la regresa marcada como UTC. El panel (y el detalle de un cobro) la pasaba a
+hora local y le restaba 6 horas en México. Pendiente: el registro de visitas
+(`registrar_visita`) y el límite de una entrada por jornada usan `now()`, que
+sí es UTC real; habría que guardar todo en UTC real (app, consultas y datos
+ya guardados) para que coincidan.
+
 El panel ocupa la ventana sin desplazarse: la actividad llena lo que queda y
 cada lista muestra solo las filas que caben enteras (las demás, en "Ver
 todo"). Antes se desplazaba unos píxeles sin que hubiera nada más. Si no cabe
@@ -337,7 +345,7 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 786 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 798 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`
@@ -384,6 +392,14 @@ notas. Las lecturas pendientes se descartan al salir de la pantalla. En la
 pantalla de prueba y el formulario de productos, el campo de lectura debe
 estar enfocado.
 
+**Sin sonido fuera de Venta e Inventario.** En otras pantallas nadie usa las
+teclas del lector, y el sistema las hacía sonar como tecla no válida (una por
+lectura). En computadora, las teclas sueltas que nadie atendió se marcan como
+atendidas (`VentanaEscritorio.silenciarTeclasSueltas()` en `main()`), salvo
+con ⌘, Ctrl o Alt (atajos del sistema y menús) o dentro de un campo de texto,
+donde deben llegar a la escritura. En macOS, además, la ventana ignora las
+teclas que nadie usó (`keyDown` en `MainFlutterWindow.swift`).
+
 Estos ajustes adaptan la app al lector; **no reprograman su firmware**.
 Para cambiar HID/serie, idioma del teclado, terminador o simbologías se usan los
 códigos del manual de cada fabricante. Aún falta identificar los modelos del
@@ -412,8 +428,13 @@ En macOS se incluyen cámaras integradas, externas, virtuales y, desde macOS 14,
 los tipos Continuity Camera y Desk View. La disponibilidad real depende del
 sistema, controladores y requisitos de la aplicación que provee la webcam.
 
-Las fotos se confirman con **Usar foto** o **Repetir**. La versión circular
-recorta la misma región que muestra la guía. Los controladores se liberan al
+Las fotos se confirman con **Usar foto** o **Repetir**. Se guardan completas,
+en todas las versiones (`prepararFotoCompleta`: derecha y de 1600 px como
+máximo por lado): el círculo es solo una guía para encuadrar la cara, con una
+sombra ligera alrededor para que se vea toda la imagen. Antes se guardaba solo
+lo de adentro del círculo. La confirmación y la foto ampliada de la ficha la
+muestran completa; las miniaturas siguen redondas. Las fotos que ya se habían
+recortado se quedan así. Los controladores se liberan al
 cambiar cámara y al cerrar, incluso si la inicialización termina después.
 
 ## Permisos y lector RFID

@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:gymads/app/modules/home/controllers/resumen_del_dia.dart';
+import 'package:gymads/app/data/models/ingreso_model.dart';
+import 'package:gymads/app/data/models/access_log_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:showcaseview/showcaseview.dart';
@@ -290,6 +293,51 @@ void main() {
         expect(find.text('Inicio'), findsOneWidget);
       }
     }
+  }, variant: _escritorio);
+
+  testWidgets('el panel muestra la hora de entradas y cobros como se guardó',
+      (tester) async {
+    // La base regresa la hora del gimnasio marcada como UTC (así la guarda la
+    // app). Antes se pasaba a hora local: 4:23 p. m. salía 10:23 a. m.
+    final hoy = DateTime.now();
+    final utc = DateTime.utc(hoy.year, hoy.month, hoy.day, 16, 23);
+    Get.delete<ResumenDelDia>(force: true);
+    Get.put(ResumenDelDia(
+      cobrosDeHoy: () async => [
+        IngresoModel(
+          clienteNombre: 'Leo',
+          concepto: 'renovacion',
+          tipoMembresia: 'Mensual',
+          montoBase: 100,
+          montoFinal: 100,
+          metodoPago: 'efectivo',
+          fecha: DateTime.utc(hoy.year, hoy.month, hoy.day, 13, 20),
+          usuarioStaff: 'Recepción',
+        ),
+      ],
+      accesosDeHoy: () async => [
+        AccessLogModel(
+          id: '1',
+          userId: '1',
+          userName: 'Leo',
+          userNumber: '1',
+          accessType: 'entrada',
+          method: 'rfid',
+          staffUser: 'Recepción',
+          accessTime: utc,
+          createdAt: utc,
+        ),
+      ],
+      clientes: () async => [],
+      precioDelDia: () async => null,
+    ));
+    Get.put<TenantContextService>(_Tenant());
+    Get.put<HomeController>(_Inicio());
+    await _mostrarApp(tester);
+    await _tamano(tester, const Size(1920, 1000));
+    expect(find.text('4:23 p. m.'), findsOneWidget);
+    expect(find.text('1:20 p. m.'), findsOneWidget);
+    expect(find.text('10:23 a. m.'), findsNothing);
   }, variant: _escritorio);
 
   testWidgets('el panel del día cabe en la ventana sin desplazarse',

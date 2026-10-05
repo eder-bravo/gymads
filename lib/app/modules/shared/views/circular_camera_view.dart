@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -39,7 +38,6 @@ class _CircularCameraViewState extends State<CircularCameraView>
 
   /// El tamaño de la pantalla de la cámara: con él se sabe dónde estaba el
   /// círculo guía para recortar la foto.
-  Size? _vista;
 
   @override
   void initState() {
@@ -147,16 +145,8 @@ class _CircularCameraViewState extends State<CircularCameraView>
       final File resultFile = File(targetPath);
       await File(photoFile.path).copy(targetPath);
 
-      // Se guarda solo lo que se veía dentro del círculo: la foto completa
-      // salía alejada y descentrada respecto a lo que se encuadró.
-      final vista = _vista;
-      if (vista != null) {
-        await recortarFotoAlCirculo(
-          targetPath,
-          vista: vista,
-          aspectoVistaPrevia: _aspectoVistaPrevia(),
-        );
-      }
+      // La foto completa, no solo lo de adentro del círculo.
+      await prepararFotoCompleta(targetPath);
 
       if (await resultFile.exists() && mounted) {
         // Limpiar archivo temporal original
@@ -227,24 +217,16 @@ class _CircularCameraViewState extends State<CircularCameraView>
             ),
           ),
         ),
+        // La foto completa, como se va a guardar.
         Expanded(
-          child: Center(
-            child: LayoutBuilder(builder: (context, limites) {
-              final lado =
-                  (limites.biggest.shortestSide * 0.85).clamp(160.0, 360.0);
-              return Container(
-                width: lado,
-                height: lado,
-                clipBehavior: Clip.antiAlias,
-                decoration: const BoxDecoration(shape: BoxShape.circle),
-                // El aro encima de la foto, para que no la tape.
-                foregroundDecoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 4),
-                ),
-                child: Image.file(foto, fit: BoxFit.cover),
-              );
-            }),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.file(foto, key: const Key('foto_tomada')),
+              ),
+            ),
           ),
         ),
         Padding(
@@ -292,15 +274,6 @@ class _CircularCameraViewState extends State<CircularCameraView>
     );
   }
 
-  /// La proporción (ancho/alto) con que `CameraPreview` dibuja la cámara.
-  double _aspectoVistaPrevia() {
-    final valor = _controller!.value;
-    final giro = valor.lockedCaptureOrientation ?? valor.deviceOrientation;
-    final deLado = giro == DeviceOrientation.landscapeLeft ||
-        giro == DeviceOrientation.landscapeRight;
-    return deLado ? valor.aspectRatio : 1 / valor.aspectRatio;
-  }
-
   Widget _buildBody() {
     if (_errorMessage != null) {
       return _buildErrorWidget();
@@ -325,10 +298,7 @@ class _CircularCameraViewState extends State<CircularCameraView>
       );
     }
 
-    return LayoutBuilder(builder: (context, espacio) {
-      _vista = espacio.biggest;
-      return _camara();
-    });
+    return _camara();
   }
 
   Widget _camara() {
@@ -495,7 +465,7 @@ class _CircularCameraViewState extends State<CircularCameraView>
 class CircularMaskPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    // El mismo círculo con que se recorta la foto (recorte_circulo.dart).
+    // Solo una guía para la cara: la foto se guarda completa.
     final guia = circuloGuia(size);
     final double centerX = guia.center.dx;
     final double centerY = guia.center.dy;
@@ -517,10 +487,11 @@ class CircularMaskPainter extends CustomPainter {
       circlePath,
     );
 
-    // Dibujar la máscara semitransparente (menos opaca para ver mejor)
+    // Una sombra ligera alrededor: se ve toda la foto, que es la que se
+    // guarda, y el círculo resalta dónde va la cara.
     canvas.drawPath(
       maskPath,
-      Paint()..color = Colors.black.withOpacity(0.7), // Aumentado de 0.6 a 0.7
+      Paint()..color = Colors.black.withOpacity(0.3),
     );
 
     // Dibujar el borde del círculo con mejor visibilidad

@@ -382,11 +382,15 @@ Widget _filaDeTarjetas(List<Widget> hijos) => Row(
     );
 
 /// "10:32 a. m."
+///
+/// Con la hora tal como se guardó, como en Entradas e Ingresos
+/// (`HoraFormato`): la app guarda la hora del gimnasio sin zona y la base la
+/// devuelve marcada como UTC. Pasarla a hora local le restaba 6 horas en
+/// México (una entrada de las 4:23 p. m. salía a las 10:23 a. m.).
 String _hora(DateTime d) {
-  final local = d.toLocal();
-  final h = local.hour % 12 == 0 ? 12 : local.hour % 12;
-  final m = local.minute.toString().padLeft(2, '0');
-  return '$h:$m ${local.hour < 12 ? 'a. m.' : 'p. m.'}';
+  final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  final m = d.minute.toString().padLeft(2, '0');
+  return '$h:$m ${d.hour < 12 ? 'a. m.' : 'p. m.'}';
 }
 
 /// "Vence hoy", "Vence mañana", "Vence el jueves 9". Siempre es esta semana:

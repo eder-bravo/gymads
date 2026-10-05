@@ -9,81 +9,53 @@ import 'package:gymads/core/theme/app_theme.dart';
 import 'package:image/image.dart' as img;
 
 void main() {
-  // Un iPhone en vertical; la vista previa de la cámara, 9:16.
+  // Un iPhone en vertical.
   const vista = Size(390, 844);
-  const aspecto = 9 / 16;
 
-  void esCuadradoDentro(Rect r, Size foto) {
-    expect(r.width, closeTo(r.height, 0.001));
-    expect(r.left, greaterThanOrEqualTo(-0.001));
-    expect(r.top, greaterThanOrEqualTo(-0.001));
-    expect(r.right, lessThanOrEqualTo(foto.width + 0.001));
-    expect(r.bottom, lessThanOrEqualTo(foto.height + 0.001));
-  }
-
-  group('Recorte al círculo guía', () {
-    test('foto con la misma proporción que la vista previa', () {
-      const foto = Size(720, 1280);
-      final r = recorteDelCirculo(
-          vista: vista, aspectoVistaPrevia: aspecto, foto: foto);
-      esCuadradoDentro(r, foto);
-      // El círculo está centrado a lo ancho y un poco arriba del centro.
-      expect(r.center.dx, closeTo(360, 1));
-      expect(r.center.dy, lessThan(foto.height / 2));
-      expect(r.center.dy, closeTo(562, 2));
-    });
-
-    test('foto más ancha que la vista previa (4:3): se toma su centro', () {
-      const foto = Size(3024, 4032);
-      final r = recorteDelCirculo(
-          vista: vista, aspectoVistaPrevia: aspecto, foto: foto);
-      esCuadradoDentro(r, foto);
-      expect(r.center.dx, closeTo(1512, 1));
-      // El lado del círculo en la foto, no la foto completa.
-      expect(r.width, lessThan(foto.width));
-      expect(r.width, closeTo(2326, 3));
-    });
-
-    test('en pantallas bajas el recorte no se sale de la foto', () {
-      const foto = Size(720, 1280);
-      final r = recorteDelCirculo(
-        vista: const Size(390, 500),
-        aspectoVistaPrevia: aspecto,
-        foto: foto,
-      );
-      esCuadradoDentro(r, foto);
-    });
-
-    test('la máscara y el recorte usan el mismo círculo', () {
+  group('Foto completa', () {
+    test('el círculo es solo una guía, centrado y un poco arriba', () {
       final c = circuloGuia(vista);
       expect(c.center.dx, 195);
       expect(c.center.dy, closeTo(844 * 0.45, 0.001));
       expect(c.width / 2, 200); // 25 % del alto, máximo 200
     });
 
-    test('recorta el archivo y lo deja cuadrado', () async {
-      final dir = await Directory.systemTemp.createTemp('recorte');
-      addTearDown(() => dir.delete(recursive: true));
+    Future<String> foto(Directory dir, int ancho, int alto) async {
       final ruta = '${dir.path}/foto.jpg';
       File(ruta).writeAsBytesSync(
-          img.encodeJpg(img.Image(width: 720, height: 1280)));
+          img.encodeJpg(img.Image(width: ancho, height: alto)));
+      return ruta;
+    }
 
-      await recortarFotoAlCirculo(ruta,
-          vista: vista, aspectoVistaPrevia: aspecto);
+    test('se guarda completa, no solo lo de adentro del círculo', () async {
+      final dir = await Directory.systemTemp.createTemp('foto');
+      addTearDown(() => dir.delete(recursive: true));
+      final ruta = await foto(dir, 720, 1280);
+
+      await prepararFotoCompleta(ruta);
 
       final resultado = img.decodeImage(File(ruta).readAsBytesSync())!;
-      expect(resultado.width, resultado.height);
-      expect(resultado.width, 720);
+      expect((resultado.width, resultado.height), (720, 1280));
+    });
+
+    test('una foto muy grande se achica sin cambiar su forma', () async {
+      final dir = await Directory.systemTemp.createTemp('foto');
+      addTearDown(() => dir.delete(recursive: true));
+      final ruta = await foto(dir, 3024, 4032);
+
+      await prepararFotoCompleta(ruta);
+
+      final resultado = img.decodeImage(File(ruta).readAsBytesSync())!;
+      expect((resultado.width, resultado.height), (1200, 1600));
     });
 
     test('si el archivo no es una foto, lo deja como estaba', () async {
-      final dir = await Directory.systemTemp.createTemp('recorte');
+      final dir = await Directory.systemTemp.createTemp('foto');
       addTearDown(() => dir.delete(recursive: true));
       final ruta = '${dir.path}/roto.jpg';
       File(ruta).writeAsStringSync('no soy una foto');
 
-      await recortarFotoAlCirculo(ruta,
-          vista: vista, aspectoVistaPrevia: aspecto);
+      await prepararFotoCompleta(ruta);
 
       expect(File(ruta).readAsStringSync(), 'no soy una foto');
     });

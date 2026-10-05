@@ -40,6 +40,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // En iPad (iPadOS 26+), cuánto ocupan los botones de la ventana.
   VentanaEscritorio.escucharControlesDeVentana();
+  // En computadora, sin el sonido de "tecla no válida" (p. ej. al usar el
+  // lector de códigos fuera de Venta).
+  VentanaEscritorio.silenciarTeclasSueltas();
   // Sonidos del lector en Linux (just_audio no trae Linux): con libmpv.
   // Windows sigue con just_audio_windows.
   if (PlataformaApp.linux) {

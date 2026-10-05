@@ -46,7 +46,6 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
   bool _tomando = false;
   bool _cerrado = false;
   Future<void> _operacion = Future.value();
-  Size? _vista;
   double get _aspecto => _argumentos != null
       ? _argumentos!.size.width / _argumentos!.size.height
       : _windows?.value.aspectRatio ?? 4 / 3;
@@ -197,10 +196,9 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
           await File(imagen.path).delete();
         } catch (_) {}
       }
-      if (widget.circular && _vista != null) {
-        await recortarFotoAlCirculo(destino.path,
-            vista: _vista!, aspectoVistaPrevia: _aspecto);
-      }
+      // La foto completa (derecha y de tamaño razonable), no solo lo de
+      // adentro del círculo.
+      await prepararFotoCompleta(destino.path);
       if (_cerrado) {
         await destino.delete();
         return;
@@ -348,7 +346,6 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
                   ])))));
     }
     return LayoutBuilder(builder: (context, limites) {
-      _vista = limites.biggest;
       final preview = _argumentos != null
           ? Texture(textureId: _argumentos!.textureId!)
           : _windows!.buildPreview();
@@ -392,7 +389,8 @@ class _GuiaFoto extends CustomPainter {
     canvas.drawPath(
         Path.combine(PathOperation.difference,
             Path()..addRect(Offset.zero & size), Path()..addOval(circulo)),
-        Paint()..color = Colors.black54);
+        // Sombra ligera: se ve toda la foto, que es la que se guarda.
+        Paint()..color = Colors.black.withOpacity(0.3));
     canvas.drawOval(
         circulo,
         Paint()

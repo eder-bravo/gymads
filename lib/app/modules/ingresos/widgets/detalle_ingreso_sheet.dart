@@ -9,12 +9,13 @@ import '../controllers/ingresos_controller.dart';
 
 String _moneda(double monto) => dinero(monto);
 
+/// Tal como se guardó, igual que en la lista: la app guarda la hora del
+/// gimnasio sin zona y pasarla a hora local le restaba 6 horas en México.
 String _fechaConHora(DateTime f) {
-  final local = f.toLocal();
-  final hora = '${local.hour.toString().padLeft(2, '0')}:'
-      '${local.minute.toString().padLeft(2, '0')}';
-  return '${local.day} ${PeriodoFiltroMixin.nombresMesesCortos[local.month - 1]} '
-      '${local.year}, $hora';
+  final hora = '${f.hour.toString().padLeft(2, '0')}:'
+      '${f.minute.toString().padLeft(2, '0')}';
+  return '${f.day} ${PeriodoFiltroMixin.nombresMesesCortos[f.month - 1]} '
+      '${f.year}, $hora';
 }
 
 String _fecha(DateTime f) =>

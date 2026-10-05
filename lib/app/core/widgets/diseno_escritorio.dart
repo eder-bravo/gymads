@@ -69,6 +69,36 @@ class VentanaEscritorio extends StatelessWidget {
     });
   }
 
+  /// En computadora, una tecla que nadie usó llegaba al sistema y sonaba
+  /// como tecla no válida. Pasaba con el lector de códigos fuera de Venta e
+  /// Inventario: cada lectura teclea el código y un Enter. Se marca como
+  /// atendida, salvo con ⌘, Ctrl o Alt (atajos del sistema y menús) o en un
+  /// campo de texto, donde la tecla debe llegar a la escritura del sistema.
+  static void silenciarTeclasSueltas() {
+    if (!PlataformaApp.escritorio) return;
+    FocusManager.instance.addLateKeyEventHandler(teclaSuelta);
+  }
+
+  @visibleForTesting
+  static void dejarDeSilenciar() =>
+      FocusManager.instance.removeLateKeyEventHandler(teclaSuelta);
+
+  @visibleForTesting
+  static KeyEventResult teclaSuelta(KeyEvent evento) {
+    if (evento is KeyUpEvent) return KeyEventResult.ignored;
+    final teclado = HardwareKeyboard.instance;
+    if (teclado.isMetaPressed ||
+        teclado.isControlPressed ||
+        teclado.isAltPressed) {
+      return KeyEventResult.ignored;
+    }
+    final foco = FocusManager.instance.primaryFocus;
+    if (foco?.context?.findAncestorStateOfType<EditableTextState>() != null) {
+      return KeyEventResult.ignored;
+    }
+    return KeyEventResult.handled;
+  }
+
   static double escalaDeTableta(Size pantalla) {
     final proporcion = pantalla.shortestSide / ladoCortoBaseTableta;
     final escalonada = (proporcion * 20 + 1e-9).floorToDouble() / 20;

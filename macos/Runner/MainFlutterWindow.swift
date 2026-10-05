@@ -24,6 +24,11 @@ class MainFlutterWindow: NSWindow {
     super.awakeFromNib()
   }
 
+  // Una tecla que ni la app ni el campo de texto usaron llega hasta la
+  // ventana, y macOS suena como tecla no válida (p. ej. el lector de códigos
+  // fuera de Venta). Los atajos con ⌘ van por los menús y no pasan por aquí.
+  override func keyDown(with event: NSEvent) {}
+
   private func marcoInicial() -> NSRect {
     guard let visible = (self.screen ?? NSScreen.main)?.visibleFrame else {
       return self.frame

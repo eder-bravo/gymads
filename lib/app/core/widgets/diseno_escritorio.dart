@@ -237,7 +237,8 @@ class ScaffoldAdaptable extends StatelessWidget {
     if (!_muestraMenu(context)) return pantalla;
     final datos = MediaQuery.of(context);
     final c = context.colores;
-    return CallbackShortcuts(
+    return _AtajosDeRespaldo(
+        child: CallbackShortcuts(
       bindings: MenuLateral.atajos(),
       // El foco queda en la pantalla para que los atajos funcionen sin hacer
       // clic antes.
@@ -274,7 +275,7 @@ class ScaffoldAdaptable extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _pantalla(BuildContext context) => AnchoContenido(
@@ -295,6 +296,60 @@ class ScaffoldAdaptable extends StatelessWidget {
           floatingActionButtonLocation: _AccionEnContenido(anchoMaximo),
         ),
       );
+}
+
+/// Los atajos de la barra lateral aunque el foco haya quedado fuera de la
+/// pantalla, arriba de [CallbackShortcuts]. Venta e Inventario van dentro de
+/// la lectura automática del escáner, que se queda con el foco: las teclas
+/// subían desde ahí y nunca llegaban a los atajos.
+///
+/// Solo atiende lo que nadie más usó (`addLateKeyEventHandler`) y solo si
+/// esta pantalla es la de enfrente: con un diálogo o un menú abierto, no.
+class _AtajosDeRespaldo extends StatefulWidget {
+  const _AtajosDeRespaldo({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_AtajosDeRespaldo> createState() => _AtajosDeRespaldoState();
+}
+
+class _AtajosDeRespaldoState extends State<_AtajosDeRespaldo> {
+  ModalRoute<Object?>? _ruta;
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addLateKeyEventHandler(_tecla);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ruta = ModalRoute.of(context);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeLateKeyEventHandler(_tecla);
+    super.dispose();
+  }
+
+  KeyEventResult _tecla(KeyEvent evento) {
+    if (!mounted || !(_ruta?.isCurrent ?? true)) {
+      return KeyEventResult.ignored;
+    }
+    for (final atajo in MenuLateral.atajos().entries) {
+      if (atajo.key.accepts(evento, HardwareKeyboard.instance)) {
+        atajo.value();
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Marca lo que va dentro de una [VentanaFormulario]: ahí no va la barra

@@ -57,8 +57,13 @@ Vender, Inventario, Ingresos y Entradas, con Configuración abajo. La sección
 actual se resalta (una pantalla de detalle marca la sección de la que se
 abrió) y cada rol ve solo las secciones de sus permisos. ⌘/Ctrl + 1…7 abre
 cada sección y ⌘/Ctrl + coma, Configuración; cada renglón muestra su atajo.
+Funcionan en todas las secciones, también en Venta e Inventario: esas dos van
+dentro de la lectura automática del escáner, que se queda con el foco, así que
+además de `CallbackShortcuts` hay un respaldo (`_AtajosDeRespaldo`,
+`addLateKeyEventHandler`) que atiende las teclas que nadie más usó si la
+pantalla está al frente. Con un diálogo abierto no hacen nada.
 
-La barra se puede ocultar con el botón "Ocultar menú", abajo de la barra, o
+La barra se puede ocultar con el botón de la cabecera, junto a "GymOne", o
 con ⌘/Ctrl + B. Queda una franja angosta de 64 puntos con los íconos de las
 secciones (cada uno con su nombre al pasar el mouse) y un botón para volver a
 mostrarla; el contenido aprovecha el ancho liberado. Se recuerda entre
@@ -120,7 +125,7 @@ Patrones propios de escritorio (en el teléfono no cambian):
   franja roja a todo lo ancho se veía turbia porque su sombra se traslucía. La
   tableta y el teléfono conservan la tarjeta.
 - **Abonar como en la tableta acostada**: clientes en tarjetas (3 por fila,
-  de 380 como máximo para que quepa "3 de enero de 2027") con "Cobrar visita"
+  de 380 como máximo; con letra grande, menos por fila) con "Cobrar visita"
   junto al buscador (arriba si la ventana es angosta), y el cobro con todo
   abierto: los pasos a la izquierda y el resumen con "Cobrar $…" en una
   tarjeta a la derecha, desde 820 puntos de contenido (sin contar la barra
@@ -200,6 +205,12 @@ muestra ahora lo de hoy:
   abre su detalle) y quién vence esta semana, con un botón "Cobrar" que abre
   Abonar con ese cliente y regresa a Inicio. Cada lista tiene "Ver todo".
 
+El panel ocupa la ventana sin desplazarse: la actividad llena lo que queda y
+cada lista muestra solo las filas que caben enteras (las demás, en "Ver
+todo"). Antes se desplazaba unos píxeles sin que hubiera nada más. Si no cabe
+ni con dos filas por lista (ventana mínima o letra grande), se desplaza como
+una página normal.
+
 Todo se pide según los permisos del rol, se vuelve a pedir cada vez que Inicio
 regresa al frente o con "Actualizar", y se actualiza solo cuando otro equipo
 (o el lector) registra un cobro o una entrada. Si un dato no carga se muestra
@@ -253,8 +264,13 @@ escritorio (desde 880 puntos de ancho, con el carrito de 340); de pie, el
 resumen va abajo. Abonar no va paso por paso: todo está abierto a la vez y se
 cobra directo, sin "Continuar". Al buscar cliente, los clientes van en
 tarjetas grandes (3 por fila acostada, 2 de pie) con su foto y cómo está su
-membresía ("Pagado hasta el…", "Venció el…" en rojo, "Cliente nuevo"), y
-"Cobrar visita" queda junto al buscador. Acostada, los pasos van a la izquierda y el
+membresía ("Pagado hasta el…", "Venció el…" en rojo, "Cliente nuevo"). Cada
+fila de tarjetas mide lo que necesita su contenido: una fecha larga ("11 de
+septiembre de 2126") pasa a otro renglón en vez de cortarse. Lo que queda de
+una membresía larga se dice en meses y días o en años ("Le quedan 2 meses y
+29 días", "Le quedan más de 99 años"; `loQueLeQueda` en `vigencia.dart`);
+hasta 60 días, en días como en el teléfono, que no cambia. "Cobrar
+visita" queda junto al buscador. Acostada, los pasos van a la izquierda y el
 resumen con "Cobrar $…" fijo a la derecha; de pie, todo en una columna con el
 resumen al final.
 
@@ -321,7 +337,7 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 773 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 786 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`

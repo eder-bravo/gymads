@@ -564,6 +564,8 @@ void main() {
         cliente('Jorge Díaz', ahora.add(const Duration(days: 2))),
         cliente('Sofía Torres', ahora.add(const Duration(days: 90))),
         cliente('Pedro Sánchez', ahora.subtract(const Duration(days: 40))),
+        // Membresía "para siempre": la fecha larga no debe cortarse.
+        cliente('Leo', DateTime(2126, 9, 11)),
       ]);
       return const AbonarView();
     },

@@ -41,7 +41,10 @@ String periodoEnPalabras(int n, String tipo) {
 /// falta, otra debajo.
 typedef Situacion = ({String texto, String? detalle, bool vencido});
 
-Situacion situacionDe(UserModel cliente, DateTime ahora) {
+/// Con [resumida] (tableta y escritorio), lo que queda de una membresía
+/// larga se dice en meses o años: "Le quedan 36499 días" no se entiende.
+Situacion situacionDe(UserModel cliente, DateTime ahora,
+    {bool resumida = false}) {
   final vence = cliente.expirationDate;
   if (vence == null) {
     return (texto: 'Cliente nuevo', detalle: null, vencido: false);
@@ -56,7 +59,9 @@ Situacion situacionDe(UserModel cliente, DateTime ahora) {
           ? 'Vence hoy'
           : dias == 1
               ? 'Le queda 1 día'
-              : 'Le quedan $dias días',
+              : resumida
+                  ? loQueLeQueda(hoy, vence, dias)
+                  : 'Le quedan $dias días',
       vencido: false,
     );
   }
@@ -65,6 +70,32 @@ Situacion situacionDe(UserModel cliente, DateTime ahora) {
     detalle: null,
     vencido: true,
   );
+}
+
+/// "Le quedan 45 días" hasta 60 días; después en meses y días ("Le quedan 2
+/// meses y 29 días") y, desde dos años, en años ("Le quedan más de 99 años").
+/// Contado en el calendario, como se cuentan los periodos al cobrar.
+String loQueLeQueda(DateTime hoy, DateTime vence, int dias) {
+  if (dias <= 60) return 'Le quedan $dias días';
+  // En UTC: un cambio de horario no debe restar un día.
+  final desde = DateTime.utc(hoy.year, hoy.month, hoy.day);
+  final hasta = DateTime.utc(vence.year, vence.month, vence.day);
+  var meses = (hasta.year - desde.year) * 12 + hasta.month - desde.month;
+  if (hasta.day < desde.day) meses--;
+  if (meses >= 24) {
+    final anios = meses ~/ 12;
+    final exacto = meses % 12 == 0 &&
+        DateTime.utc(desde.year + anios, desde.month, desde.day) == hasta;
+    return exacto ? 'Le quedan $anios años' : 'Le quedan más de $anios años';
+  }
+  final resto = hasta
+      .difference(DateTime.utc(desde.year, desde.month + meses, desde.day))
+      .inDays;
+  final enMeses = meses == 1 ? '1 mes' : '$meses meses';
+  if (resto <= 0) {
+    return meses == 1 ? 'Le queda 1 mes' : 'Le quedan $enMeses';
+  }
+  return 'Le quedan $enMeses y ${resto == 1 ? '1 día' : '$resto días'}';
 }
 
 /// Cuánto se cobra: el precio de un periodo por la cantidad elegida, tanto

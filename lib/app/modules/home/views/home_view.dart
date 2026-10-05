@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';

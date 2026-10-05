@@ -10,6 +10,7 @@ import 'package:get/get.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:gymads/app/core/permissions/permissions.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
+import 'package:gymads/app/core/widgets/escaner_automatico.dart';
 import 'package:gymads/app/core/widgets/menu_lateral.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/app/routes/app_pages.dart';
@@ -289,6 +290,109 @@ void main() {
         expect(find.text('Inicio'), findsOneWidget);
       }
     }
+  }, variant: _escritorio);
+
+  testWidgets('el panel del día cabe en la ventana sin desplazarse',
+      (tester) async {
+    Get.put<TenantContextService>(_Tenant());
+    Get.put<HomeController>(_Inicio());
+    await _mostrarApp(tester);
+    // Lo del panel (no las listas de la barra lateral ni de cada tarjeta).
+    final panel = find.descendant(
+        of: find.byType(HomeView),
+        matching: find.byType(SingleChildScrollView));
+    // Laptop, monitor grande y una ventana de 1440×900.
+    for (final tamano in [
+      const Size(1280, 800),
+      const Size(2560, 1410),
+      const Size(1440, 900),
+    ]) {
+      await _tamano(tester, tamano);
+      expect(panel, findsNothing, reason: '$tamano');
+      expect(find.text('Últimas entradas'), findsOneWidget);
+      expect(find.text('Carlos Ruiz').hitTestable(), findsWidgets);
+      expect(tester.takeException(), isNull, reason: '$tamano');
+    }
+    // Ventana mínima con letra al 200 %: no cabe y se desplaza, sin errores.
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await _tamano(tester, const Size(960, 600));
+    expect(panel, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  }, variant: _escritorio);
+
+  testWidgets('los atajos funcionan en Venta e Inventario', (tester) async {
+    // Las dos escuchan el escáner de códigos, que envuelve toda la pantalla y
+    // se queda con el foco: los atajos de la barra no recibían las teclas.
+    Get.put<TenantContextService>(_Tenant());
+    Get.put<HomeController>(_Inicio());
+    Get.put<PointOfSaleController>(_Venta())
+        .availableProducts
+        .addAll(_productos());
+    final inventario = Get.put<InventarioController>(_Inventario());
+    inventario.products.addAll(_productos());
+    inventario.filterProducts();
+    await _mostrarApp(tester);
+    await _tamano(tester, const Size(1920, 1000));
+    final modificador = defaultTargetPlatform == TargetPlatform.macOS
+        ? LogicalKeyboardKey.meta
+        : LogicalKeyboardKey.control;
+    Future<void> atajo(LogicalKeyboardKey tecla) async {
+      await tester.sendKeyDownEvent(modificador);
+      await tester.sendKeyEvent(tecla);
+      await tester.sendKeyUpEvent(modificador);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> abrir(String ruta) async {
+      Get.to(
+        () => ruta == Routes.POINT_OF_SALE
+            ? const PointOfSaleView()
+            : const InventarioView(),
+        routeName: ruta,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(EscanerAutomatico), findsOneWidget);
+    }
+
+    for (final ruta in [Routes.POINT_OF_SALE, Routes.INVENTARIO]) {
+      await abrir(ruta);
+      await atajo(LogicalKeyboardKey.digit2);
+      expect(Get.currentRoute, Routes.CLIENTES, reason: ruta);
+      await atajo(LogicalKeyboardKey.digit1);
+      expect(Get.currentRoute, Routes.HOME, reason: ruta);
+
+      await abrir(ruta);
+      await atajo(LogicalKeyboardKey.comma);
+      expect(Get.currentRoute, Routes.CONFIGURACION, reason: ruta);
+      await atajo(LogicalKeyboardKey.digit1);
+
+      // Ocultar y mostrar la barra.
+      await abrir(ruta);
+      await atajo(LogicalKeyboardKey.keyB);
+      expect(MenuLateral.oculto.value, isTrue, reason: ruta);
+      await atajo(LogicalKeyboardKey.keyB);
+      expect(MenuLateral.oculto.value, isFalse, reason: ruta);
+      await atajo(LogicalKeyboardKey.digit1);
+    }
+
+    // Con un diálogo encima, no: se queda en el diálogo.
+    await abrir(Routes.POINT_OF_SALE);
+    Get.dialog(const AlertDialog(content: Text('¿Seguro?')));
+    await tester.pumpAndSettle();
+    await atajo(LogicalKeyboardKey.digit2);
+    expect(find.text('¿Seguro?'), findsOneWidget);
+    expect(Get.isDialogOpen, isTrue);
+    Get.back();
+    await tester.pumpAndSettle();
+    expect(Get.currentRoute, Routes.POINT_OF_SALE);
+
+    // También mientras se escribe en el buscador de Venta.
+    await tester.tap(find.byType(TextField).first);
+    await tester.pumpAndSettle();
+    await atajo(LogicalKeyboardKey.digit5);
+    expect(Get.currentRoute, Routes.INVENTARIO);
+    expect(tester.takeException(), isNull);
   }, variant: _escritorio);
 
   testWidgets('venta conserva búsqueda, foco y cantidades al redimensionar',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/abono_prices_model.dart';
@@ -8,6 +9,7 @@ import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:gymads/app/modules/abonar/controllers/abonar_controller.dart';
 import 'package:gymads/app/modules/abonar/views/abonar_view.dart';
@@ -260,6 +262,49 @@ void main() {
         greaterThan(tester.getCenter(find.text('Efectivo')).dx));
     expect(tester.takeException(), isNull);
   }, variant: escritorio);
+
+  testWidgets('la fecha de una membresía larga se lee completa',
+      (tester) async {
+    Get.put(AbonarController(
+      userRepository: _Usuarios([
+        ..._tresClientes(),
+        UserModel(
+          id: 'leo',
+          name: 'Leo',
+          phone: '+520000000000',
+          joinDate: DateTime(2026),
+          expirationDate: DateTime(2126, 9, 11),
+          userNumber: '1',
+        ),
+      ]),
+      ingresoService: _Ingresos(),
+      pricesRepository: _Precios(),
+    ));
+    final fecha = find.text('Pagado hasta el 11 de septiembre de 2126');
+    for (final escala in [1.0, 2.0]) {
+      for (final tamano in PlataformaApp.escritorio
+          ? [const Size(960, 600), const Size(1280, 800)]
+          : [const Size(1180, 820), const Size(820, 1180)]) {
+        await mostrar(tester, const AbonarView(), tamano, escala: escala);
+        await tester.scrollUntilVisible(fecha, 200,
+            scrollable: find.byType(Scrollable).last);
+        await tester.pumpAndSettle();
+        expect(tester.renderObject<RenderParagraph>(fecha).didExceedMaxLines,
+            isFalse,
+            reason: '$tamano, texto $escala');
+        expect(find.text('Le quedan más de 99 años'), findsOneWidget);
+        expect(tester.takeException(), isNull,
+            reason: '$tamano, texto $escala');
+      }
+    }
+  },
+      variant: const TargetPlatformVariant({
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+        TargetPlatform.iOS,
+        TargetPlatform.android,
+      }));
 
   testWidgets('abonar en escritorio cabe con texto grande', (tester) async {
     Get.put(AbonarController(

@@ -70,39 +70,96 @@ class _PanelDelDiaState extends State<_PanelDelDia> {
     final listas = _listasDelDia(context, home, resumen);
     return LayoutBuilder(builder: (context, limites) {
       final ancha = limites.maxWidth >= 900;
+      final porFilaAccesos = ancha ? 4 : 2;
+      final porFilaListas = ancha ? 3 : 2;
+      final arriba = <Widget>[
+        widget.pasoCabecera(_cabecera(context)),
+        if (widget.datos.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 120 * escala,
+            child: _filaDeTarjetas([
+              for (final d in widget.datos)
+                _TarjetaDato(dato: d, cargando: resumen.cargando),
+            ]),
+          ),
+        ],
+        if (accesos.isNotEmpty) ...[
+          const SizedBox(height: 32),
+          const _TituloDelPanel('Accesos rápidos'),
+          const SizedBox(height: 12),
+          _rejillaDeTarjetas(accesos,
+              porFila: porFilaAccesos, alto: 96 * escala),
+        ],
+        if (listas.isNotEmpty) ...[
+          const SizedBox(height: 32),
+          const _TituloDelPanel('Actividad'),
+          const SizedBox(height: 12),
+        ],
+      ];
+
+      // Si cabe, sin desplazamiento: la actividad llena lo que queda de la
+      // ventana y cada lista muestra las filas que alcanzan (el resto, en
+      // "Ver todo"). Se desplazaba unos píxeles sin que hubiera nada más.
+      final filasDeListas = (listas.length / porFilaListas).ceil();
+      final filasDeAccesos = (accesos.length / porFilaAccesos).ceil();
+      // Alto de lo de arriba, con holgura: si se queda corto, solo se achica
+      // la actividad.
+      final altoArriba = 28 +
+          32 +
+          math.max(64 * escala, 48) +
+          (widget.datos.isEmpty ? 0 : 24 + 120 * escala) +
+          (accesos.isEmpty
+              ? 0
+              : 32 +
+                  26 * escala +
+                  12 +
+                  filasDeAccesos * 96 * escala +
+                  (filasDeAccesos - 1) * 16) +
+          (listas.isEmpty ? 0 : 32 + 26 * escala + 12);
+      // Al menos el título de cada lista y dos filas.
+      final minimoActividad =
+          filasDeListas * (68 + 2 * 58) * escala + (filasDeListas - 1) * 16;
+      if (listas.isNotEmpty &&
+          altoArriba + minimoActividad <= limites.maxHeight) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ...arriba,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < listas.length; i += porFilaListas) ...[
+                      if (i > 0) const SizedBox(height: 16),
+                      Expanded(
+                        child: _filaDeTarjetas([
+                          for (var j = i; j < i + porFilaListas; j++)
+                            j < listas.length ? listas[j] : const SizedBox(),
+                        ]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }
       return SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            widget.pasoCabecera(_cabecera(context)),
-            if (widget.datos.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 120 * escala,
-                child: _filaDeTarjetas([
-                  for (final d in widget.datos)
-                    _TarjetaDato(dato: d, cargando: resumen.cargando),
-                ]),
-              ),
-            ],
-            if (accesos.isNotEmpty) ...[
-              const SizedBox(height: 32),
-              const _TituloDelPanel('Accesos rápidos'),
-              const SizedBox(height: 12),
-              _rejillaDeTarjetas(accesos,
-                  porFila: ancha ? 4 : 2, alto: 96 * escala),
-            ],
-            if (listas.isNotEmpty) ...[
-              const SizedBox(height: 32),
-              const _TituloDelPanel('Actividad'),
-              const SizedBox(height: 12),
+            ...arriba,
+            if (listas.isNotEmpty)
               _rejillaDeTarjetas(
                 listas,
-                porFila: ancha ? 3 : 2,
+                porFila: porFilaListas,
                 alto: (68 + _filasPorLista * 58) * escala,
               ),
-            ],
           ],
         ),
       );
@@ -539,10 +596,28 @@ class _ListaDelDia extends StatelessWidget {
                   ),
                 );
               }
-              return ListView(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                children: lista,
-              );
+              // Solo las filas que caben enteras, sin desplazamiento dentro
+              // de la tarjeta: las demás están en "Ver todo".
+              return LayoutBuilder(builder: (context, limites) {
+                final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
+                final caben = ((limites.maxHeight - 8) / (58 * escala))
+                    .floor()
+                    .clamp(0, lista.length);
+                return ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.topCenter,
+                    maxHeight: double.infinity,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: lista.take(caben).toList(),
+                      ),
+                    ),
+                  ),
+                );
+              });
             }),
           ),
         ],

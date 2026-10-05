@@ -338,29 +338,48 @@ class AbonarView extends GetView<AbonarController> {
                   );
                 }
                 final ahora = DateTime.now();
-                return Refrescable(
-                  onRefresh: controller.refrescar,
-                  child: GridView.builder(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                      // En escritorio, un poco más anchas: con 4 por fila la
-                      // fecha larga ("3 de enero de 2027") se cortaba.
-                      maxCrossAxisExtent: PlataformaApp.escritorio ? 380 : 340,
-                      mainAxisExtent: 172 * escala,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
+                final clientes = controller.searchResults.toList();
+                // Como una rejilla, pero cada fila mide lo que necesitan sus
+                // tarjetas: una fecha larga ocupa dos renglones en vez de
+                // cortarse. En escritorio, tarjetas un poco más anchas.
+                // Con letra grande, menos tarjetas por fila.
+                final maximo = (PlataformaApp.escritorio ? 380.0 : 340.0) *
+                    escala.clamp(1.0, 1.5);
+                return LayoutBuilder(builder: (context, limites) {
+                  final columnas =
+                      (limites.maxWidth / (maximo + 16)).ceil().clamp(1, 12);
+                  return Refrescable(
+                    onRefresh: controller.refrescar,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      itemCount: (clientes.length / columnas).ceil(),
+                      separatorBuilder: (_, __) => const SizedBox(height: 16),
+                      itemBuilder: (context, fila) => IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (var i = 0; i < columnas; i++) ...[
+                              if (i > 0) const SizedBox(width: 16),
+                              Expanded(
+                                child: fila * columnas + i < clientes.length
+                                    ? _TarjetaCliente(
+                                        cliente: clientes[fila * columnas + i],
+                                        situacion: situacionDe(
+                                            clientes[fila * columnas + i],
+                                            ahora,
+                                            resumida: true),
+                                        onTap: () => controller.selectClient(
+                                            clientes[fila * columnas + i]),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
-                    itemCount: controller.searchResults.length,
-                    itemBuilder: (context, index) {
-                      final client = controller.searchResults[index];
-                      return _TarjetaCliente(
-                        cliente: client,
-                        situacion: situacionDe(client, ahora),
-                        onTap: () => controller.selectClient(client),
-                      );
-                    },
-                  ),
-                );
+                  );
+                });
               }),
             ),
           ),
@@ -582,7 +601,8 @@ class AbonarView extends GetView<AbonarController> {
   /// Quién paga: foto grande, nombre y cómo está su membresía en palabras.
   Widget _cabeceraCliente(BuildContext context, UserModel client) {
     final c = context.colores;
-    final situacion = situacionDe(client, DateTime.now());
+    final situacion = situacionDe(client, DateTime.now(),
+        resumida: PlataformaApp.pantallaGrande);
     final color = situacion.vencido ? AppColors.error : c.textSecondary;
     return Row(
       children: [
@@ -1178,8 +1198,11 @@ class _TarjetaCliente extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              // El estado abajo, a la misma altura en toda la fila.
+              const SizedBox(height: 10),
               const Spacer(),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
                     vencido
@@ -1192,10 +1215,9 @@ class _TarjetaCliente extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Expanded(
+                    // Sin límite de renglones: la fila crece con la tarjeta.
                     child: Text(
                       situacion.texto,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: vencido ? AppColors.error : c.textPrimary,
                         fontSize: 14,
@@ -1210,8 +1232,6 @@ class _TarjetaCliente extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 2, left: 24),
                   child: Text(
                     situacion.detalle!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: c.textSecondary, fontSize: 14),
                   ),
                 ),

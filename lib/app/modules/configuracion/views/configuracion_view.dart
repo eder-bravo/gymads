@@ -119,9 +119,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
       TourStep(
         tourKey: controller.keyApariencia,
         title: 'Apariencia',
-        description: PlataformaApp.escritorio
-            ? 'Clara, oscura o como tu sistema.'
-            : 'Clara, oscura o como tu teléfono.',
+        description: 'Clara, oscura o como ${PlataformaApp.tuAparato}.',
         borderRadius: 12,
         isLastStep: controller.esUltimoPasoDelTour(controller.keyApariencia),
         child: _buildOptionTile(
@@ -429,12 +427,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
 class _HojaApariencia extends StatelessWidget {
   const _HojaApariencia();
 
-  static String nombre(ThemeMode modo) => switch (modo) {
-        ThemeMode.system =>
-          PlataformaApp.escritorio ? 'Según el sistema' : 'Según el teléfono',
-        ThemeMode.light => 'Claro',
-        ThemeMode.dark => 'Oscuro',
-      };
+  static String nombre(ThemeMode modo) => nombreDeApariencia(modo);
 
   static IconData _icono(ThemeMode modo) => switch (modo) {
         ThemeMode.system => Icons.brightness_auto_outlined,
@@ -501,3 +494,11 @@ class _HojaApariencia extends StatelessWidget {
     );
   }
 }
+
+/// Cómo se llama cada apariencia. "Según el teléfono" / "Según la tableta" /
+/// "Según la computadora": sigue el modo del aparato.
+String nombreDeApariencia(ThemeMode modo) => switch (modo) {
+      ThemeMode.system => 'Según ${PlataformaApp.elAparato}',
+      ThemeMode.light => 'Claro',
+      ThemeMode.dark => 'Oscuro',
+    };

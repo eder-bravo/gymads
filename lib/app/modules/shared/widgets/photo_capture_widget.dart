@@ -70,7 +70,7 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
             style: TextStyle(color: c.textPrimary)),
         content: Text(
           'Para tomar la foto del cliente, permite el acceso a la cámara en '
-          'los ajustes del teléfono.',
+          'los ajustes ${PlataformaApp.delAparato}.',
           style: TextStyle(color: c.textSecondary),
         ),
         actions: [

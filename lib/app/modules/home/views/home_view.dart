@@ -134,8 +134,7 @@ class HomeView extends GetView<HomeController> {
                             child: _buildHeader(context, isTablet)),
                         // El alto que queda bajo la cabecera, fijo aunque se
                         // desplace o rebote. Con poca altura o texto grande, la
-                        // rejilla conserva un mínimo y se desplaza; en vertical no
-                        // pasa de un máximo, para no hacer tarjetas enormes.
+                        // rejilla conserva un mínimo y se desplaza.
                         SliverLayoutBuilder(
                           builder: (context, limites) {
                             final escala =
@@ -143,7 +142,7 @@ class HomeView extends GetView<HomeController> {
                             final alto = (limites.viewportMainAxisExtent -
                                     limites.precedingScrollExtent -
                                     48)
-                                .clamp(440.0 * escala, 620.0 * escala);
+                                .clamp(440.0 * escala, double.infinity);
                             return SliverToBoxAdapter(
                               child: Padding(
                                 padding:
@@ -163,9 +162,6 @@ class HomeView extends GetView<HomeController> {
                             );
                           },
                         ),
-                        // Debajo, lo de hoy en listas: en vertical llena lo que
-                        // antes quedaba vacío.
-                        SliverToBoxAdapter(child: _actividadTableta(context)),
                       ],
                     )
                   : SingleChildScrollView(
@@ -312,13 +308,22 @@ class HomeView extends GetView<HomeController> {
               color: AppColors.brand, size: 22),
         ),
         const SizedBox(width: 14),
-        Text(
-          'Inicio',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: c.contraste,
-            letterSpacing: 0.5,
+        // Con texto muy grande en una tableta de pie, el título se corta en
+        // vez de salirse de la cabecera. Un ancho máximo y no Flexible: así la
+        // fecha y Configuración siguen pegadas a la esquina derecha.
+        ConstrainedBox(
+          constraints:
+              BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.3),
+          child: Text(
+            'Inicio',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: c.contraste,
+              letterSpacing: 0.5,
+            ),
           ),
         ),
         // La fecha ocupa el espacio libre, pegada a Configuración: las dos
@@ -336,26 +341,35 @@ class HomeView extends GetView<HomeController> {
           ),
         ),
         const SizedBox(width: 16),
-        TourStep(
-          tourKey: controller.keyConfiguracion,
-          title: 'Configuración',
-          description: 'Tu cuenta, precios, categorías, lector y permisos.',
-          borderRadius: 14,
-          isLastStep: true,
-          // Con su nombre: un engrane solo no se entiende a la primera.
-          child: TextButton.icon(
-            onPressed: controller.goToConfiguracion,
-            icon: const Icon(Icons.settings_outlined, size: 22),
-            label: const Text('Configuración'),
-            style: TextButton.styleFrom(
-              foregroundColor: c.contraste,
-              backgroundColor: c.contraste.withOpacity(0.08),
-              minimumSize: const Size(0, 48),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              textStyle:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+        // Hasta la mitad del ancho, al borde derecho; con texto muy grande se
+        // encoge en vez de salirse de la cabecera.
+        ConstrainedBox(
+          constraints:
+              BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.4),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: TourStep(
+              tourKey: controller.keyConfiguracion,
+              title: 'Configuración',
+              description: 'Tu cuenta, precios, categorías, lector y permisos.',
+              borderRadius: 14,
+              isLastStep: true,
+              // Con su nombre: un engrane solo no se entiende a la primera.
+              child: TextButton.icon(
+                onPressed: controller.goToConfiguracion,
+                icon: const Icon(Icons.settings_outlined, size: 22),
+                label: const Text('Configuración'),
+                style: TextButton.styleFrom(
+                  foregroundColor: c.contraste,
+                  backgroundColor: c.contraste.withOpacity(0.08),
+                  minimumSize: const Size(0, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  textStyle: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
               ),
             ),
           ),
@@ -447,33 +461,6 @@ class HomeView extends GetView<HomeController> {
       cargando: resumen.cargando,
       recargar: () => _recargar(resumen),
       datos: _datosDeHoy(context, resumen, conPasos: true),
-    );
-  }
-
-  /// Las listas del día bajo la rejilla de tableta.
-  Widget _actividadTableta(BuildContext context) {
-    final listas = _listasDelDia(context, controller, _resumen());
-    if (listas.isEmpty) return const SizedBox.shrink();
-    final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
-    return ContenidoEscritorio(
-      anchoMaximo: _anchoContenido,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-        child: LayoutBuilder(
-          builder: (context, limites) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _TituloDelPanel('Actividad'),
-              const SizedBox(height: 12),
-              _rejillaDeTarjetas(
-                listas,
-                porFila: limites.maxWidth >= 1000 ? 3 : 2,
-                alto: (68 + _filasPorLista * 58) * escala,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

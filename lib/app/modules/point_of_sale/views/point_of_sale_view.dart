@@ -52,8 +52,11 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       body: SafeArea(
         child: LayoutBuilder(builder: (context, constraints) {
           final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
+          // En tableta acostada también va el carrito al lado, como en
+          // escritorio: ahí la pantalla es algo más angosta.
           final lateral = PlataformaApp.pantallaGrande &&
-              constraints.maxWidth >= 1100 * escala &&
+              constraints.maxWidth >=
+                  (PlataformaApp.tableta ? 880 : 1100) * escala &&
               constraints.maxHeight >= 420;
           return Flex(
             direction: lateral ? Axis.horizontal : Axis.vertical,
@@ -173,7 +176,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
 
               // Panel inferior fijo del carrito
               SizedBox(
-                width: lateral ? 380 : null,
+                width: lateral ? (PlataformaApp.tableta ? 340 : 380) : null,
                 child: TourStep(
                   tourKey: controller.keyCarrito,
                   title: 'Carrito y cobro',

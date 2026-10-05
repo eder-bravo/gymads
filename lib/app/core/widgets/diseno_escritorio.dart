@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -38,8 +39,85 @@ class VentanaEscritorio extends StatelessWidget {
     return escalonada.clamp(1.0, escalaMaxima);
   }
 
+  // ─── Tableta ───
+  //
+  // En una tableta las pantallas de los módulos se veían chicas: los mismos
+  // tamaños del teléfono en una pantalla mucho mayor. Crecen según el lado
+  // corto (igual acostada o de pie): un iPad de 11" al 125 %, un iPad mini al
+  // 115 %, uno de 13" al 150 %. Inicio también, para que vaya en proporción
+  // con las demás pantallas.
+
+  static const ladoCortoBaseTableta = 640.0;
+  static const escalaMaximaTableta = 1.5;
+
+  /// Tamaño mínimo de la ventana en iPad (`SceneDelegate` en
+  /// `ios/Runner/AppDelegate.swift`): iPadOS 26+ abre las apps en ventanas
+  /// que se pueden achicar, y como en escritorio no bajan de aquí.
+  static const minimoTableta = Size(720, 720);
+
+  /// Alto de la franja que ocupan los botones de la ventana en iPadOS 26+
+  /// (cerrar, minimizar, acomodar), arriba a la izquierda y encima del
+  /// contenido. Lo mide iOS y lo manda por `gymone/ventana`; 0 en pantalla
+  /// completa, en Android y en las pruebas.
+  static final margenDeControles = ValueNotifier<double>(0);
+
+  static void escucharControlesDeVentana() {
+    const MethodChannel('gymone/ventana').setMethodCallHandler((llamada) async {
+      if (llamada.method == 'controles' && llamada.arguments is num) {
+        margenDeControles.value = (llamada.arguments as num).toDouble();
+      }
+    });
+  }
+
+  static double escalaDeTableta(Size pantalla) {
+    final proporcion = pantalla.shortestSide / ladoCortoBaseTableta;
+    final escalonada = (proporcion * 20 + 1e-9).floorToDouble() / 20;
+    return escalonada.clamp(1.0, escalaMaximaTableta);
+  }
+
+  /// El MediaQuery de una pantalla dibujada a [escala]: medidas lógicas y
+  /// las imágenes con la resolución de lo que de verdad ocupan.
+  static MediaQueryData _escalado(MediaQueryData datos, double escala) =>
+      datos.copyWith(
+        size: datos.size / escala,
+        devicePixelRatio: datos.devicePixelRatio * escala,
+        padding: datos.padding / escala,
+        viewPadding: datos.viewPadding / escala,
+        viewInsets: datos.viewInsets / escala,
+        systemGestureInsets: datos.systemGestureInsets / escala,
+      );
+
+  Widget _tableta(BuildContext context) => ValueListenableBuilder<double>(
+        valueListenable: margenDeControles,
+        builder: (context, controles, _) {
+          var datos = MediaQuery.of(context);
+          // La barra superior baja lo que ocupan los botones de la ventana:
+          // si no, tapan el título.
+          if (controles > 0) {
+            datos = datos.copyWith(
+              padding:
+                  datos.padding.copyWith(top: datos.padding.top + controles),
+              viewPadding: datos.viewPadding
+                  .copyWith(top: datos.viewPadding.top + controles),
+            );
+          }
+          final escala = escalaDeTableta(datos.size);
+          // La misma estructura con cualquier escala: al cambiar el tamaño
+          // de la ventana las pantallas no se vuelven a montar.
+          return FittedBox(
+            fit: BoxFit.fill,
+            alignment: Alignment.topLeft,
+            child: SizedBox.fromSize(
+              size: datos.size / escala,
+              child: MediaQuery(data: _escalado(datos, escala), child: child),
+            ),
+          );
+        },
+      );
+
   @override
   Widget build(BuildContext context) {
+    if (PlataformaApp.tableta) return _tableta(context);
     if (!PlataformaApp.escritorio) return child;
     return LayoutBuilder(builder: (context, limites) {
       final ancho = limites.maxWidth.clamp(minimo.width, double.infinity);
@@ -528,6 +606,131 @@ class VentanaFormulario extends StatelessWidget {
                   Navigator.of(context).maybePop(),
             },
             child: Focus(autofocus: true, child: _EnVentana(child: child)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Una fila de [children] que se desplaza de lado cuando no caben (los
+/// filtros de categoría).
+///
+/// En el teléfono es la lista de siempre, que se arrastra con el dedo. En
+/// pantalla grande se le añade lo que un mouse necesita para llegar a lo que
+/// no cabe: una barra visible que se arrastra, la rueda del mouse (que mueve
+/// la fila de lado) y arrastrar con el mouse. En tableta la barra muestra que
+/// hay más a los lados. La barra solo aparece si algo no cabe.
+class FilaDesplazable extends StatefulWidget {
+  const FilaDesplazable({
+    super.key,
+    required this.children,
+    this.alto = 50,
+  });
+
+  final List<Widget> children;
+
+  /// Alto de la fila, sin contar la barra.
+  final double alto;
+
+  @override
+  State<FilaDesplazable> createState() => _FilaDesplazableState();
+}
+
+class _FilaDesplazableState extends State<FilaDesplazable> {
+  final _controlador = ScrollController();
+
+  /// Espacio que ocupa la barra bajo la fila, solo mientras hay algo que
+  /// desplazar.
+  static const _alturaBarra = 12.0;
+  bool _desborda = false;
+
+  @override
+  void dispose() {
+    _controlador.dispose();
+    super.dispose();
+  }
+
+  /// La rueda vertical mueve la fila de lado; con trackpad o rueda lateral ya
+  /// se mueve sola. Solo si la fila se desplaza: si no, la rueda sigue para la
+  /// pantalla de abajo.
+  void _alRueda(PointerSignalEvent evento) {
+    if (evento is! PointerScrollEvent || !_controlador.hasClients) return;
+    final posicion = _controlador.position;
+    if (posicion.maxScrollExtent <= 0) return;
+    final delta = evento.scrollDelta;
+    if (delta.dy == 0 || delta.dx != 0) return;
+    GestureBinding.instance.pointerSignalResolver.register(evento, (_) {
+      _controlador.jumpTo((posicion.pixels + delta.dy)
+          .clamp(posicion.minScrollExtent, posicion.maxScrollExtent));
+    });
+  }
+
+  bool _alMedir(ScrollMetricsNotification n) {
+    final desborda = n.metrics.maxScrollExtent > 0;
+    if (desborda != _desborda) {
+      // Se avisa al terminar el cuadro: esto llega mientras se mide.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && desborda != _desborda) {
+          setState(() => _desborda = desborda);
+        }
+      });
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!PlataformaApp.pantallaGrande) {
+      return SizedBox(
+        height: widget.alto,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: widget.children,
+        ),
+      );
+    }
+    final barra = _desborda ? _alturaBarra : 0.0;
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: _alMedir,
+      child: Listener(
+        onPointerSignal: _alRueda,
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(
+            // La barra es la de abajo, siempre visible: la de siempre solo
+            // aparece al desplazar.
+            scrollbars: false,
+            dragDevices: {
+              ...ScrollConfiguration.of(context).dragDevices,
+              PointerDeviceKind.mouse,
+            },
+          ),
+          // A todo lo ancho: sin esto la fila toma el ancho de sus filtros y,
+          // si caben, se centra en vez de empezar a la izquierda.
+          child: SizedBox(
+            width: double.infinity,
+            height: widget.alto + barra,
+            child: Scrollbar(
+              controller: _controlador,
+              thumbVisibility: _desborda,
+              trackVisibility: _desborda,
+              interactive: true,
+              thickness: 8,
+              radius: const Radius.circular(4),
+              // No un ListView: este mide sus elementos conforme los dibuja y
+              // calcula el largo total por estimación, y la barra no llegaría
+              // al último. Aquí son pocos y se miden todos.
+              child: SingleChildScrollView(
+                controller: _controlador,
+                scrollDirection: Axis.horizontal,
+                // La barra va debajo de las fichas, no encima.
+                padding: EdgeInsets.only(bottom: barra),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: widget.children,
+                ),
+              ),
+            ),
           ),
         ),
       ),

@@ -56,8 +56,14 @@ class ResumenDelDia extends GetxController with RecargaEnVivoMixin {
   /// Por fecha de vencimiento: primero quien vence antes.
   final porVencer = <UserModel>[].obs;
 
-  /// Precio de una visita de un día, para "Cobrar visita".
-  final precioDia = RxnDouble();
+  /// Precio de una visita de un día, para "Cobrar visita". Empieza con el
+  /// último conocido: el acceso rápido no aparece sin precio y luego con él.
+  final precioDia = RxnDouble(_precioConocido());
+
+  static double? _precioConocido() {
+    final precio = AbonoPricesRepository.enCache?.priceDay;
+    return precio != null && precio > 0 ? precio : null;
+  }
 
   final cargando = false.obs;
 

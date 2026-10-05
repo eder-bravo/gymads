@@ -6,6 +6,10 @@ import UIKit
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let permisoRedLocal = PermisoRedLocal()
 
+  /// Para avisarle a Flutter cuánto espacio ocupan los botones de la ventana
+  /// en iPad (`VentanaEscritorio.margenDeControles` en Dart).
+  static var canalDeVentana: FlutterMethodChannel?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -15,6 +19,11 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "VentanaDeTableta") {
+      AppDelegate.canalDeVentana = FlutterMethodChannel(
+        name: "gymone/ventana", binaryMessenger: registrar.messenger())
+    }
 
     // Pantalla "Permisos de la app" (lib/app/data/services/permisos_app.dart).
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "PermisoRedLocal") {
@@ -30,6 +39,67 @@ import UIKit
         }
       }
     }
+  }
+}
+
+/// La escena de la app. Extiende la de Flutter (`Info.plist`,
+/// UISceneDelegateClassName) para las ventanas de iPadOS 26+, que se pueden
+/// achicar y mover como en la Mac.
+class SceneDelegate: FlutterSceneDelegate {
+  /// Ventana mínima en iPad, igual que en escritorio
+  /// (`VentanaEscritorio.minimoTableta` en Dart): por debajo la app no
+  /// cabría con su diseño de tableta.
+  static let tamanoMinimo = CGSize(width: 720, height: 720)
+
+  override func scene(
+    _ scene: UIScene, willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    let esIPad = UIDevice.current.userInterfaceIdiom == .pad
+    // Antes de que se cree la ventana: así lo pide Apple.
+    if esIPad, let escena = scene as? UIWindowScene {
+      escena.sizeRestrictions?.minimumSize = SceneDelegate.tamanoMinimo
+    }
+    super.scene(scene, willConnectTo: session, options: connectionOptions)
+    // Los botones de la ventana (cerrar, minimizar, acomodar) van arriba a la
+    // izquierda, encima del contenido. Una vista invisible mide cuánto ocupan.
+    if esIPad, let vista = window?.rootViewController?.view {
+      let observador = ObservadorDeControles(frame: vista.bounds)
+      observador.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+      observador.isUserInteractionEnabled = false
+      observador.isHidden = true
+      vista.addSubview(observador)
+    }
+  }
+}
+
+/// Mide la franja de arriba que ocupan los botones de la ventana en iPadOS
+/// 26+ y se la manda a Flutter, que baja la barra superior para no quedar
+/// tapada. Pantalla completa o versiones anteriores: 0.
+final class ObservadorDeControles: UIView {
+  private var ultimo: CGFloat = -1
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    informar()
+  }
+
+  override func safeAreaInsetsDidChange() {
+    super.safeAreaInsetsDidChange()
+    setNeedsLayout()
+  }
+
+  private func informar() {
+    var franja: CGFloat = 0
+    if #available(iOS 26.0, *) {
+      let conControles = directionalEdgeInsets(
+        for: .safeArea(cornerAdaptation: .vertical)
+      ).top
+      franja = max(0, conControles - safeAreaInsets.top)
+    }
+    guard franja != ultimo else { return }
+    ultimo = franja
+    AppDelegate.canalDeVentana?.invokeMethod("controles", arguments: Double(franja))
   }
 }
 

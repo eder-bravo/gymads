@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
@@ -37,6 +37,8 @@ String _initialRoute = Routes.LOGIN;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // En iPad (iPadOS 26+), cuánto ocupan los botones de la ventana.
+  VentanaEscritorio.escucharControlesDeVentana();
   // Carga las variables de entorno
   await dotenv.load(fileName: ".env");
 
@@ -194,9 +196,8 @@ class _MyAppState extends State<MyApp> {
       navigatorObservers: [
         if (PlataformaApp.escritorio) MenuLateral.observador,
       ],
-      transitionDuration: PlataformaApp.escritorio
-          ? const Duration(milliseconds: 160)
-          : null,
+      transitionDuration:
+          PlataformaApp.escritorio ? const Duration(milliseconds: 160) : null,
       locale: const Locale('es'),
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [

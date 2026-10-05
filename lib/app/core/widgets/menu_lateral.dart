@@ -174,8 +174,17 @@ class MenuLateral extends StatelessWidget {
   }
 
   /// Va a [ruta]: regresa a Inicio y abre la sección encima.
+  ///
+  /// Si la sección ya está abierta y se está en una de sus subpantallas
+  /// (Cuenta dentro de Configuración), solo se regresa a ella. Cerrar todo y
+  /// abrir otra igual dejaba a las dos a la vez durante la transición, y la
+  /// que salía se llevaba el controlador que compartían con la nueva.
   static void ir(String ruta) {
     if (Get.currentRoute == ruta) return;
+    if (ruta != Routes.HOME && _ObservadorDeSecciones.estaAbierta(ruta)) {
+      Get.until((r) => r.settings.name == ruta);
+      return;
+    }
     Get.until((r) => r.settings.name == Routes.HOME || r.isFirst);
     if (ruta != Routes.HOME) {
       Get.toNamed(ruta);
@@ -386,6 +395,11 @@ class _ItemDelMenu extends StatelessWidget {
 
 class _ObservadorDeSecciones extends NavigatorObserver {
   static final pila = <Route<dynamic>>[];
+
+  /// Si hay una pantalla con ese nombre abierta en el navegador. Solo cuentan
+  /// las activas: las de pruebas o navegadores ya desmontados no.
+  static bool estaAbierta(String ruta) =>
+      pila.any((r) => r.isActive && r.settings.name == ruta);
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>

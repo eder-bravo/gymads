@@ -260,9 +260,10 @@ FalloBusquedaBle explicarFalloBusquedaBle(Object error) {
     descripcion = '';
   }
   if (descripcion.contains('location services')) {
-    return const FalloBusquedaBle(
-      'Activa «Ubicación» en los ajustes rápidos del teléfono y vuelve a '
-      'intentar. Este teléfono la necesita para buscar el lector por Bluetooth.',
+    return FalloBusquedaBle(
+      'Activa «Ubicación» en los ajustes rápidos ${PlataformaApp.delAparato} y '
+      'vuelve a intentar. ${_Frase.mayuscula(PlataformaApp.esteAparato)} la '
+      'necesita para buscar el lector por Bluetooth.',
       TipoFalloBusquedaBle.ubicacion,
     );
   }
@@ -290,17 +291,18 @@ FalloBusquedaBle explicarFalloBusquedaBle(Object error) {
     );
   }
   if (codigo == 6) {
-    return const FalloBusquedaBle(
-      'El teléfono necesita una pausa entre búsquedas. Espera 30 segundos '
-      'y pulsa «Intentar de nuevo».',
+    return FalloBusquedaBle(
+      '${_Frase.mayuscula(PlataformaApp.elAparato)} necesita una pausa entre '
+      'búsquedas. Espera 30 segundos y pulsa «Intentar de nuevo».',
       TipoFalloBusquedaBle.demasiadosIntentos,
       codigo: 6,
     );
   }
   if (codigo == 4) {
-    return const FalloBusquedaBle(
-      'El teléfono no pudo iniciar la búsqueda Bluetooth. Apaga Bluetooth, '
-      'espera 5 segundos y vuelve a encenderlo antes de intentar de nuevo.',
+    return FalloBusquedaBle(
+      '${_Frase.mayuscula(PlataformaApp.elAparato)} no pudo iniciar la '
+      'búsqueda Bluetooth. Apaga Bluetooth, espera 5 segundos y vuelve a '
+      'encenderlo antes de intentar de nuevo.',
       TipoFalloBusquedaBle.sinCompatibilidad,
       codigo: 4,
     );
@@ -450,7 +452,7 @@ class LectorBleService {
               ? 'La app no tiene permiso para usar Bluetooth. Actívalo en '
                   '$_ajustesBluetooth.'
               : 'La app no tiene permiso para usar Bluetooth. Actívalo en los '
-                  'ajustes del teléfono.',
+                  'ajustes ${PlataformaApp.delAparato}.',
           TipoFalloBusquedaBle.permisoBluetooth);
     }
     if (estado != BluetoothAdapterState.on) {
@@ -511,9 +513,10 @@ class LectorBleService {
       // pulsar varias veces ni al hacer el único reintento automático.
       if (Platform.isAndroid) {
         if (!_limiteAndroid.reservarInicio()) {
-          throw const FalloBusquedaBle(
-              'El teléfono necesita una pausa entre búsquedas. Espera 30 '
-              'segundos y pulsa «Intentar de nuevo».',
+          throw FalloBusquedaBle(
+              '${_Frase.mayuscula(PlataformaApp.elAparato)} necesita una pausa '
+              'entre búsquedas. Espera 30 segundos y pulsa «Intentar de '
+              'nuevo».',
               TipoFalloBusquedaBle.demasiadosIntentos);
         }
       }
@@ -1091,3 +1094,10 @@ class LectorBleService {
 }
 
 class _Desconectado implements Exception {}
+
+/// Pasa a mayúscula la primera letra de un texto que empieza una oración
+/// ("el teléfono" → "El teléfono").
+abstract final class _Frase {
+  static String mayuscula(String texto) =>
+      texto[0].toUpperCase() + texto.substring(1);
+}

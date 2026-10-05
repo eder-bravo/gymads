@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:get/get.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:gymads/app/core/permissions/permissions.dart';
@@ -77,7 +78,71 @@ void main() {
   tearDown(() {
     tour.unregister();
     Get.reset();
+    VentanaEscritorio.margenDeControles.value = 0;
   });
+
+  // ─── Ventanas (iPadOS 26+ y tabletas Android) ───
+
+  test('la escala de tableta no baja de 100 %', () {
+    double e(double a, double b) =>
+        VentanaEscritorio.escalaDeTableta(Size(a, b));
+    // El mínimo de la ventana en iPad.
+    expect(
+        e(VentanaEscritorio.minimoTableta.width,
+            VentanaEscritorio.minimoTableta.height),
+        1.1);
+    expect(e(500, 700), 1.0);
+  });
+
+  testWidgets('los botones de la ventana no tapan la barra superior',
+      (tester) async {
+    Get.put<HomeController>(_Inicio());
+    const modulo = ScaffoldAdaptable(
+      appBar: GymAppBar(title: 'Módulo'),
+      body: SizedBox.expand(),
+    );
+    await _mostrar(tester, modulo);
+    final sinControles = tester.getTopLeft(find.text('Módulo')).dy;
+    // iPadOS 26+ en ventana: 32 puntos de botones arriba a la izquierda.
+    VentanaEscritorio.margenDeControles.value = 32;
+    await tester.pumpAndSettle();
+    // La barra baja exactamente lo que ocupan los botones en la pantalla,
+    // con cualquier escala.
+    expect(tester.getTopLeft(find.text('Módulo')).dy - sinControles,
+        closeTo(32, 0.5));
+    // Inicio también.
+    await _mostrar(tester, const HomeView());
+    final inicio = tester.getTopLeft(find.text('Inicio')).dy;
+    VentanaEscritorio.margenDeControles.value = 0;
+    await tester.pumpAndSettle();
+    expect(
+        inicio - tester.getTopLeft(find.text('Inicio')).dy, closeTo(32, 0.5));
+    expect(tester.takeException(), isNull);
+  }, variant: _tabletas);
+
+  testWidgets('cambiar el tamaño de la ventana no vuelve a montar la pantalla',
+      (tester) async {
+    final campo = TextEditingController();
+    addTearDown(campo.dispose);
+    await _mostrar(
+        tester, Scaffold(body: Center(child: TextField(controller: campo))));
+    await tester.enterText(find.byType(TextField), 'Juan');
+    final estado = tester.state(find.byType(TextField));
+    // De 125 % a 110 % (el mínimo), con y sin los botones de la ventana.
+    for (final tamano in [
+      const Size(900, 760),
+      VentanaEscritorio.minimoTableta,
+      const Size(1366, 1024),
+    ]) {
+      await _pantalla(tester, tamano);
+      VentanaEscritorio.margenDeControles.value =
+          VentanaEscritorio.margenDeControles.value == 0 ? 32 : 0;
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(TextField)), same(estado),
+          reason: '$tamano');
+      expect(campo.text, 'Juan');
+    }
+  }, variant: _tabletas);
 
   testWidgets('tableta: iPad o Android con 720 puntos o más de lado corto',
       (tester) async {
@@ -106,9 +171,8 @@ void main() {
       variant: const TargetPlatformVariant(
           {TargetPlatform.macOS, TargetPlatform.windows}));
 
-  testWidgets(
-      'inicio de tableta: números arriba, un dato en cada recuadro y '
-      'actividad debajo', (tester) async {
+  testWidgets('inicio de tableta: números arriba y un dato en cada recuadro',
+      (tester) async {
     final inicio = Get.put<HomeController>(_Inicio()) as _Inicio;
     await _mostrar(tester, const HomeView());
     // Sin barra lateral: en tableta se navega desde Inicio.
@@ -138,10 +202,8 @@ void main() {
     await tester.tap(find.text('Vender'));
     await tester.pump();
     expect(inicio.abiertos, ['Configuración', 'Vender']);
-    // Debajo, la actividad del día.
-    await tester.scrollUntilVisible(find.text('Últimas entradas'), 300,
-        scrollable: find.byType(Scrollable).first);
-    expect(find.text('Últimas entradas'), findsOneWidget);
+    // Sin la sección de actividad: los números de arriba ya lo dicen.
+    expect(find.text('Últimas entradas'), findsNothing);
     expect(tester.takeException(), isNull);
   }, variant: _tabletas);
 
@@ -165,6 +227,91 @@ void main() {
         expect(tester.takeException(), isNull,
             reason: 'Inicio $tamano, texto $escala, al desplazar');
       }
+    }
+  }, variant: _tabletas);
+
+  testWidgets(
+      'inicio de tableta de pie: Vender a lo ancho arriba y los demás en '
+      'una fila abajo', (tester) async {
+    Get.put<HomeController>(_Inicio());
+    for (final tamano in [const Size(1024, 1366), const Size(820, 1180)]) {
+      for (final escala in [1.0, 1.3, 2.0]) {
+        await _mostrar(tester, const HomeView(),
+            tamano: tamano, escala: escala);
+        expect(tester.takeException(), isNull,
+            reason: 'de pie $tamano, texto $escala');
+      }
+      await _mostrar(tester, const HomeView(), tamano: tamano);
+      Rect tarjeta(String texto) => tester.getRect(find
+          .ancestor(of: find.text(texto), matching: find.byType(InkWell))
+          .first);
+      final vender = tarjeta('Vender');
+      final abonar = tarjeta('Abonar');
+      final clientes = tarjeta('Clientes');
+      final inventario = tarjeta('Inventario');
+      // Vender ocupa todo el ancho de la fila de abajo.
+      expect(vender.left, closeTo(abonar.left, 1));
+      expect(vender.right, closeTo(inventario.right, 1));
+      // Los otros tres, debajo de Vender y en la misma fila.
+      for (final r in [abonar, clientes, inventario]) {
+        expect(r.top, greaterThan(vender.bottom));
+        expect(r.top, closeTo(abonar.top, 1));
+      }
+    }
+    // Acostada, Vender sigue a la izquierda de los demás.
+    await _mostrar(tester, const HomeView());
+    expect(
+        tester
+            .getRect(find
+                .ancestor(
+                    of: find.text('Abonar'), matching: find.byType(InkWell))
+                .first)
+            .left,
+        greaterThan(tester
+            .getRect(find
+                .ancestor(
+                    of: find.text('Vender'), matching: find.byType(InkWell))
+                .first)
+            .right));
+  }, variant: _tabletas);
+
+  test('escala de tableta según el lado corto, igual acostada o de pie', () {
+    double e(double a, double b) =>
+        VentanaEscritorio.escalaDeTableta(Size(a, b));
+    expect(e(1180, 820), 1.25); // iPad de 11"
+    expect(e(820, 1180), 1.25);
+    expect(e(1133, 744), 1.15); // iPad mini
+    expect(e(1366, 1024), 1.5); // iPad de 13" (Air M2 o Pro), con tope
+    expect(e(1024, 1366), 1.5);
+    expect(e(1500, 1100), 1.5); // más grande: no pasa del tope
+    expect(e(1280, 800), 1.25); // Android de 10"
+  });
+
+  testWidgets('todas las pantallas crecen igual, Inicio incluido',
+      (tester) async {
+    Get.put<HomeController>(_Inicio());
+    await _mostrar(
+        tester,
+        const ScaffoldAdaptable(
+            body: Text('Módulo', style: TextStyle(fontSize: 20))));
+    // Se ve al 125 %: lo que mide el texto, por 1.25 en la pantalla.
+    expect(tester.getRect(find.text('Módulo')).height,
+        closeTo(tester.getSize(find.text('Módulo')).height * 1.25, 0.5));
+    expect(MediaQuery.sizeOf(tester.element(find.text('Módulo'))),
+        const Size(944, 656));
+
+    await _mostrar(tester, const HomeView());
+    // Inicio, en proporción con las demás pantallas.
+    expect(MediaQuery.sizeOf(tester.element(find.text('Vender'))),
+        const Size(944, 656));
+    expect(tester.takeException(), isNull);
+  }, variant: _tabletas);
+
+  testWidgets('en teléfono y tableta chica no hay escala', (tester) async {
+    for (final tamano in [const Size(390, 844), const Size(600, 960)]) {
+      await _mostrar(tester, const Scaffold(body: Text('Módulo')),
+          tamano: tamano);
+      expect(MediaQuery.sizeOf(tester.element(find.text('Módulo'))), tamano);
     }
   }, variant: _tabletas);
 

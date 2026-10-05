@@ -11,6 +11,8 @@ abstract final class PlataformaApp {
 
   /// iPad o tableta Android de 720 puntos o más por su lado corto. Las
   /// tabletas chicas (7–8") y los teléfonos conservan el diseño del teléfono.
+  /// En iPad la ventana no baja de 720×720 (`SceneDelegate`), así que siempre
+  /// cumple.
   static bool get tableta {
     if (kIsWeb) return false;
     if (defaultTargetPlatform != TargetPlatform.android &&
@@ -39,6 +41,33 @@ abstract final class PlataformaApp {
   /// los dos casos, así que "el/este/del ___" no cambia.
   static String get equipo =>
       escritorio ? 'equipo' : (tableta ? 'dispositivo' : 'teléfono');
+
+  // ─── El aparato, en femenino cuando toca ───
+  //
+  // Los textos que nombran el aparato dicen "teléfono" en el celular,
+  // "tableta" en la tableta y "computadora" en escritorio. Se escriben con
+  // el artículo para que concuerde: "del teléfono" / "de la tableta".
+
+  /// "teléfono", "tableta" o "computadora".
+  static String get aparato =>
+      escritorio ? 'computadora' : (tableta ? 'tableta' : 'teléfono');
+
+  /// "el teléfono", "la tableta" o "la computadora".
+  static String get elAparato =>
+      escritorio ? 'la computadora' : (tableta ? 'la tableta' : 'el teléfono');
+
+  /// "del teléfono", "de la tableta" o "de la computadora".
+  static String get delAparato => escritorio
+      ? 'de la computadora'
+      : (tableta ? 'de la tableta' : 'del teléfono');
+
+  /// "este teléfono", "esta tableta" o "esta computadora".
+  static String get esteAparato => escritorio
+      ? 'esta computadora'
+      : (tableta ? 'esta tableta' : 'este teléfono');
+
+  /// "tu teléfono", "tu tableta" o "tu computadora".
+  static String get tuAparato => 'tu $aparato';
 
   /// "Toca" en pantallas táctiles, "Haz clic en" con mouse.
   static String get toca => escritorio ? 'Haz clic en' : 'Toca';

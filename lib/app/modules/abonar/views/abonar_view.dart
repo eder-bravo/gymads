@@ -24,8 +24,12 @@ class AbonarView extends GetView<AbonarController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
+    // En tableta acostada el cobro va en dos columnas: los pasos y, al lado,
+    // el resumen con el botón de cobrar.
+    final dosColumnas =
+        PlataformaApp.tableta && MediaQuery.sizeOf(context).width >= 820;
     return ScaffoldAdaptable(
-      anchoMaximo: 800,
+      anchoMaximo: PlataformaApp.tableta ? 1200 : 800,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Abonar',
@@ -54,6 +58,9 @@ class AbonarView extends GetView<AbonarController> {
             return _buildSearchState(context);
           }
 
+          if (PlataformaApp.tableta) {
+            return _formularioTableta(context, dosColumnas: dosColumnas);
+          }
           return _buildAbonarForm(context);
         }),
       ),
@@ -61,12 +68,14 @@ class AbonarView extends GetView<AbonarController> {
       bottomNavigationBar: Obx(() {
         final cobrando = !controller.isSuccess.value &&
             controller.selectedClient.value != null;
-        return cobrando ? _botonCobrar(context) : const SizedBox.shrink();
+        if (!cobrando || dosColumnas) return const SizedBox.shrink();
+        return _botonCobrar(context, directo: PlataformaApp.tableta);
       }),
     );
   }
 
   Widget _buildSearchState(BuildContext context) {
+    if (PlataformaApp.tableta) return _busquedaTableta(context);
     final c = context.colores;
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -225,6 +234,118 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
+  /// Buscar cliente en tableta: el buscador con "Cobrar visita" al lado y los
+  /// clientes en tarjetas grandes (2 o 3 por fila) con su foto y cómo está su
+  /// membresía. Una lista de filas delgadas dejaba casi toda la pantalla
+  /// vacía. Tocar una tarjeta abre el cobro, como en el teléfono.
+  Widget _busquedaTableta(BuildContext context) {
+    final c = context.colores;
+    final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TourStep(
+                  tourKey: controller.keyBuscar,
+                  title: 'Busca al cliente',
+                  description: 'Busca por nombre o teléfono, o pasa su '
+                      'tarjeta por el lector.',
+                  child: AppSearchField(
+                    hintText: 'Buscar cliente...',
+                    controller: controller.searchController,
+                    keyboardType: TextInputType.phone,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              TourStep(
+                tourKey: controller.keyVisita,
+                title: 'Cobrar una visita',
+                description: 'Cobra un día a alguien que no es cliente.',
+                isFirstStep: true,
+                child: Obx(() {
+                  final precio = controller.prices.value?.priceDay;
+                  return OutlinedButton.icon(
+                    onPressed: () => abrirCobrarVisita(precioDia: precio),
+                    icon: const Icon(Icons.confirmation_number_outlined,
+                        size: 22),
+                    label: Text(precio == null
+                        ? 'Cobrar visita'
+                        : 'Cobrar visita · ${pesos(precio)}'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.accent,
+                      side:
+                          BorderSide(color: AppColors.accent.withOpacity(0.5)),
+                      minimumSize: const Size(0, 56),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      textStyle: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: TourStep(
+              tourKey: controller.keyResultados,
+              title: 'Cobra su membresía',
+              description: 'Toca un cliente para cobrarle.',
+              isLastStep: true,
+              child: Obx(() {
+                if (controller.isLoadingClients.value) {
+                  return const Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.accent));
+                }
+                if (controller.searchResults.isEmpty) {
+                  return Refrescable.centrado(
+                    onRefresh: controller.refrescar,
+                    child: Text(
+                      controller.searchController.text.trim().isEmpty
+                          ? 'No hay clientes registrados'
+                          : 'No se encontraron resultados',
+                      style: TextStyle(color: c.textSecondary, fontSize: 16),
+                    ),
+                  );
+                }
+                final ahora = DateTime.now();
+                return Refrescable(
+                  onRefresh: controller.refrescar,
+                  child: GridView.builder(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 340,
+                      mainAxisExtent: 172 * escala,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
+                    itemCount: controller.searchResults.length,
+                    itemBuilder: (context, index) {
+                      final client = controller.searchResults[index];
+                      return _TarjetaCliente(
+                        cliente: client,
+                        situacion: situacionDe(client, ahora),
+                        onTap: () => controller.selectClient(client),
+                      );
+                    },
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// El cobro en tres pasos, de arriba abajo: cuánto tiempo, cómo paga y el
   /// resumen. Solo uno está abierto; los ya hechos se cierran y muestran lo
   /// elegido, con "Cambiar" para volver. El botón de abajo ([_botonCobrar])
@@ -273,6 +394,75 @@ class AbonarView extends GetView<AbonarController> {
               hecho: '',
               contenido: () => _resumen(context),
             )),
+      ],
+    );
+  }
+
+  /// El cobro en tableta: con espacio de sobra no hace falta ir paso por
+  /// paso. Todo está abierto a la vez y se cobra directo, sin "Continuar".
+  /// Acostada, el resumen y el botón quedan fijos a la derecha; de pie, el
+  /// resumen va al final y el botón abajo.
+  Widget _formularioTableta(BuildContext context, {required bool dosColumnas}) {
+    final c = context.colores;
+    final client = controller.selectedClient.value!;
+    final pasos = ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        _cabeceraCliente(context, client),
+        const SizedBox(height: 20),
+        _paso(context, 1, '¿Cuánto tiempo paga?'),
+        Obx(() => _pasoTiempo(context)),
+        const SizedBox(height: 24),
+        _paso(context, 2, '¿Cómo paga?'),
+        Obx(() => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SelectorMetodoPago(
+                  metodos: controller.paymentMethods,
+                  elegido: controller.paymentMethod.value,
+                  onElegir: controller.setPaymentMethod,
+                ),
+                if (controller.usaReferenciaPago)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: CampoReferenciaPago(controlador: controller),
+                  ),
+              ],
+            )),
+        if (!dosColumnas) ...[
+          const SizedBox(height: 24),
+          _paso(context, 3, 'Resumen'),
+          Obx(() => _resumen(context)),
+        ],
+      ],
+    );
+    if (!dosColumnas) return pasos;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: pasos),
+        Container(
+          width: 360,
+          decoration: BoxDecoration(
+            color: c.cardBackground,
+            border: Border(left: BorderSide(color: c.divisor)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _paso(context, 3, 'Resumen'),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Obx(() => _resumen(context)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Obx(() => _botonCobrar(context, directo: true, enPanel: true)),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -737,41 +927,46 @@ class AbonarView extends GetView<AbonarController> {
   /// El botón de abajo, siempre en el mismo lugar: "Continuar" mientras se
   /// llenan los pasos y "Cobrar $1,000" en el resumen. Si falta algo, apagado
   /// y diciendo qué.
-  Widget _botonCobrar(BuildContext context) {
+  ///
+  /// [directo] (tableta, con todo a la vista): cobra sin pasar por
+  /// "Continuar". [enPanel]: dentro del resumen lateral, a todo lo ancho.
+  Widget _botonCobrar(BuildContext context,
+      {bool directo = false, bool enPanel = false}) {
     final c = context.colores;
     final falta = controller.faltaParaCobrar;
-    final enResumen = controller.pasoActual.value == 3;
-    return PieDeFormulario(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: PlataformaApp.pantallaGrande
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.center,
-        children: [
-          if (falta != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                falta,
-                style: TextStyle(color: c.textSecondary, fontSize: 15),
-              ),
+    final enResumen = directo || controller.pasoActual.value == 3;
+    final contenido = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: enPanel
+          ? CrossAxisAlignment.stretch
+          : PlataformaApp.pantallaGrande
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.center,
+      children: [
+        if (falta != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              falta,
+              style: TextStyle(color: c.textSecondary, fontSize: 15),
             ),
-          BotonGuardar(
-            texto: !enResumen
-                ? 'Continuar'
-                : falta == null
-                    ? 'Cobrar ${pesos(controller.totalAmount)}'
-                    : 'Cobrar',
-            guardando: controller.isLoading.value,
-            onPressed: falta != null
-                ? null
-                : enResumen
-                    ? controller.procesarAbono
-                    : controller.continuar,
           ),
-        ],
-      ),
+        BotonGuardar(
+          texto: !enResumen
+              ? 'Continuar'
+              : falta == null
+                  ? 'Cobrar ${pesos(controller.totalAmount)}'
+                  : 'Cobrar',
+          guardando: controller.isLoading.value,
+          onPressed: falta != null
+              ? null
+              : enResumen
+                  ? controller.procesarAbono
+                  : controller.continuar,
+        ),
+      ],
     );
+    return enPanel ? contenido : PieDeFormulario(child: contenido);
   }
 
   Widget _buildSuccessState(BuildContext context) {
@@ -830,6 +1025,117 @@ class AbonarView extends GetView<AbonarController> {
               onPressed: controller.clearSelection,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Un cliente en la búsqueda de tableta: foto, nombre y cómo está su
+/// membresía. Las vencidas llevan el borde y el estado en rojo, para verlas
+/// de un vistazo.
+class _TarjetaCliente extends StatelessWidget {
+  const _TarjetaCliente({
+    required this.cliente,
+    required this.situacion,
+    required this.onTap,
+  });
+
+  final UserModel cliente;
+  final Situacion situacion;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colores;
+    final vencido = situacion.vencido;
+    // Sin fecha de vencimiento todavía no ha pagado: ni verde ni rojo.
+    final nuevo = cliente.expirationDate == null;
+    final color = vencido
+        ? AppColors.error
+        : nuevo
+            ? c.textSecondary
+            : AppColors.success;
+    final radio = BorderRadius.circular(16);
+    return Material(
+      color: c.cardBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: radio,
+        side: BorderSide(
+          color: vencido ? AppColors.error.withOpacity(0.45) : c.borde,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  UserThumbnail(
+                    imageUrl: cliente.photoUrl,
+                    userName: cliente.name,
+                    size: 56,
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.arrow_forward_ios,
+                      size: 18, color: AppColors.accent),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                cliente.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  Icon(
+                    vencido
+                        ? Icons.event_busy_outlined
+                        : nuevo
+                            ? Icons.person_add_alt_outlined
+                            : Icons.event_available_outlined,
+                    size: 18,
+                    color: color,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      situacion.texto,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: vencido ? AppColors.error : c.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (situacion.detalle != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, left: 24),
+                  child: Text(
+                    situacion.detalle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: c.textSecondary, fontSize: 14),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

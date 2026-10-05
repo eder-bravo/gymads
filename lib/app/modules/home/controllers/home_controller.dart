@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
 
 import '../../../core/permissions/permissions.dart';
 import '../../../data/services/tenant_context_service.dart';
@@ -89,6 +90,8 @@ class HomeController extends GetxController {
   void onReady() {
     super.onReady();
     checkOnboarding();
+    // Abonar abre ya con el precio de la visita y de los periodos.
+    AbonoPricesRepository.precargar();
   }
 
   /// Decide si el gimnasio necesita el asistente inicial o el tour.

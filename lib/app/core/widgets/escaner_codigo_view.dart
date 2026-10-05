@@ -312,7 +312,7 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
             Text(
               esPermiso
                   ? 'La app no tiene permiso para usar la cámara. '
-                      'Actívalo en los ajustes del teléfono.'
+                      'Actívalo en los ajustes ${PlataformaApp.delAparato}.'
                   : 'No se pudo abrir la cámara.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white, fontSize: 15),

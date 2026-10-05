@@ -195,6 +195,13 @@ class AbonarController extends GetxController
       montoLibre.value = double.tryParse(montoLibreController.text) ?? 0.0;
     });
 
+    // Con los últimos precios conocidos desde el primer cuadro; la consulta
+    // de abajo solo los actualiza si cambiaron.
+    final conocidos = AbonoPricesRepository.enCache;
+    if (conocidos != null) {
+      prices.value = conocidos;
+      _modoInicial();
+    }
     _loadPrices();
   }
 
@@ -212,9 +219,18 @@ class AbonarController extends GetxController
 
   Future<void> _loadPrices() async {
     final result = await pricesRepository.getPrices();
+    final anterior = prices.value;
     prices.value = result;
-    _modoInicial();
+    // Si eran los mismos que ya se mostraban, no se toca el modo: quien ya
+    // empezó a cobrar no ve cambiar la pantalla.
+    if (anterior == null || !_mismos(anterior, result)) _modoInicial();
   }
+
+  static bool _mismos(AbonoPricesModel a, AbonoPricesModel b) =>
+      a.priceDay == b.priceDay &&
+      a.priceWeek == b.priceWeek &&
+      a.priceMonth == b.priceMonth &&
+      a.priceYear == b.priceYear;
 
   /// Cómo abre el cobro: con costo fijo si hay al menos un precio
   /// configurado, y en un periodo que lo tenga. Se puede pasar a abono libre

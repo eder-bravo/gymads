@@ -159,48 +159,46 @@ class CategoryFilterChips extends StatelessWidget {
       ...categories,
     ];
 
-    return SizedBox(
-      height: 50,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: items.map((item) {
-          final isAll = item.id.isEmpty;
-          final isSelected = isAll ? selectedId == null : selectedId == item.id;
+    // Una fila que se desplaza de lado; en pantalla grande con barra visible,
+    // rueda y arrastre del mouse para llegar a las categorías que no caben.
+    return FilaDesplazable(
+      children: items.map((item) {
+        final isAll = item.id.isEmpty;
+        final isSelected = isAll ? selectedId == null : selectedId == item.id;
 
-          return Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              avatar: Icon(
-                item.icon,
-                size: 18,
-                color: isSelected ? c.textPrimary : c.textSecondary,
-              ),
-              label: Text(
-                item.label,
-                style: TextStyle(
-                  color: isSelected ? c.textPrimary : c.textSecondary,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-              selected: isSelected,
-              // Sin esto Material sustituye el avatar por una palomita al
-              // seleccionar, y el icono desaparece justo al mirarlo.
-              showCheckmark: false,
-              onSelected: (_) => onSelected(isAll ? null : item.id),
-              backgroundColor: c.cardBackground,
-              selectedColor: AppColors.accent,
-              side: BorderSide(
-                color: isSelected
-                    ? AppColors.accent
-                    : AppColors.accent.withOpacity(0.3),
-                width: 1.5,
-              ),
-              elevation: isSelected ? 4 : 1,
-              shadowColor: AppColors.accent.withOpacity(0.3),
+        return Container(
+          margin: const EdgeInsets.only(right: 8),
+          child: FilterChip(
+            avatar: Icon(
+              item.icon,
+              size: 18,
+              color: isSelected ? c.textPrimary : c.textSecondary,
             ),
-          );
-        }).toList(),
-      ),
+            label: Text(
+              item.label,
+              style: TextStyle(
+                color: isSelected ? c.textPrimary : c.textSecondary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            selected: isSelected,
+            // Sin esto Material sustituye el avatar por una palomita al
+            // seleccionar, y el icono desaparece justo al mirarlo.
+            showCheckmark: false,
+            onSelected: (_) => onSelected(isAll ? null : item.id),
+            backgroundColor: c.cardBackground,
+            selectedColor: AppColors.accent,
+            side: BorderSide(
+              color: isSelected
+                  ? AppColors.accent
+                  : AppColors.accent.withOpacity(0.3),
+              width: 1.5,
+            ),
+            elevation: isSelected ? 4 : 1,
+            shadowColor: AppColors.accent.withOpacity(0.3),
+          ),
+        );
+      }).toList(),
     );
   }
 }

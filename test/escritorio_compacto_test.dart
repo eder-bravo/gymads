@@ -428,6 +428,32 @@ ProductCategory _categoria() => ProductCategory(
     createdAt: DateTime(2026),
     updatedAt: DateTime(2026));
 
+/// Categorías de sobra: los filtros no caben en una pantalla y hay que
+/// desplazarlos.
+List<ProductCategory> _muchasCategorias() => [
+      for (final (i, nombre) in [
+        'Bebidas',
+        'Suplementos',
+        'Barras de proteína',
+        'Ropa deportiva',
+        'Accesorios',
+        'Toallas',
+        'Guantes',
+        'Cinturones',
+        'Snacks',
+        'Equipo de entrenamiento',
+      ].indexed)
+        ProductCategory(
+            id: 'c$i',
+            name: nombre,
+            description: '',
+            icon: 'shopping_bag',
+            sortOrder: i,
+            isActive: true,
+            createdAt: DateTime(2026),
+            updatedAt: DateTime(2026)),
+    ];
+
 class _RepoPrecios implements AbonoPricesRepository {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -519,6 +545,26 @@ void main() {
     'Abonar buscar': () {
       final c = Get.put<AbonarController>(_Abonar());
       c.searchResults.add(_cliente());
+      return const AbonarView();
+    },
+    'Abonar con varios clientes': () {
+      final c = Get.put<AbonarController>(_Abonar());
+      final ahora = DateTime(2026, 10, 5);
+      UserModel cliente(String nombre, DateTime? vence) => UserModel(
+          id: nombre,
+          name: nombre,
+          phone: '8112345678',
+          userNumber: '1',
+          joinDate: DateTime(2026),
+          expirationDate: vence);
+      c.searchResults.addAll([
+        cliente('Ana López', ahora.add(const Duration(days: 20))),
+        cliente('Carlos Ruiz', ahora.subtract(const Duration(days: 5))),
+        cliente('María Fernanda González Rodríguez', null),
+        cliente('Jorge Díaz', ahora.add(const Duration(days: 2))),
+        cliente('Sofía Torres', ahora.add(const Duration(days: 90))),
+        cliente('Pedro Sánchez', ahora.subtract(const Duration(days: 40))),
+      ]);
       return const AbonarView();
     },
     'Abonar costo fijo': () {
@@ -613,6 +659,21 @@ void main() {
     },
     'Inventario': () {
       final c = Get.put<InventarioController>(_Inventario());
+      c.products.addAll(_productos());
+      c.filterProducts();
+      c.inventoryStats.assignAll(
+          {'totalProducts': 6, 'totalStock': 69, 'totalValue': 2350.0});
+      return const InventarioView();
+    },
+    'Venta con muchas categorías': () {
+      final c = Get.put<PointOfSaleController>(_Venta());
+      c.categories.addAll(_muchasCategorias());
+      c.availableProducts.addAll(_productos());
+      return const PointOfSaleView();
+    },
+    'Inventario con muchas categorías': () {
+      final c = Get.put<InventarioController>(_Inventario());
+      c.categories.addAll(_muchasCategorias());
       c.products.addAll(_productos());
       c.filterProducts();
       c.inventoryStats.assignAll(
@@ -727,6 +788,17 @@ void main() {
       (
         carpeta: 'build/capturas_tableta/vertical',
         tamano: const Size(820, 1180),
+        plataforma: TargetPlatform.iOS
+      ),
+      // iPad de 13" (Air M2 o Pro): --plain-name 1366 y --plain-name 1024.
+      (
+        carpeta: 'build/capturas_tableta/13_horizontal',
+        tamano: const Size(1366, 1024),
+        plataforma: TargetPlatform.iOS
+      ),
+      (
+        carpeta: 'build/capturas_tableta/13_vertical',
+        tamano: const Size(1024, 1366),
         plataforma: TargetPlatform.iOS
       ),
     ];

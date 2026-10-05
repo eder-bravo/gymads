@@ -39,7 +39,14 @@ ventanas modales, en el inicio de sesión, en el asistente de modo de cobro ni
 en los permisos de la primera vez. Al cambiar de sección se regresa a Inicio y
 la sección se abre encima, con un fundido corto: Inicio queda siempre debajo,
 que es donde sale el aviso de pantalla completa del lector. Las pantallas
-principales de cada sección no llevan flecha atrás; sus subpantallas sí. Con
+principales de cada sección no llevan flecha atrás; sus subpantallas sí. Si la
+sección ya está abierta y se está en una de sus subpantallas (Cuenta dentro de
+Configuración), la barra solo regresa a ella: cerrar todo y abrir otra igual
+dejaba a las dos a la vez durante la transición, y la que salía se llevaba el
+controlador que compartían ("ConfiguracionController not found" al cerrar
+sesión). Además, los bindings que comparten controlador entre rutas
+(Configuración y sus subpantallas, Inventario y su formulario) usan `fenix`:
+si GetX los borra antes de tiempo, se vuelven a crear en vez de fallar. Con
 texto muy grande en la ventana mínima, los botones de la barra superior se
 encogen y las acciones de una ficha bajan a su propio renglón
 (`FichaConAcciones`) en vez de salirse.
@@ -67,6 +74,13 @@ Patrones propios de escritorio (en el teléfono no cambian):
   directamente para reordenarlas. Sin "jalar para refrescar": cada pantalla
   tiene su botón de recargar. En venta, un clic en la ficha agrega el
   producto y su borde se resalta al pasar el mouse (`AlPasarMouse`).
+- **Filtros que no caben** (categorías en Venta e Inventario,
+  `FilaDesplazable`): una barra visible bajo la fila muestra cuánto falta y se
+  arrastra; la rueda del mouse mueve la fila de lado y también se arrastra con
+  el mouse. La barra solo aparece si algo no cabe. En tableta la barra indica
+  que hay más a los lados; el teléfono conserva su lista de siempre. La fila
+  mide todos sus elementos (no es una lista perezosa) para que la barra llegue
+  de verdad al último filtro.
 - **Configuración en dos columnas**, con Cerrar sesión aparte y a todo lo
   ancho debajo de las opciones.
 - **Historiales alineados**: en ingresos y entradas el importe y el estado van
@@ -118,7 +132,7 @@ escritorio; el teléfono queda idéntico):
   "Subir" y "Bajar" como alternativa a arrastrar categorías, la cámara con
   ancho de lectura y el error técnico en "Ver detalles".
 
-`test/escritorio_compacto_test.dart` genera capturas de 38 pantallas,
+`test/escritorio_compacto_test.dart` genera capturas de 40 pantallas,
 diálogos y pasos del asistente: escritorio maximizado (`pantallas/`), laptop
 (`laptop/`), tableta acostada y de pie (`build/capturas_tableta/horizontal` y
 `vertical`, iPad de 1180×820) y teléfono (`build/capturas_movil/<carpeta>`).
@@ -155,10 +169,59 @@ teléfono.
 **Inicio de tableta** (`home/views/inicio_tableta.dart`) conserva la rejilla
 "bento" que gustó en las pruebas, con los ajustes que pidieron: los números de
 hoy van arriba, cada recuadro dice algo del día ("3 ventas hoy", "2
-membresías cobradas hoy", "120 con membresía vigente"), la rejilla tiene un
-alto máximo y debajo va la misma actividad del panel de escritorio, que en
-vertical llena lo que antes quedaba vacío. Configuración es un botón con su
-nombre en la cabecera. Sin atajos ni efectos de mouse.
+membresías cobradas hoy", "120 con membresía vigente") y la rejilla llena el
+resto de la pantalla. Acostada, Vender va grande a la izquierda y los demás
+alrededor; de pie, Vender va a lo ancho arriba y Abonar, Clientes e
+Inventario en una fila abajo (al lado de Vender quedaban columnas delgadas y
+vacías). Sin sección de actividad: los números de arriba ya dicen lo mismo. Configuración es un botón con su nombre en la cabecera. Sin atajos
+ni efectos de mouse.
+
+**Escala en tableta.** Las pantallas de los módulos se veían chicas en una
+tableta: los mismos tamaños del teléfono en una pantalla mucho mayor.
+`VentanaEscritorio` las hace crecer según el lado corto de la pantalla, igual
+acostada o de pie: un iPad de 11" o una tableta Android de 10" al 125 %, un
+iPad mini al 115 % y un iPad de 13" (Air o Pro) al 150 % como máximo. Diálogos,
+ventanas modales y el teclado en pantalla se ajustan con la misma escala.
+Inicio crece igual, para que vaya en proporción con las demás pantallas. En
+las tarjetas angostas (tableta de pie) los números de hoy usan un ícono más
+chico y sin flecha, y el texto de los módulos conserva su tamaño y baja de
+renglón en vez de encogerse.
+
+**Tableta en ventana.** iPadOS 26+ abre las apps en ventanas que se pueden
+achicar y mover, como en la Mac. Igual que en escritorio, la ventana tiene un
+tamaño mínimo de 720×720 puntos: `SceneDelegate` (en
+`ios/Runner/AppDelegate.swift`, declarado en `Info.plist`) extiende
+`FlutterSceneDelegate` y lo fija en `scene(_:willConnectTo:options:)`, antes
+de crear la ventana, como piden Flutter y Apple. Los botones de la ventana
+(cerrar, minimizar, acomodar) van arriba a la izquierda, encima del
+contenido: una vista invisible mide su franja con
+`directionalEdgeInsets(for: .safeArea(cornerAdaptation: .vertical))` y la
+manda por `gymone/ventana`; la app baja la barra superior esa franja
+(`VentanaEscritorio.margenDeControles`). Al cambiar el tamaño de la ventana
+las pantallas no se vuelven a montar.
+
+En Android no hay bloqueo: el único es el mínimo del manifiesto
+(`<layout android:minWidth/minHeight>`), que Android aplica a toda la app y en
+los teléfonos impediría la pantalla dividida. En una tableta Android con
+ventanas, si la ventana baja de 720 puntos por su lado corto, la app usa el
+diseño del teléfono.
+
+**Venta y Abonar en tableta.** Venta acostada usa el carrito al lado, como
+escritorio (desde 880 puntos de ancho, con el carrito de 340); de pie, el
+resumen va abajo. Abonar no va paso por paso: todo está abierto a la vez y se
+cobra directo, sin "Continuar". Al buscar cliente, los clientes van en
+tarjetas grandes (3 por fila acostada, 2 de pie) con su foto y cómo está su
+membresía ("Pagado hasta el…", "Venció el…" en rojo, "Cliente nuevo"), y
+"Cobrar visita" queda junto al buscador. Acostada, los pasos van a la izquierda y el
+resumen con "Cobrar $…" fijo a la derecha; de pie, todo en una columna con el
+resumen al final.
+
+Los textos que nombran el aparato concuerdan con él (`PlataformaApp.aparato`,
+`elAparato`, `delAparato`, `esteAparato`, `tuAparato`): "teléfono" en el
+celular, "tableta" en la tableta y "computadora" en escritorio. Por ejemplo,
+Apariencia dice "Según el teléfono", "Según la tableta" o "Según la
+computadora", y los permisos de cámara y Bluetooth remiten a "los ajustes de
+la tableta".
 
 Los textos hablan del equipo y no del teléfono (`PlataformaApp.equipo`:
 "equipo" en escritorio, "dispositivo" en tableta): apariencia "Según el
@@ -174,13 +237,15 @@ ventana modal y la barra lateral (clic, atajos, sección resaltada, sin flecha
 atrás, Inicio siempre debajo). `test/tableta_test.dart` cubre la detección de
 tableta, el Inicio de tableta de pie, acostado y con texto al 200 %, y la
 ventana modal con el teclado en pantalla; `test/resumen_del_dia_test.dart`,
-los datos del día; y `test/inicio_navegacion_test.dart`, Inicio en teléfono,
+los datos del día; `test/filtros_desplazables_test.dart`, los filtros que no
+caben (barra, rueda, arrastre, llegar al último y el teléfono sin cambios); y
+`test/inicio_navegacion_test.dart`, Inicio en teléfono,
 tableta y escritorio al entrar y salir de secciones, al girar o
 redimensionar y al regresar con `Get.offAllNamed` (permisos y modo de cobro),
 cuando por un momento hay dos Inicio montados. Por eso Inicio pide los datos
 del día al terminar el cuadro y no mientras se dibuja. Para generar capturas opcionales del render de Flutter con
 datos de prueba, ejecutar ese archivo (o `test/escritorio_compacto_test.dart`,
-que guarda las 38 pantallas maximizadas, en claro y oscuro y con sombras
+que guarda las 40 pantallas maximizadas, en claro y oscuro y con sombras
 reales, en `build/capturas_escritorio/pantallas`) con
 `--dart-define=CAPTURAS_ESCRITORIO=true` y `FUENTES_CAPTURA` apuntando a
 `bin/cache/artifacts/material_fonts` del SDK de Flutter. Se guardan en
@@ -209,12 +274,12 @@ requieren detener la app y volver a ejecutarla; hot restart no los aplica.
 Las pantallas conservan sus variantes compactas (resúmenes en varias filas,
 fichas con el importe debajo del nombre, botón de cobro en su propia fila)
 para texto grande y para el respaldo de `VentanaEscritorio`.
-`test/escritorio_compacto_test.dart` cubre 38 pantallas/estados (con la barra lateral), el
+`test/escritorio_compacto_test.dart` cubre 40 pantallas/estados (con la barra lateral), el
 formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 555 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 658 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`

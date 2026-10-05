@@ -269,9 +269,11 @@ class RegisterView extends GetView<RegisterController> {
     return Obx(() => ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 52),
           child: OutlinedButton(
-            onPressed: controller.isLoading.value
-                ? null
-                : controller.registerWithGoogle,
+            onPressed: controller.waitingForGoogle.value
+                ? controller.cancelGoogleSignIn
+                : (controller.isLoading.value
+                    ? null
+                    : controller.registerWithGoogle),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: c.contraste.withOpacity(0.24)),
               shape: RoundedRectangleBorder(
@@ -299,7 +301,9 @@ class RegisterView extends GetView<RegisterController> {
                 const SizedBox(width: 12),
                 Flexible(
                     child: Text(
-                  'Registrarse con Google',
+                  controller.waitingForGoogle.value
+                      ? 'Cancelar inicio con Google'
+                      : 'Registrarse con Google',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: c.contraste,

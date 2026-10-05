@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../data/services/tenant_context_service.dart';
@@ -69,6 +70,40 @@ class MenuLateral extends StatelessWidget {
   final Map<String, PasoDelMenu> pasos;
 
   static const ancho = 232.0;
+
+  /// Ancho de la franja que queda cuando el menú está oculto.
+  static const anchoRiel = 64.0;
+
+  // ─── Ocultar el menú ───
+  //
+  // La barra se puede ocultar para dar todo el ancho al contenido. Queda una
+  // franja angosta con los íconos de las secciones y el botón para volver a
+  // mostrarla. Se recuerda entre una sesión y otra.
+
+  static const _claveOculto = 'menu_lateral_oculto';
+
+  /// Si el menú está oculto. Compartido: todas las pantallas lo siguen.
+  static final oculto = ValueNotifier<bool>(false);
+
+  static bool _recordar = false;
+
+  /// Lee lo que se eligió la última vez. Va en `main()`, después de iniciar
+  /// el almacenamiento: sin esa llamada (en las pruebas) el menú no lee ni
+  /// guarda nada.
+  static void cargarPreferencia() {
+    _recordar = true;
+    oculto.value = GetStorage().read<bool>(_claveOculto) ?? false;
+  }
+
+  /// Oculta o muestra el menú, y lo recuerda.
+  static void alternar() {
+    oculto.value = !oculto.value;
+    if (_recordar) GetStorage().write(_claveOculto, oculto.value);
+  }
+
+  /// Lo muestra sin cambiar lo que la persona eligió: el recorrido de
+  /// bienvenida señala las secciones del menú y necesita verlas.
+  static void mostrarParaRecorrido() => oculto.value = false;
 
   static const secciones = [
     SeccionDelMenu(
@@ -221,6 +256,7 @@ class MenuLateral extends StatelessWidget {
       for (var i = 0; i < visibles.length && i < _digitos.length; i++)
         atajo(_digitos[i]): () => ir(visibles[i].ruta),
       atajo(LogicalKeyboardKey.comma): () => ir(configuracion.ruta),
+      atajo(LogicalKeyboardKey.keyB): alternar,
     };
   }
 
@@ -258,7 +294,7 @@ class MenuLateral extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
                 child: Row(
                   children: [
                     // El logo de la app, el mismo del inicio de sesión.
@@ -272,7 +308,7 @@ class MenuLateral extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Flexible(
+                    Expanded(
                       child: Text(
                         'GymOne',
                         maxLines: 1,
@@ -285,6 +321,9 @@ class MenuLateral extends StatelessWidget {
                         ),
                       ),
                     ),
+                    // Arriba, junto al logo, como en las apps de Mac: en el
+                    // mismo lugar con el menú abierto y oculto.
+                    const BotonDelMenu(),
                   ],
                 ),
               ),
@@ -305,6 +344,116 @@ class MenuLateral extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// El menú oculto: una franja con los íconos de las secciones (cada uno con
+/// su nombre al pasar el mouse) y el botón para volver a mostrarlo.
+class RielDelMenu extends StatelessWidget {
+  const RielDelMenu({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colores;
+    final actual = MenuLateral.seccionDeRuta(ModalRoute.of(context));
+    Widget icono(SeccionDelMenu s) {
+      final seleccionada = s.ruta == actual;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Tooltip(
+          message: s.etiqueta,
+          child: Semantics(
+            label: s.etiqueta,
+            selected: seleccionada,
+            button: true,
+            child: Material(
+              color: seleccionada
+                  ? AppColors.accent.withOpacity(0.14)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => MenuLateral.ir(s.ruta),
+                child: SizedBox(
+                  height: 44,
+                  child: Center(
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: s.color.withOpacity(seleccionada ? 0.25 : 0.14),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(s.icono, size: 20, color: s.color),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Material(
+      color: c.cardBackground,
+      child: SizedBox(
+        width: MenuLateral.anchoRiel,
+        child: SafeArea(
+          right: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // El mismo botón, en el mismo lugar que con el menú abierto.
+              const Padding(
+                padding: EdgeInsets.fromLTRB(8, 20, 8, 16),
+                child: Center(child: BotonDelMenu()),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  children: [
+                    for (final s in MenuLateral.visibles()) icono(s),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: c.divisor),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+                child: icono(MenuLateral.configuracion),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Oculta o muestra el menú: el ícono de panel lateral de las apps de Mac,
+/// con su nombre al pasar el mouse.
+class BotonDelMenu extends StatelessWidget {
+  const BotonDelMenu({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colores;
+    return ValueListenableBuilder<bool>(
+      valueListenable: MenuLateral.oculto,
+      builder: (context, oculto, _) => IconButton(
+        onPressed: MenuLateral.alternar,
+        tooltip: '${oculto ? 'Mostrar' : 'Ocultar'} menú '
+            '(${MenuLateral.textoAtajo('B')})',
+        icon: const Icon(Icons.view_sidebar_outlined),
+        iconSize: 22,
+        color: c.textSecondary,
+        style: IconButton.styleFrom(
+          minimumSize: const Size(40, 40),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
     );

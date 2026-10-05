@@ -651,8 +651,8 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
-  /// Paso 1. Con costo fijo, una tarjeta por periodo con su precio; con
-  /// abono libre, el periodo y cuánto paga en total. En los dos, "¿Cuántos?".
+  /// Paso 1. Con abono libre se escribe la cantidad, se elige la unidad y
+  /// después se captura el precio de cada periodo para calcular el total.
   Widget _pasoTiempo(BuildContext context) {
     final c = context.colores;
     final fijo = controller.isPrecioFijo.value;
@@ -664,6 +664,24 @@ class AbonarView extends GetView<AbonarController> {
         if (controller.hayCostosFijos) ...[
           _pestanasModo(context, fijo),
           const SizedBox(height: 14),
+        ],
+        if (!fijo) ...[
+          TextField(
+            key: const Key('cantidad_libre'),
+            controller: controller.cantidadLibreController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+            decoration: const InputDecoration(labelText: '¿Cuántos periodos?'),
+          ),
+          const SizedBox(height: 18),
+          Text('Elige el periodo',
+              style: TextStyle(color: c.textSecondary, fontSize: 16)),
+          const SizedBox(height: 10),
         ],
         LayoutBuilder(builder: (context, medidas) {
           final ancho = (medidas.maxWidth - 10) / 2;
@@ -677,9 +695,10 @@ class AbonarView extends GetView<AbonarController> {
             ],
           );
         }),
-        const SizedBox(height: 18),
-        _cuantos(context),
-        if (!fijo) ...[
+        if (fijo) ...[
+          const SizedBox(height: 18),
+          _cuantos(context),
+        ] else ...[
           const SizedBox(height: 18),
           TextField(
             key: const Key('monto_libre'),
@@ -693,16 +712,30 @@ class AbonarView extends GetView<AbonarController> {
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
-            decoration: const InputDecoration(
-              labelText: '¿Cuánto paga en total?',
+            decoration: InputDecoration(
+              labelText:
+                  'Precio por ${periodoEnPalabras(1, controller.durationType.value).substring(2)}',
               prefixText: '\$ ',
-              prefixStyle: TextStyle(
+              prefixStyle: const TextStyle(
                 color: AppColors.accent,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
+          if (controller.durationValue.value > 0 &&
+              controller.montoLibre.value > 0) ...[
+            const SizedBox(height: 16),
+            Text(
+              '${controller.periodoElegido} × ${pesos(controller.montoLibre.value)} = ${pesos(controller.totalAmount)}',
+              key: const Key('total_libre'),
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ],
       ],
     );
@@ -751,7 +784,7 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
-  /// Una opción de periodo: "1 mes" y, con costo fijo, su precio.
+  /// Una opción de periodo: singular con costo fijo, unidad con abono libre.
   Widget _tarjetaPeriodo(BuildContext context, String periodo, bool fijo) {
     final c = context.colores;
     final elegida = controller.durationType.value == periodo;
@@ -777,7 +810,7 @@ class AbonarView extends GetView<AbonarController> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      periodoEnPalabras(1, periodo),
+                      fijo ? periodoEnPalabras(1, periodo) : periodo,
                       style: TextStyle(
                         color: c.textPrimary,
                         fontSize: 17,
@@ -893,9 +926,7 @@ class AbonarView extends GetView<AbonarController> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           renglon(
-            fijo && precio != null
-                ? '${controller.periodoElegido} × ${pesos(precio)}'
-                : controller.periodoElegido,
+            '${controller.periodoElegido} × ${pesos(fijo ? (precio ?? 0) : controller.montoLibre.value)}',
             pesos(total),
           ),
           Divider(height: 24, color: c.divisor),

@@ -67,15 +67,15 @@ Situacion situacionDe(UserModel cliente, DateTime ahora) {
   );
 }
 
-/// Cuánto se cobra: con costo fijo, el precio del periodo por la cantidad;
-/// con abono libre, lo que se escribió (ya es el total).
+/// Cuánto se cobra: el precio de un periodo por la cantidad elegida, tanto
+/// con costo fijo como con abono libre.
 double totalDelCobro({
   required bool costoFijo,
   required double? precioPorPeriodo,
   required int cantidad,
   required double montoLibre,
 }) =>
-    costoFijo ? (precioPorPeriodo ?? 0) * cantidad : montoLibre;
+    (costoFijo ? (precioPorPeriodo ?? 0) : montoLibre) * cantidad;
 
 /// Qué falta para poder cobrar, dicho como se le pide a la persona, o null
 /// si ya se puede.
@@ -89,7 +89,7 @@ String? faltaParaCobrarDe({
   if (costoFijo) {
     return (precioPorPeriodo ?? 0) > 0 ? null : 'Elige cuánto tiempo paga';
   }
-  return montoLibre > 0 ? null : 'Escribe cuánto paga';
+  return montoLibre > 0 ? null : 'Escribe el precio por periodo';
 }
 
 /// "\$1,000" para un monto redondo; con centavos, "\$1,000.50".

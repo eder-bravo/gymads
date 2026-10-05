@@ -73,8 +73,8 @@ void main() {
   testWidgets(
       'costo fijo: cada paso se cierra al continuar y el último dice cuánto '
       'se cobra', (tester) async {
-    await abrir(tester,
-        const AbonoPricesModel(priceMonth: 500, priceWeek: 150));
+    await abrir(
+        tester, const AbonoPricesModel(priceMonth: 500, priceWeek: 150));
 
     expect(find.text('Cliente nuevo'), findsOneWidget);
     // Paso 1 abierto, solo con los periodos que tienen precio.
@@ -116,25 +116,51 @@ void main() {
     expect(find.text('2 semanas · \$300'), findsOneWidget);
   });
 
-  testWidgets('abono libre: sin el monto no se puede continuar',
+  testWidgets('abono libre: cantidad, periodo, precio y total automático',
       (tester) async {
-    await abrir(tester, const AbonoPricesModel(priceMonth: 500));
+    final controller =
+        await abrir(tester, const AbonoPricesModel(priceMonth: 500));
 
     await tester.tap(find.text('Abono libre'));
     await tester.pump();
-    expect(find.text('Escribe cuánto paga'), findsOneWidget);
+    expect(find.text('Escribe el precio por periodo'), findsOneWidget);
+    expect(tester.getTopLeft(find.byKey(const Key('cantidad_libre'))).dy,
+        lessThan(tester.getTopLeft(find.text('Elige el periodo')).dy));
+    expect(tester.getTopLeft(find.text('Elige el periodo')).dy,
+        lessThan(tester.getTopLeft(find.byKey(const Key('monto_libre'))).dy));
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('monto_libre')), findsOneWidget);
 
+    await tester.enterText(find.byKey(const Key('cantidad_libre')), '3');
+    await tester.pump();
+    await tester.tap(find.text('Años'));
+    await tester.pump();
     await tester.enterText(find.byKey(const Key('monto_libre')), '800');
     await tester.pump();
-    expect(find.text('Escribe cuánto paga'), findsNothing);
+    expect(find.text('3 años × \$800 = \$2,400'), findsOneWidget);
+    expect(controller.totalAmount, 2400);
+    await tester.enterText(find.byKey(const Key('cantidad_libre')), '2');
+    await tester.pump();
+    expect(find.text('2 años × \$800 = \$1,600'), findsOneWidget);
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
+    expect(find.text('2 años · \$1,600'), findsOneWidget);
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
-    expect(find.text('Cobrar \$800'), findsOneWidget);
+    expect(find.text('2 años × \$800'), findsOneWidget);
+    expect(find.text('Cobrar \$1,600'), findsOneWidget);
+  });
+
+  testWidgets('abono libre: requiere una cantidad positiva', (tester) async {
+    await abrir(tester, const AbonoPricesModel());
+    await tester.enterText(find.byKey(const Key('cantidad_libre')), '');
+    await tester.enterText(find.byKey(const Key('monto_libre')), '800');
+    await tester.pump();
+    expect(find.text('Elige cuánto tiempo paga'), findsOneWidget);
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('cantidad_libre')), findsOneWidget);
   });
 
   testWidgets('sin precios configurados abre directo en abono libre',
@@ -142,8 +168,9 @@ void main() {
     await abrir(tester, const AbonoPricesModel());
 
     expect(find.text('Costo fijo'), findsNothing);
+    expect(find.byKey(const Key('cantidad_libre')), findsOneWidget);
     expect(find.byKey(const Key('monto_libre')), findsOneWidget);
-    expect(find.text('1 día'), findsWidgets);
+    expect(find.text('Días'), findsOneWidget);
   });
 
   testWidgets('en un teléfono angosto no se sale nada', (tester) async {

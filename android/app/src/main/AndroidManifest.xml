@@ -80,8 +80,14 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Retorno del navegador después de autenticar con Google.
-                 Esta ruta funciona también en Huawei sin Google Play Services. -->
+        </activity>
+        <!-- La sesión del navegador recibe éxito o cancelación y cierra la
+             pestaña de autenticación, también en Huawei sin GMS. El esquema
+             tiene un solo receptor para evitar un selector entre actividades. -->
+        <activity
+            android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
+            android:exported="true"
+            android:taskAffinity="">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

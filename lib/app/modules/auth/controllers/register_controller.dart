@@ -6,9 +6,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gymads/app/data/models/gym_settings_model.dart';
-import '../../../data/config/auth_config.dart';
 import '../../../data/providers/staff_profile_provider.dart';
 import '../../../data/services/google_play_services.dart';
+import '../../../data/services/google_browser_auth.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
 import 'package:gymads/app/core/utils/correo_valido.dart';
@@ -21,6 +21,10 @@ import 'package:gymads/app/core/utils/nombre_completo.dart';
 ///   2. On submit → creates auth user → calls RPC → auto-login → HOME
 ///   OR: Google Sign-In → if no gym → shows gym/location form → RPC → HOME
 class RegisterController extends GetxController {
+  RegisterController({GoogleBrowserAuth Function(GoTrueClient)? browserFactory})
+      : _browserFactory = browserFactory ?? GoogleBrowserAuth.new;
+
+  final GoogleBrowserAuth Function(GoTrueClient) _browserFactory;
   final SupabaseClient _supabase = Supabase.instance.client;
   final StaffProfileProvider _staffProfileProvider = StaffProfileProvider();
 
@@ -46,6 +50,20 @@ class RegisterController extends GetxController {
 
   // State
   final RxBool isLoading = false.obs;
+  final RxBool waitingForGoogle = false.obs;
+  GoogleBrowserAuth? _browserAuth;
+  int _googleAttempt = 0;
+
+  void cancelGoogleSignIn() {
+    if (!waitingForGoogle.value) return;
+    _googleAttempt++;
+    _browserAuth?.cancel();
+    _browserAuth = null;
+    waitingForGoogle.value = false;
+    isLoading.value = false;
+    clearError();
+  }
+
   final RxnString errorMessage = RxnString();
   final RxBool obscurePassword = true.obs;
   final RxBool obscureConfirmPassword = true.obs;
@@ -59,6 +77,8 @@ class RegisterController extends GetxController {
 
   @override
   void onClose() {
+    _googleAttempt++;
+    _browserAuth?.cancel();
     firstNameController.dispose();
     lastNameController.dispose();
     emailController.dispose();
@@ -165,6 +185,7 @@ class RegisterController extends GetxController {
   Future<void> registerWithGoogle() async {
     // Prevent concurrent calls (double-tap)
     if (isLoading.value) return;
+    final attempt = ++_googleAttempt;
     clearError();
     isLoading.value = true;
 
@@ -175,7 +196,7 @@ class RegisterController extends GetxController {
             'RegisterController',
             'Google Play Services no disponible; usando OAuth por navegador',
           );
-          await _registerWithGoogleNavegador();
+          await _registerWithGoogleNavegador(attempt);
         } else {
           try {
             await _registerWithGoogleNativo();
@@ -186,7 +207,7 @@ class RegisterController extends GetxController {
                 'RegisterController',
                 'Google nativo no disponible; usando OAuth por navegador',
               );
-              await _registerWithGoogleNavegador();
+              await _registerWithGoogleNavegador(attempt);
             } else {
               rethrow;
             }
@@ -195,18 +216,23 @@ class RegisterController extends GetxController {
       } else if (GetPlatform.isIOS) {
         await _registerWithGoogleNativo();
       } else {
-        // Escritorio y web: flujo por navegador.
-        await _registerWithGoogleNavegador();
+        // Las apps de escritorio usan el navegador del sistema.
+        await _registerWithGoogleNavegador(attempt);
       }
     } on AuthException catch (e) {
+      if (attempt != _googleAttempt) return;
       AppLogger.error(
           'RegisterController', 'Fallo de autenticación con Google', e);
       errorMessage.value = 'Error con Google: ${e.message}';
     } catch (e) {
+      if (attempt != _googleAttempt) return;
       AppLogger.error('RegisterController', 'Google sign-in error', e);
       errorMessage.value = e.toString().replaceAll('Exception: ', '');
     } finally {
-      isLoading.value = false;
+      if (attempt == _googleAttempt) {
+        waitingForGoogle.value = false;
+        isLoading.value = false;
+      }
     }
   }
 
@@ -252,35 +278,26 @@ class RegisterController extends GetxController {
     );
   }
 
-  /// Huawei sin GMS, escritorio y web: flujo OAuth por navegador.
-  Future<void> _registerWithGoogleNavegador() async {
+  /// Huawei sin GMS y apps de escritorio: flujo OAuth por navegador.
+  Future<void> _registerWithGoogleNavegador(int attempt) async {
     AppLogger.info(
         'RegisterController', 'Starting Supabase OAuth flow for registration');
 
-    // Se escucha antes de abrir el navegador para no perder un retorno rápido.
-    final authResult = _supabase.auth.onAuthStateChange.firstWhere((data) =>
-        data.event == AuthChangeEvent.signedIn && data.session != null);
-
-    final success = await _supabase.auth.signInWithOAuth(
-      OAuthProvider.google,
-      redirectTo: AuthConfig.oauthRedirectUrl,
-      queryParams: const {'prompt': 'select_account'},
-    );
-
-    if (!success) {
-      throw Exception('No se pudo iniciar sesión con Google');
+    final browser = _browserAuth = _browserFactory(_supabase.auth);
+    final User? user;
+    try {
+      user = await browser.signIn(onWaiting: (waiting) {
+        if (attempt == _googleAttempt) waitingForGoogle.value = waiting;
+      });
+    } finally {
+      if (identical(_browserAuth, browser)) _browserAuth = null;
     }
-
-    final session = await authResult.timeout(
-      const Duration(minutes: 2),
-      onTimeout: () => throw Exception('Tiempo de espera agotado'),
-    );
-
-    final userId = session.session!.user.id;
-    final userMeta = session.session!.user.userMetadata;
+    if (user == null || attempt != _googleAttempt) return;
+    final userId = user.id;
+    final userMeta = user.userMetadata;
     final fullName =
         userMeta?['full_name'] as String? ?? userMeta?['name'] as String? ?? '';
-    final email = session.session!.user.email ?? '';
+    final email = user.email ?? '';
 
     await _handleGoogleRegResult(userId, fullName, email);
   }

@@ -246,22 +246,31 @@ class ScaffoldAdaptable extends StatelessWidget {
         // Con fondo: la línea entre la barra y el contenido es translúcida.
         child: ColoredBox(
           color: backgroundColor ?? Theme.of(context).scaffoldBackgroundColor,
-          child: Row(
-            children: [
-              menu ?? const MenuLateral(),
-              VerticalDivider(width: 1, thickness: 1, color: c.divisor),
-              Expanded(
-                // El contenido mide su propia área: así sus anchos máximos y
-                // márgenes se calculan sin la barra.
-                child: MediaQuery(
-                  data: datos.copyWith(
-                    size: Size(datos.size.width - MenuLateral.ancho - 1,
-                        datos.size.height),
+          // El menú se puede ocultar: queda una franja angosta.
+          child: ValueListenableBuilder<bool>(
+            valueListenable: MenuLateral.oculto,
+            builder: (context, oculto, _) => Row(
+              children: [
+                oculto ? const RielDelMenu() : (menu ?? const MenuLateral()),
+                VerticalDivider(width: 1, thickness: 1, color: c.divisor),
+                Expanded(
+                  // El contenido mide su propia área: así sus anchos máximos
+                  // y márgenes se calculan sin la barra.
+                  child: MediaQuery(
+                    data: datos.copyWith(
+                      size: Size(
+                          datos.size.width -
+                              (oculto
+                                  ? MenuLateral.anchoRiel
+                                  : MenuLateral.ancho) -
+                              1,
+                          datos.size.height),
+                    ),
+                    child: ConMenuLateral(child: pantalla),
                   ),
-                  child: ConMenuLateral(child: pantalla),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

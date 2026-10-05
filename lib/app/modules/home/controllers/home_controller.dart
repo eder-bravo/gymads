@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
 
 import '../../../core/permissions/permissions.dart';
+import '../../../core/widgets/menu_lateral.dart';
+import '../../../core/utils/plataforma_app.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../../routes/app_pages.dart';
@@ -128,6 +130,14 @@ class HomeController extends GetxController {
       // enseñar nada.
       if (Get.currentRoute != Routes.HOME) return;
 
+      // En escritorio el recorrido señala las secciones del menú lateral: si
+      // estaba oculto se muestra mientras haya un recorrido pendiente (lo que
+      // se eligió no se pierde: al volver a abrir la app sigue oculto).
+      if (PlataformaApp.escritorio &&
+          MenuLateral.oculto.value &&
+          await WelcomeTourService.to.isPending(AppTours.home)) {
+        MenuLateral.mostrarParaRecorrido();
+      }
       await WelcomeTourService.to.startIfPending(AppTours.home, _tourSteps);
     } finally {
       _checkingOnboarding = false;

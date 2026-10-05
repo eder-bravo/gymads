@@ -33,6 +33,14 @@ actual se resalta (una pantalla de detalle marca la sección de la que se
 abrió) y cada rol ve solo las secciones de sus permisos. ⌘/Ctrl + 1…7 abre
 cada sección y ⌘/Ctrl + coma, Configuración; cada renglón muestra su atajo.
 
+La barra se puede ocultar con el botón "Ocultar menú", abajo de la barra, o
+con ⌘/Ctrl + B. Queda una franja angosta de 64 puntos con los íconos de las
+secciones (cada uno con su nombre al pasar el mouse) y un botón para volver a
+mostrarla; el contenido aprovecha el ancho liberado. Se recuerda entre
+sesiones (`MenuLateral.cargarPreferencia()` en `main()`). Si hay un recorrido
+de bienvenida pendiente, el menú se muestra mientras dure, porque el recorrido
+señala sus secciones; lo elegido no se pierde.
+
 La barra va dentro de `ScaffoldAdaptable`, no encima del navegador: así los
 diálogos la cubren y el recorrido de bienvenida la encuentra. No aparece en
 ventanas modales, en el inicio de sesión, en el asistente de modo de cobro ni
@@ -279,7 +287,7 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 658 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 669 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`

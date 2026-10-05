@@ -52,6 +52,9 @@ void main() async {
   // Initialize GetStorage for local caching
   await GetStorage.init();
 
+  // En escritorio, si el menú lateral se dejó oculto la última vez.
+  MenuLateral.cargarPreferencia();
+
   // Modo claro u oscuro elegido en este teléfono (por defecto, el del
   // teléfono). Antes del primer cuadro, para que no parpadee.
   Get.put(TemaService(), permanent: true);

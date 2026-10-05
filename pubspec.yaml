@@ -43,6 +43,8 @@ dependencies:
   get_storage: ^2.1.1
   showcaseview: ^5.1.0
   google_sign_in: ^6.1.6
+  flutter_web_auth_2: ^5.1.0
+  window_to_front: ^0.0.4
   win32_registry: ^2.1.0
   pdf: ^3.11.1
   printing: ^5.13.4

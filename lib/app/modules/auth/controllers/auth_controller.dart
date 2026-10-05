@@ -7,7 +7,6 @@ import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import '../../../data/config/auth_config.dart';
 import '../../../data/models/staff_profile_model.dart';
 import '../../../data/providers/staff_profile_provider.dart';
 import '../../../core/permissions/staff_role.dart';
@@ -16,6 +15,7 @@ import '../../../core/utils/nombre_completo.dart';
 import '../../../data/services/cambio_de_perfil.dart';
 import '../../../data/services/cambios_en_vivo_service.dart';
 import '../../../data/services/google_play_services.dart';
+import '../../../data/services/google_browser_auth.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../../routes/app_pages.dart';
@@ -26,6 +26,10 @@ import 'register_controller.dart';
 /// Handles Supabase Auth login and fetches staff_profile
 /// to establish tenant context before allowing access.
 class AuthController extends GetxController {
+  AuthController({GoogleBrowserAuth Function(GoTrueClient)? browserFactory})
+      : _browserFactory = browserFactory ?? GoogleBrowserAuth.new;
+
+  final GoogleBrowserAuth Function(GoTrueClient) _browserFactory;
   final SupabaseClient _supabase = Supabase.instance.client;
   final StaffProfileProvider _staffProfileProvider = StaffProfileProvider();
 
@@ -35,10 +39,25 @@ class AuthController extends GetxController {
 
   // State
   final RxBool isLoading = false.obs;
+  final RxBool waitingForGoogle = false.obs;
   final RxnString errorMessage = RxnString();
   final RxBool obscurePassword = true.obs;
 
   StreamSubscription<void>? _perfilEnVivo;
+  GoogleBrowserAuth? _browserAuth;
+  int _loginAttempt = 0;
+
+  /// Cambiar a correo invalida el intento anterior: una ventana vieja no
+  /// puede completar el acceso después de que se eligió otra forma de entrar.
+  void cancelGoogleSignIn() {
+    if (!waitingForGoogle.value) return;
+    _loginAttempt++;
+    _browserAuth?.cancel();
+    _browserAuth = null;
+    waitingForGoogle.value = false;
+    isLoading.value = false;
+    clearError();
+  }
 
   /// Revisiones del perfil encadenadas: dos avisos seguidos no se enciman.
   Future<void> _revisandoPerfil = Future.value();
@@ -58,6 +77,8 @@ class AuthController extends GetxController {
 
   @override
   void onClose() {
+    _loginAttempt++;
+    _browserAuth?.cancel();
     _perfilEnVivo?.cancel();
     emailController.dispose();
     passwordController.dispose();
@@ -156,6 +177,9 @@ class AuthController extends GetxController {
   ///
   /// Returns true if login was successful
   Future<bool> login() async {
+    if (waitingForGoogle.value) cancelGoogleSignIn();
+    if (isLoading.value) return false;
+    final attempt = ++_loginAttempt;
     clearError();
 
     // Validate fields
@@ -229,7 +253,7 @@ class AuthController extends GetxController {
       errorMessage.value = e.toString().replaceAll('Exception: ', '');
       return false;
     } finally {
-      isLoading.value = false;
+      if (attempt == _loginAttempt) isLoading.value = false;
     }
   }
 
@@ -237,6 +261,7 @@ class AuthController extends GetxController {
   Future<bool> loginWithGoogle() async {
     // Prevent concurrent calls (double-tap)
     if (isLoading.value) return false;
+    final attempt = ++_loginAttempt;
     clearError();
     isLoading.value = true;
 
@@ -247,7 +272,7 @@ class AuthController extends GetxController {
             'AuthController',
             'Google Play Services no disponible; usando OAuth por navegador',
           );
-          return await _loginWithGoogleNavegador();
+          return await _loginWithGoogleNavegador(attempt);
         }
 
         try {
@@ -261,17 +286,18 @@ class AuthController extends GetxController {
               'AuthController',
               'Google nativo no disponible; usando OAuth por navegador',
             );
-            return await _loginWithGoogleNavegador();
+            return await _loginWithGoogleNavegador(attempt);
           }
           rethrow;
         }
       } else if (GetPlatform.isIOS) {
         return await _loginWithGoogleNativo();
       } else {
-        // Escritorio y web: flujo por navegador.
-        return await _loginWithGoogleNavegador();
+        // Las apps de escritorio usan el navegador del sistema.
+        return await _loginWithGoogleNavegador(attempt);
       }
     } on AuthException catch (e) {
+      if (attempt != _loginAttempt) return false;
       AppLogger.error('AuthController', 'Fallo de autenticación', e);
       if (e.message.contains('host lookup') ||
           e.message.contains('SocketException')) {
@@ -282,6 +308,7 @@ class AuthController extends GetxController {
       }
       return false;
     } catch (e) {
+      if (attempt != _loginAttempt) return false;
       AppLogger.error('AuthController', 'Exception', e);
       final msg = e.toString();
       if (msg.contains('12500') || msg.contains('sign_in_failed')) {
@@ -300,7 +327,10 @@ class AuthController extends GetxController {
       }
       return false;
     } finally {
-      isLoading.value = false;
+      if (attempt == _loginAttempt) {
+        waitingForGoogle.value = false;
+        isLoading.value = false;
+      }
     }
   }
 
@@ -356,40 +386,27 @@ class AuthController extends GetxController {
         response.user!.id, googleUser.displayName, googleUser.email);
   }
 
-  /// Huawei sin GMS, escritorio y web: flujo OAuth por navegador.
-  Future<bool> _loginWithGoogleNavegador() async {
+  /// Huawei sin GMS y apps de escritorio: flujo OAuth por navegador.
+  Future<bool> _loginWithGoogleNavegador(int attempt) async {
     AppLogger.info('AuthController', 'Starting Supabase OAuth flow');
-
-    // Se escucha antes de abrir el navegador para no perder un retorno rápido.
-    final authResult = _supabase.auth.onAuthStateChange.firstWhere((data) =>
-        data.event == AuthChangeEvent.signedIn && data.session != null);
-
-    final success = await _supabase.auth.signInWithOAuth(
-      OAuthProvider.google,
-      redirectTo: AuthConfig.oauthRedirectUrl,
-      queryParams: const {'prompt': 'select_account'},
-    );
-
-    if (!success) {
-      AppLogger.error('AuthController', 'OAuth flow failed to launch');
-      throw Exception('No se pudo iniciar sesión con Google');
+    final browser = _browserAuth = _browserFactory(_supabase.auth);
+    final User? user;
+    try {
+      user = await browser.signIn(onWaiting: (waiting) {
+        if (attempt == _loginAttempt) waitingForGoogle.value = waiting;
+      });
+    } finally {
+      if (identical(_browserAuth, browser)) _browserAuth = null;
     }
-
-    AppLogger.info('AuthController', 'OAuth launched, waiting for session');
-
-    final session = await authResult.timeout(
-      const Duration(minutes: 2),
-      onTimeout: () => throw Exception('Tiempo de espera agotado'),
-    );
-
-    final userId = session.session!.user.id;
+    if (user == null || attempt != _loginAttempt) return false;
+    final userId = user.id;
     AppLogger.info('AuthController', 'Supabase auth successful');
 
     // Get user metadata from Supabase session
-    final userMeta = session.session!.user.userMetadata;
+    final userMeta = user.userMetadata;
     final fullName =
         userMeta?['full_name'] as String? ?? userMeta?['name'] as String? ?? '';
-    final email = session.session!.user.email ?? '';
+    final email = user.email ?? '';
 
     return await _handleGoogleAuthResult(userId, fullName, email);
   }

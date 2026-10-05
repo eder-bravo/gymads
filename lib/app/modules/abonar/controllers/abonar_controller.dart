@@ -81,7 +81,8 @@ class AbonarController extends GetxController
   /// Como se guarda en `metodo_pago` (efectivo, tarjeta_debito…).
   final paymentMethod = 'efectivo'.obs;
 
-  /// Abono libre: lo que paga en total, escrito a mano.
+  /// Abono libre: cantidad editable y precio por cada periodo.
+  final cantidadLibreController = TextEditingController(text: '1');
   final montoLibreController = TextEditingController();
   final montoLibre = 0.0.obs;
 
@@ -194,6 +195,9 @@ class AbonarController extends GetxController
     montoLibreController.addListener(() {
       montoLibre.value = double.tryParse(montoLibreController.text) ?? 0.0;
     });
+    cantidadLibreController.addListener(() {
+      durationValue.value = int.tryParse(cantidadLibreController.text) ?? 0;
+    });
 
     // Con los últimos precios conocidos desde el primer cuadro; la consulta
     // de abajo solo los actualiza si cambiaron.
@@ -252,6 +256,8 @@ class AbonarController extends GetxController
     if (fijo == isPrecioFijo.value) return;
     if (fijo && !hayCostosFijos) return;
     isPrecioFijo.value = fijo;
+    if (fijo && durationValue.value <= 0) durationValue.value = 1;
+    if (!fijo) cantidadLibreController.text = '${durationValue.value}';
     if (fijo && configuredPrice == null) {
       durationType.value = periodosConPrecio.first;
     }
@@ -268,6 +274,7 @@ class AbonarController extends GetxController
   @override
   void onClose() {
     searchController.dispose();
+    cantidadLibreController.dispose();
     montoLibreController.dispose();
     super.onClose();
   }
@@ -345,6 +352,7 @@ class AbonarController extends GetxController
     paymentMethod.value = 'efectivo';
     limpiarReferencia();
     montoLibreController.clear();
+    cantidadLibreController.text = '1';
     durationValue.value = 1;
     durationType.value = 'Meses';
     // El siguiente cliente vuelve a empezar con precio fijo, aunque al
@@ -404,7 +412,7 @@ class AbonarController extends GetxController
     final amount = totalAmount;
     final descripcion = isPrecioFijo.value
         ? 'Abono: $periods ${durationType.value.toLowerCase()} × \$${configuredPrice!.toStringAsFixed(2)}'
-        : 'Abono: $periodoElegido · \$${amount.toStringAsFixed(2)}';
+        : 'Abono libre: $periods ${durationType.value.toLowerCase()} × \$${montoLibre.value.toStringAsFixed(2)} = \$${amount.toStringAsFixed(2)}';
 
     isLoading.value = true;
     try {

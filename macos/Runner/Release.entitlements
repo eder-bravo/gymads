@@ -8,6 +8,9 @@
 	     y devuelve "Operation not permitted" (errno 1). -->
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- Retorno OAuth por loopback desde el navegador predeterminado. -->
+	<key>com.apple.security.network.server</key>
+	<true/>
 	<key>com.apple.security.personal-information.pasteboard</key>
 	<true/>
 	<key>com.apple.security.device.camera</key>

@@ -311,7 +311,10 @@ class LoginView extends GetView<AuthController> {
     return Obx(() => ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 50),
           child: ElevatedButton(
-            onPressed: controller.isLoading.value ? null : controller.login,
+            onPressed:
+                controller.isLoading.value && !controller.waitingForGoogle.value
+                    ? null
+                    : controller.login,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
@@ -320,31 +323,32 @@ class LoginView extends GetView<AuthController> {
               ),
               elevation: 0,
             ),
-            child: controller.isLoading.value
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.login, size: 20),
-                      SizedBox(width: 8),
-                      Flexible(
-                          child: Text(
-                        'Iniciar Sesión',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+            child:
+                controller.isLoading.value && !controller.waitingForGoogle.value
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
                         ),
-                      )),
-                    ],
-                  ),
+                      )
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.login, size: 20),
+                          SizedBox(width: 8),
+                          Flexible(
+                              child: Text(
+                            'Iniciar Sesión',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )),
+                        ],
+                      ),
           ),
         ));
   }
@@ -354,8 +358,11 @@ class LoginView extends GetView<AuthController> {
     return Obx(() => ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 50),
           child: OutlinedButton(
-            onPressed:
-                controller.isLoading.value ? null : controller.loginWithGoogle,
+            onPressed: controller.waitingForGoogle.value
+                ? controller.cancelGoogleSignIn
+                : (controller.isLoading.value
+                    ? null
+                    : controller.loginWithGoogle),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: c.contraste.withOpacity(0.24)),
               shape: RoundedRectangleBorder(
@@ -382,7 +389,9 @@ class LoginView extends GetView<AuthController> {
                 const SizedBox(width: 12),
                 Flexible(
                     child: Text(
-                  'Continuar con Google',
+                  controller.waitingForGoogle.value
+                      ? 'Cancelar inicio con Google'
+                      : 'Continuar con Google',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: c.contraste,

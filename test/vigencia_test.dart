@@ -86,14 +86,14 @@ void main() {
           1000);
     });
 
-    test('abono libre: lo escrito es el total', () {
+    test('abono libre: el precio escrito se multiplica por la cantidad', () {
       expect(
           totalDelCobro(
               costoFijo: false,
               precioPorPeriodo: 500,
               cantidad: 2,
               montoLibre: 800),
-          800);
+          1600);
     });
 
     test('qué falta para cobrar', () {
@@ -110,7 +110,7 @@ void main() {
               precioPorPeriodo: null,
               cantidad: 1,
               montoLibre: 0),
-          'Escribe cuánto paga');
+          'Escribe el precio por periodo');
       expect(
           faltaParaCobrarDe(
               costoFijo: true,

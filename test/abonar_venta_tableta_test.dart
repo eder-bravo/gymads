@@ -202,6 +202,26 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: _tabletas);
 
+  testWidgets('abono libre en tableta calcula el total de varios periodos',
+      (tester) async {
+    final c = abonar();
+    await mostrar(tester, const AbonarView(), const Size(1180, 820));
+    await tester.tap(find.text('Abono libre'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('cantidad_libre')), '2');
+    await tester.tap(find.text('Años'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('monto_libre')), '300');
+    await tester.pumpAndSettle();
+    expect(c.totalAmount, 600);
+    expect(find.text('Cobrar \$600'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await mostrar(tester, const AbonarView(), const Size(820, 1180));
+    expect(find.text('Cobrar \$600'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  }, variant: _tabletas);
+
   testWidgets('abonar cabe con texto grande, de pie y acostada',
       (tester) async {
     abonar();

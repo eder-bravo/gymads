@@ -574,6 +574,82 @@ void main() {
     expect(find.text('\$4,350'), findsOneWidget);
   }, variant: _escritorio);
 
+  testWidgets('la barra lateral se oculta y se vuelve a mostrar',
+      (tester) async {
+    Get.put<TenantContextService>(_Tenant());
+    Get.put<HomeController>(_Inicio());
+    MenuLateral.oculto.value = false;
+    addTearDown(() => MenuLateral.oculto.value = false);
+    await _mostrarApp(tester);
+    await _tamano(tester, const Size(1280, 800));
+    expect(find.byType(MenuLateral), findsOneWidget);
+    expect(find.byType(RielDelMenu), findsNothing);
+    final anchoConMenu = tester.getSize(find.byType(ConMenuLateral)).width;
+    expect(anchoConMenu, closeTo(1280 - MenuLateral.ancho - 1, 1));
+    // El botón dice lo que hace al pasar el mouse.
+    final ocultar =
+        find.byTooltip('Ocultar menú (${MenuLateral.textoAtajo('B')})');
+    expect(ocultar, findsOneWidget);
+
+    await tester.tap(ocultar);
+    await tester.pumpAndSettle();
+    expect(MenuLateral.oculto.value, isTrue);
+    expect(find.byType(MenuLateral), findsNothing);
+    expect(find.byType(RielDelMenu), findsOneWidget);
+    // El contenido aprovecha el ancho que se liberó.
+    final anchoSinMenu = tester.getSize(find.byType(ConMenuLateral)).width;
+    expect(anchoSinMenu, closeTo(1280 - MenuLateral.anchoRiel - 1, 1));
+    expect(anchoSinMenu, greaterThan(anchoConMenu));
+    // Las secciones siguen a un clic, con su nombre al pasar el mouse.
+    expect(find.byTooltip('Clientes'), findsOneWidget);
+    await tester.tap(find.byTooltip('Clientes'));
+    await tester.pumpAndSettle();
+    expect(Get.currentRoute, Routes.CLIENTES);
+    // Sigue oculto en la otra pantalla, y se muestra con el botón de la franja.
+    expect(find.byType(RielDelMenu), findsOneWidget);
+    await tester
+        .tap(find.byTooltip('Mostrar menú (${MenuLateral.textoAtajo('B')})'));
+    await tester.pumpAndSettle();
+    expect(MenuLateral.oculto.value, isFalse);
+    expect(find.byType(MenuLateral), findsOneWidget);
+
+    // El atajo ⌘/Ctrl + B hace lo mismo.
+    final mac = defaultTargetPlatform == TargetPlatform.macOS;
+    final modificador =
+        mac ? LogicalKeyboardKey.meta : LogicalKeyboardKey.control;
+    Future<void> atajo() async {
+      await tester.sendKeyDownEvent(modificador);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
+      await tester.sendKeyUpEvent(modificador);
+      await tester.pumpAndSettle();
+    }
+
+    await atajo();
+    expect(MenuLateral.oculto.value, isTrue);
+    await atajo();
+    expect(MenuLateral.oculto.value, isFalse);
+    expect(tester.takeException(), isNull);
+  }, variant: _escritorio);
+
+  testWidgets('oculto, el menú cabe con texto grande y en la ventana mínima',
+      (tester) async {
+    Get.put<TenantContextService>(_Tenant());
+    Get.put<HomeController>(_Inicio());
+    MenuLateral.oculto.value = true;
+    addTearDown(() => MenuLateral.oculto.value = false);
+    await _mostrarApp(tester);
+    for (final size in [
+      const Size(2560, 1410),
+      VentanaEscritorio.minimo,
+      const Size(800, 500),
+    ]) {
+      await _tamano(tester, size);
+      expect(find.byType(RielDelMenu), findsOneWidget, reason: '$size');
+      expect(tester.takeException(), isNull, reason: '$size');
+    }
+    await _capturar(tester, 'menu-oculto');
+  }, variant: _escritorio);
+
   testWidgets('la barra lateral no va en ventanas modales', (tester) async {
     Get.put<TenantContextService>(_Tenant());
     await _mostrar(tester, const ScaffoldAdaptable(body: SizedBox.expand()));

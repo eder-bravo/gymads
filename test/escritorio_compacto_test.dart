@@ -992,7 +992,10 @@ void main() {
       expect(ctrl.searchController.text, 'María');
       expect(FocusManager.instance.primaryFocus, same(foco));
       expect(tester.takeException(), isNull);
-      final tarjeta = find.byType(Card).first;
+      // En escritorio, el cliente es una tarjeta de la rejilla.
+      final tarjeta = find
+          .ancestor(of: find.text(cliente.name), matching: find.byType(InkWell))
+          .first;
       await tester.ensureVisible(tarjeta);
       await tester.pumpAndSettle();
       await tester.tapAt(tester.getTopLeft(tarjeta) + const Offset(10, 10));

@@ -222,6 +222,70 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: _tabletas);
 
+  // Escritorio (macOS, Windows y Linux): el mismo diseño que la tableta
+  // acostada. Antes era una columna angosta con mucho espacio vacío.
+  const escritorio = TargetPlatformVariant(
+      {TargetPlatform.macOS, TargetPlatform.windows, TargetPlatform.linux});
+
+  testWidgets('abonar en escritorio: clientes en tarjetas, sin vacío',
+      (tester) async {
+    final c = Get.put(AbonarController(
+      userRepository: _Usuarios(_tresClientes()),
+      ingresoService: _Ingresos(),
+      pricesRepository: _Precios(),
+    ));
+    await mostrar(tester, const AbonarView(), const Size(1280, 800));
+    final tops = [
+      for (final n in ['Ana López', 'Carlos Ruiz', 'María Pérez'])
+        tester.getTopLeft(find.text(n)).dy
+    ];
+    expect(tops.toSet().length, 1);
+    expect(tester.getCenter(find.textContaining('Cobrar visita')).dy,
+        closeTo(tester.getCenter(find.text('Buscar cliente...')).dy, 2));
+    await tester.tap(find.text('Carlos Ruiz'));
+    await tester.pumpAndSettle();
+    expect(c.selectedClient.value?.name, 'Carlos Ruiz');
+    expect(tester.takeException(), isNull);
+  }, variant: escritorio);
+
+  testWidgets('abonar en escritorio: pasos y, al lado, resumen y cobro',
+      (tester) async {
+    abonar();
+    await mostrar(tester, const AbonarView(), const Size(1280, 800));
+    expect(find.text('Continuar'), findsNothing);
+    expect(find.text('Efectivo'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('Resumen')).dx,
+        greaterThan(tester.getTopRight(find.text('¿Cuánto tiempo paga?')).dx));
+    expect(tester.getTopLeft(find.text('Cobrar \$500')).dx,
+        greaterThan(tester.getCenter(find.text('Efectivo')).dx));
+    expect(tester.takeException(), isNull);
+  }, variant: escritorio);
+
+  testWidgets('abonar en escritorio cabe con texto grande', (tester) async {
+    Get.put(AbonarController(
+      userRepository: _Usuarios(_tresClientes()),
+      ingresoService: _Ingresos(),
+      pricesRepository: _Precios(),
+    ));
+    final c = Get.find<AbonarController>();
+    for (final escala in [1.0, 1.3, 2.0]) {
+      for (final tamano in [
+        const Size(960, 600),
+        const Size(1280, 800),
+        const Size(1920, 1000),
+      ]) {
+        c.selectedClient.value = null;
+        await mostrar(tester, const AbonarView(), tamano, escala: escala);
+        expect(tester.takeException(), isNull,
+            reason: 'buscar $tamano, texto $escala');
+        c.selectedClient.value = c.searchResults.first;
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull,
+            reason: 'cobro $tamano, texto $escala');
+      }
+    }
+  }, variant: escritorio);
+
   testWidgets('abonar cabe con texto grande, de pie y acostada',
       (tester) async {
     abonar();

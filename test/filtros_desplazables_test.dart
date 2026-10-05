@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
+import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/core/theme/app_theme.dart';
 
 /// Los filtros de categoría (Venta e Inventario) que no caben en el ancho se
@@ -26,13 +27,14 @@ Future<void> _mostrar(
   required Size tamano,
   required int categorias,
   double escala = 1,
+  ThemeData? tema,
 }) async {
   tester.view.physicalSize = tamano;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   String? elegida;
   await tester.pumpWidget(MaterialApp(
-    theme: AppTheme.oscuro,
+    theme: tema ?? AppTheme.oscuro,
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context)
           .copyWith(textScaler: TextScaler.linear(escala)),
@@ -152,6 +154,35 @@ void main() {
       }
     }
   }, variant: _pantallaGrande);
+
+  /// Color del texto del filtro elegido ("Todas" al empezar).
+  Color? colorDelElegido(WidgetTester tester) => tester
+      .widget<Text>(find.descendant(
+          of: find.byType(FilterChip).first, matching: find.text('Todas')))
+      .style
+      ?.color;
+
+  testWidgets('escritorio: el filtro elegido va en blanco, también en claro',
+      (tester) async {
+    for (final tema in [AppTheme.claro, AppTheme.oscuro]) {
+      await _mostrar(tester,
+          tamano: const Size(1000, 800), categorias: 3, tema: tema);
+      expect(colorDelElegido(tester), Colors.white);
+    }
+  },
+      variant: const TargetPlatformVariant({
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux
+      }));
+
+  testWidgets('teléfono: el filtro elegido conserva su color', (tester) async {
+    await _mostrar(tester,
+        tamano: const Size(390, 844), categorias: 3, tema: AppTheme.claro);
+    expect(colorDelElegido(tester), ColoresTema.claro.textPrimary);
+  },
+      variant: const TargetPlatformVariant(
+          {TargetPlatform.android, TargetPlatform.iOS}));
 
   testWidgets('teléfono: la lista de siempre, sin barra ni espacio nuevo',
       (tester) async {

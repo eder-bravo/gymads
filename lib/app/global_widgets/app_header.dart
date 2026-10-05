@@ -158,6 +158,9 @@ class CategoryFilterChips extends StatelessWidget {
       CategoryChipData(id: '', label: allLabel, icon: allIcon),
       ...categories,
     ];
+    // En escritorio, el elegido en blanco sobre el azul: en modo claro el
+    // texto oscuro casi no se leía.
+    final elegido = PlataformaApp.escritorio ? Colors.white : c.textPrimary;
 
     // Una fila que se desplaza de lado; en pantalla grande con barra visible,
     // rueda y arrastre del mouse para llegar a las categorías que no caben.
@@ -172,12 +175,12 @@ class CategoryFilterChips extends StatelessWidget {
             avatar: Icon(
               item.icon,
               size: 18,
-              color: isSelected ? c.textPrimary : c.textSecondary,
+              color: isSelected ? elegido : c.textSecondary,
             ),
             label: Text(
               item.label,
               style: TextStyle(
-                color: isSelected ? c.textPrimary : c.textSecondary,
+                color: isSelected ? elegido : c.textSecondary,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),

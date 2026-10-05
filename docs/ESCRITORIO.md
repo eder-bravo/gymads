@@ -113,9 +113,18 @@ Patrones propios de escritorio (en el teléfono no cambian):
   el mouse. La barra solo aparece si algo no cabe. En tableta la barra indica
   que hay más a los lados; el teléfono conserva su lista de siempre. La fila
   mide todos sus elementos (no es una lista perezosa) para que la barra llegue
-  de verdad al último filtro.
-- **Configuración en dos columnas**, con Cerrar sesión aparte y a todo lo
-  ancho debajo de las opciones.
+  de verdad al último filtro. En computadora, el filtro elegido lleva texto e
+  ícono blancos sobre el azul (en modo claro el texto oscuro casi no se leía).
+- **Configuración en dos columnas**. Cerrar sesión es un botón rojo con borde,
+  debajo de las opciones y alineado con ellas, como en las apps del sistema; la
+  franja roja a todo lo ancho se veía turbia porque su sombra se traslucía. La
+  tableta y el teléfono conservan la tarjeta.
+- **Abonar como en la tableta acostada**: clientes en tarjetas (3 por fila,
+  de 380 como máximo para que quepa "3 de enero de 2027") con "Cobrar visita"
+  junto al buscador (arriba si la ventana es angosta), y el cobro con todo
+  abierto: los pasos a la izquierda y el resumen con "Cobrar $…" en una
+  tarjeta a la derecha, desde 820 puntos de contenido (sin contar la barra
+  lateral). Antes era una columna de 800 con mucho espacio vacío.
 - **Historiales alineados**: en ingresos y entradas el importe y el estado van
   al borde derecho de cada ficha, con cifras tabulares.
 
@@ -312,7 +321,7 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 755 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 773 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`

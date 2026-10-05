@@ -287,10 +287,38 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
       children: [
         ResumenAdaptable(anchoMinimo: 380, espacio: 12, children: tarjetas),
         const SizedBox(height: 24),
-        peligrosas,
+        // En computadora, un botón como en las apps del sistema: la franja
+        // roja a todo lo ancho se veía turbia (su sombra se trasluce).
+        if (PlataformaApp.escritorio)
+          Align(
+            alignment: Alignment.centerLeft,
+            // Alineado con el borde de las tarjetas (su margen es de 4).
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: _botonCerrarSesion(context),
+            ),
+          )
+        else
+          peligrosas,
       ],
     );
   }
+
+  Widget _botonCerrarSesion(BuildContext context) => OutlinedButton.icon(
+        onPressed: controller.logout,
+        icon: const Icon(Icons.logout, size: 20),
+        label: const Text('Cerrar sesión'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.error,
+          backgroundColor: context.colores.cardBackground,
+          side: BorderSide(color: AppColors.error.withOpacity(0.5)),
+          minimumSize: const Size(0, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+      );
 
   Widget _buildOptionTile(
     BuildContext context, {

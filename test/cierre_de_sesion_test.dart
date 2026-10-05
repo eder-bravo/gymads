@@ -111,6 +111,46 @@ void main() {
     TargetPlatform.windows,
   });
 
+  testWidgets(
+      'en computadora, "Cerrar sesión" es un botón; en el teléfono, '
+      'la tarjeta de siempre', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800) * 2;
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(GetMaterialApp(
+      theme: AppTheme.claro,
+      builder: (context, child) => VentanaEscritorio(child: child!),
+      initialRoute: Routes.CONFIGURACION,
+      getPages: [
+        GetPage(
+            name: Routes.CONFIGURACION,
+            page: () => const ConfiguracionView(),
+            binding: _Binding()),
+      ],
+    ));
+    await tester.pumpAndSettle();
+    final boton = find.widgetWithText(OutlinedButton, 'Cerrar sesión');
+    final tarjeta = find.widgetWithText(ListTile, 'Cerrar sesión');
+    if (PlataformaApp.escritorio) {
+      expect(boton, findsOneWidget);
+      expect(tarjeta, findsNothing);
+      // Alineado con el borde izquierdo de las tarjetas de arriba.
+      // (el Card mide también su margen de 4).
+      expect(tester.getTopLeft(boton).dx,
+          tester.getTopLeft(find.widgetWithText(Card, 'Apariencia')).dx + 4);
+    } else {
+      expect(boton, findsNothing);
+      expect(tarjeta, findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
+  },
+      variant: const TargetPlatformVariant({
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+        TargetPlatform.android,
+      }));
+
   for (final tamano in [const Size(390, 844), const Size(1180, 820)]) {
     testWidgets('cerrar sesión desde Configuración (${tamano.width.toInt()})',
         (tester) async {

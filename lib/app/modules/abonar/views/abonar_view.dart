@@ -24,12 +24,8 @@ class AbonarView extends GetView<AbonarController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
-    // En tableta acostada el cobro va en dos columnas: los pasos y, al lado,
-    // el resumen con el botón de cobrar.
-    final dosColumnas =
-        PlataformaApp.tableta && MediaQuery.sizeOf(context).width >= 820;
     return ScaffoldAdaptable(
-      anchoMaximo: PlataformaApp.tableta ? 1200 : 800,
+      anchoMaximo: PlataformaApp.pantallaGrande ? 1200 : 800,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Abonar',
@@ -48,34 +44,48 @@ class AbonarView extends GetView<AbonarController> {
           }),
         ],
       ),
+      // Builder: en escritorio, el ancho que se mide es el del contenido, sin
+      // la barra lateral.
       body: SafeArea(
-        child: Obx(() {
-          if (controller.isSuccess.value) {
-            return _buildSuccessState(context);
-          }
+        child: Builder(
+          builder: (context) => Obx(() {
+            if (controller.isSuccess.value) {
+              return _buildSuccessState(context);
+            }
 
-          if (controller.selectedClient.value == null) {
-            return _buildSearchState(context);
-          }
+            if (controller.selectedClient.value == null) {
+              return _buildSearchState(context);
+            }
 
-          if (PlataformaApp.tableta) {
-            return _formularioTableta(context, dosColumnas: dosColumnas);
-          }
-          return _buildAbonarForm(context);
-        }),
+            if (PlataformaApp.pantallaGrande) {
+              return _formularioTableta(context,
+                  dosColumnas: _dosColumnas(context));
+            }
+            return _buildAbonarForm(context);
+          }),
+        ),
       ),
       // El botón de cobrar, fijo abajo y con el monto: siempre a la vista.
-      bottomNavigationBar: Obx(() {
-        final cobrando = !controller.isSuccess.value &&
-            controller.selectedClient.value != null;
-        if (!cobrando || dosColumnas) return const SizedBox.shrink();
-        return _botonCobrar(context, directo: PlataformaApp.tableta);
-      }),
+      bottomNavigationBar: Builder(
+        builder: (context) => Obx(() {
+          final cobrando = !controller.isSuccess.value &&
+              controller.selectedClient.value != null;
+          if (!cobrando || _dosColumnas(context)) {
+            return const SizedBox.shrink();
+          }
+          return _botonCobrar(context, directo: PlataformaApp.pantallaGrande);
+        }),
+      ),
     );
   }
 
+  /// En tableta acostada y en escritorio el cobro va en dos columnas: los
+  /// pasos y, al lado, el resumen con el botón de cobrar.
+  static bool _dosColumnas(BuildContext context) =>
+      PlataformaApp.pantallaGrande && MediaQuery.sizeOf(context).width >= 820;
+
   Widget _buildSearchState(BuildContext context) {
-    if (PlataformaApp.tableta) return _busquedaTableta(context);
+    if (PlataformaApp.pantallaGrande) return _busquedaTableta(context);
     final c = context.colores;
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -234,7 +244,7 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
-  /// Buscar cliente en tableta: el buscador con "Cobrar visita" al lado y los
+  /// Buscar cliente en tableta y escritorio: el buscador con "Cobrar visita" al lado y los
   /// clientes en tarjetas grandes (2 o 3 por fila) con su foto y cómo está su
   /// membresía. Una lista de filas delgadas dejaba casi toda la pantalla
   /// vacía. Tocar una tarjeta abre el cobro, como en el teléfono.
@@ -246,58 +256,69 @@ class AbonarView extends GetView<AbonarController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TourStep(
-                  tourKey: controller.keyBuscar,
-                  title: 'Busca al cliente',
-                  description: 'Busca por nombre o teléfono, o pasa su '
-                      'tarjeta por el lector.',
-                  child: AppSearchField(
-                    hintText: 'Buscar cliente...',
-                    controller: controller.searchController,
-                    keyboardType: TextInputType.phone,
+          // Buscador con "Cobrar visita" al lado; si la ventana es angosta,
+          // el botón va arriba, a la derecha.
+          LayoutBuilder(builder: (context, limites) {
+            final buscador = TourStep(
+              tourKey: controller.keyBuscar,
+              title: 'Busca al cliente',
+              description: 'Busca por nombre o teléfono, o pasa su '
+                  'tarjeta por el lector.',
+              child: AppSearchField(
+                hintText: 'Buscar cliente...',
+                controller: controller.searchController,
+                keyboardType: TextInputType.phone,
+              ),
+            );
+            final visita = TourStep(
+              tourKey: controller.keyVisita,
+              title: 'Cobrar una visita',
+              description: 'Cobra un día a alguien que no es cliente.',
+              isFirstStep: true,
+              child: Obx(() {
+                final precio = controller.prices.value?.priceDay;
+                return OutlinedButton.icon(
+                  onPressed: () => abrirCobrarVisita(precioDia: precio),
+                  icon:
+                      const Icon(Icons.confirmation_number_outlined, size: 22),
+                  label: Text(precio == null
+                      ? 'Cobrar visita'
+                      : 'Cobrar visita · ${pesos(precio)}'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
+                    minimumSize: const Size(0, 56),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    textStyle: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
                   ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              TourStep(
-                tourKey: controller.keyVisita,
-                title: 'Cobrar una visita',
-                description: 'Cobra un día a alguien que no es cliente.',
-                isFirstStep: true,
-                child: Obx(() {
-                  final precio = controller.prices.value?.priceDay;
-                  return OutlinedButton.icon(
-                    onPressed: () => abrirCobrarVisita(precioDia: precio),
-                    icon: const Icon(Icons.confirmation_number_outlined,
-                        size: 22),
-                    label: Text(precio == null
-                        ? 'Cobrar visita'
-                        : 'Cobrar visita · ${pesos(precio)}'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.accent,
-                      side:
-                          BorderSide(color: AppColors.accent.withOpacity(0.5)),
-                      minimumSize: const Size(0, 56),
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                      textStyle: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                  );
-                }),
-              ),
-            ],
-          ),
+                );
+              }),
+            );
+            if (limites.maxWidth >= 560 * escala) {
+              return Row(children: [
+                Expanded(child: buscador),
+                const SizedBox(width: 16),
+                visita,
+              ]);
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(alignment: Alignment.centerRight, child: visita),
+                const SizedBox(height: 12),
+                buscador,
+              ],
+            );
+          }),
           const SizedBox(height: 20),
           Expanded(
             child: TourStep(
               tourKey: controller.keyResultados,
               title: 'Cobra su membresía',
-              description: 'Toca un cliente para cobrarle.',
+              description: '${PlataformaApp.toca} un cliente para cobrarle.',
               isLastStep: true,
               child: Obx(() {
                 if (controller.isLoadingClients.value) {
@@ -322,7 +343,9 @@ class AbonarView extends GetView<AbonarController> {
                   child: GridView.builder(
                     padding: const EdgeInsets.only(bottom: 24),
                     gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 340,
+                      // En escritorio, un poco más anchas: con 4 por fila la
+                      // fecha larga ("3 de enero de 2027") se cortaba.
+                      maxCrossAxisExtent: PlataformaApp.escritorio ? 380 : 340,
                       mainAxisExtent: 172 * escala,
                       crossAxisSpacing: 16,
                       mainAxisSpacing: 16,
@@ -398,7 +421,7 @@ class AbonarView extends GetView<AbonarController> {
     );
   }
 
-  /// El cobro en tableta: con espacio de sobra no hace falta ir paso por
+  /// El cobro en tableta y escritorio: con espacio de sobra no hace falta ir paso por
   /// paso. Todo está abierto a la vez y se cobra directo, sin "Continuar".
   /// Acostada, el resumen y el botón quedan fijos a la derecha; de pie, el
   /// resumen va al final y el botón abajo.
@@ -444,10 +467,21 @@ class AbonarView extends GetView<AbonarController> {
         Expanded(child: pasos),
         Container(
           width: 360,
-          decoration: BoxDecoration(
-            color: c.cardBackground,
-            border: Border(left: BorderSide(color: c.divisor)),
-          ),
+          // En escritorio el contenido no llega a la orilla de la ventana:
+          // una tarjeta con margen en vez de un panel pegado a la derecha.
+          margin: PlataformaApp.escritorio
+              ? const EdgeInsets.fromLTRB(8, 16, 16, 16)
+              : null,
+          decoration: PlataformaApp.escritorio
+              ? BoxDecoration(
+                  color: c.cardBackground,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: c.divisor),
+                )
+              : BoxDecoration(
+                  color: c.cardBackground,
+                  border: Border(left: BorderSide(color: c.divisor)),
+                ),
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -904,14 +938,30 @@ class AbonarView extends GetView<AbonarController> {
         fontSize: grande ? 20 : 16,
         fontWeight: grande ? FontWeight.bold : FontWeight.normal,
       );
-      return Row(
-        children: [
-          Expanded(child: Text(izquierda, style: estilo)),
-          Text(derecha,
-              style: grande
-                  ? estilo.copyWith(color: AppColors.accent, fontSize: 24)
-                  : estilo),
-        ],
+      final monto = Text(derecha,
+          style: grande
+              ? estilo.copyWith(color: AppColors.accent, fontSize: 24)
+              : estilo);
+      if (!PlataformaApp.pantallaGrande) {
+        return Row(
+          children: [
+            Expanded(child: Text(izquierda, style: estilo)),
+            monto,
+          ],
+        );
+      }
+      // En el panel lateral (360) con texto grande, el monto se achica en vez
+      // de salirse.
+      return LayoutBuilder(
+        builder: (context, limites) => Row(
+          children: [
+            Expanded(child: Text(izquierda, style: estilo)),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: limites.maxWidth * 0.6),
+              child: FittedBox(fit: BoxFit.scaleDown, child: monto),
+            ),
+          ],
+        ),
       );
     }
 
@@ -959,7 +1009,7 @@ class AbonarView extends GetView<AbonarController> {
   /// llenan los pasos y "Cobrar $1,000" en el resumen. Si falta algo, apagado
   /// y diciendo qué.
   ///
-  /// [directo] (tableta, con todo a la vista): cobra sin pasar por
+  /// [directo] (tableta y escritorio, con todo a la vista): cobra sin pasar por
   /// "Continuar". [enPanel]: dentro del resumen lateral, a todo lo ancho.
   Widget _botonCobrar(BuildContext context,
       {bool directo = false, bool enPanel = false}) {

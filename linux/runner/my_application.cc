@@ -40,14 +40,22 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "gymads");
+    gtk_header_bar_set_title(header_bar, "GymOne");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "gymads");
+    gtk_window_set_title(window, "GymOne");
   }
 
-  gtk_window_set_default_size(window, 1280, 720);
+  // Igual que en macOS y Windows: abre en 1280×800, centrada, y no se puede
+  // achicar a menos de 960×600 (por debajo la app no cabe con su diseño de
+  // escritorio; ver VentanaEscritorio en diseno_escritorio.dart).
+  gtk_window_set_default_size(window, 1280, 800);
+  GdkGeometry minimo = {};
+  minimo.min_width = 960;
+  minimo.min_height = 600;
+  gtk_window_set_geometry_hints(window, nullptr, &minimo, GDK_HINT_MIN_SIZE);
+  gtk_window_set_position(window, GTK_WIN_POS_CENTER);
   gtk_widget_show(GTK_WIDGET(window));
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();

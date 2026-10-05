@@ -66,6 +66,11 @@ const _disenos = <_Diseno>[
     plataforma: TargetPlatform.windows,
     tamano: Size(1920, 1080)
   ),
+  (
+    nombre: 'escritorio',
+    plataforma: TargetPlatform.linux,
+    tamano: Size(1920, 1080)
+  ),
 ];
 
 Future<void> _app(WidgetTester tester, Size tamano) async {

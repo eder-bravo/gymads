@@ -16,8 +16,8 @@ import 'package:gymads/app/modules/inventario/views/inventario_view.dart';
 import 'package:gymads/app/modules/point_of_sale/controllers/point_of_sale_controller.dart';
 import 'package:gymads/app/modules/point_of_sale/views/point_of_sale_view.dart';
 
-const _escritorio =
-    TargetPlatformVariant({TargetPlatform.macOS, TargetPlatform.windows});
+const _escritorio = TargetPlatformVariant(
+    {TargetPlatform.macOS, TargetPlatform.windows, TargetPlatform.linux});
 
 Future<void> _leer(
   WidgetTester tester,

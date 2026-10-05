@@ -65,6 +65,6 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
         variant: const TargetPlatformVariant(
-            {TargetPlatform.macOS, TargetPlatform.windows}));
+            {TargetPlatform.macOS, TargetPlatform.windows, TargetPlatform.linux}));
   }
 }

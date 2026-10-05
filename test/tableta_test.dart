@@ -168,8 +168,11 @@ void main() {
     expect(PlataformaApp.tableta, isFalse);
     expect(PlataformaApp.pantallaGrande, isTrue);
   },
-      variant: const TargetPlatformVariant(
-          {TargetPlatform.macOS, TargetPlatform.windows}));
+      variant: const TargetPlatformVariant({
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux
+      }));
 
   testWidgets('inicio de tableta: números arriba y un dato en cada recuadro',
       (tester) async {

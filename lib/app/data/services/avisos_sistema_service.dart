@@ -65,7 +65,8 @@ class AvisosSistema {
       (Platform.isAndroid ||
           Platform.isIOS ||
           Platform.isMacOS ||
-          Platform.isWindows);
+          Platform.isWindows ||
+          Platform.isLinux);
 
   /// Prepara las notificaciones. No pide permiso: eso se hace solo en el
   /// teléfono que atiende el lector ([pedirPermiso]).
@@ -73,21 +74,25 @@ class AvisosSistema {
     if (!_soportado || _listo) return;
     try {
       await _plugin.initialize(
-        settings: const InitializationSettings(
-          android: AndroidInitializationSettings('ic_notificacion'),
-          iOS: DarwinInitializationSettings(
+        settings: InitializationSettings(
+          android: const AndroidInitializationSettings('ic_notificacion'),
+          iOS: const DarwinInitializationSettings(
             requestAlertPermission: false,
             requestSoundPermission: false,
             requestBadgePermission: false,
           ),
-          macOS: DarwinInitializationSettings(
+          macOS: const DarwinInitializationSettings(
               requestAlertPermission: false,
               requestSoundPermission: false,
               requestBadgePermission: false),
-          windows: WindowsInitializationSettings(
+          windows: const WindowsInitializationSettings(
               appName: 'GymOne',
               appUserModelId: 'GymOne.Desktop',
               guid: 'c4528774-85b5-4dd4-9c45-47b9d4a7e292'),
+          // Linux no pide permiso: se muestran por el servicio del escritorio.
+          linux: LinuxInitializationSettings(
+              defaultActionName: 'Abrir GymOne',
+              defaultIcon: AssetsLinuxIcon('assets/images/logo_app.png')),
         ),
       );
       await _plugin
@@ -159,6 +164,8 @@ class AvisosSistema {
           macOS: const DarwinNotificationDetails(
               presentAlert: true, presentSound: true),
           windows: const WindowsNotificationDetails(),
+          linux: const LinuxNotificationDetails(
+              urgency: LinuxNotificationUrgency.normal),
         ),
       );
     } catch (e) {

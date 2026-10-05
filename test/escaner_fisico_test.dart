@@ -40,7 +40,11 @@ void main() {
         '00123');
   });
 
-  for (final plataforma in [TargetPlatform.macOS, TargetPlatform.windows]) {
+  for (final plataforma in [
+    TargetPlatform.macOS,
+    TargetPlatform.windows,
+    TargetPlatform.linux,
+  ]) {
     testWidgets('$plataforma abre lector físico sin crear escáner de cámara',
         (tester) async {
       debugDefaultTargetPlatformOverride = plataforma;

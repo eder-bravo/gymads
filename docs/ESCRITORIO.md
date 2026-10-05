@@ -7,7 +7,7 @@ Las versiones exactas resueltas están en `pubspec.lock`.
 
 Hay tres diseños, y el del teléfono no cambia:
 
-- **Escritorio** (macOS y Windows, `PlataformaApp.escritorio`): barra lateral
+- **Escritorio** (macOS, Windows y Linux, `PlataformaApp.escritorio`): barra lateral
   con las secciones, Inicio como panel del día, mouse y teclado.
 - **Tableta** (iPad o Android con 720 puntos o más por su lado corto,
   `PlataformaApp.tableta`): Inicio con rejilla "bento", sin barra lateral,
@@ -22,6 +22,31 @@ dos columnas e importes con separador de miles. Lo del mouse y el teclado
 computadora) sigue con `PlataformaApp.escritorio`. En tableta los textos dicen
 "Toca" y hablan del "dispositivo"; la ventana modal de un formulario se
 acorta cuando aparece el teclado en pantalla.
+
+**Linux.** Usa el mismo diseño de escritorio (antes caía en el del teléfono).
+La ventana abre en 1280×800 centrada y no baja de 960×600, como en macOS y
+Windows (`linux/runner/my_application.cc`). Funciona todo lo de las otras
+computadoras:
+
+- Cámara (fotos de clientes): `camera_desktop` (GStreamer + V4L2), copiado en
+  `packages/camera_desktop` con solo Linux declarado para no chocar con
+  `camera_windows`. Usa el mismo camino que Windows en `desktop_camera_view`.
+  Sin "Abrir permisos de cámara": Linux no tiene ese permiso.
+- Bluetooth del lector: Universal BLE (BlueZ), igual que Windows. Con
+  FlutterBluePlus, BlueZ no vuelve a anunciar un lector que ya vio y la
+  segunda búsqueda no lo encontraría. Los mensajes dicen "Linux".
+- Sonidos del lector: `just_audio_media_kit` (libmpv), iniciado solo en Linux
+  en `main.dart`; Windows sigue con `just_audio_windows`. mimalloc enlazado en
+  `linux/CMakeLists.txt`.
+- Notificaciones de pases: `flutter_local_notifications` con su parte de Linux.
+- Permisos no ofrece "Abrir ajustes": en Linux no hay permisos del sistema.
+
+Para compilar en Linux (Ubuntu/Debian):
+
+```
+sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+  gstreamer1.0-plugins-good libmpv-dev mpv
+```
 
 ## Diseño de escritorio
 
@@ -287,7 +312,7 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 669 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 755 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`

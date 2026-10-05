@@ -900,8 +900,11 @@ void main() {
       }
       await tester.pumpWidget(const SizedBox());
     },
-        variant: const TargetPlatformVariant(
-            {TargetPlatform.macOS, TargetPlatform.windows}));
+        variant: const TargetPlatformVariant({
+          TargetPlatform.macOS,
+          TargetPlatform.windows,
+          TargetPlatform.linux
+        }));
   }
 
   testWidgets('producto conserva texto, selección y foco al reducir y ampliar',
@@ -958,8 +961,11 @@ void main() {
     }
     await tester.pumpWidget(const SizedBox());
   },
-      variant: const TargetPlatformVariant(
-          {TargetPlatform.macOS, TargetPlatform.windows}));
+      variant: const TargetPlatformVariant({
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux
+      }));
 
   testWidgets('Abonar permite elegir al cliente tras reducir la ventana',
       (tester) async {
@@ -999,6 +1005,9 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   },
-      variant: const TargetPlatformVariant(
-          {TargetPlatform.macOS, TargetPlatform.windows}));
+      variant: const TargetPlatformVariant({
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux
+      }));
 }

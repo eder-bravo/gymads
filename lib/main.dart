@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/material_localizations_12h.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
@@ -39,6 +40,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // En iPad (iPadOS 26+), cuánto ocupan los botones de la ventana.
   VentanaEscritorio.escucharControlesDeVentana();
+  // Sonidos del lector en Linux (just_audio no trae Linux): con libmpv.
+  // Windows sigue con just_audio_windows.
+  if (PlataformaApp.linux) {
+    JustAudioMediaKit.ensureInitialized(linux: true, windows: false);
+  }
   // Carga las variables de entorno
   await dotenv.load(fileName: ".env");
 

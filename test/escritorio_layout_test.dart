@@ -35,8 +35,8 @@ import 'package:gymads/core/theme/app_theme.dart';
 
 import 'herramientas/resumen_de_prueba.dart';
 
-const _escritorio =
-    TargetPlatformVariant({TargetPlatform.macOS, TargetPlatform.windows});
+const _escritorio = TargetPlatformVariant(
+    {TargetPlatform.macOS, TargetPlatform.windows, TargetPlatform.linux});
 const _capturas = bool.fromEnvironment('CAPTURAS_ESCRITORIO');
 final _imagen = GlobalKey();
 

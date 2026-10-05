@@ -16,9 +16,14 @@ import 'transporte_lector_ble.dart';
 
 /// Dónde se da el permiso de Bluetooth: en macOS, los ajustes del sistema;
 /// en el teléfono, los permisos de la app.
-String get _ajustesBluetooth => PlataformaApp.escritorio
-    ? 'Ajustes del Sistema > Privacidad y seguridad > Bluetooth'
-    : 'Ajustes > Aplicaciones > GymOne > Permisos';
+String get _ajustesBluetooth => PlataformaApp.linux
+    ? 'la configuración de Bluetooth del sistema'
+    : PlataformaApp.escritorio
+        ? 'Ajustes del Sistema > Privacidad y seguridad > Bluetooth'
+        : 'Ajustes > Aplicaciones > GymOne > Permisos';
+
+/// Windows o Linux: las dos computadoras que buscan con Universal BLE.
+String get _sistemaUniversal => PlataformaApp.linux ? 'Linux' : 'Windows';
 
 // UUIDs del firmware 6.0 (arduino/esp32_rfid_wifi_setup_fixed). Si cambian
 // allá, cambian aquí. No cambiaron con el nombre GymOne (v6.4.0): con ellos
@@ -363,7 +368,10 @@ class LimiteBusquedasBle {
 class LectorBleService {
   LectorBleService({RegistroBusquedaLector? registro, bool? usarBleWindows})
       : registroBusqueda = registro ?? RegistroBusquedaLector.instance,
-        _usarBleWindows = usarBleWindows ?? (!kIsWeb && Platform.isWindows);
+        // Linux también: con FlutterBluePlus, BlueZ no vuelve a anunciar un
+        // lector que ya vio, y una segunda búsqueda no lo encontraría.
+        _usarBleWindows = usarBleWindows ??
+            (!kIsWeb && (Platform.isWindows || Platform.isLinux));
 
   final RegistroBusquedaLector registroBusqueda;
   _BusquedaBle? _busqueda;
@@ -395,7 +403,7 @@ class LectorBleService {
   Future<void> prepararBluetooth() async {
     if (kIsWeb) {
       throw const FalloBusquedaBle(
-          'Configura el lector de tarjetas desde la app de macOS, Windows o tu celular. '
+          'Configura el lector de tarjetas desde la app de macOS, Windows, Linux o tu celular. '
           'El escáner de códigos USB funciona en esta página como teclado.',
           TipoFalloBusquedaBle.sinCompatibilidad);
     }
@@ -404,14 +412,14 @@ class LectorBleService {
           await universal.UniversalBle.getBluetoothAvailabilityState();
       if (estado == universal.AvailabilityState.poweredOn) return;
       if (estado == universal.AvailabilityState.unauthorized) {
-        throw const FalloBusquedaBle(
-            'Permite el acceso a Bluetooth en los ajustes de Windows.',
+        throw FalloBusquedaBle(
+            'Permite el acceso a Bluetooth en los ajustes de $_sistemaUniversal.',
             TipoFalloBusquedaBle.permisoBluetooth);
       }
       throw FalloBusquedaBle(
           estado == universal.AvailabilityState.poweredOff
-              ? 'Enciende Bluetooth en Windows. Si este equipo no tiene adaptador, configura el lector desde tu celular con la misma cuenta y red del gimnasio.'
-              : 'No hay Bluetooth BLE disponible. Usa un adaptador USB compatible con Windows o configura el lector desde tu celular con la misma cuenta. '
+              ? 'Enciende Bluetooth en $_sistemaUniversal. Si este equipo no tiene adaptador, configura el lector desde tu celular con la misma cuenta y red del gimnasio.'
+              : 'No hay Bluetooth BLE disponible. Usa un adaptador USB compatible con $_sistemaUniversal o configura el lector desde tu celular con la misma cuenta. '
                   'Después, esta computadora lo encontrará en la red del gimnasio.',
           estado == universal.AvailabilityState.poweredOff
               ? TipoFalloBusquedaBle.bluetoothApagado
@@ -655,8 +663,8 @@ class LectorBleService {
       adaptador = universal.UniversalBle.availabilityStream.listen((estado) {
         if (estado != universal.AvailabilityState.poweredOn &&
             !fin.isCompleted) {
-          fin.completeError(const FalloBusquedaBle(
-              'Bluetooth dejó de estar disponible. Revisa el adaptador de Windows.',
+          fin.completeError(FalloBusquedaBle(
+              'Bluetooth dejó de estar disponible. Revisa el adaptador de $_sistemaUniversal.',
               TipoFalloBusquedaBle.bluetoothNoListo));
         }
       });

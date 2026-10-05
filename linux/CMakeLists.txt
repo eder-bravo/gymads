@@ -74,6 +74,12 @@ set_target_properties(${BINARY_NAME}
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# Sonidos en Linux (just_audio_media_kit con libmpv): mimalloc evita las fugas
+# de memoria de libmpv. Lo prepara media_kit_libs_linux; ver su README.
+if(DEFINED MIMALLOC_LIB)
+  target_link_libraries(${BINARY_NAME} PRIVATE ${MIMALLOC_LIB})
+endif()
+
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build

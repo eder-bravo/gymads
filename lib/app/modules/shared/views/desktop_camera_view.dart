@@ -109,6 +109,8 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
                   _Camara(d.deviceId, d.localizedName ?? 'Cámara externa'))
               .toList();
         } else {
+          // Windows (camera_windows) y Linux (camera_desktop, con GStreamer)
+          // usan el mismo paquete camera.
           final devices = await availableCameras();
           _camaras = devices
               .map((d) =>
@@ -154,6 +156,11 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
           if (e is StateError) {
             // Mensajes de la propia app ("No hay cámaras…"): se leen tal cual.
             _error = e.message;
+          } else if (Platform.isLinux) {
+            // En Linux no hay permisos de cámara que revisar en el sistema.
+            _error = 'No se pudo abrir la cámara. Cierra otras apps que la '
+                'usen o elige otra cámara.';
+            _detalleError = '$e';
           } else {
             _error = 'No se pudo abrir la cámara. Revisa los permisos, '
                 'cierra otras apps que la usen o elige otra cámara.';
@@ -331,9 +338,10 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
                           ],
                         ),
                       ),
-                    const TextButton(
-                        onPressed: PermisosEscritorio.abrirAjustes,
-                        child: Text('Abrir permisos de cámara')),
+                    if (!Platform.isLinux)
+                      const TextButton(
+                          onPressed: PermisosEscritorio.abrirAjustes,
+                          child: Text('Abrir permisos de cámara')),
                     TextButton(
                         onPressed: () => _actualizar(),
                         child: const Text('Intentar de nuevo')),

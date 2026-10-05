@@ -4,7 +4,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:universal_ble/universal_ble.dart' as universal;
 
 /// Mantiene el protocolo del firmware y sus reservas en un solo servicio.
-/// Windows usa WinRT a través de Universal BLE; móviles/macOS usan FBP.
+/// Windows (WinRT) y Linux (BlueZ) usan Universal BLE; móviles/macOS usan FBP.
 class DispositivoLectorBle {
   DispositivoLectorBle(this.original, {required this.windows});
   final BluetoothDevice original;

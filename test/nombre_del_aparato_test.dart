@@ -56,6 +56,9 @@ void main() {
     expect(nombreDeApariencia(ThemeMode.system), 'Según la computadora');
     expect(nombreDeApariencia(ThemeMode.dark), 'Oscuro');
   },
-      variant: const TargetPlatformVariant(
-          {TargetPlatform.macOS, TargetPlatform.windows}));
+      variant: const TargetPlatformVariant({
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux
+      }));
 }

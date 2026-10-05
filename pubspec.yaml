@@ -58,6 +58,11 @@ dependencies:
     path: packages/camera_macos
   just_audio_windows: ^0.2.2
   universal_ble: ^2.3.0
+  # Cámara de escritorio en Linux (copia local con solo Linux; ver su README).
+  camera_desktop:
+    path: packages/camera_desktop
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_linux: ^1.2.1
 
 dev_dependencies:
   flutter_test:

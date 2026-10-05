@@ -1,0 +1,33 @@
+name: camera_desktop
+description: >-
+  A Flutter camera plugin for desktop platforms (Linux, macOS, Windows).
+  Implements camera_platform_interface for easy integration
+  with the standard camera package.
+version: 2.0.0
+publish_to: none
+homepage: https://github.com/hugocornellier/camera_desktop
+repository: https://github.com/hugocornellier/camera_desktop
+issue_tracker: https://github.com/hugocornellier/camera_desktop/issues
+
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.3.0'
+
+dependencies:
+  camera_platform_interface: ^2.7.0
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.0.2
+  stream_transform: ^2.1.0
+
+
+flutter:
+  plugin:
+    implements: camera
+    platforms:
+      # Copia local de camera_desktop 2.0.0 (MIT, ver LICENSE) solo para
+      # Linux: en Windows la cámara es camera_windows y en macOS
+      # camera_macos. Con las tres plataformas, chocaba con camera_windows.
+      linux:
+        dartPluginClass: CameraDesktopPlugin
+        pluginClass: CameraDesktopPlugin

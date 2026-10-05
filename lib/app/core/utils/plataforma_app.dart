@@ -3,10 +3,17 @@ import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 
 abstract final class PlataformaApp {
+  /// macOS, Windows o Linux: computadora con mouse y teclado.
   static bool get escritorio =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.macOS ||
-          defaultTargetPlatform == TargetPlatform.windows);
+          defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux);
+
+  /// Linux: escritorio, pero sin cámara ni Bluetooth en la app (no hay
+  /// plugins para esas dos cosas ahí).
+  static bool get linux =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.linux;
   static bool get escanerFisico => kIsWeb || escritorio;
 
   /// iPad o tableta Android de 720 puntos o más por su lado corto. Las

@@ -138,8 +138,10 @@ class PermisosView extends GetView<PermisosController> {
         notas.add('Los bloqueados solo se pueden activar desde los ajustes '
             'del sistema.');
       }
-      // En tableta, como en el teléfono: solo si algo quedó bloqueado.
-      if (controller.hayBloqueados || PlataformaApp.escritorio) {
+      // En tableta, como en el teléfono: solo si algo quedó bloqueado. En
+      // Linux no hay permisos del sistema que abrir.
+      if (controller.hayBloqueados ||
+          (PlataformaApp.escritorio && controller.permisos.isNotEmpty)) {
         botones.add(abrirAjustes);
       }
       if (controller.desdeConfiguracion && controller.hayNegados) {

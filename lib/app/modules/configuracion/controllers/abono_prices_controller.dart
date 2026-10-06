@@ -14,9 +14,15 @@ class AbonoPricesController extends GetxController {
   /// [repository] es para las pruebas; en la app, el de siempre.
   AbonoPricesController(
       {AbonoPricesRepository? repository,
-      CodigoAbonoLibreRepository? codigoRepository})
+      CodigoAbonoLibreRepository? codigoRepository,
+      Future<bool> Function(String modo)? guardarModo})
       : repository = repository ?? AbonoPricesRepository(),
-        codigoRepository = codigoRepository ?? CodigoAbonoLibreRepository();
+        codigoRepository = codigoRepository ?? CodigoAbonoLibreRepository(),
+        _guardarModo =
+            guardarModo ?? OnboardingController.savePaymentModeAndSyncProfile;
+
+  /// Guarda el modo de cobro al terminar el asistente (en pruebas, otro).
+  final Future<bool> Function(String modo) _guardarModo;
 
   final AbonoPricesRepository repository;
   final CodigoAbonoLibreRepository codigoRepository;
@@ -32,6 +38,11 @@ class AbonoPricesController extends GetxController {
   final yearController = TextEditingController();
   final inscripcionController = TextEditingController();
 
+  /// Código para abono libre al configurar el gimnasio (costos fijos):
+  /// opcional, se escribe dos veces.
+  final codigoNuevoController = TextEditingController();
+  final codigoRepetidoController = TextEditingController();
+
   final isLoading = false.obs;
   final isSaving = false.obs;
 
@@ -42,6 +53,10 @@ class AbonoPricesController extends GetxController {
   /// En el asistente, con "Abonos libres": solo se pregunta la inscripción y
   /// al continuar se guarda el modo libre.
   late final bool soloInscripcion;
+
+  /// En el asistente con costos fijos se pide aquí el código del encargado,
+  /// junto con los precios: es cuando se decide cobrar con costos fijos.
+  bool get pideCodigoInicial => isOnboarding && !soloInscripcion;
 
   @override
   void onInit() {
@@ -61,6 +76,8 @@ class AbonoPricesController extends GetxController {
     monthController.dispose();
     yearController.dispose();
     inscripcionController.dispose();
+    codigoNuevoController.dispose();
+    codigoRepetidoController.dispose();
     super.onClose();
   }
 
@@ -129,6 +146,17 @@ class AbonoPricesController extends GetxController {
       return false;
     }
 
+    // El código del encargado (opcional) se revisa antes de guardar nada.
+    final codigo = pideCodigoInicial ? codigoNuevoController.text.trim() : '';
+    if (pideCodigoInicial) {
+      final error = errorDeCodigo(codigo, codigoRepetidoController.text.trim(),
+          opcional: true);
+      if (error != null) {
+        SnackbarHelper.error('Revisa el código', error);
+        return false;
+      }
+    }
+
     isSaving.value = true;
     try {
       final success = await repository.savePrices(prices);
@@ -138,10 +166,14 @@ class AbonoPricesController extends GetxController {
         return false;
       }
 
+      if (codigo.isNotEmpty && !await codigoRepository.guardar(codigo)) {
+        SnackbarHelper.error('Error', 'No se pudo guardar el código');
+        return false;
+      }
+
       if (isOnboarding) {
-        final modeSaved =
-            await OnboardingController.savePaymentModeAndSyncProfile(
-                soloInscripcion ? PaymentModes.libre : PaymentModes.fijo);
+        final modeSaved = await _guardarModo(
+            soloInscripcion ? PaymentModes.libre : PaymentModes.fijo);
         if (!modeSaved) {
           SnackbarHelper.error('Error',
               'No se pudo guardar el modo de cobro. Intenta de nuevo.');
@@ -156,6 +188,18 @@ class AbonoPricesController extends GetxController {
     } finally {
       isSaving.value = false;
     }
+  }
+
+  /// Qué tiene mal el código, o null si está bien. Con [opcional], los dos
+  /// vacíos también están bien (no se crea).
+  static String? errorDeCodigo(String codigo, String repetido,
+      {bool opcional = false}) {
+    if (opcional && codigo.isEmpty && repetido.isEmpty) return null;
+    if (!RegExp(r'^\d{4,6}$').hasMatch(codigo)) {
+      return 'El código lleva de 4 a 6 números.';
+    }
+    if (codigo != repetido) return 'Los dos códigos no coinciden.';
+    return null;
   }
 
   String _format(double? value) =>

@@ -220,6 +220,12 @@ class _Precios extends GetxController implements AbonoPricesController {
   @override
   final hayCodigo = RxnBool(true);
   @override
+  final codigoNuevoController = TextEditingController();
+  @override
+  final codigoRepetidoController = TextEditingController();
+  @override
+  bool get pideCodigoInicial => false;
+  @override
   final guardandoCodigo = false.obs;
   @override
   final isLoading = false.obs;

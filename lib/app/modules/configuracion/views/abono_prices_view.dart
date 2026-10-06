@@ -8,9 +8,13 @@ import 'package:gymads/app/global_widgets/app_header.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import '../controllers/abono_prices_controller.dart';
 
-/// Pantalla de Precios de Abonos: precio fijo por día, semana, mes y año, e
-/// inscripción para clientes nuevos. En el asistente con abono libre solo
-/// pregunta la inscripción ([AbonoPricesController.soloInscripcion]).
+/// Pantalla de Precios de Abonos: precio fijo por día, semana, mes y año,
+/// inscripción para clientes nuevos y el código del encargado para el abono
+/// libre. En el asistente con abono libre solo pregunta la inscripción
+/// ([AbonoPricesController.soloInscripcion]); con costos fijos, pide ahí
+/// mismo el código ([AbonoPricesController.pideCodigoInicial]).
+///
+/// Con pocas palabras: títulos cortos y cada campo dice qué es.
 class AbonoPricesView extends GetView<AbonoPricesController> {
   const AbonoPricesView({super.key});
 
@@ -66,91 +70,19 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (controller.soloInscripcion) ...[
-                  _inscripcion(context),
-                ] else ...[
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.attach_money,
-                            color: AppColors.accent, size: 28),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Al cobrar, el precio se llena solo según el periodo.',
-                            style: TextStyle(
-                              color: c.textSecondary,
-                              fontSize: legible(13),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const TituloSeccion('Precio por periodo',
-                      detalle: 'Deja vacío el periodo que no ofrezcas.'),
-                  // En escritorio, dos por fila: un precio no necesita un
-                  // campo de lado a lado de la ventana.
-                  if (PlataformaApp.pantallaGrande)
-                    ResumenAdaptable(anchoMinimo: 300, espacio: 16, children: [
-                      _priceField(context,
-                          controller: controller.dayController,
-                          label: 'Precio por día',
-                          icon: Icons.today),
-                      _priceField(context,
-                          controller: controller.weekController,
-                          label: 'Precio por semana',
-                          icon: Icons.date_range),
-                      _priceField(context,
-                          controller: controller.monthController,
-                          label: 'Precio por mes',
-                          icon: Icons.calendar_month),
-                      _priceField(context,
-                          controller: controller.yearController,
-                          label: 'Precio por año',
-                          icon: Icons.event_repeat),
-                    ])
-                  else ...[
-                    _priceField(
-                      context,
-                      controller: controller.dayController,
-                      label: 'Precio por día',
-                      icon: Icons.today,
-                    ),
-                    const SizedBox(height: 16),
-                    _priceField(
-                      context,
-                      controller: controller.weekController,
-                      label: 'Precio por semana',
-                      icon: Icons.date_range,
-                    ),
-                    const SizedBox(height: 16),
-                    _priceField(
-                      context,
-                      controller: controller.monthController,
-                      label: 'Precio por mes',
-                      icon: Icons.calendar_month,
-                    ),
-                    const SizedBox(height: 16),
-                    _priceField(
-                      context,
-                      controller: controller.yearController,
-                      label: 'Precio por año',
-                      icon: Icons.event_repeat,
-                    ),
-                  ],
+                if (controller.soloInscripcion)
+                  _inscripcion(context)
+                else ...[
+                  const TituloSeccion('Precios',
+                      detalle: 'Deja vacío el que no ofrezcas.'),
+                  _precios(context),
                   const SizedBox(height: 32),
                   _inscripcion(context),
-                  if (!controller.isOnboarding) ...[
-                    const SizedBox(height: 32),
+                  const SizedBox(height: 32),
+                  if (controller.pideCodigoInicial)
+                    _codigoInicial(context)
+                  else if (!controller.isOnboarding)
                     _codigo(context),
-                  ],
                 ],
               ],
             ),
@@ -160,16 +92,91 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
     );
   }
 
-  /// El código del encargado para el abono libre. Nunca se muestra: solo si
-  /// existe, y se crea, cambia o quita.
+  /// Día, semana, mes y año. En pantalla grande, dos por fila.
+  Widget _precios(BuildContext context) {
+    final campos = [
+      _priceField(context,
+          controller: controller.dayController,
+          label: 'Por día',
+          icon: Icons.today),
+      _priceField(context,
+          controller: controller.weekController,
+          label: 'Por semana',
+          icon: Icons.date_range),
+      _priceField(context,
+          controller: controller.monthController,
+          label: 'Por mes',
+          icon: Icons.calendar_month),
+      _priceField(context,
+          controller: controller.yearController,
+          label: 'Por año',
+          icon: Icons.event_repeat),
+    ];
+    if (PlataformaApp.pantallaGrande) {
+      return ResumenAdaptable(anchoMinimo: 300, espacio: 16, children: campos);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < campos.length; i++) ...[
+          if (i > 0) const SizedBox(height: 16),
+          campos[i],
+        ],
+      ],
+    );
+  }
+
+  /// La inscripción: una vez, a los clientes nuevos, junto con su primer
+  /// pago. Al cobrar no se puede cambiar el monto, solo quitarla.
+  Widget _inscripcion(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TituloSeccion('Inscripción',
+              detalle: controller.soloInscripcion
+                  ? '¿Cobras inscripción a los clientes nuevos?'
+                  : 'Solo para clientes nuevos.'),
+          _angosto(_priceField(
+            context,
+            controller: controller.inscripcionController,
+            label: 'Costo de inscripción',
+            icon: Icons.how_to_reg_outlined,
+          )),
+        ],
+      );
+
+  /// Al configurar el gimnasio con costos fijos: el código del encargado,
+  /// escrito dos veces. Opcional.
+  Widget _codigoInicial(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const TituloSeccion('Código para abono libre',
+              detalle: 'Lo pide el mostrador para cobrar sin precio fijo. '
+                  'Puedes crearlo después.'),
+          _angosto(_campoCodigo(
+            context,
+            controller.codigoNuevoController,
+            'Código (4 a 6 números)',
+            llave: const Key('codigo_inicial'),
+          )),
+          const SizedBox(height: 16),
+          _angosto(_campoCodigo(
+            context,
+            controller.codigoRepetidoController,
+            'Repite el código',
+            llave: const Key('codigo_inicial_repetido'),
+          )),
+        ],
+      );
+
+  /// En Configuración: si hay código (nunca se muestra), y crearlo,
+  /// cambiarlo o quitarlo.
   Widget _codigo(BuildContext context) {
     final c = context.colores;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const TituloSeccion('Código para abono libre',
-            detalle: 'El mostrador lo pide para cobrar un abono libre cuando '
-                'tienes costos fijos. Tú y el encargado no lo necesitan.'),
+            detalle: 'Lo pide el mostrador para cobrar sin precio fijo.'),
         Obx(() {
           final hay = controller.hayCodigo.value;
           final guardando = controller.guardandoCodigo.value;
@@ -187,9 +194,8 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                     child: Text(
                       switch (hay) {
                         true => 'Código creado',
-                        false => 'Sin código: el mostrador no puede cobrar '
-                            'abonos libres',
-                        null => 'No se pudo revisar el código',
+                        false => 'Sin código',
+                        null => 'No se pudo revisar',
                       },
                       style: TextStyle(color: c.textPrimary, fontSize: 16),
                     ),
@@ -197,8 +203,11 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
                 ],
               ),
               const SizedBox(height: 12),
-              FilaDeBotones(
-                alineacion: WrapAlignment.start,
+              // Botones de ancho natural: los dos caben en el teléfono.
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   if (hay == null)
                     OutlinedButton.icon(
@@ -238,37 +247,16 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
     if (codigo != null) await controller.guardarCodigo(codigo);
   }
 
-  Widget _campoInscripcion(BuildContext context) => _priceField(
-        context,
-        controller: controller.inscripcionController,
-        label: 'Costo de inscripción',
-        icon: Icons.how_to_reg_outlined,
-      );
-
-  /// La inscripción: una vez, a los clientes nuevos, junto con su primer
-  /// pago. Al cobrar no se puede cambiar el monto, solo quitarla.
-  Widget _inscripcion(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TituloSeccion('Inscripción',
-              detalle: controller.soloInscripcion
-                  ? '¿Cobras inscripción a los clientes nuevos? Se cobra una '
-                      'vez, junto con su primer pago.'
-                  : 'Solo a clientes nuevos, una vez, junto con su primer '
-                      'pago. Déjalo vacío si no cobras inscripción.'),
-          // En pantalla grande, del ancho de un campo de precio.
-          if (PlataformaApp.pantallaGrande)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: _campoInscripcion(context),
-              ),
-            )
-          else
-            _campoInscripcion(context),
-        ],
-      );
+  /// En pantalla grande, un campo solo no va de lado a lado.
+  Widget _angosto(Widget campo) => PlataformaApp.pantallaGrande
+      ? Align(
+          alignment: Alignment.centerLeft,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: campo,
+          ),
+        )
+      : campo;
 
   Widget _priceField(
     BuildContext context, {
@@ -302,6 +290,37 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
   }
 }
 
+/// Un campo para el código: solo números, oculto, de 4 a 6.
+Widget _campoCodigo(
+  BuildContext context,
+  TextEditingController controlador,
+  String etiqueta, {
+  Key? llave,
+  bool autofocus = false,
+  String? error,
+  ValueChanged<String>? alTerminar,
+}) =>
+    TextField(
+      key: llave,
+      controller: controlador,
+      autofocus: autofocus,
+      obscureText: true,
+      keyboardType: TextInputType.number,
+      maxLength: 6,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      textInputAction:
+          alTerminar == null ? TextInputAction.next : TextInputAction.done,
+      onSubmitted: alTerminar,
+      style: const TextStyle(fontSize: 22, letterSpacing: 6),
+      decoration: InputDecoration(
+        labelText: etiqueta,
+        prefixIcon: const Icon(Icons.lock_outline),
+        counterText: '',
+        errorText: error,
+        errorMaxLines: 2,
+      ),
+    );
+
 class _DialogoCodigoNuevo extends StatefulWidget {
   const _DialogoCodigoNuevo();
 
@@ -323,37 +342,14 @@ class _DialogoCodigoNuevoState extends State<_DialogoCodigoNuevo> {
 
   void _listo() {
     final codigo = _codigo.text.trim();
-    if (!RegExp(r'^\d{4,6}$').hasMatch(codigo)) {
-      setState(() => _error = 'El código lleva de 4 a 6 números.');
-      return;
-    }
-    if (codigo != _repetido.text.trim()) {
-      setState(() => _error = 'Los dos códigos no coinciden.');
+    final error =
+        AbonoPricesController.errorDeCodigo(codigo, _repetido.text.trim());
+    if (error != null) {
+      setState(() => _error = error);
       return;
     }
     Get.back(result: codigo);
   }
-
-  Widget _campo(TextEditingController controlador, String etiqueta,
-          {Key? key, bool ultimo = false, String? error}) =>
-      TextField(
-        key: key,
-        controller: controlador,
-        autofocus: !ultimo,
-        obscureText: true,
-        keyboardType: TextInputType.number,
-        maxLength: 6,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        textInputAction: ultimo ? TextInputAction.done : TextInputAction.next,
-        onSubmitted: ultimo ? (_) => _listo() : null,
-        style: const TextStyle(fontSize: 22, letterSpacing: 6),
-        decoration: InputDecoration(
-          labelText: etiqueta,
-          counterText: '',
-          errorText: error,
-          errorMaxLines: 2,
-        ),
-      );
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -364,16 +360,13 @@ class _DialogoCodigoNuevoState extends State<_DialogoCodigoNuevo> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'De 4 a 6 números. Dáselo solo a quien pueda autorizar abonos '
-              'libres.',
-              style: TextStyle(height: 1.35),
-            ),
-            const SizedBox(height: 16),
-            _campo(_codigo, 'Código nuevo', key: const Key('codigo_nuevo')),
+            _campoCodigo(context, _codigo, 'Código (4 a 6 números)',
+                llave: const Key('codigo_nuevo'), autofocus: true),
             const SizedBox(height: 12),
-            _campo(_repetido, 'Repite el código',
-                key: const Key('codigo_repetido'), ultimo: true, error: _error),
+            _campoCodigo(context, _repetido, 'Repite el código',
+                llave: const Key('codigo_repetido'),
+                error: _error,
+                alTerminar: (_) => _listo()),
           ],
         ),
         actions: [

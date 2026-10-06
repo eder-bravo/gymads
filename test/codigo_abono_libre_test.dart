@@ -272,7 +272,7 @@ void main() {
     codigo.hay = false;
     await mostrar(tester, const Size(1280, 800));
     await tocarLibre(tester);
-    expect(find.text('Falta el código del encargado'), findsOneWidget);
+    expect(find.text('Aún no hay código'), findsOneWidget);
     expect(find.textContaining('Configuración › Precios de abonos'),
         findsOneWidget);
     expect(c.isPrecioFijo.value, isTrue);

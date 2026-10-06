@@ -862,11 +862,10 @@ class AbonarView extends GetView<AbonarController> {
       await Get.dialog<void>(AlertDialog(
         scrollable: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Falta el código del encargado'),
+        title: const Text('Aún no hay código'),
         content: const Text(
-          'Para cobrar un abono libre se necesita el código del encargado, y '
-          'aún no hay uno. El dueño o el encargado lo crea en Configuración › '
-          'Precios de abonos.',
+          'El dueño o el encargado lo crea en Configuración › Precios de '
+          'abonos.',
           style: TextStyle(height: 1.35),
         ),
         actions: [
@@ -1411,8 +1410,7 @@ class _DialogoCodigoState extends State<_DialogoCodigo> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Para cobrar un abono libre, pide al encargado que escriba su '
-              'código.',
+              'Pide al encargado que escriba su código.',
               style: TextStyle(height: 1.35),
             ),
             const SizedBox(height: 16),

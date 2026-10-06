@@ -389,7 +389,6 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     _loadConfiguration();
   }
 
-
   // =================== USER INFO FROM SESSION ===================
 
   void _loadUserInfo() {
@@ -1114,8 +1113,7 @@ class _ConfirmDeleteDialog extends StatelessWidget {
             children: [
               RichText(
                 text: TextSpan(
-                  style: TextStyle(
-                      color: c.textSecondary, height: 1.5),
+                  style: TextStyle(color: c.textSecondary, height: 1.5),
                   children: [
                     const TextSpan(
                         text:
@@ -1136,8 +1134,7 @@ class _ConfirmDeleteDialog extends StatelessWidget {
                 style: TextStyle(color: c.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Escribe el nombre aquí',
-                  hintStyle: TextStyle(
-                      color: c.textSecondary.withOpacity(0.5)),
+                  hintStyle: TextStyle(color: c.textSecondary.withOpacity(0.5)),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.red.withOpacity(0.3)),

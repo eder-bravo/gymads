@@ -8,6 +8,7 @@ import 'package:gymads/app/data/models/abono_prices_model.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
+import 'package:gymads/app/data/repositories/codigo_abono_libre_repository.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
@@ -16,6 +17,7 @@ import 'package:gymads/app/modules/abonar/views/abonar_view.dart';
 import 'package:gymads/app/modules/configuracion/controllers/abono_prices_controller.dart';
 import 'package:gymads/app/modules/configuracion/views/abono_prices_view.dart';
 import 'package:gymads/app/modules/ingresos/widgets/detalle_ingreso_sheet.dart';
+import 'package:gymads/app/routes/app_pages.dart';
 import 'package:gymads/core/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:showcaseview/showcaseview.dart';
@@ -64,6 +66,17 @@ class _Ingresos extends Fake implements IngresoService {
   }) async {
     cobros.add((monto: monto, cuotaRegistro: cuotaRegistro));
     ultimoFin = periodoFin;
+    return true;
+  }
+}
+
+class _Codigo extends CodigoAbonoLibreRepository {
+  final guardados = <String?>[];
+  @override
+  Future<bool?> hayCodigo() async => false;
+  @override
+  Future<bool> guardar(String? pin) async {
+    guardados.add(pin);
     return true;
   }
 }
@@ -254,10 +267,13 @@ void main() {
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   group('Precios', () {
+    late _Codigo codigo;
+    final modos = <String>[];
     Future<_Precios> precios(WidgetTester tester,
         {Map<String, dynamic>? argumentos,
         AbonoPricesModel inicial = conInscripcion}) async {
       final repo = _Precios(inicial);
+      codigo = _Codigo();
       tester.view.physicalSize = const Size(390, 844) * 2;
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
@@ -266,11 +282,18 @@ void main() {
         initialRoute: '/inicio',
         getPages: [
           GetPage(name: '/inicio', page: () => const Scaffold()),
+          GetPage(name: Routes.HOME, page: () => const Scaffold()),
           GetPage(
             name: '/precios',
             // Aquí, ya con los argumentos de la ruta (los lee en onInit).
             page: () {
-              Get.put(AbonoPricesController(repository: repo));
+              Get.put(AbonoPricesController(
+                  repository: repo,
+                  codigoRepository: codigo,
+                  guardarModo: (modo) async {
+                    modos.add(modo);
+                    return true;
+                  }));
               return const AbonoPricesView();
             },
           ),
@@ -303,13 +326,49 @@ void main() {
     });
 
     testWidgets(
+        'al configurar con costos fijos se crea ahí el código '
+        '(opcional)', (tester) async {
+      final repo = await precios(tester,
+          argumentos: {'fromOnboarding': true},
+          inicial: const AbonoPricesModel(priceMonth: 500));
+      final c = Get.find<AbonoPricesController>();
+      expect(find.text('Código para abono libre'), findsOneWidget);
+      expect(find.byKey(const Key('crear_codigo')), findsNothing);
+      // No coinciden: no se guarda nada.
+      c.codigoNuevoController.text = '1234';
+      c.codigoRepetidoController.text = '4321';
+      expect(await c.savePrices(), isFalse);
+      expect(repo.guardados, isNull);
+      expect(codigo.guardados, isEmpty);
+      // Correcto: se guarda con los precios.
+      c.codigoRepetidoController.text = '1234';
+      await c.savePrices();
+      expect(repo.guardados?.priceMonth, 500);
+      expect(codigo.guardados, ['1234']);
+      expect(modos.last, 'fijo');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('sin código también se puede continuar', (tester) async {
+      final repo = await precios(tester,
+          argumentos: {'fromOnboarding': true},
+          inicial: const AbonoPricesModel(priceMonth: 500));
+      await Get.find<AbonoPricesController>().savePrices();
+      expect(repo.guardados?.priceMonth, 500);
+      expect(codigo.guardados, isEmpty);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
         'en el asistente con abono libre solo se pregunta la '
         'inscripción', (tester) async {
       await precios(tester,
           argumentos: {'fromOnboarding': true, 'soloInscripcion': true},
           inicial: const AbonoPricesModel());
       expect(find.text('Costo de inscripción'), findsOneWidget);
-      expect(find.text('Precio por mes'), findsNothing);
+      expect(find.text('Por mes'), findsNothing);
       expect(find.text('No cobro inscripción'), findsOneWidget);
       expect(find.text('Continuar'), findsOneWidget);
     });

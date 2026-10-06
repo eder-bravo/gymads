@@ -393,7 +393,7 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 931 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 933 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`
@@ -437,10 +437,15 @@ encargado cambian directo. Autoriza solo ese cobro: después de cobrar, al
 cambiar de cliente o al volver a costo fijo se vuelve a pedir. Sin costos
 fijos (el gimnasio solo cobra libre) no se pide.
 
-- Un código por gimnasio (PIN de 4 a 6 números), en Configuración › Precios de
-  abonos › "Código para abono libre": crear (escribirlo dos veces), cambiar o
-  quitar. Nunca se muestra. Sin código, el mostrador no puede cobrar abonos
-  libres y la app le dice dónde se crea.
+- Un código por gimnasio (PIN de 4 a 6 números). Se crea al configurar el
+  gimnasio: al elegir "Costos fijos", la pantalla de precios lo pide al final
+  (opcional, escrito dos veces; si no coinciden no se guarda nada). Después,
+  en Configuración › Precios de abonos › "Código para abono libre": crear,
+  cambiar o quitar. Nunca se muestra. Sin código, el mostrador no puede cobrar
+  abonos libres y la app le dice dónde se crea.
+- La pantalla de precios va con pocas palabras: "Precios" (Por día, Por
+  semana, Por mes, Por año), "Inscripción" y el código, cada uno con una
+  línea de ayuda corta.
 - Migración `20261006150607_codigo_abono_libre`: el hash (bcrypt) vive en
   `gym_codigo_abono_libre`, con RLS sin políticas y sin permisos para la app
   (el mostrador no puede leerlo para adivinar el PIN). Todo pasa por

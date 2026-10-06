@@ -237,7 +237,15 @@ también tiene su paso.
 "Saltar" (que ahí dice "Saltar (Esc)"): quita el recorrido de esa pantalla y
 lo da por visto; los de otras pantallas siguen saliendo. Se atiende antes que
 nada, pero solo con un recorrido a la vista: si no, Esc sigue cerrando las
-ventanas modales (`WelcomeTourService._escapeSalta`).
+ventanas modales (`WelcomeTourService._tecladoDelRecorrido`).
+
+**Con un recorrido a la vista, el resto del teclado no hace nada** hasta que
+termine o se salte; los pasos se avanzan con clic. Antes, con ⌘2 (Ctrl+2) se
+cambiaba de sección con el recorrido encima y la otra pantalla quedaba tapada
+sin poder usarse, y con Tab y Enter se pulsaba lo de detrás. El clic fuera
+de la burbuja ya estaba bloqueado. Soltar una tecla sí pasa, y los atajos
+del sistema (salir de la app, cambiar de ventana) los atiende el sistema
+antes y siguen funcionando.
 
 **Pantalla para clientes** (monitor extra, solo computadora). El botón
 "Pantalla para clientes" de la cabecera de Inicio (junto a "Actualizar")
@@ -393,7 +401,7 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 944 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 950 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`

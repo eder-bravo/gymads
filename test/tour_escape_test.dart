@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,7 +7,9 @@ import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:showcaseview/showcaseview.dart';
 
-/// En computadora, Esc salta el recorrido de la pantalla, igual que "Saltar".
+/// En computadora, Esc salta el recorrido de la pantalla, igual que "Saltar",
+/// y mientras se ve el resto del teclado no hace nada (antes, con ⌘2 se
+/// cambiaba de sección con el recorrido encima).
 class _Acceso implements ToursDelEmpleado {
   final vistos_ = <String>{};
   @override
@@ -21,6 +24,9 @@ void main() {
   final navegador = GlobalKey<NavigatorState>();
   late WelcomeTourService tours;
   late _Acceso acceso;
+  // Lo que hay detrás del recorrido: un atajo de la barra y un botón.
+  var atajos = 0;
+  var botones = 0;
 
   const escritorio = TargetPlatformVariant(
       {TargetPlatform.macOS, TargetPlatform.windows, TargetPlatform.linux});
@@ -28,6 +34,8 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     acceso = _Acceso();
+    atajos = 0;
+    botones = 0;
   });
   tearDown(() {
     tours.dejarDeEscuchar();
@@ -54,18 +62,31 @@ void main() {
     ).init();
     await tester.pumpWidget(MaterialApp(
       navigatorKey: navegador,
-      home: Scaffold(
-        body: Column(children: [
-          for (var i = 0; i < 2; i++)
-            TourStep(
-              tourKey: pasos[i],
-              title: 'Paso ${i + 1}',
-              description: 'Explicación ${i + 1}',
-              isFirstStep: i == 0,
-              isLastStep: i == 1,
-              child: SizedBox(height: 120, child: Text('Bloque ${i + 1}')),
-            ),
-        ]),
+      home: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.digit2, meta: true): () =>
+              atajos++,
+          const SingleActivator(LogicalKeyboardKey.digit2, control: true): () =>
+              atajos++,
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            body: Column(children: [
+              ElevatedButton(
+                  onPressed: () => botones++, child: const Text('Detrás')),
+              for (var i = 0; i < 2; i++)
+                TourStep(
+                  tourKey: pasos[i],
+                  title: 'Paso ${i + 1}',
+                  description: 'Explicación ${i + 1}',
+                  isFirstStep: i == 0,
+                  isLastStep: i == 1,
+                  child: SizedBox(height: 120, child: Text('Bloque ${i + 1}')),
+                ),
+            ]),
+          ),
+        ),
       ),
     ));
     // showcaseview registra los pasos al reconstruirse la pantalla.
@@ -94,6 +115,62 @@ void main() {
     expect(find.text('Explicación 1'), findsNothing);
     expect(WelcomeTourService.recorridoEnCurso.value, isFalse);
     expect(acceso.vistos_, contains(AppTours.home));
+  }, variant: escritorio);
+
+  /// ⌘2 en macOS, Ctrl+2 en Windows y Linux.
+  Future<void> atajo(WidgetTester tester) async {
+    final modificador = defaultTargetPlatform == TargetPlatform.macOS
+        ? LogicalKeyboardKey.meta
+        : LogicalKeyboardKey.control;
+    await tester.sendKeyDownEvent(modificador);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
+    await tester.sendKeyUpEvent(modificador);
+    await tester.pump();
+  }
+
+  Future<void> tabYEnter(WidgetTester tester) async {
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+  }
+
+  testWidgets(
+      'con el recorrido a la vista el teclado no hace nada hasta saltarlo',
+      (tester) async {
+    await conRecorrido(tester);
+    await atajo(tester);
+    await tabYEnter(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await esperar(tester);
+    expect(atajos, 0);
+    expect(botones, 0);
+    expect(find.text('Explicación 1'), findsOneWidget);
+
+    // Con clic sí se avanza.
+    await tester.tap(find.text('Siguiente'));
+    await esperar(tester);
+    expect(find.text('Explicación 2'), findsOneWidget);
+    await atajo(tester);
+    expect(atajos, 0);
+
+    // Saltado con Esc, todo vuelve a funcionar.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await esperar(tester);
+    expect(WelcomeTourService.recorridoEnCurso.value, isFalse);
+    await atajo(tester);
+    expect(atajos, 1);
+    await tabYEnter(tester);
+    expect(botones, 1);
+  }, variant: escritorio);
+
+  testWidgets('sin recorrido, el teclado sigue como siempre', (tester) async {
+    await mostrar(tester);
+    await atajo(tester);
+    await tabYEnter(tester);
+    expect(atajos, 1);
+    expect(botones, 1);
   }, variant: escritorio);
 
   testWidgets('sin recorrido, Esc sigue cerrando una ventana modal',

@@ -202,30 +202,39 @@ class WelcomeTourService extends GetxService {
       onFinish: _onFinish,
       onDismiss: (_) => _onDismiss(),
     );
-    // En computadora, Esc salta el recorrido que está en pantalla.
+    // En computadora, con un recorrido a la vista el teclado solo sirve
+    // para saltarlo con Esc.
     if (PlataformaApp.escritorio) {
-      FocusManager.instance.addEarlyKeyEventHandler(_escapeSalta);
+      FocusManager.instance.addEarlyKeyEventHandler(_tecladoDelRecorrido);
     }
     return this;
   }
 
   @visibleForTesting
   void dejarDeEscuchar() =>
-      FocusManager.instance.removeEarlyKeyEventHandler(_escapeSalta);
+      FocusManager.instance.removeEarlyKeyEventHandler(_tecladoDelRecorrido);
 
-  /// Esc hace lo mismo que "Saltar": quita el recorrido de esta pantalla y lo
-  /// da por visto. Se atiende antes que nada (también antes que el Esc que
-  /// cierra una ventana modal), pero solo con un recorrido a la vista; si
-  /// no, Esc sigue con su uso de siempre.
-  KeyEventResult _escapeSalta(KeyEvent evento) {
-    if (evento.logicalKey != LogicalKeyboardKey.escape) {
-      return KeyEventResult.ignored;
-    }
+  /// Con un recorrido a la vista, el teclado solo sirve para saltarlo: Esc
+  /// hace lo mismo que "Saltar" (lo quita y lo da por visto). Lo demás se
+  /// ignora hasta que termine o se salte (los pasos se avanzan con clic): con
+  /// los atajos de la barra (⌘2…) se cambiaba de sección con el recorrido
+  /// encima y la otra pantalla quedaba tapada, sin poder usarse; con Tab y
+  /// Enter se pulsaba lo que hay detrás. Se atiende antes que nada (también
+  /// antes que el Esc que cierra una ventana modal). Sin recorrido, el
+  /// teclado sigue como siempre. Los atajos del sistema (salir de la app,
+  /// cambiar de ventana) los atiende el sistema antes y siguen funcionando.
+  KeyEventResult _tecladoDelRecorrido(KeyEvent evento) {
     final vista = _showcaseView;
     if (!recorridoEnCurso.value || vista == null || !vista.isShowcaseRunning) {
       return KeyEventResult.ignored;
     }
-    if (evento is KeyDownEvent) vista.dismiss();
+    if (evento.logicalKey == LogicalKeyboardKey.escape) {
+      if (evento is KeyDownEvent) vista.dismiss();
+      return KeyEventResult.handled;
+    }
+    // Soltar una tecla pasa: quien la vio bajar antes del recorrido espera
+    // verla subir.
+    if (evento is KeyUpEvent) return KeyEventResult.ignored;
     return KeyEventResult.handled;
   }
 

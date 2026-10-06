@@ -372,7 +372,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   @override
   List<GlobalKey> get tourSteps => [
         keyCuenta,
-        if (PlataformaApp.escanerFisico) keyEscaner,
+        if (PlataformaApp.escanerFisico || PlataformaApp.tableta) keyEscaner,
         keyApariencia,
         if (can(Permission.gestionarPreciosAbonos)) keyPrecios,
         if (can(Permission.gestionarCategorias)) keyCategorias,

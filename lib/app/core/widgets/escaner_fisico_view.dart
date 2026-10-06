@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../data/services/escaner_fisico_service.dart';
+import '../utils/plataforma_app.dart';
+import 'escaner_automatico.dart';
 
 /// Captura solo con este campo enfocado: no intercepta formularios ajenos.
+///
+/// En la tableta no hay campo (abriría el teclado de la pantalla): escucha
+/// al lector con [EscanerAutomatico] y devuelve la primera lectura.
 class EscanerFisicoView extends StatefulWidget {
   const EscanerFisicoView({super.key, required this.titulo, this.alLeer});
   final String titulo;
@@ -74,8 +79,48 @@ class _EscanerFisicoViewState extends State<EscanerFisicoView> {
     if (mounted) _foco.requestFocus();
   }
 
+  /// La tableta: sin campo, solo escucha al lector.
+  Widget _sinCampo(BuildContext context) => EscanerAutomatico(
+        habilitado: () => !_devuelto,
+        alLeer: (codigo) async {
+          if (widget.alLeer != null) return widget.alLeer!(codigo);
+          _devuelto = true;
+          Get.back(result: codigo);
+          return null;
+        },
+        child: Scaffold(
+          appBar: AppBar(title: Text(widget.titulo)),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(24),
+                children: const [
+                  Icon(Icons.barcode_reader, size: 64),
+                  SizedBox(height: 20),
+                  Text('Escanea cualquier código con tu lector',
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 12),
+                  Text(
+                      'Si no pasa nada, revisa que el lector esté conectado y '
+                      'en modo teclado (HID).',
+                      textAlign: TextAlign.center),
+                  AvisoEscanerAutomatico(soloTrasLeer: true),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) =>
+      PlataformaApp.tableta ? _sinCampo(context) : _conCampo(context);
+
+  Widget _conCampo(BuildContext context) => Scaffold(
         appBar: AppBar(title: Text(widget.titulo)),
         body: Center(
             child: ConstrainedBox(

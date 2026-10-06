@@ -15,14 +15,18 @@ import '../controllers/abono_prices_controller.dart';
 /// mismo el código ([AbonoPricesController.pideCodigoInicial]).
 ///
 /// Con pocas palabras: títulos cortos y cada campo dice qué es.
+///
+/// Acostada (tableta o teléfono de lado): los precios a la izquierda y la
+/// inscripción y el código a la derecha.
 class AbonoPricesView extends GetView<AbonoPricesController> {
   const AbonoPricesView({super.key});
 
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
+    final acostada = pantallaAcostada(context);
     return ScaffoldAdaptable(
-      anchoMaximo: 800,
+      anchoMaximo: acostada ? 1100 : 800,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
           title:
@@ -72,17 +76,30 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
               children: [
                 if (controller.soloInscripcion)
                   _inscripcion(context)
+                else if (acostada)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _seccionPrecios(context)),
+                      const SizedBox(width: 24),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _inscripcion(context),
+                            const SizedBox(height: 32),
+                            ..._seccionCodigo(context),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
                 else ...[
-                  const TituloSeccion('Precios',
-                      detalle: 'Deja vacío el que no ofrezcas.'),
-                  _precios(context),
+                  _seccionPrecios(context),
                   const SizedBox(height: 32),
                   _inscripcion(context),
                   const SizedBox(height: 32),
-                  if (controller.pideCodigoInicial)
-                    _codigoInicial(context)
-                  else if (!controller.isOnboarding)
-                    _codigo(context),
+                  ..._seccionCodigo(context),
                 ],
               ],
             ),
@@ -92,7 +109,24 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
     );
   }
 
-  /// Día, semana, mes y año. En pantalla grande, dos por fila.
+  Widget _seccionPrecios(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const TituloSeccion('Precios',
+              detalle: 'Deja vacío el que no ofrezcas.'),
+          _precios(context),
+        ],
+      );
+
+  /// Al configurar el gimnasio se crea; en Configuración se cambia.
+  List<Widget> _seccionCodigo(BuildContext context) => [
+        if (controller.pideCodigoInicial)
+          _codigoInicial(context)
+        else if (!controller.isOnboarding)
+          _codigo(context),
+      ];
+
+  /// Día, semana, mes y año. En pantalla grande y de lado, dos por fila.
   Widget _precios(BuildContext context) {
     final campos = [
       _priceField(context,
@@ -112,6 +146,10 @@ class AbonoPricesView extends GetView<AbonoPricesController> {
           label: 'Por año',
           icon: Icons.event_repeat),
     ];
+    // De lado van en media pantalla: caben dos por fila desde más angostos.
+    if (pantallaAcostada(context)) {
+      return ResumenAdaptable(anchoMinimo: 180, espacio: 16, children: campos);
+    }
     if (PlataformaApp.pantallaGrande) {
       return ResumenAdaptable(anchoMinimo: 300, espacio: 16, children: campos);
     }

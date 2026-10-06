@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../utils/confirmador_codigo.dart';
 import '../../../core/theme/siempre_oscuro.dart';
 import '../utils/plataforma_app.dart';
+import 'escaner_automatico.dart';
 import 'escaner_fisico_view.dart';
 
 /// Lector de códigos de barras.
@@ -28,6 +29,9 @@ import 'escaner_fisico_view.dart';
 ///   seguidos.
 ///
 /// No sabe nada de productos: solo lee y entrega.
+///
+/// En la tableta también acepta el lector de códigos conectado por OTG, hub
+/// o Bluetooth ([PlataformaApp.lectorDeTeclado]): lo que llegue primero.
 class EscanerCodigoView extends StatefulWidget {
   const EscanerCodigoView({
     super.key,
@@ -174,11 +178,34 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
     });
   }
 
+  /// Una lectura del lector de códigos (en la tableta, junto a la cámara).
+  Future<String?> _delLector(String codigo) async {
+    if (_yaDevuelto) return null;
+    if (_continuo) {
+      final aviso = await widget.alLeer!(codigo);
+      if (mounted && aviso != null) _mostrarAviso(aviso);
+      return aviso;
+    }
+    _yaDevuelto = true;
+    Get.back(result: codigo);
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (PlataformaApp.escanerFisico) {
       return EscanerFisicoView(titulo: widget.titulo, alLeer: widget.alLeer);
     }
+    final camara = _camara(context);
+    if (!PlataformaApp.lectorDeTeclado) return camara;
+    return EscanerAutomatico(
+      habilitado: () => !_yaDevuelto,
+      alLeer: _delLector,
+      child: camara,
+    );
+  }
+
+  Widget _camara(BuildContext context) {
     return SiempreOscuro(
         child: Scaffold(
       backgroundColor: Colors.black,

@@ -16,6 +16,11 @@ abstract final class PlataformaApp {
       !kIsWeb && defaultTargetPlatform == TargetPlatform.linux;
   static bool get escanerFisico => kIsWeb || escritorio;
 
+  /// Escucha al lector de códigos que escribe como teclado (HID): en la
+  /// computadora y en la tableta, donde se conecta por USB con un adaptador
+  /// OTG o un hub, o por Bluetooth. El teléfono usa la cámara.
+  static bool get lectorDeTeclado => !kIsWeb && (escritorio || tableta);
+
   /// iPad o tableta Android de 720 puntos o más por su lado corto. Las
   /// tabletas chicas (7–8") y los teléfonos conservan el diseño del teléfono.
   /// En iPad la ventana no baja de 720×720 (`SceneDelegate`), así que siempre

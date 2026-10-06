@@ -268,6 +268,8 @@ class _Auth extends GetxController implements AuthController {
   @override
   final isLoading = false.obs;
   @override
+  final waitingForGoogle = false.obs;
+  @override
   void onClose() {
     emailController.dispose();
     passwordController.dispose();
@@ -303,6 +305,8 @@ class _Registro extends GetxController implements RegisterController {
   final obscureConfirmPassword = true.obs;
   @override
   final sugerenciaCorreo = RxnString();
+  @override
+  final waitingForGoogle = false.obs;
   @override
   final errorMessage = RxnString();
   @override
@@ -847,7 +851,8 @@ void main() {
         home: const ConfiguracionView()));
     await tester.pumpAndSettle();
     final c = Get.find<ConfiguracionController>();
-    final escaner = PlataformaApp.escanerFisico;
+    // También en la tableta (por OTG, hub o Bluetooth).
+    final escaner = PlataformaApp.escanerFisico || PlataformaApp.tableta;
     expect(c.tourSteps.take(escaner ? 3 : 2), [
       c.keyCuenta,
       if (escaner) c.keyEscaner,
@@ -908,6 +913,12 @@ void main() {
       (
         carpeta: 'build/capturas_movil/$carpetaMovil',
         tamano: const Size(390, 844),
+        plataforma: TargetPlatform.android
+      ),
+      // El teléfono acostado (--plain-name 844).
+      (
+        carpeta: 'build/capturas_movil_horizontal',
+        tamano: const Size(844, 390),
         plataforma: TargetPlatform.android
       ),
       // iPad de 11" acostado y de pie. También se generan aparte
@@ -989,6 +1000,57 @@ void main() {
     }
     return;
   }
+  // Tableta y teléfono acostados: las pantallas de entrada y de
+  // configuración inicial van en dos columnas (de pie, en una). Por cada
+  // una, lo que va a la izquierda y lo que va a la derecha.
+  final acostadas = <String, (String, String)>{
+    'Login': ('GYMONE', 'Correo electrónico'),
+    'Registro': ('Datos Personales', 'Tu Gimnasio'),
+    'Registro Google': ('¡Bienvenido a GymOne!', 'Tu Gimnasio'),
+    'Modo de cobro': ('Costos fijos', 'Abonos libres'),
+    'Precios': ('Deja vacío el que no ofrezcas.', 'Solo para clientes nuevos.'),
+  };
+  for (final MapEntry(key: nombre, value: (izquierda, derecha))
+      in acostadas.entries) {
+    testWidgets('$nombre: de lado en dos columnas, de pie en una',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final pantalla = pantallas[nombre]!();
+      for (final (tamano, deLado) in [
+        (const Size(844, 390), true), // teléfono acostado
+        (const Size(1180, 820), true), // tableta acostada
+        (const Size(390, 844), false),
+        (const Size(820, 1180), false),
+      ]) {
+        for (final escala in [1.0, 1.3, 2.0]) {
+          tester.view.physicalSize = tamano;
+          await tester.pumpWidget(GetMaterialApp(
+              theme: AppTheme.oscuro,
+              builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: TextScaler.linear(escala)),
+                  child: VentanaEscritorio(child: child!)),
+              home: pantalla));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull,
+              reason: '$nombre $tamano, texto $escala');
+          if (escala != 1) continue;
+          final a = tester.getRect(find.text(izquierda).first);
+          final b = tester.getRect(find.text(derecha).first);
+          if (deLado) {
+            expect(a.right, lessThan(b.left), reason: '$nombre $tamano');
+          } else {
+            expect(a.bottom, lessThan(b.top), reason: '$nombre $tamano');
+          }
+        }
+      }
+      await tester.pumpWidget(const SizedBox());
+    },
+        variant: const TargetPlatformVariant(
+            {TargetPlatform.android, TargetPlatform.iOS}));
+  }
+
   for (final entry in pantallas.entries) {
     testWidgets('${entry.key} permite reducir y ampliar con texto aumentado',
         (tester) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/utils/plataforma_app.dart';
 import '../../../core/widgets/diseno_escritorio.dart';
 import '../../../core/widgets/formulario.dart';
 import '../../../core/widgets/escaner_fisico_view.dart';
@@ -79,18 +80,27 @@ class _EscanerConfiguracionViewState extends State<EscanerConfiguracionView> {
         paso(
             Icons.usb,
             'Con cable USB',
-            'Conéctalo a la computadora. Si no escribe nada, ponlo en modo '
-                '"teclado" (HID) con el manual del lector.'),
+            PlataformaApp.tableta
+                ? 'Conéctalo a la tableta con un adaptador OTG o un hub USB. '
+                    'Si no escribe nada, ponlo en modo "teclado" (HID) con el '
+                    'manual del lector.'
+                : 'Conéctalo a la computadora. Si no escribe nada, ponlo en '
+                    'modo "teclado" (HID) con el manual del lector.'),
         paso(
             Icons.bluetooth,
             'Por Bluetooth',
-            'Emparéjalo desde los ajustes de Bluetooth de la computadora, '
+            'Emparéjalo desde los ajustes de Bluetooth '
+                '${PlataformaApp.tableta ? 'de la tableta' : 'de la computadora'}, '
                 'como si fuera un teclado.'),
         paso(
             Icons.settings_input_antenna,
             'Con receptor inalámbrico',
-            'Conecta el receptor USB que trae el lector. Solo funciona con '
-                'los lectores de su misma marca.'),
+            PlataformaApp.tableta
+                ? 'Conecta el receptor USB que trae el lector, con un '
+                    'adaptador OTG o un hub. Solo funciona con los lectores '
+                    'de su misma marca.'
+                : 'Conecta el receptor USB que trae el lector. Solo funciona '
+                    'con los lectores de su misma marca.'),
         const SizedBox(height: 16),
         Align(
           alignment: Alignment.centerRight,

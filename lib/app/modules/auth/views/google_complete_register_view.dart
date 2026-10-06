@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/core/widgets/centrado_desplazable.dart';
+import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import '../controllers/register_controller.dart';
 import '../widgets/horario_selector.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 
 /// Screen shown to Google Sign-In users who don't have a gym yet.
 /// They only need to provide gym name + location.
+///
+/// Acostada (tableta o teléfono de lado): la bienvenida a la izquierda y los
+/// datos del gimnasio a la derecha.
 class GoogleCompleteRegisterView extends GetView<RegisterController> {
   const GoogleCompleteRegisterView({super.key});
 
@@ -16,237 +21,268 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
       body: Container(
         decoration: BoxDecoration(gradient: c.fondoAcceso),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
+          child: pantallaAcostada(context)
+              ? _acostada(context)
+              : Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ..._bienvenida(context),
+                        const SizedBox(height: 32),
+                        _tarjeta(context),
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  /// De lado: la bienvenida a la izquierda y los datos del gimnasio a la
+  /// derecha, cada uno centrado en su mitad.
+  Widget _acostada(BuildContext context) => Row(
+        children: [
+          Expanded(
+            child: CentradoDesplazable(
+              padding: const EdgeInsets.all(24),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Welcome icon
+                mainAxisSize: MainAxisSize.min,
+                children: _bienvenida(context),
+              ),
+            ),
+          ),
+          Expanded(
+            child: CentradoDesplazable(
+              padding: const EdgeInsets.all(24),
+              child: _tarjeta(context),
+            ),
+          ),
+        ],
+      );
+
+  /// El ícono, el saludo y la cuenta de Google con la que entra.
+  List<Widget> _bienvenida(BuildContext context) {
+    final c = context.colores;
+    return [
+      // Welcome icon
+      Container(
+        width: 100,
+        height: 100,
+        decoration: BoxDecoration(
+          color: AppColors.accent.withOpacity(0.15),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.accent.withOpacity(0.3),
+            width: 2,
+          ),
+        ),
+        child: const Icon(
+          Icons.fitness_center,
+          size: 48,
+          color: AppColors.accent,
+        ),
+      ),
+      const SizedBox(height: 28),
+
+      // Title
+      Text(
+        '¡Bienvenido a GymOne!',
+        style: TextStyle(
+          fontSize: 26,
+          fontWeight: FontWeight.bold,
+          color: c.contraste,
+        ),
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 10),
+
+      // Subtitle
+      Text(
+        'Solo necesitamos los datos de tu gimnasio para empezar',
+        style: TextStyle(
+          fontSize: 15,
+          color: c.contraste.withOpacity(0.6),
+        ),
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 8),
+
+      // User info from Google
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: c.contraste.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.account_circle,
+                color: c.contraste.withOpacity(0.54), size: 20),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                '${controller.firstNameController.text} ${controller.lastNameController.text}'
+                    .trim(),
+                style: TextStyle(
+                  color: c.contraste.withOpacity(0.70),
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  /// Los datos del gimnasio y "Empezar".
+  Widget _tarjeta(BuildContext context) {
+    final c = context.colores;
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 450),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: c.tarjetaAcceso,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.contraste.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: c.sombra,
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.store, color: AppColors.accent, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Text(
+                'Tu Gimnasio',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: c.contraste,
+                ),
+              )),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Gym name
+          _buildTextField(
+            context,
+            controller: controller.gymNameController,
+            label: 'Nombre del gimnasio',
+            icon: Icons.fitness_center,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 16),
+
+          // Location
+          _buildTextField(
+            context,
+            controller: controller.locationController,
+            label: 'Ubicación',
+            icon: Icons.location_on_outlined,
+            textInputAction: TextInputAction.done,
+            hint: 'Ej: Col. Centro, Monterrey',
+          ),
+          const SizedBox(height: 16),
+
+          // Horario
+          Obx(() => HorarioSelector(
+                apertura: controller.horaApertura.value,
+                cierre: controller.horaCierre.value,
+                onChanged: controller.setHorario,
+              )),
+          const SizedBox(height: 24),
+
+          // Error + Button (single Obx to avoid GetX issues)
+          Obx(() {
+            final error = controller.errorMessage.value;
+            final loading = controller.isLoading.value;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (error != null)
                   Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.accent.withOpacity(0.3),
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.fitness_center,
-                      size: 48,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-
-                  // Title
-                  Text(
-                    '¡Bienvenido a GymOne!',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: c.contraste,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Subtitle
-                  Text(
-                    'Solo necesitamos los datos de tu gimnasio para empezar',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: c.contraste.withOpacity(0.6),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-
-                  // User info from Google
-                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: c.contraste.withOpacity(0.06),
+                      color: Colors.redAccent.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10),
+                      border:
+                          Border.all(color: Colors.redAccent.withOpacity(0.3)),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.account_circle,
-                            color: c.contraste.withOpacity(0.54), size: 20),
-                        const SizedBox(width: 8),
-                        Flexible(
+                        const Icon(Icons.error_outline,
+                            color: Colors.redAccent, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
                           child: Text(
-                            '${controller.firstNameController.text} ${controller.lastNameController.text}'
-                                .trim(),
-                            style: TextStyle(
-                              color: c.contraste.withOpacity(0.70),
-                              fontSize: 14,
-                            ),
+                            error,
+                            style: const TextStyle(
+                                color: Colors.redAccent, fontSize: 13),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 32),
-
-                  // Form card
-                  Container(
-                    width: double.infinity,
-                    constraints: const BoxConstraints(maxWidth: 450),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: c.tarjetaAcceso,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: c.contraste.withOpacity(0.1)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: c.sombra,
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
+                SizedBox(
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed:
+                        loading ? null : controller.completeGoogleRegistration,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.store,
-                                color: AppColors.accent, size: 22),
-                            const SizedBox(width: 10),
-                            Expanded(
-                                child: Text(
-                              'Tu Gimnasio',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: c.contraste,
-                              ),
-                            )),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Gym name
-                        _buildTextField(
-                          context,
-                          controller: controller.gymNameController,
-                          label: 'Nombre del gimnasio',
-                          icon: Icons.fitness_center,
-                          textInputAction: TextInputAction.next,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Location
-                        _buildTextField(
-                          context,
-                          controller: controller.locationController,
-                          label: 'Ubicación',
-                          icon: Icons.location_on_outlined,
-                          textInputAction: TextInputAction.done,
-                          hint: 'Ej: Col. Centro, Monterrey',
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Horario
-                        Obx(() => HorarioSelector(
-                              apertura: controller.horaApertura.value,
-                              cierre: controller.horaCierre.value,
-                              onChanged: controller.setHorario,
-                            )),
-                        const SizedBox(height: 24),
-
-                        // Error + Button (single Obx to avoid GetX issues)
-                        Obx(() {
-                          final error = controller.errorMessage.value;
-                          final loading = controller.isLoading.value;
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                    child: loading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              if (error != null)
-                                Container(
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.redAccent.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                        color:
-                                            Colors.redAccent.withOpacity(0.3)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.error_outline,
-                                          color: Colors.redAccent, size: 18),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          error,
-                                          style: const TextStyle(
-                                              color: Colors.redAccent,
-                                              fontSize: 13),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                              Icon(Icons.rocket_launch, size: 20),
+                              SizedBox(width: 8),
+                              Flexible(
+                                  child: Text(
+                                'Empezar',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                              SizedBox(
-                                height: 50,
-                                child: ElevatedButton(
-                                  onPressed: loading
-                                      ? null
-                                      : controller.completeGoogleRegistration,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.accent,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                  child: loading
-                                      ? const SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : const Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.rocket_launch, size: 20),
-                                            SizedBox(width: 8),
-                                            Text(
-                                              'Empezar',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              ),
+                              )),
                             ],
-                          );
-                        }),
-                      ],
-                    ),
+                          ),
                   ),
-                ],
-              ),
-            ),
-          ),
-        ),
+                ),
+              ],
+            );
+          }),
+        ],
       ),
     );
   }

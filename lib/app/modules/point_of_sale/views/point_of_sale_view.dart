@@ -73,7 +73,10 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                         description:
                             'Usa tu lector: cada lectura agrega una unidad al carrito.',
                         child: const AvisoEscanerAutomatico(),
-                      ),
+                      )
+                    // En la tableta el paso del recorrido es el de la cámara.
+                    else if (PlataformaApp.lectorDeTeclado)
+                      const AvisoEscanerAutomatico(soloTrasLeer: true),
                     // Barra de búsqueda
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
@@ -191,7 +194,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         }),
       ),
     );
-    return PlataformaApp.escritorio
+    return PlataformaApp.lectorDeTeclado
         ? EscanerAutomatico(
             habilitado: () =>
                 !controller.isLoading && !controller.isProcessingPayment,

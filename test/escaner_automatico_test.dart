@@ -8,6 +8,8 @@ import 'package:get/get.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:gymads/app/core/permissions/permissions.dart';
 import 'package:gymads/app/core/widgets/escaner_automatico.dart';
+import 'package:gymads/app/core/widgets/escaner_codigo_view.dart';
+import 'package:gymads/app/core/widgets/escaner_fisico_view.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/modules/inventario/controllers/inventario_controller.dart';
@@ -381,6 +383,97 @@ void main() {
     expect(find.text('Agregar producto'), findsNothing);
     expect(find.text('Entendido'), findsOneWidget);
   }, variant: _escritorio);
+
+  // ─── Tableta: el lector por OTG, hub o Bluetooth (antes no se escuchaba) ───
+
+  const tabletas =
+      TargetPlatformVariant({TargetPlatform.android, TargetPlatform.iOS});
+
+  /// Una tableta de 11" acostada.
+  void comoTableta(WidgetTester tester) {
+    tester.view.physicalSize = const Size(2360, 1640);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+  }
+
+  testWidgets('tableta: venta lee el lector y conserva la cámara',
+      (tester) async {
+    comoTableta(tester);
+    final controller = Get.put<PointOfSaleController>(_Venta());
+    controller.availableProducts.add(_producto());
+    await tester.pumpWidget(const GetMaterialApp(home: PointOfSaleView()));
+    await tester.pumpAndSettle();
+    expect(find.byType(EscanerAutomatico), findsOneWidget);
+    expect(find.byTooltip('Escanear productos'), findsOneWidget);
+    // Sin lectura no se habla del lector: no todas las tabletas tienen.
+    expect(find.text('Escanea un producto con tu lector'), findsNothing);
+    await _leer(tester, '001234567890');
+    await tester.pumpAndSettle();
+    expect(controller.totalUnidades, 1);
+    expect(find.byType(AvisoEscanerAutomatico), findsOneWidget);
+    expect(find.textContaining('Agua'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  }, variant: tabletas);
+
+  testWidgets('tableta: inventario abre el ajuste de stock al escanear',
+      (tester) async {
+    comoTableta(tester);
+    final controller =
+        Get.put<InventarioController>(_Inventario()) as _Inventario;
+    controller.products.add(_producto());
+    controller.filterProducts();
+    await tester.pumpWidget(const GetMaterialApp(home: InventarioView()));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Escanear código'), findsOneWidget);
+    await _leer(tester, '001234567890');
+    await tester.pumpAndSettle();
+    expect(find.text('Cantidad'), findsOneWidget);
+  }, variant: tabletas);
+
+  testWidgets('tableta: "Probar mi lector" escucha sin campo de texto',
+      (tester) async {
+    comoTableta(tester);
+    String? leido;
+    await tester.pumpWidget(const GetMaterialApp(home: Scaffold()));
+    Get.to<String>(() => const EscanerFisicoView(titulo: 'Probar escáner'))!
+        .then((codigo) => leido = codigo);
+    await tester.pumpAndSettle();
+    // Un campo abriría el teclado de la pantalla.
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('Escanea cualquier código con tu lector'), findsOneWidget);
+    await _leer(tester, '7501234');
+    await tester.pumpAndSettle();
+    expect(leido, '7501234');
+  }, variant: tabletas);
+
+  testWidgets('tableta: la pantalla de la cámara también acepta el lector',
+      (tester) async {
+    comoTableta(tester);
+    String? leido;
+    await tester.pumpWidget(const GetMaterialApp(home: Scaffold()));
+    Get.to<String>(() => const EscanerCodigoView())!
+        .then((codigo) => leido = codigo);
+    // La cámara no termina de cargar en pruebas: se avanza a mano.
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byType(EscanerAutomatico), findsOneWidget);
+    await _leer(tester, '7501234567890');
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(leido, '7501234567890');
+  }, variant: tabletas);
+
+  testWidgets('teléfono acostado sigue sin captura automática', (tester) async {
+    tester.view.physicalSize = const Size(1688, 780);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    Get.put<PointOfSaleController>(_Venta());
+    await tester.pumpWidget(const GetMaterialApp(home: PointOfSaleView()));
+    await tester.pumpAndSettle();
+    expect(find.byType(EscanerAutomatico), findsNothing);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('móvil conserva el botón y no activa la captura automática',
       (tester) async {

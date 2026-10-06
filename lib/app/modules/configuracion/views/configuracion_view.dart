@@ -103,8 +103,9 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         ),
       ),
 
-      // El escáner de códigos solo existe en computadora y web.
-      if (PlataformaApp.escanerFisico) ...[
+      // El lector de códigos: en computadora, web y tableta (por OTG, hub o
+      // Bluetooth). El teléfono escanea con la cámara.
+      if (PlataformaApp.escanerFisico || PlataformaApp.tableta) ...[
         const SizedBox(height: 12),
         TourStep(
           tourKey: controller.keyEscaner,

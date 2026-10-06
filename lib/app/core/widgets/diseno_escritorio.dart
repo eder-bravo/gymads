@@ -185,6 +185,17 @@ class VentanaEscritorio extends StatelessWidget {
   }
 }
 
+/// Tableta o teléfono acostados (más anchos que altos). Las pantallas de
+/// entrada y de configuración inicial (iniciar sesión, crear la cuenta, modo
+/// de cobro, precios) van en dos columnas, en vez de una columna angosta con
+/// mucho espacio a los lados. La computadora conserva su diseño, y de pie
+/// todo sigue igual.
+bool pantallaAcostada(BuildContext context) {
+  if (PlataformaApp.escritorio) return false;
+  final tamano = MediaQuery.sizeOf(context);
+  return tamano.width > tamano.height && tamano.width >= 640;
+}
+
 /// El contenido mantiene un ancho legible al ampliar la ventana. Los márgenes
 /// pertenecen a la pantalla; no se cambia el tamaño de letra ni el MediaQuery.
 class ContenidoEscritorio extends StatelessWidget {

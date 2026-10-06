@@ -127,7 +127,11 @@ class InventarioView extends GetView<InventarioController> {
                 description:
                     'Usa tu lector para abrir el ajuste de stock del producto.',
                 child: const AvisoEscanerAutomatico(),
-              ),
+              )
+            // En la tableta el paso del recorrido es el de la cámara.
+            else if (PlataformaApp.lectorDeTeclado &&
+                controller.can(Permission.ajustarStock))
+              const AvisoEscanerAutomatico(soloTrasLeer: true),
             _buildStatsSection(context),
             _buildFaltantesBanner(context),
             TourStep(
@@ -153,7 +157,7 @@ class InventarioView extends GetView<InventarioController> {
         ),
       ),
     );
-    return PlataformaApp.escritorio
+    return PlataformaApp.lectorDeTeclado
         ? EscanerAutomatico(
             habilitado: () =>
                 controller.can(Permission.ajustarStock) &&

@@ -401,12 +401,36 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 950 pruebas aprobadas de la batería completa,
-análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
+Verificación de esta revisión: 975 pruebas aprobadas de la batería completa,
+análisis sin incidencias nuevas y compilación de macOS y del APK de Android. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`
 actualizó el paquete `printing` (cambió la firma de `layoutPdf`). En macOS la app abrió en 1280×800 centrada. La compilación nativa de Windows queda pendiente de una
 computadora Windows.
+
+## Tableta y teléfono acostados
+
+Con la pantalla más ancha que alta (`pantallaAcostada` en
+`diseno_escritorio.dart`; no aplica en computadora), las pantallas de entrada
+y de configuración inicial van en dos columnas en vez de una columna angosta:
+
+- Iniciar sesión: el logo y "Crear cuenta" a la izquierda, la tarjeta a la
+  derecha. En el teléfono acostado (poco alto) el logo y la tarjeta son más
+  compactos y la tarjeta se desplaza.
+- Crear cuenta: "Datos personales" y "Tu gimnasio" lado a lado; Google y el
+  botón, centrados y sin cruzar la pantalla.
+- Registro con Google: la bienvenida a la izquierda, los datos del gimnasio a
+  la derecha.
+- Modo de cobro: las dos opciones lado a lado; en la tableta, tarjetas altas
+  con el ícono arriba y letra más grande.
+- Precios: los precios (dos por fila) a la izquierda; la inscripción y el
+  código a la derecha.
+
+De pie todo sigue igual (teléfono y tableta), y la computadora también.
+Capturas del teléfono acostado: `--plain-name 844`
+(`build/capturas_movil_horizontal`). `escritorio_compacto_test.dart`
+comprueba las dos columnas de lado y una de pie, sin desbordes con texto al
+130 y 200 %.
 
 ## Enter confirma los diálogos (solo computadora)
 
@@ -483,6 +507,25 @@ fijos (el gimnasio solo cobra libre) no se pide.
   libre); `procesarAbono` lo vuelve a revisar antes de cobrar.
 
 ## Escáner de códigos de barras
+
+**También en la tableta** (Android y iPad, `PlataformaApp.lectorDeTeclado`):
+el lector que escribe como teclado (HID) se conecta por USB con un adaptador
+OTG o un hub, o por Bluetooth. Antes solo se escuchaba en computadora y la
+tableta no lo reconocía (lo reportaron con un K102 por OTG).
+
+- Venta e Inventario lo escuchan igual que en computadora; el botón de la
+  cámara se queda. El aviso "Escanea un producto con tu lector" sale hasta la
+  primera lectura (`AvisoEscanerAutomatico(soloTrasLeer: true)`): no todas
+  las tabletas tienen lector. El paso del recorrido sigue siendo el de la
+  cámara.
+- La pantalla de la cámara (agregar producto, escanear al carrito) también
+  acepta el lector: lo que llegue primero.
+- Configuración › Escáner de códigos aparece en la tableta, con los pasos
+  para tableta (OTG o hub). "Probar mi lector" escucha sin campo de texto
+  (un campo abriría el teclado de la pantalla).
+- `AndroidManifest.xml`: `navigation` en `configChanges`, para que conectar
+  el lector no reinicie la app.
+- El teléfono sigue con la cámara.
 
 En macOS y Windows, **Punto de venta e Inventario escuchan el lector físico al
 entrar**, sin botón de escanear ni pantalla adicional. En venta, cada lectura

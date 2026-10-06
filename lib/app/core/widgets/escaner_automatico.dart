@@ -9,7 +9,8 @@ import '../utils/app_logger.dart';
 import '../utils/plataforma_app.dart';
 
 /// Lectura HID al entrar en venta/inventario, sin abrir otra pantalla ni
-/// exigir foco en un campo. Solo escucha la ruta visible de escritorio.
+/// exigir foco en un campo. Solo escucha la ruta visible, en computadora y
+/// en tableta ([PlataformaApp.lectorDeTeclado]).
 class EscanerAutomatico extends StatefulWidget {
   const EscanerAutomatico({
     super.key,
@@ -30,7 +31,7 @@ class EscanerAutomatico extends StatefulWidget {
 
 class _EscanerAutomaticoState extends State<EscanerAutomatico> {
   static const _intervalo = Duration(milliseconds: 100);
-  final _estado = ValueNotifier<String?>('Escanea un producto con tu lector');
+  final _estado = ValueNotifier<String?>(_mensajeInicial);
   final _cola = <String>[];
   String _entrada = '';
   Duration? _ultimaTecla;
@@ -46,7 +47,7 @@ class _EscanerAutomaticoState extends State<EscanerAutomatico> {
 
   bool get _activa =>
       mounted &&
-      PlataformaApp.escritorio &&
+      PlataformaApp.lectorDeTeclado &&
       widget.habilitado() &&
       _ciclo != AppLifecycleState.inactive &&
       _ciclo != AppLifecycleState.paused &&
@@ -235,8 +236,14 @@ class _EstadoEscaner extends InheritedWidget {
   bool updateShouldNotify(_EstadoEscaner anterior) => estado != anterior.estado;
 }
 
+const _mensajeInicial = 'Escanea un producto con tu lector';
+
 class AvisoEscanerAutomatico extends StatelessWidget {
-  const AvisoEscanerAutomatico({super.key});
+  const AvisoEscanerAutomatico({super.key, this.soloTrasLeer = false});
+
+  /// En la tableta no todos tienen lector (también está la cámara): el
+  /// aviso aparece hasta que llega la primera lectura.
+  final bool soloTrasLeer;
 
   @override
   Widget build(BuildContext context) {
@@ -244,14 +251,19 @@ class AvisoEscanerAutomatico extends StatelessWidget {
         context.dependOnInheritedWidgetOfExactType<_EstadoEscaner>()!;
     return ValueListenableBuilder<String?>(
       valueListenable: estado.estado,
-      builder: (context, mensaje, _) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: Row(children: [
-          const Icon(Icons.barcode_reader, size: 20),
-          const SizedBox(width: 8),
-          Expanded(child: Text(mensaje ?? 'Escanea un producto con tu lector')),
-        ]),
-      ),
+      builder: (context, mensaje, _) => soloTrasLeer &&
+              (mensaje == null || mensaje == _mensajeInicial)
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(children: [
+                const Icon(Icons.barcode_reader, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                    child:
+                        Text(mensaje ?? 'Escanea un producto con tu lector')),
+              ]),
+            ),
     );
   }
 }

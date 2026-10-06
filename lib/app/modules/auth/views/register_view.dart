@@ -7,6 +7,9 @@ import '../widgets/horario_selector.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 
 /// Registration view — single-form with email/password + Google option
+///
+/// Acostada (tableta o teléfono de lado), "Datos personales" y "Tu gimnasio"
+/// van lado a lado.
 class RegisterView extends GetView<RegisterController> {
   const RegisterView({super.key});
 
@@ -17,7 +20,8 @@ class RegisterView extends GetView<RegisterController> {
       body: Container(
         decoration: BoxDecoration(gradient: c.fondoAcceso),
         child: ContenidoEscritorio(
-          anchoMaximo: 720,
+          // De lado, las dos tarjetas una junto a la otra.
+          anchoMaximo: pantallaAcostada(context) ? 1100 : 720,
           child: SafeArea(
             child: Column(
               children: [
@@ -78,149 +82,33 @@ class RegisterView extends GetView<RegisterController> {
 
   Widget _buildForm(BuildContext context) {
     final c = context.colores;
+    final acostada = pantallaAcostada(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Google Sign-In button
-        _buildGoogleButton(context),
+        _angosto(acostada, _buildGoogleButton(context)),
         const SizedBox(height: 20),
 
         // Divider
         _buildDivider(context),
         const SizedBox(height: 20),
 
-        // Personal info card
-        _buildCard(
-          context,
-          title: 'Datos Personales',
-          icon: Icons.person_outline,
-          children: [
-            _buildTextField(
-              context,
-              controller: controller.firstNameController,
-              label: 'Nombre(s)',
-              icon: Icons.person,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 14),
-            _buildTextField(
-              context,
-              controller: controller.lastNameController,
-              label: 'Apellidos',
-              icon: Icons.person_outline,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 14),
-            _buildTextField(
-              context,
-              controller: controller.emailController,
-              label: 'Correo electrónico',
-              icon: Icons.email_outlined,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              onChanged: controller.revisarCorreo,
-            ),
-            // Un error de dedo en el dominio (gmial.com): se sugiere, no se
-            // impide.
-            Obx(() {
-              final sugerida = controller.sugerenciaCorreo.value;
-              if (sugerida == null) return const SizedBox.shrink();
-              return Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: controller.usarSugerenciaCorreo,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.accent,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                  ),
-                  child: Text('¿Quisiste decir $sugerida?'),
-                ),
-              );
-            }),
-            const SizedBox(height: 14),
-            Obx(() => _buildTextField(
-                  context,
-                  controller: controller.passwordController,
-                  label: 'Contraseña',
-                  icon: Icons.lock_outline,
-                  obscureText: controller.obscurePassword.value,
-                  textInputAction: TextInputAction.next,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      controller.obscurePassword.value
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                      color: c.contraste.withOpacity(0.54),
-                      size: 20,
-                    ),
-                    tooltip: PlataformaApp.escritorio
-                        ? (controller.obscurePassword.value
-                            ? 'Mostrar contraseña'
-                            : 'Ocultar contraseña')
-                        : null,
-                    onPressed: () => controller.obscurePassword.value =
-                        !controller.obscurePassword.value,
-                  ),
-                )),
-            const SizedBox(height: 14),
-            Obx(() => _buildTextField(
-                  context,
-                  controller: controller.confirmPasswordController,
-                  label: 'Confirmar contraseña',
-                  icon: Icons.lock_outline,
-                  obscureText: controller.obscureConfirmPassword.value,
-                  textInputAction: TextInputAction.next,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      controller.obscureConfirmPassword.value
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                      color: c.contraste.withOpacity(0.54),
-                      size: 20,
-                    ),
-                    tooltip: PlataformaApp.escritorio
-                        ? (controller.obscureConfirmPassword.value
-                            ? 'Mostrar contraseña'
-                            : 'Ocultar contraseña')
-                        : null,
-                    onPressed: () => controller.obscureConfirmPassword.value =
-                        !controller.obscureConfirmPassword.value,
-                  ),
-                )),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Gym info card
-        _buildCard(
-          context,
-          title: 'Tu Gimnasio',
-          icon: Icons.fitness_center,
-          children: [
-            _buildTextField(
-              context,
-              controller: controller.gymNameController,
-              label: 'Nombre del gimnasio',
-              icon: Icons.store,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 14),
-            _buildTextField(
-              context,
-              controller: controller.locationController,
-              label: 'Ubicación',
-              icon: Icons.location_on_outlined,
-              textInputAction: TextInputAction.done,
-              hint: 'Ej: Col. Centro, Monterrey',
-            ),
-            const SizedBox(height: 14),
-            Obx(() => HorarioSelector(
-                  apertura: controller.horaApertura.value,
-                  cierre: controller.horaCierre.value,
-                  onChanged: controller.setHorario,
-                )),
-          ],
-        ),
+        // Datos personales y del gimnasio: de lado, uno junto al otro.
+        if (acostada)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _cardPersonal(context)),
+              const SizedBox(width: 16),
+              Expanded(child: _cardGimnasio(context)),
+            ],
+          )
+        else ...[
+          _cardPersonal(context),
+          const SizedBox(height: 16),
+          _cardGimnasio(context),
+        ],
         const SizedBox(height: 24),
 
         // Error message
@@ -229,7 +117,7 @@ class RegisterView extends GetView<RegisterController> {
             : const SizedBox.shrink()),
 
         // Register button
-        _buildRegisterButton(),
+        _angosto(acostada, _buildRegisterButton()),
         const SizedBox(height: 16),
 
         // Login link
@@ -256,6 +144,151 @@ class RegisterView extends GetView<RegisterController> {
             ),
           ],
         ),
+      ],
+    );
+  }
+
+  /// De lado, los botones no cruzan toda la pantalla.
+  Widget _angosto(bool acostada, Widget boton) => acostada
+      ? Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: SizedBox(width: double.infinity, child: boton),
+          ),
+        )
+      : boton;
+
+  Widget _cardPersonal(BuildContext context) {
+    final c = context.colores;
+    return _buildCard(
+      context,
+      title: 'Datos Personales',
+      icon: Icons.person_outline,
+      children: [
+        _buildTextField(
+          context,
+          controller: controller.firstNameController,
+          label: 'Nombre(s)',
+          icon: Icons.person,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 14),
+        _buildTextField(
+          context,
+          controller: controller.lastNameController,
+          label: 'Apellidos',
+          icon: Icons.person_outline,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 14),
+        _buildTextField(
+          context,
+          controller: controller.emailController,
+          label: 'Correo electrónico',
+          icon: Icons.email_outlined,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          onChanged: controller.revisarCorreo,
+        ),
+        // Un error de dedo en el dominio (gmial.com): se sugiere, no se
+        // impide.
+        Obx(() {
+          final sugerida = controller.sugerenciaCorreo.value;
+          if (sugerida == null) return const SizedBox.shrink();
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: controller.usarSugerenciaCorreo,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+              child: Text('¿Quisiste decir $sugerida?'),
+            ),
+          );
+        }),
+        const SizedBox(height: 14),
+        Obx(() => _buildTextField(
+              context,
+              controller: controller.passwordController,
+              label: 'Contraseña',
+              icon: Icons.lock_outline,
+              obscureText: controller.obscurePassword.value,
+              textInputAction: TextInputAction.next,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  controller.obscurePassword.value
+                      ? Icons.visibility_off
+                      : Icons.visibility,
+                  color: c.contraste.withOpacity(0.54),
+                  size: 20,
+                ),
+                tooltip: PlataformaApp.escritorio
+                    ? (controller.obscurePassword.value
+                        ? 'Mostrar contraseña'
+                        : 'Ocultar contraseña')
+                    : null,
+                onPressed: () => controller.obscurePassword.value =
+                    !controller.obscurePassword.value,
+              ),
+            )),
+        const SizedBox(height: 14),
+        Obx(() => _buildTextField(
+              context,
+              controller: controller.confirmPasswordController,
+              label: 'Confirmar contraseña',
+              icon: Icons.lock_outline,
+              obscureText: controller.obscureConfirmPassword.value,
+              textInputAction: TextInputAction.next,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  controller.obscureConfirmPassword.value
+                      ? Icons.visibility_off
+                      : Icons.visibility,
+                  color: c.contraste.withOpacity(0.54),
+                  size: 20,
+                ),
+                tooltip: PlataformaApp.escritorio
+                    ? (controller.obscureConfirmPassword.value
+                        ? 'Mostrar contraseña'
+                        : 'Ocultar contraseña')
+                    : null,
+                onPressed: () => controller.obscureConfirmPassword.value =
+                    !controller.obscureConfirmPassword.value,
+              ),
+            )),
+      ],
+    );
+  }
+
+  Widget _cardGimnasio(BuildContext context) {
+    return _buildCard(
+      context,
+      title: 'Tu Gimnasio',
+      icon: Icons.fitness_center,
+      children: [
+        _buildTextField(
+          context,
+          controller: controller.gymNameController,
+          label: 'Nombre del gimnasio',
+          icon: Icons.store,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 14),
+        _buildTextField(
+          context,
+          controller: controller.locationController,
+          label: 'Ubicación',
+          icon: Icons.location_on_outlined,
+          textInputAction: TextInputAction.done,
+          hint: 'Ej: Col. Centro, Monterrey',
+        ),
+        const SizedBox(height: 14),
+        Obx(() => HorarioSelector(
+              apertura: controller.horaApertura.value,
+              cierre: controller.horaCierre.value,
+              onChanged: controller.setHorario,
+            )),
       ],
     );
   }
@@ -321,7 +354,7 @@ class RegisterView extends GetView<RegisterController> {
     final c = context.colores;
     // En escritorio el texto toma su ancho y las dos líneas se reparten el
     // resto: con el texto en un espacio fijo quedaba recargado a un lado.
-    if (PlataformaApp.pantallaGrande) {
+    if (PlataformaApp.pantallaGrande || pantallaAcostada(context)) {
       return Row(
         children: [
           Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),

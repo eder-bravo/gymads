@@ -17,13 +17,37 @@ class PaymentModeView extends GetView<OnboardingController> {
     final c = context.colores;
     final bool isTablet = !PlataformaApp.escritorio &&
         MediaQuery.sizeOf(context).shortestSide >= 600;
+    final acostada = pantallaAcostada(context);
+    final grande = acostada && PlataformaApp.tableta;
+    final fijo = Obx(() => _ChoiceCard(
+          icon: Icons.price_check,
+          title: 'Costos fijos',
+          description: 'Un precio fijo por día, semana, mes y año.',
+          gradient: const [Color(0xFF667eea), Color(0xFF764ba2)],
+          isTablet: isTablet,
+          grande: grande,
+          enabled: !controller.isSaving.value,
+          onTap: controller.chooseFijo,
+        ));
+    final libre = Obx(() => _ChoiceCard(
+          icon: Icons.tune,
+          title: 'Abonos libres',
+          description: 'Escribes el precio en cada cobro.',
+          gradient: const [Color(0xFF4facfe), Color(0xFF00f2fe)],
+          isTablet: isTablet,
+          grande: grande,
+          enabled: !controller.isSaving.value,
+          isLoading: controller.isSaving.value,
+          onTap: controller.chooseLibre,
+        ));
 
     return PopScope(
       canPop: false,
       child: ScaffoldAdaptable(
         // Antes de terminar de configurar el gimnasio: sin barra lateral.
         conMenu: false,
-        anchoMaximo: 800,
+        // De lado, las dos opciones una junto a la otra.
+        anchoMaximo: acostada ? 1000 : 800,
         backgroundColor: c.backgroundColor,
         appBar: const GymAppBar(
           title: 'Configuración inicial',
@@ -54,26 +78,23 @@ class PaymentModeView extends GetView<OnboardingController> {
                   ),
                 ),
                 const SizedBox(height: 28),
-                Obx(() => _ChoiceCard(
-                      icon: Icons.price_check,
-                      title: 'Costos fijos',
-                      description: 'Un precio fijo por día, semana, mes y año.',
-                      gradient: const [Color(0xFF667eea), Color(0xFF764ba2)],
-                      isTablet: isTablet,
-                      enabled: !controller.isSaving.value,
-                      onTap: controller.chooseFijo,
-                    )),
-                const SizedBox(height: 14),
-                Obx(() => _ChoiceCard(
-                      icon: Icons.tune,
-                      title: 'Abonos libres',
-                      description: 'Escribes el precio en cada cobro.',
-                      gradient: const [Color(0xFF4facfe), Color(0xFF00f2fe)],
-                      isTablet: isTablet,
-                      enabled: !controller.isSaving.value,
-                      isLoading: controller.isSaving.value,
-                      onTap: controller.chooseLibre,
-                    )),
+                if (acostada)
+                  // Las dos del mismo alto.
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: fijo),
+                        const SizedBox(width: 16),
+                        Expanded(child: libre),
+                      ],
+                    ),
+                  )
+                else ...[
+                  fijo,
+                  const SizedBox(height: 14),
+                  libre,
+                ],
               ],
             ),
           ),
@@ -94,6 +115,10 @@ class _ChoiceCard extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onTap;
 
+  /// En la tableta acostada: tarjeta alta, con el ícono arriba y letra más
+  /// grande, para usar el espacio y tocarla fácil.
+  final bool grande;
+
   const _ChoiceCard({
     required this.icon,
     required this.title,
@@ -103,7 +128,72 @@ class _ChoiceCard extends StatelessWidget {
     required this.enabled,
     required this.onTap,
     this.isLoading = false,
+    this.grande = false,
   });
+
+  Widget _icono(double tamano, {double relleno = 14}) => Container(
+        padding: EdgeInsets.all(relleno),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: gradient),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: gradient[0].withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(icon, color: Colors.white, size: tamano),
+      );
+
+  Widget _flecha(ColoresTema c) => isLoading
+      ? SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: c.textSecondary,
+          ),
+        )
+      : Icon(
+          Icons.arrow_forward_ios_rounded,
+          color: c.contraste.withOpacity(0.25),
+          size: 16,
+        );
+
+  Widget _contenidoGrande(ColoresTema c) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _icono(40, relleno: 20),
+              const Spacer(),
+              _flecha(c),
+            ],
+          ),
+          const SizedBox(height: 28),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: c.textPrimary,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: TextStyle(
+              fontSize: 17,
+              color: c.textSecondary.withOpacity(0.8),
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ],
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +206,7 @@ class _ChoiceCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           onTap: enabled ? onTap : null,
           child: Container(
-            padding: EdgeInsets.all(isTablet ? 22 : 18),
+            padding: EdgeInsets.all(grande ? 32 : (isTablet ? 22 : 18)),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               gradient: LinearGradient(
@@ -129,69 +219,42 @@ class _ChoiceCard extends StatelessWidget {
               ),
               border: Border.all(color: gradient[0].withOpacity(0.25)),
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: gradient),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: gradient[0].withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child:
-                      Icon(icon, color: Colors.white, size: isTablet ? 30 : 26),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: grande
+                ? _contenidoGrande(c)
+                : Row(
                     children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: isTablet ? 19 : 17,
-                          fontWeight: FontWeight.w700,
-                          color: c.textPrimary,
-                          letterSpacing: 0.3,
+                      _icono(isTablet ? 30 : 26),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: TextStyle(
+                                fontSize: isTablet ? 19 : 17,
+                                fontWeight: FontWeight.w700,
+                                color: c.textPrimary,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              description,
+                              style: TextStyle(
+                                fontSize: isTablet ? 14 : legible(12.5),
+                                color: c.textSecondary.withOpacity(0.75),
+                                fontWeight: FontWeight.w500,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        description,
-                        style: TextStyle(
-                          fontSize: isTablet ? 14 : legible(12.5),
-                          color: c.textSecondary.withOpacity(0.75),
-                          fontWeight: FontWeight.w500,
-                          height: 1.35,
-                        ),
-                      ),
+                      const SizedBox(width: 8),
+                      _flecha(c),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                if (isLoading)
-                  SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: c.textSecondary,
-                    ),
-                  )
-                else
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: c.contraste.withOpacity(0.25),
-                    size: 16,
-                  ),
-              ],
-            ),
           ),
         ),
       ),

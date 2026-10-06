@@ -9,11 +9,14 @@ class IngresoService {
   IngresoService({required IngresoProvider ingresoProvider})
       : _ingresoProvider = ingresoProvider;
 
-  /// Registra un abono libre en el sistema
+  /// Registra un abono. [monto] es solo el abono; [cuotaRegistro], la
+  /// inscripción de un cliente nuevo si se cobró. Van en el mismo ingreso,
+  /// desglosados: el total es la suma.
   Future<bool> registrarAbono({
     required String clienteId,
     required String clienteNombre,
     required double monto,
+    double cuotaRegistro = 0,
     required String metodoPago,
     required String descripcion,
     required String usuarioStaff,
@@ -29,9 +32,9 @@ class IngresoService {
         concepto: 'abono',
         tipoMembresia: descripcion, // Usamos este campo para la descripción del abono
         montoBase: monto,
-        cuotaRegistro: 0.0,
+        cuotaRegistro: cuotaRegistro,
         descuento: 0.0,
-        montoFinal: monto,
+        montoFinal: monto + cuotaRegistro,
         metodoPago: metodoPago,
         fecha: DateTime.now(),
         periodoInicio: periodoInicio,

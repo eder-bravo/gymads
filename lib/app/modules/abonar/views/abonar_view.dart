@@ -11,6 +11,7 @@ import 'package:gymads/app/global_widgets/app_header.dart';
 import '../../../core/widgets/refrescable.dart';
 import '../controllers/abonar_controller.dart';
 import '../../../data/models/user_model.dart';
+import '../../../data/repositories/codigo_abono_libre_repository.dart';
 import '../vigencia.dart';
 import 'cobrar_visita_view.dart';
 import '../../../core/widgets/centrado_desplazable.dart';
@@ -405,7 +406,7 @@ class AbonarView extends GetView<AbonarController> {
               1,
               '¿Cuánto tiempo paga?',
               hecho: '${controller.periodoElegido} · '
-                  '${pesos(controller.totalAmount)}',
+                  '${pesos(controller.montoAbono)}',
               contenido: () => _pasoTiempo(context),
             )),
         Obx(() => _seccionPaso(
@@ -781,7 +782,7 @@ class AbonarView extends GetView<AbonarController> {
               controller.montoLibre.value > 0) ...[
             const SizedBox(height: 16),
             Text(
-              '${controller.periodoElegido} × ${pesos(controller.montoLibre.value)} = ${pesos(controller.totalAmount)}',
+              '${controller.periodoElegido} × ${pesos(controller.montoLibre.value)} = ${pesos(controller.montoAbono)}',
               key: const Key('total_libre'),
               style: TextStyle(
                 color: c.textPrimary,
@@ -798,26 +799,41 @@ class AbonarView extends GetView<AbonarController> {
   /// "Costo fijo | Abono libre", como dos botones grandes.
   Widget _pestanasModo(BuildContext context, bool fijo) {
     final c = context.colores;
+    // El mostrador necesita el código del encargado para pasar a libre.
+    final conCandado =
+        controller.necesitaCodigoParaLibre && !controller.libreAutorizado.value;
     Widget pestana(String texto, bool valor) {
       final elegida = fijo == valor;
+      final candado = !valor && conCandado;
+      final estilo = TextStyle(
+        fontSize: 15,
+        fontWeight: elegida ? FontWeight.bold : FontWeight.w500,
+        color: elegida ? Colors.white : c.textSecondary,
+      );
       return Expanded(
         child: Material(
           color: elegida ? AppColors.accent : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
-            onTap: () => controller.setPrecioFijo(valor),
+            onTap: () => candado
+                ? _pedirCodigo(context)
+                : controller.setPrecioFijo(valor),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                texto,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: elegida ? FontWeight.bold : FontWeight.w500,
-                  color: elegida ? Colors.white : c.textSecondary,
-                ),
-              ),
+              child: candado
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_outline, size: 16, color: estilo.color),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(texto,
+                              textAlign: TextAlign.center, style: estilo),
+                        ),
+                      ],
+                    )
+                  : Text(texto, textAlign: TextAlign.center, style: estilo),
             ),
           ),
         ),
@@ -836,6 +852,31 @@ class AbonarView extends GetView<AbonarController> {
         pestana('Abono libre', false),
       ]),
     );
+  }
+
+  /// Pide el código del encargado para cobrar este abono libre. Sin código
+  /// configurado, explica dónde se crea.
+  Future<void> _pedirCodigo(BuildContext context) async {
+    final hay = await controller.codigoRepository.hayCodigo();
+    if (hay == false) {
+      await Get.dialog<void>(AlertDialog(
+        scrollable: true,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Falta el código del encargado'),
+        content: const Text(
+          'Para cobrar un abono libre se necesita el código del encargado, y '
+          'aún no hay uno. El dueño o el encargado lo crea en Configuración › '
+          'Precios de abonos.',
+          style: TextStyle(height: 1.35),
+        ),
+        actions: [
+          BotonGuardar(
+              texto: 'Entendido', compacto: true, onPressed: () => Get.back()),
+        ],
+      ));
+      return;
+    }
+    await Get.dialog<void>(_DialogoCodigo(controller: controller));
   }
 
   /// Una opción de periodo: singular con costo fijo, unidad con abono libre.
@@ -950,6 +991,7 @@ class AbonarView extends GetView<AbonarController> {
     final fijo = controller.isPrecioFijo.value;
     final precio = controller.configuredPrice;
     final total = controller.totalAmount;
+    final inscripcion = controller.inscripcionACobrar;
     final hasta = controller.calculateNewExpirationDate();
 
     Widget renglon(String izquierda, String derecha, {bool grande = false}) {
@@ -995,10 +1037,19 @@ class AbonarView extends GetView<AbonarController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Cliente nuevo: la inscripción, marcada; se puede quitar.
+          if (controller.aplicaInscripcion) ...[
+            _casillaInscripcion(context),
+            const SizedBox(height: 14),
+          ],
           renglon(
             '${controller.periodoElegido} × ${pesos(fijo ? (precio ?? 0) : controller.montoLibre.value)}',
-            pesos(total),
+            pesos(controller.montoAbono),
           ),
+          if (inscripcion > 0) ...[
+            const SizedBox(height: 8),
+            renglon('Inscripción', pesos(inscripcion)),
+          ],
           Divider(height: 24, color: c.divisor),
           renglon('Total', pesos(total), grande: true),
           const SizedBox(height: 14),
@@ -1021,6 +1072,61 @@ class AbonarView extends GetView<AbonarController> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// "Cobrar inscripción · $200", marcada por defecto. El monto es el del
+  /// gimnasio: aquí solo se decide si se cobra.
+  Widget _casillaInscripcion(BuildContext context) {
+    final c = context.colores;
+    final marcada = controller.cobrarInscripcion.value;
+    final radio = BorderRadius.circular(12);
+    return Material(
+      color: marcada ? AppColors.accent.withOpacity(0.08) : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: radio,
+        side: BorderSide(
+            color: marcada ? AppColors.accent.withOpacity(0.5) : c.borde),
+      ),
+      child: InkWell(
+        key: const Key('casilla_inscripcion'),
+        borderRadius: radio,
+        onTap: controller.cobrarInscripcion.toggle,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
+          child: Row(
+            children: [
+              Checkbox(
+                value: marcada,
+                activeColor: AppColors.accent,
+                onChanged: (v) =>
+                    controller.cobrarInscripcion.value = v ?? false,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Cobrar inscripción · ${pesos(controller.precioInscripcion)}',
+                      style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Cliente nuevo: se cobra una sola vez.',
+                      style: TextStyle(color: c.textSecondary, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1241,4 +1347,104 @@ class _TarjetaCliente extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "Autorización del encargado": su código para cobrar un abono libre. Se
+/// comprueba en el servidor y autoriza solo este cobro.
+class _DialogoCodigo extends StatefulWidget {
+  const _DialogoCodigo({required this.controller});
+
+  final AbonarController controller;
+
+  @override
+  State<_DialogoCodigo> createState() => _DialogoCodigoState();
+}
+
+class _DialogoCodigoState extends State<_DialogoCodigo> {
+  final _pin = TextEditingController();
+  bool _revisando = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _pin.dispose();
+    super.dispose();
+  }
+
+  Future<void> _autorizar() async {
+    if (_revisando) return;
+    if (_pin.text.trim().length < 4) {
+      setState(() => _error = 'Escribe el código (4 a 6 números).');
+      return;
+    }
+    setState(() {
+      _revisando = true;
+      _error = null;
+    });
+    final resultado = await widget.controller.autorizarConCodigo(_pin.text);
+    if (!mounted) return;
+    if (resultado == ResultadoAutorizacion.ok) {
+      Get.back();
+      return;
+    }
+    setState(() {
+      _revisando = false;
+      _pin.clear();
+      _error = switch (resultado) {
+        ResultadoAutorizacion.incorrecto => 'Código incorrecto.',
+        ResultadoAutorizacion.demasiadosIntentos =>
+          'Demasiados intentos. Espera unos minutos.',
+        ResultadoAutorizacion.sinCodigo =>
+          'Aún no hay código. Se crea en Configuración › Precios de abonos.',
+        _ => 'No se pudo revisar. Revisa tu conexión.',
+      };
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        scrollable: true,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Autorización del encargado'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Para cobrar un abono libre, pide al encargado que escriba su '
+              'código.',
+              style: TextStyle(height: 1.35),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              key: const Key('codigo_encargado'),
+              controller: _pin,
+              autofocus: true,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _autorizar(),
+              style: const TextStyle(fontSize: 22, letterSpacing: 6),
+              decoration: InputDecoration(
+                labelText: 'Código del encargado',
+                prefixIcon: const Icon(Icons.lock_outline),
+                counterText: '',
+                errorText: _error,
+                errorMaxLines: 3,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          BotonCancelar(onPressed: () => Get.back()),
+          BotonGuardar(
+            texto: 'Autorizar',
+            compacto: true,
+            guardando: _revisando,
+            onPressed: _autorizar,
+          ),
+        ],
+      );
 }

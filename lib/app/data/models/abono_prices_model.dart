@@ -8,6 +8,11 @@ class AbonoPricesModel {
   final double? priceMonth;
   final double? priceYear;
 
+  /// Inscripción: se cobra una sola vez, a los clientes nuevos (que nunca
+  /// han pagado), junto con su primer abono. Vale en costo fijo y en abono
+  /// libre. Null: el gimnasio no cobra inscripción.
+  final double? priceInscripcion;
+
   /// Modo de cobro del gimnasio: 'fijo' | 'libre'. Null significa que el
   /// asistente de configuración inicial aún está pendiente. Abonar no lo usa
   /// para decidir cómo abre: con precios configurados siempre abre en fijo.
@@ -18,6 +23,7 @@ class AbonoPricesModel {
     this.priceWeek,
     this.priceMonth,
     this.priceYear,
+    this.priceInscripcion,
     this.paymentMode,
   });
 
@@ -27,6 +33,7 @@ class AbonoPricesModel {
       priceWeek: _toDouble(json['price_week']),
       priceMonth: _toDouble(json['price_month']),
       priceYear: _toDouble(json['price_year']),
+      priceInscripcion: _toDouble(json['price_inscripcion']),
       paymentMode: json['payment_mode'] as String?,
     );
   }
@@ -37,7 +44,8 @@ class AbonoPricesModel {
     return double.tryParse(value.toString());
   }
 
-  /// Solo los cuatro precios. `payment_mode` queda fuera a propósito: este
+  /// Los precios (los cuatro periodos y la inscripción). `payment_mode` queda
+  /// fuera a propósito: este
   /// mapa lo consume `savePrices()`, que se llama desde Configuración con un
   /// modelo construido sin `paymentMode`; incluirlo aquí borraría el modo de
   /// cobro en cada guardado de precios. Para escribirlo usa
@@ -47,6 +55,7 @@ class AbonoPricesModel {
         'price_week': priceWeek,
         'price_month': priceMonth,
         'price_year': priceYear,
+        'price_inscripcion': priceInscripcion,
       };
 
   /// Precio configurado para un tipo de periodo de `AbonarController.durationTypes`
@@ -66,7 +75,11 @@ class AbonoPricesModel {
     }
   }
 
-  /// True si hay al menos un periodo con precio configurado.
+  /// Si el gimnasio cobra inscripción a los clientes nuevos.
+  bool get cobraInscripcion => (priceInscripcion ?? 0) > 0;
+
+  /// True si hay al menos un periodo con precio configurado. La inscripción
+  /// no cuenta: sola no hace "costo fijo".
   bool get hasAnyPrice =>
       priceDay != null ||
       priceWeek != null ||

@@ -135,6 +135,12 @@ Future<void> mostrarDetalleIngreso(BuildContext context, IngresoModel ingreso) {
       if (ingreso.periodoInicio != null && ingreso.periodoFin != null)
         _Dato('Vigencia',
             '${_fecha(ingreso.periodoInicio!)} – ${_fecha(ingreso.periodoFin!)}'),
+      // Primer pago de un cliente nuevo: el abono y la inscripción, por
+      // separado (el total es la suma).
+      if (ingreso.tieneCuotaRegistro) ...[
+        _Dato('Abono', _moneda(ingreso.montoBase)),
+        _Dato('Inscripción', _moneda(ingreso.cuotaRegistro)),
+      ],
       if (ingreso.descuento > 0) _Dato('Descuento', _moneda(ingreso.descuento)),
     ],
     _Dato('Total', _moneda(ingreso.montoFinal), destacado: true),

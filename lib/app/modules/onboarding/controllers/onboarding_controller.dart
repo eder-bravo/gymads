@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import '../../../data/repositories/abono_prices_repository.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../data/services/welcome_tour_service.dart';
-import '../../../core/utils/snackbar_helper.dart';
 import '../../../routes/app_pages.dart';
 
 /// Modos de cobro disponibles, tal y como se guardan en `gyms.payment_mode`.
@@ -31,22 +30,12 @@ class OnboardingController extends GetxController {
     WelcomeTourService.to.markPending();
   }
 
-  /// "Abonos libres": se guarda al instante y se vuelve a Inicio.
-  Future<void> chooseLibre() async {
-    if (isSaving.value) return;
-    isSaving.value = true;
-    try {
-      final saved = await OnboardingController.savePaymentModeAndSyncProfile(
-          PaymentModes.libre);
-      if (!saved) {
-        SnackbarHelper.error(
-            'Error', 'No se pudo guardar el modo de cobro. Intenta de nuevo.');
-        return;
-      }
-      Get.offAllNamed(Routes.HOME);
-    } finally {
-      isSaving.value = false;
-    }
+  /// "Abonos libres": antes de terminar se pregunta la inscripción (también
+  /// se cobra con abono libre). El modo se guarda al confirmar ese paso (ver
+  /// AbonoPricesController), igual que con costos fijos.
+  void chooseLibre() {
+    Get.toNamed(Routes.ABONO_PRICES,
+        arguments: {'fromOnboarding': true, 'soloInscripcion': true});
   }
 
   /// "Costos fijos": se pasa a configurar los precios. El modo NO se guarda

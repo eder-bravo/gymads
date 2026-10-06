@@ -260,6 +260,10 @@ app, y vuelve a la espera a los 4 s (6 s si se rechaza).
   notificaciones o enlaces. Al cerrar la ventana principal se cierra la app.
 - Todo se dibuja a 1024×768 y se escala a la ventana: en un monitor grande se
   ve grande.
+- Sigue la Apariencia de la app: abre con el modo de la principal (va en sus
+  argumentos, `pantalla_clientes:dark`) y, si se cambia con la ventana
+  abierta, la principal se lo avisa (`PantallaClientes.cambiarModo`). Con
+  "Según la computadora" sigue sola al sistema.
 
 `escritorio_compacto_test.dart` comprueba que cada paso de cada recorrido
 (Inicio, Abonar, Configuración, Clientes, Ingresos, Inventario, Venta y
@@ -389,12 +393,62 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 889 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 931 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`
 actualizó el paquete `printing` (cambió la firma de `layoutPdf`). En macOS la app abrió en 1280×800 centrada. La compilación nativa de Windows queda pendiente de una
 computadora Windows.
+
+## Inscripción (todas las versiones)
+
+El gimnasio puede cobrar una inscripción a los clientes nuevos, en costo fijo
+y en abono libre. Se configura en Configuración › Precios de abonos ("Costo de
+inscripción"; vacío: no se cobra) y en el asistente inicial: con costos fijos
+va en la misma pantalla de precios; con abono libre se pregunta solo la
+inscripción (con "No cobro inscripción"). Se guarda en `gyms.price_inscripcion`
+(migración `20261006142959_inscripcion_del_gimnasio`).
+
+Al cobrarle a un cliente nuevo (sin fecha de vencimiento: nunca ha pagado),
+el resumen de Abonar muestra la casilla "Cobrar inscripción · $…", marcada.
+Si se desmarca no se cobra. El monto no se cambia ahí. El cobro es uno solo,
+desglosado: el abono en `monto_base`, la inscripción en `cuota_registro` y el
+total en `monto_final`. El detalle del ingreso muestra "Abono" e "Inscripción"
+por separado y el PDF dice "Abono + inscripción". A quien ya pagó antes no se
+le ofrece.
+
+## Vencimientos por calendario
+
+Meses y años se suman por calendario (`sumarPeriodo` y `sumarMeses` en
+`abonar/vigencia.dart`): el mismo día del mes siguiente (pagado el 6 de
+octubre, un mes vence el 6 de noviembre; dos años, el 6 de octubre dos años
+después). Si el mes de llegada es más corto, el último día: 31 de enero + 1
+mes = 28 (o 29) de febrero; 29 de febrero + 1 año = 28 de febrero. Se suma de
+una vez (31 de enero + 2 meses = 31 de marzo). Semanas y días siguen sumando
+días. Se conserva la hora y si la fecha es UTC. "Le quedan…" cuenta los meses
+con la misma regla. Antes un mes eran 30 días y un año 365.
+
+## Código del encargado para el abono libre
+
+Con costos fijos, el mostrador y el staff general necesitan el código del
+encargado para cobrar un abono libre: la pestaña muestra un candado y, al
+tocarla, se pide el código ("Autorización del encargado"). El dueño y el
+encargado cambian directo. Autoriza solo ese cobro: después de cobrar, al
+cambiar de cliente o al volver a costo fijo se vuelve a pedir. Sin costos
+fijos (el gimnasio solo cobra libre) no se pide.
+
+- Un código por gimnasio (PIN de 4 a 6 números), en Configuración › Precios de
+  abonos › "Código para abono libre": crear (escribirlo dos veces), cambiar o
+  quitar. Nunca se muestra. Sin código, el mostrador no puede cobrar abonos
+  libres y la app le dice dónde se crea.
+- Migración `20261006150607_codigo_abono_libre`: el hash (bcrypt) vive en
+  `gym_codigo_abono_libre`, con RLS sin políticas y sin permisos para la app
+  (el mostrador no puede leerlo para adivinar el PIN). Todo pasa por
+  `guardar_codigo_abono_libre` (dueño y encargado), `hay_codigo_abono_libre`
+  y `autorizar_abono_libre`, que limita a 5 fallos cada 10 minutos por
+  usuario (`intentos_codigo_abono_libre`).
+- El candado es de la app (el insert de `ingresos` no distingue fijo de
+  libre); `procesarAbono` lo vuelve a revisar antes de cobrar.
 
 ## Escáner de códigos de barras
 

@@ -161,7 +161,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
             icon: Icons.attach_money,
             iconColor: AppColors.success,
             title: 'Precios de Abonos',
-            subtitle: 'Precio por día, semana, mes y año',
+            subtitle: 'Precio por día, semana, mes, año e inscripción',
             onTap: () => controller.openAbonoPrices(),
             trailing:
                 Icon(Icons.arrow_forward_ios, size: 16, color: c.textSecondary),

@@ -67,7 +67,8 @@ class AbonoPricesRepository {
   }
 
   static const _columns =
-      'price_day, price_week, price_month, price_year, payment_mode';
+      'price_day, price_week, price_month, price_year, price_inscripcion, '
+      'payment_mode';
 
   /// Precios del gimnasio actual. Devuelve un modelo vacío si no hay contexto
   /// de gimnasio o si falla la consulta.

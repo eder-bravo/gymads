@@ -2,19 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/abono_prices_model.dart';
 import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
+import 'package:gymads/app/data/repositories/codigo_abono_libre_repository.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../routes/app_pages.dart';
 import '../../onboarding/controllers/onboarding_controller.dart';
 
 /// Controlador de la pantalla de Precios de Abonos: un precio fijo por
-/// unidad de periodo (día, semana, mes, año) para todo el gimnasio.
+/// unidad de periodo (día, semana, mes, año) para todo el gimnasio, y la
+/// inscripción para clientes nuevos (vale también con abono libre).
 class AbonoPricesController extends GetxController {
-  final AbonoPricesRepository repository = AbonoPricesRepository();
+  /// [repository] es para las pruebas; en la app, el de siempre.
+  AbonoPricesController(
+      {AbonoPricesRepository? repository,
+      CodigoAbonoLibreRepository? codigoRepository})
+      : repository = repository ?? AbonoPricesRepository(),
+        codigoRepository = codigoRepository ?? CodigoAbonoLibreRepository();
+
+  final AbonoPricesRepository repository;
+  final CodigoAbonoLibreRepository codigoRepository;
+
+  /// Si el gimnasio ya tiene código para el abono libre. Null: no se pudo
+  /// saber (sin conexión) o aún no se pregunta.
+  final hayCodigo = RxnBool();
+  final guardandoCodigo = false.obs;
 
   final dayController = TextEditingController();
   final weekController = TextEditingController();
   final monthController = TextEditingController();
   final yearController = TextEditingController();
+  final inscripcionController = TextEditingController();
 
   final isLoading = false.obs;
   final isSaving = false.obs;
@@ -23,12 +39,19 @@ class AbonoPricesController extends GetxController {
   /// una sola vez en onInit porque `Get.arguments` cambia al navegar fuera.
   late final bool isOnboarding;
 
+  /// En el asistente, con "Abonos libres": solo se pregunta la inscripción y
+  /// al continuar se guarda el modo libre.
+  late final bool soloInscripcion;
+
   @override
   void onInit() {
     super.onInit();
     final args = Get.arguments;
     isOnboarding = args is Map && args['fromOnboarding'] == true;
+    soloInscripcion = args is Map && args['soloInscripcion'] == true;
     loadPrices();
+    // En el asistente no se configura: se hace después, en Configuración.
+    if (!isOnboarding) cargarCodigo();
   }
 
   @override
@@ -37,6 +60,7 @@ class AbonoPricesController extends GetxController {
     weekController.dispose();
     monthController.dispose();
     yearController.dispose();
+    inscripcionController.dispose();
     super.onClose();
   }
 
@@ -48,23 +72,58 @@ class AbonoPricesController extends GetxController {
       weekController.text = _format(prices.priceWeek);
       monthController.text = _format(prices.priceMonth);
       yearController.text = _format(prices.priceYear);
+      inscripcionController.text = _format(prices.priceInscripcion);
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Guarda los cuatro precios. Un campo vacío borra el precio de ese periodo.
+  Future<void> cargarCodigo() async =>
+      hayCodigo.value = await codigoRepository.hayCodigo();
+
+  /// Crea o cambia el código del encargado para el abono libre.
+  Future<bool> guardarCodigo(String pin) => _cambiarCodigo(pin,
+      listo: hayCodigo.value == true ? 'Código cambiado' : 'Código creado');
+
+  /// Quita el código: el mostrador ya no podrá cobrar abonos libres.
+  Future<bool> quitarCodigo() => _cambiarCodigo(null, listo: 'Código quitado');
+
+  Future<bool> _cambiarCodigo(String? pin, {required String listo}) async {
+    guardandoCodigo.value = true;
+    try {
+      final ok = await codigoRepository.guardar(pin);
+      if (!ok) {
+        SnackbarHelper.error('Error', 'No se pudo guardar el código');
+        return false;
+      }
+      hayCodigo.value = pin != null;
+      SnackbarHelper.success('Listo', listo);
+      return true;
+    } finally {
+      guardandoCodigo.value = false;
+    }
+  }
+
+  /// En el asistente con abono libre: "No cobro inscripción".
+  Future<bool> sinInscripcion() {
+    inscripcionController.clear();
+    return savePrices();
+  }
+
+  /// Guarda los cuatro precios y la inscripción. Un campo vacío borra ese
+  /// precio (la inscripción vacía: no se cobra).
   Future<bool> savePrices() async {
     final prices = AbonoPricesModel(
       priceDay: _parse(dayController.text),
       priceWeek: _parse(weekController.text),
       priceMonth: _parse(monthController.text),
       priceYear: _parse(yearController.text),
+      priceInscripcion: _parse(inscripcionController.text),
     );
 
     // En el asistente inicial elegir "abonos fijos" sin ningún precio dejaría
     // el modo fijo sin nada que ofrecer, así que se exige al menos uno.
-    if (isOnboarding && !prices.hasAnyPrice) {
+    if (isOnboarding && !soloInscripcion && !prices.hasAnyPrice) {
       SnackbarHelper.error(
           'Falta un precio', 'Configura al menos un periodo para continuar');
       return false;
@@ -82,7 +141,7 @@ class AbonoPricesController extends GetxController {
       if (isOnboarding) {
         final modeSaved =
             await OnboardingController.savePaymentModeAndSyncProfile(
-                PaymentModes.fijo);
+                soloInscripcion ? PaymentModes.libre : PaymentModes.fijo);
         if (!modeSaved) {
           SnackbarHelper.error('Error',
               'No se pudo guardar el modo de cobro. Intenta de nuevo.');

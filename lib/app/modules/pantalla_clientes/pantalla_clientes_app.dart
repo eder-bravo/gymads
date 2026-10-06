@@ -15,9 +15,10 @@ import '../shared/widgets/welcome_screen_widget.dart';
 /// Arranca la ventana para clientes (monitor extra). La llama `main` cuando
 /// la abre desktop_multi_window: es otro motor de Flutter, ligero, sin
 /// Supabase, GetX ni el lector. Los pases le llegan de la ventana principal.
-Future<void> correrPantallaClientes(String idVentana) async {
+Future<void> correrPantallaClientes(String idVentana, ThemeMode modo) async {
   WidgetsFlutterBinding.ensureInitialized();
   final avisos = ValueNotifier<AvisoParaClientes?>(null);
+  final tema = ValueNotifier<ThemeMode>(modo);
   await WindowController.fromWindowId(idVentana)
       .setWindowMethodHandler((llamada) async {
     switch (llamada.method) {
@@ -26,30 +27,45 @@ Future<void> correrPantallaClientes(String idVentana) async {
             llamada.arguments as Map<dynamic, dynamic>);
       case 'quitar':
         avisos.value = null;
+      // Se cambió Apariencia en la ventana principal.
+      case 'modo':
+        tema.value = ThemeMode.values.firstWhere(
+            (m) => m.name == llamada.arguments,
+            orElse: () => ThemeMode.system);
     }
     return null;
   });
-  runApp(PantallaClientesApp(avisos: avisos));
+  runApp(PantallaClientesApp(avisos: avisos, modo: tema));
 }
 
 class PantallaClientesApp extends StatelessWidget {
-  const PantallaClientesApp({super.key, required this.avisos});
+  const PantallaClientesApp(
+      {super.key, required this.avisos, required this.modo});
 
   final ValueListenable<AvisoParaClientes?> avisos;
 
+  /// Claro, oscuro o el de la computadora: el mismo que la ventana principal.
+  /// Con el de la computadora, esta ventana lo sigue sola.
+  final ValueListenable<ThemeMode> modo;
+
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'GymOne · Pantalla para clientes',
-        theme: AppTheme.oscuro,
-        locale: const Locale('es'),
-        supportedLocales: const [Locale('es')],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        home: PantallaClientesVista(avisos: avisos),
+  Widget build(BuildContext context) => ValueListenableBuilder<ThemeMode>(
+        valueListenable: modo,
+        builder: (context, modo, _) => MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'GymOne · Pantalla para clientes',
+          theme: AppTheme.claro,
+          darkTheme: AppTheme.oscuro,
+          themeMode: modo,
+          locale: const Locale('es'),
+          supportedLocales: const [Locale('es')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: PantallaClientesVista(avisos: avisos),
+        ),
       );
 }
 

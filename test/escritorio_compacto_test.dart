@@ -146,6 +146,9 @@ class _Tenant extends GetxService implements TenantContextService {
   DateTime? get accountCreatedAt => DateTime(2026);
   @override
   bool can(Permission permiso) => true;
+  // El dueño: usa el abono libre sin código del encargado.
+  @override
+  StaffRole get rol => StaffRole.ownerAdmin;
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -210,6 +213,14 @@ class _Precios extends GetxController implements AbonoPricesController {
   final monthController = TextEditingController();
   @override
   final yearController = TextEditingController();
+  @override
+  final inscripcionController = TextEditingController(text: '200.00');
+  @override
+  bool get soloInscripcion => false;
+  @override
+  final hayCodigo = RxnBool(true);
+  @override
+  final guardandoCodigo = false.obs;
   @override
   final isLoading = false.obs;
   @override
@@ -568,6 +579,15 @@ void main() {
         // Membresía "para siempre": la fecha larga no debe cortarse.
         cliente('Leo', DateTime(2126, 9, 11)),
       ]);
+      return const AbonarView();
+    },
+    'Abonar con inscripción': () {
+      final c = Get.put<AbonarController>(_Abonar());
+      c.selectedClient.value = _cliente();
+      c.prices.value =
+          const AbonoPricesModel(priceMonth: 1500, priceInscripcion: 300);
+      // En el teléfono, directo al resumen.
+      c.pasoActual.value = 3;
       return const AbonarView();
     },
     'Abonar costo fijo': () {

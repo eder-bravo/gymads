@@ -44,8 +44,8 @@ void main(List<String> args) async {
   // salta todo lo de abajo (Supabase, lector, servicios).
   if (args.length >= 3 &&
       args[0] == 'multi_window' &&
-      args[2] == PantallaClientes.argumento) {
-    await correrPantallaClientes(args[1]);
+      PantallaClientes.esSuyo(args[2])) {
+    await correrPantallaClientes(args[1], PantallaClientes.modoDe(args[2]));
     return;
   }
   WidgetsFlutterBinding.ensureInitialized();

@@ -116,6 +116,25 @@ void main() {
           1000);
     });
 
+    test('la inscripción se suma al abono, con costo fijo y con libre', () {
+      expect(
+          totalDelCobro(
+              costoFijo: true,
+              precioPorPeriodo: 500,
+              cantidad: 1,
+              montoLibre: 0,
+              inscripcion: 200),
+          700);
+      expect(
+          totalDelCobro(
+              costoFijo: false,
+              precioPorPeriodo: null,
+              cantidad: 2,
+              montoLibre: 300,
+              inscripcion: 200),
+          800);
+    });
+
     test('abono libre: el precio escrito se multiplica por la cantidad', () {
       expect(
           totalDelCobro(
@@ -148,6 +167,50 @@ void main() {
               cantidad: 1,
               montoLibre: 0),
           isNull);
+    });
+  });
+
+  group('Vencimiento por calendario (meses y años)', () {
+    DateTime f(int a, int m, int d) => DateTime(a, m, d, 10, 30);
+    test('el mismo día del mes siguiente, no 30 días', () {
+      expect(sumarPeriodo(f(2026, 10, 6), 'Meses', 1), f(2026, 11, 6));
+      expect(sumarPeriodo(f(2026, 10, 6), 'Meses', 3), f(2027, 1, 6));
+      expect(sumarPeriodo(f(2026, 10, 6), 'Años', 2), f(2028, 10, 6));
+    });
+
+    test('si el mes es más corto, el último día', () {
+      expect(sumarPeriodo(f(2027, 1, 31), 'Meses', 1), f(2027, 2, 28));
+      expect(sumarPeriodo(f(2028, 1, 31), 'Meses', 1), f(2028, 2, 29));
+      expect(sumarPeriodo(f(2026, 10, 31), 'Meses', 1), f(2026, 11, 30));
+      // De una vez, no mes por mes: no se queda en el 28.
+      expect(sumarPeriodo(f(2027, 1, 31), 'Meses', 2), f(2027, 3, 31));
+    });
+
+    test('29 de febrero: al año siguiente, el 28', () {
+      expect(sumarPeriodo(f(2028, 2, 29), 'Años', 1), f(2029, 2, 28));
+      expect(sumarPeriodo(f(2028, 2, 29), 'Años', 4), f(2032, 2, 29));
+      expect(sumarPeriodo(f(2028, 2, 29), 'Meses', 12), f(2029, 2, 28));
+    });
+
+    test('semanas y días siguen sumando días', () {
+      expect(sumarPeriodo(f(2026, 10, 6), 'Semanas', 2), f(2026, 10, 20));
+      expect(sumarPeriodo(f(2026, 10, 6), 'Días', 30), f(2026, 11, 5));
+    });
+
+    test('conserva la hora y si la fecha es UTC', () {
+      final utc = DateTime.utc(2026, 10, 6, 23, 15);
+      final r = sumarPeriodo(utc, 'Meses', 1);
+      expect(r.isUtc, isTrue);
+      expect(r, DateTime.utc(2026, 11, 6, 23, 15));
+    });
+
+    test('lo que le queda cuenta los meses igual que el cobro', () {
+      expect(loQueLeQueda(DateTime(2027, 1, 31), DateTime(2027, 3, 31), 59),
+          'Le quedan 59 días');
+      expect(loQueLeQueda(DateTime(2026, 10, 6), DateTime(2027, 1, 6), 92),
+          'Le quedan 3 meses');
+      expect(loQueLeQueda(DateTime(2026, 10, 31), DateTime(2027, 1, 30), 91),
+          'Le quedan 2 meses y 30 días');
     });
   });
 }

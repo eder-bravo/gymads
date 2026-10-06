@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../core/utils/app_logger.dart';
 import '../../core/utils/plataforma_app.dart';
+import 'tema_service.dart';
 
 /// Qué pasó con la tarjeta, dicho para el cliente.
 enum TipoAviso { entrada, salida, vencida, noRegistrada }
@@ -64,14 +66,28 @@ class AvisoParaClientes {
 /// tarjeta. Solo en computadora. La abre el botón "Pantalla para clientes"
 /// de Inicio; se cierra con su botón de cerrar o al cerrar la app.
 abstract final class PantallaClientes {
-  /// El argumento con el que arranca esa ventana (ver `main`).
+  /// El argumento con el que arranca esa ventana (ver `main`). Lleva detrás
+  /// el modo de la app ("pantalla_clientes:dark"): así abre ya con el tema
+  /// claro u oscuro que se ve en la principal.
   static const argumento = 'pantalla_clientes';
+
+  /// Si [argumentos] son los de la pantalla para clientes.
+  static bool esSuyo(String argumentos) =>
+      argumentos == argumento || argumentos.startsWith('$argumento:');
+
+  /// El modo con que debe arrancar, según sus argumentos.
+  static ThemeMode modoDe(String argumentos) {
+    final nombre = argumentos.split(':').skip(1).firstOrNull;
+    return ThemeMode.values.firstWhere((m) => m.name == nombre,
+        orElse: () => ThemeMode.system);
+  }
 
   /// Si está abierta ahora mismo.
   static final abierta = ValueNotifier<bool>(false);
 
   static WindowController? _ventana;
   static StreamSubscription<void>? _cambios;
+  static Worker? _tema;
   static int _siguiente = 0;
 
   /// Para las pruebas: recibe lo que se mandaría a la ventana.
@@ -82,6 +98,9 @@ abstract final class PantallaClientes {
   static Future<void> abrir() async {
     if (!PlataformaApp.escritorio) return;
     _cambios ??= onWindowsChanged.listen((_) => _actualizar());
+    // Si se cambia Apariencia con la ventana abierta, cambia también.
+    final tema = TemaService.to;
+    _tema ??= ever<ThemeMode>(tema.modo, cambiarModo);
     try {
       final existente = await _buscar();
       if (existente != null) {
@@ -90,8 +109,9 @@ abstract final class PantallaClientes {
         await existente.show();
         return;
       }
-      final ventana = await WindowController.create(const WindowConfiguration(
-          arguments: argumento, hiddenAtLaunch: false));
+      final ventana = await WindowController.create(WindowConfiguration(
+          arguments: '$argumento:${tema.modo.value.name}',
+          hiddenAtLaunch: false));
       _ventana = ventana;
       abierta.value = true;
       await ventana.show();
@@ -109,7 +129,7 @@ abstract final class PantallaClientes {
 
   static Future<WindowController?> _buscar() async {
     for (final ventana in await WindowController.getAll()) {
-      if (ventana.arguments == argumento) return ventana;
+      if (esSuyo(ventana.arguments)) return ventana;
     }
     return null;
   }
@@ -134,6 +154,9 @@ abstract final class PantallaClientes {
     );
     _enviar('aviso', aviso.toJson());
   }
+
+  /// Claro, oscuro o el de la computadora, como la ventana principal.
+  static void cambiarModo(ThemeMode modo) => _enviar('modo', modo.name);
 
   static void _enviar(String metodo, Object? datos) {
     final prueba = enviarPara;

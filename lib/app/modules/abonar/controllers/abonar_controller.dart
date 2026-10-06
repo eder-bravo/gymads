@@ -6,6 +6,9 @@ import 'package:gymads/app/core/utils/referencia_de_pago.dart';
 import 'package:gymads/app/data/models/abono_prices_model.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
+import 'package:gymads/app/data/repositories/codigo_abono_libre_repository.dart';
+import 'package:gymads/app/data/services/tenant_context_service.dart';
+import 'package:gymads/app/core/permissions/staff_role.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/ingreso_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
@@ -57,7 +60,44 @@ class AbonarController extends GetxController
     required this.userRepository,
     required this.ingresoService,
     required this.pricesRepository,
-  });
+    CodigoAbonoLibreRepository? codigoRepository,
+    bool Function()? sinCodigoParaLibre,
+  })  : codigoRepository = codigoRepository ?? CodigoAbonoLibreRepository(),
+        _sinCodigoParaLibre = sinCodigoParaLibre ?? _rolSinCodigo;
+
+  // ─── Código del encargado para el abono libre ───
+  // Con costos fijos, el mostrador y el staff general necesitan que el
+  // encargado escriba su código para cobrar un abono libre; el dueño y el
+  // encargado no. Autoriza un solo cobro. Sin costos fijos no se pide.
+
+  final CodigoAbonoLibreRepository codigoRepository;
+  final bool Function() _sinCodigoParaLibre;
+
+  /// Dueño y encargado no lo necesitan. Sin sesión (solo en pruebas), no se
+  /// pide.
+  static bool _rolSinCodigo() =>
+      !Get.isRegistered<TenantContextService>() ||
+      TenantContextService.to.rol.rango >= StaffRole.encargado.rango;
+
+  /// Si quien cobra necesita el código para pasar a abono libre.
+  bool get necesitaCodigoParaLibre => hayCostosFijos && !_sinCodigoParaLibre();
+
+  /// Ya escribió el código para este cobro.
+  final libreAutorizado = false.obs;
+
+  /// Comprueba el código del encargado y, si es correcto, pasa a abono
+  /// libre para este cobro.
+  Future<ResultadoAutorizacion> autorizarConCodigo(String pin) async {
+    final resultado = await codigoRepository.autorizar(pin.trim());
+    if (resultado == ResultadoAutorizacion.ok) autorizarLibre();
+    return resultado;
+  }
+
+  /// Pasa a abono libre ya autorizado.
+  void autorizarLibre() {
+    libreAutorizado.value = true;
+    setPrecioFijo(false);
+  }
 
   // Buscador
   final searchController = TextEditingController();
@@ -86,12 +126,40 @@ class AbonarController extends GetxController
   final montoLibreController = TextEditingController();
   final montoLibre = 0.0.obs;
 
+  /// Lo que se cobra en total: el abono y, si va, la inscripción.
   double get totalAmount => totalDelCobro(
         costoFijo: isPrecioFijo.value,
         precioPorPeriodo: configuredPrice,
         cantidad: durationValue.value,
         montoLibre: montoLibre.value,
+        inscripcion: inscripcionACobrar,
       );
+
+  /// Solo el abono (los periodos), sin la inscripción.
+  double get montoAbono => totalAmount - inscripcionACobrar;
+
+  // ─── Inscripción ───
+  // Se cobra una vez, a los clientes nuevos (que nunca han pagado), junto con
+  // su primer abono; en costo fijo y en abono libre. El monto es el del
+  // gimnasio y no se cambia aquí: solo se puede quitar con la casilla.
+
+  /// La inscripción del gimnasio, o 0 si no cobra.
+  double get precioInscripcion => prices.value?.priceInscripcion ?? 0;
+
+  /// Nunca ha pagado: no tiene fecha de vencimiento.
+  bool get esClienteNuevo =>
+      selectedClient.value != null &&
+      selectedClient.value!.expirationDate == null;
+
+  /// Si a este cliente le toca inscripción (se ve la casilla).
+  bool get aplicaInscripcion => esClienteNuevo && precioInscripcion > 0;
+
+  /// La casilla "Cobrar inscripción": marcada por defecto.
+  final cobrarInscripcion = true.obs;
+
+  /// Lo que se cobra de inscripción en este cobro.
+  double get inscripcionACobrar =>
+      aplicaInscripcion && cobrarInscripcion.value ? precioInscripcion : 0;
 
   /// Qué falta para poder cobrar, o null si ya se puede.
   String? get faltaParaCobrar => faltaParaCobrarDe(
@@ -255,6 +323,10 @@ class AbonarController extends GetxController
   void setPrecioFijo(bool fijo) {
     if (fijo == isPrecioFijo.value) return;
     if (fijo && !hayCostosFijos) return;
+    // Sin el código del encargado no se pasa a libre (la vista lo pide).
+    if (!fijo && necesitaCodigoParaLibre && !libreAutorizado.value) return;
+    // De vuelta a costo fijo: el próximo abono libre lo vuelve a pedir.
+    if (fijo) libreAutorizado.value = false;
     isPrecioFijo.value = fijo;
     if (fijo && durationValue.value <= 0) durationValue.value = 1;
     if (!fijo) cantidadLibreController.text = '${durationValue.value}';
@@ -333,6 +405,8 @@ class AbonarController extends GetxController
 
   void selectClient(UserModel client) {
     pasoActual.value = 1;
+    cobrarInscripcion.value = true;
+    _volverAFijoSinAutorizacion();
     selectedClient.value = client;
     // Limpiar el buscador ya repuebla la lista con todos los clientes, así que
     // al volver aquí sigue estando lista.
@@ -347,8 +421,17 @@ class AbonarController extends GetxController
   /// o Clientes).
   AlTerminarAbono alTerminar = AlTerminarAbono.abonarOtro;
 
+  /// Otro cliente: la autorización del abono libre era para el anterior.
+  void _volverAFijoSinAutorizacion() {
+    if (!libreAutorizado.value) return;
+    libreAutorizado.value = false;
+    if (hayCostosFijos) setPrecioFijo(true);
+  }
+
   void clearSelection() {
     selectedClient.value = null;
+    cobrarInscripcion.value = true;
+    libreAutorizado.value = false;
     paymentMethod.value = 'efectivo';
     limpiarReferencia();
     montoLibreController.clear();
@@ -375,24 +458,13 @@ class AbonarController extends GetxController
     return now;
   }
 
+  /// Hasta cuándo queda pagado: desde [calculatePeriodStartDate], los meses
+  /// y años por calendario (el mismo día del mes siguiente; ver
+  /// [sumarPeriodo]) y las semanas y días sumando días.
   DateTime calculateNewExpirationDate() {
     if (selectedClient.value == null) return DateTime.now();
-
-    final baseDate = calculatePeriodStartDate();
-    final periods = durationValue.value;
-
-    switch (durationType.value) {
-      case 'Meses':
-        return baseDate.add(Duration(days: periods * 30));
-      case 'Semanas':
-        return baseDate.add(Duration(days: periods * 7));
-      case 'Días':
-        return baseDate.add(Duration(days: periods));
-      case 'Años':
-        return baseDate.add(Duration(days: periods * 365));
-      default:
-        return baseDate.add(const Duration(days: 30));
-    }
+    return sumarPeriodo(
+        calculatePeriodStartDate(), durationType.value, durationValue.value);
   }
 
   Future<void> procesarAbono() async {
@@ -407,12 +479,21 @@ class AbonarController extends GetxController
       _showSnackbar('Falta un dato', falta, isError: true);
       return;
     }
+    if (!isPrecioFijo.value &&
+        necesitaCodigoParaLibre &&
+        !libreAutorizado.value) {
+      _showSnackbar('Falta autorización',
+          'Para un abono libre, pide al encargado su código.',
+          isError: true);
+      return;
+    }
 
     final periods = durationValue.value;
-    final amount = totalAmount;
+    final abono = montoAbono;
+    final inscripcion = inscripcionACobrar;
     final descripcion = isPrecioFijo.value
         ? 'Abono: $periods ${durationType.value.toLowerCase()} × \$${configuredPrice!.toStringAsFixed(2)}'
-        : 'Abono libre: $periods ${durationType.value.toLowerCase()} × \$${montoLibre.value.toStringAsFixed(2)} = \$${amount.toStringAsFixed(2)}';
+        : 'Abono libre: $periods ${durationType.value.toLowerCase()} × \$${montoLibre.value.toStringAsFixed(2)} = \$${abono.toStringAsFixed(2)}';
 
     isLoading.value = true;
     try {
@@ -440,12 +521,16 @@ class AbonarController extends GetxController
           await ingresoService.registrarAbono(
             clienteId: client.id!,
             clienteNombre: client.name,
-            monto: amount,
+            monto: abono,
+            cuotaRegistro: inscripcion,
             metodoPago: paymentMethod.value,
             referenciaPago: usaReferenciaPago ? referenciaParaGuardar : null,
             descripcion: descripcion,
             usuarioStaff: 'Staff',
-            notas: isPrecioFijo.value ? 'Costo fijo' : 'Abono libre',
+            notas: [
+              isPrecioFijo.value ? 'Costo fijo' : 'Abono libre',
+              if (inscripcion > 0) 'con inscripción',
+            ].join(' · '),
             periodoInicio: periodStartDate,
             periodoFin: newExpirationDate,
           );
@@ -459,6 +544,8 @@ class AbonarController extends GetxController
         }
 
         selectedClient.value = updatedClient;
+        // La autorización del abono libre era solo para este cobro.
+        libreAutorizado.value = false;
 
         // Tras registrar a un cliente (desde el aviso del lector o desde
         // Clientes) se regresa solo a donde se empezó, sin pantalla de éxito:

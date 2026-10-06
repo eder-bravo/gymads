@@ -186,4 +186,47 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
     }
   }, variant: escritorio);
+
+  test('arranca con el modo de la ventana principal', () {
+    expect(PantallaClientes.esSuyo('pantalla_clientes:dark'), isTrue);
+    expect(PantallaClientes.esSuyo('pantalla_clientes'), isTrue);
+    expect(PantallaClientes.esSuyo(''), isFalse);
+    expect(PantallaClientes.modoDe('pantalla_clientes:dark'), ThemeMode.dark);
+    expect(PantallaClientes.modoDe('pantalla_clientes:light'), ThemeMode.light);
+    expect(
+        PantallaClientes.modoDe('pantalla_clientes:system'), ThemeMode.system);
+    expect(PantallaClientes.modoDe('pantalla_clientes'), ThemeMode.system);
+  });
+
+  test('al cambiar Apariencia se le avisa a la ventana', () {
+    final enviados = <(String, Object?)>[];
+    PantallaClientes.enviarPara =
+        (metodo, datos) => enviados.add((metodo, datos));
+    addTearDown(() => PantallaClientes.enviarPara = null);
+    PantallaClientes.cambiarModo(ThemeMode.light);
+    expect(enviados, [('modo', 'light')]);
+  });
+
+  testWidgets('sigue el modo claro u oscuro de la app al momento',
+      (tester) async {
+    final modo = ValueNotifier(ThemeMode.dark);
+    await tester.pumpWidget(PantallaClientesApp(
+        avisos: ValueNotifier<AvisoParaClientes?>(null), modo: modo));
+    await tester.pumpAndSettle();
+    Brightness brillo() =>
+        Theme.of(tester.element(find.text('Pasa tu tarjeta'))).brightness;
+    expect(brillo(), Brightness.dark);
+    modo.value = ThemeMode.light;
+    await tester.pumpAndSettle();
+    expect(brillo(), Brightness.light);
+    // "Según la computadora": sigue al sistema.
+    modo.value = ThemeMode.system;
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    await tester.pumpAndSettle();
+    expect(brillo(), Brightness.dark);
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    await tester.pumpAndSettle();
+    expect(brillo(), Brightness.light);
+  }, variant: escritorio);
 }

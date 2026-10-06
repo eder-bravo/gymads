@@ -49,7 +49,10 @@ class IngresosPdfBuilder {
                 '${PdfReportService.fechaCorta(i.fecha)} '
                     '${PdfReportService.horaLegible(i.fecha)}',
                 i.clienteNombre,
-                i.conceptoDescripcion,
+                // El primer pago de un cliente nuevo lleva su inscripción.
+                i.tieneCuotaRegistro
+                    ? '${i.conceptoDescripcion} + inscripción'
+                    : i.conceptoDescripcion,
                 i.metodoPagoDescripcion,
                 _moneda(i.montoFinal),
               ],

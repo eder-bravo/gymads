@@ -393,12 +393,31 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 933 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 944 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`
 actualizó el paquete `printing` (cambió la firma de `layoutPdf`). En macOS la app abrió en 1280×800 centrada. La compilación nativa de Windows queda pendiente de una
 computadora Windows.
+
+## Enter confirma los diálogos (solo computadora)
+
+En macOS, Windows y Linux, Enter (o el Enter numérico) pulsa el botón
+principal del diálogo de enfrente: el `BotonGuardar` compacto (Eliminar,
+Autorizar, Entendido, el Guardar de Ajustar stock…). `EnterConfirma` en
+`core/widgets/formulario.dart`, con un `addLateKeyEventHandler` que solo
+existe mientras hay uno de esos botones.
+
+- Solo confirmaciones: los formularios grandes (Guardar cliente) y las
+  pantallas (Cobrar) siguen con clic.
+- Se respeta lo que Enter ya hacía: un botón enfocado con Tab se pulsa él;
+  en un campo de varias líneas, renglón nuevo; un campo con su propio Enter
+  (pasar al siguiente o enviar) lo conserva. Con ⌘, Ctrl, Alt o Mayús, nada.
+- Con dos diálogos, solo el de enfrente; con dos botones principales a la
+  vista, nada (no adivina).
+- El Enter con que un lector de códigos cierra una lectura (3 o más teclas a
+  menos de 60 ms entre sí) no confirma.
+- Teléfono y tableta sin cambios.
 
 ## Inscripción (todas las versiones)
 

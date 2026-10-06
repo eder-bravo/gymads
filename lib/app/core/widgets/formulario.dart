@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../utils/plataforma_app.dart';
@@ -13,6 +14,9 @@ import '../utils/plataforma_app.dart';
 /// no manda otro guardado. En pantalla completa del teléfono ocupa todo el
 /// ancho; en escritorio toma el ancho de su texto (mínimo 200), y en un
 /// diálogo va [compacto], junto a "Cancelar".
+///
+/// En computadora, el [compacto] de un diálogo también se pulsa con Enter
+/// ([EnterConfirma]).
 class BotonGuardar extends StatelessWidget {
   const BotonGuardar({
     super.key,
@@ -63,7 +67,7 @@ class BotonGuardar extends StatelessWidget {
           );
 
     final fondo = color ?? AppColors.accent;
-    return ElevatedButton(
+    final boton = ElevatedButton(
       onPressed: guardando ? null : onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: fondo,
@@ -82,7 +86,134 @@ class BotonGuardar extends StatelessWidget {
       ),
       child: etiqueta,
     );
+    if (!compacto || !PlataformaApp.escritorio) return boton;
+    return _EnterConfirma(
+        alConfirmar: guardando ? null : onPressed, child: boton);
   }
+}
+
+/// En computadora, Enter pulsa el botón principal del diálogo de enfrente
+/// (el [BotonGuardar] compacto: Eliminar, Autorizar, Entendido, Guardar…).
+/// Solo en diálogos: los formularios grandes (Guardar cliente) y las
+/// pantallas (Cobrar) siguen pidiendo clic.
+///
+/// Se respeta lo que Enter ya hace: con un botón enfocado (llegando con Tab)
+/// lo pulsa a él, en un campo de varias líneas hace un renglón nuevo y en un
+/// campo que pasa al siguiente o envía por su cuenta, hace eso. Tampoco
+/// confirma el Enter con el que un lector de códigos cierra una lectura (el
+/// código llega de golpe, tecla tras tecla en milisegundos).
+abstract final class EnterConfirma {
+  static final _botones = <_EnterConfirmaState>[];
+
+  /// Teclas seguidas, cada una a menos de [_rapida] de la anterior.
+  static int _rafaga = 0;
+  static Duration? _ultimaTecla;
+  static const _rapida = Duration(milliseconds: 60);
+
+  static void _registrar(_EnterConfirmaState boton) {
+    if (_botones.isEmpty) FocusManager.instance.addLateKeyEventHandler(tecla);
+    _botones.add(boton);
+  }
+
+  static void _quitar(_EnterConfirmaState boton) {
+    _botones.remove(boton);
+    if (_botones.isEmpty) {
+      FocusManager.instance.removeLateKeyEventHandler(tecla);
+      _rafaga = 0;
+      _ultimaTecla = null;
+    }
+  }
+
+  @visibleForTesting
+  static KeyEventResult tecla(KeyEvent evento) {
+    if (evento is! KeyDownEvent || evento.synthesized) {
+      return KeyEventResult.ignored;
+    }
+    final seguida =
+        _ultimaTecla != null && evento.timeStamp - _ultimaTecla! <= _rapida;
+    final previas = seguida ? _rafaga : 0;
+    final esEnter = evento.logicalKey == LogicalKeyboardKey.enter ||
+        evento.logicalKey == LogicalKeyboardKey.numpadEnter;
+    if (!esEnter) {
+      _rafaga = previas + 1;
+      _ultimaTecla = evento.timeStamp;
+      return KeyEventResult.ignored;
+    }
+    _rafaga = 0;
+    _ultimaTecla = null;
+    // El Enter final de un lector de códigos.
+    if (previas >= 3) return KeyEventResult.ignored;
+
+    final teclado = HardwareKeyboard.instance;
+    if (teclado.isMetaPressed ||
+        teclado.isControlPressed ||
+        teclado.isAltPressed ||
+        teclado.isShiftPressed) {
+      return KeyEventResult.ignored;
+    }
+    final campo = FocusManager.instance.primaryFocus?.context
+        ?.findAncestorStateOfType<EditableTextState>()
+        ?.widget;
+    if (campo != null &&
+        (campo.maxLines != 1 ||
+            campo.onSubmitted != null ||
+            campo.textInputAction == TextInputAction.next)) {
+      return KeyEventResult.ignored;
+    }
+    // Con más de uno a la vista no se adivina cuál: se queda en clic.
+    final listos = [
+      for (final b in _botones)
+        if (b.listo) b
+    ];
+    if (listos.length != 1) return KeyEventResult.ignored;
+    listos.single.widget.alConfirmar!();
+    return KeyEventResult.handled;
+  }
+}
+
+class _EnterConfirma extends StatefulWidget {
+  const _EnterConfirma({required this.alConfirmar, required this.child});
+
+  /// Null mientras está desactivado o guardando.
+  final VoidCallback? alConfirmar;
+  final Widget child;
+
+  @override
+  State<_EnterConfirma> createState() => _EnterConfirmaState();
+}
+
+class _EnterConfirmaState extends State<_EnterConfirma> {
+  ModalRoute<Object?>? _ruta;
+
+  /// Activo y en el diálogo de enfrente.
+  bool get listo {
+    final ruta = _ruta;
+    return mounted &&
+        widget.alConfirmar != null &&
+        ruta is PopupRoute &&
+        ruta.isCurrent;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ruta = ModalRoute.of(context);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    EnterConfirma._registrar(this);
+  }
+
+  @override
+  void dispose() {
+    EnterConfirma._quitar(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// El botón fijo al pie de un formulario de pantalla completa

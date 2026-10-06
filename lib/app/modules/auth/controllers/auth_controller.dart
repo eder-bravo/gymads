@@ -14,6 +14,7 @@ import '../../../core/utils/snackbar_helper.dart';
 import '../../../core/utils/nombre_completo.dart';
 import '../../../data/services/cambio_de_perfil.dart';
 import '../../../data/services/cambios_en_vivo_service.dart';
+import '../../../data/services/cuenta_de_google.dart';
 import '../../../data/services/google_play_services.dart';
 import '../../../data/services/google_browser_auth.dart';
 import '../../../data/services/tenant_context_service.dart';
@@ -303,6 +304,8 @@ class AuthController extends GetxController {
           e.message.contains('SocketException')) {
         errorMessage.value =
             'Sin conexión a internet. Verifica tu red e intenta de nuevo.';
+      } else if (tokenRechazado(e)) {
+        errorMessage.value = mensajeTokenRechazado;
       } else {
         errorMessage.value = 'Error con Google: ${e.message}';
       }
@@ -354,29 +357,23 @@ class AuthController extends GetxController {
     );
 
     AppLogger.info('AuthController', 'Calling signIn');
-    final googleUser = await googleSignIn.signIn();
-    if (googleUser == null) {
+    // Elige la cuenta y entra a Supabase con su token (si llega vencido, pide
+    // otro).
+    final entrada = await entrarConGoogle(
+      googleSignIn,
+      (idToken, accessToken) => _supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      ),
+    );
+    if (entrada == null) {
       AppLogger.info('AuthController', 'User cancelled sign-in');
       isLoading.value = false;
       return false;
     }
-
-    AppLogger.info('AuthController', 'Signed in as');
-    final googleAuth = await googleUser.authentication;
-    final idToken = googleAuth.idToken;
-    final accessToken = googleAuth.accessToken;
-
-    if (idToken == null) {
-      throw Exception('No se pudo obtener el token de Google');
-    }
-
-    // Sign in to Supabase with Google token
-    AppLogger.info('AuthController', 'Calling Supabase signInWithIdToken');
-    final response = await _supabase.auth.signInWithIdToken(
-      provider: OAuthProvider.google,
-      idToken: idToken,
-      accessToken: accessToken,
-    );
+    final googleUser = entrada.cuenta;
+    final response = entrada.respuesta;
 
     if (response.user == null) {
       throw Exception('Error al autenticar con Google');

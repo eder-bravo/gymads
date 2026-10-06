@@ -118,8 +118,9 @@ Patrones propios de escritorio (en el teléfono no cambian):
   el mouse. La barra solo aparece si algo no cabe. En tableta la barra indica
   que hay más a los lados; el teléfono conserva su lista de siempre. La fila
   mide todos sus elementos (no es una lista perezosa) para que la barra llegue
-  de verdad al último filtro. En computadora, el filtro elegido lleva texto e
-  ícono blancos sobre el azul (en modo claro el texto oscuro casi no se leía).
+  de verdad al último filtro. El filtro elegido lleva texto e ícono blancos
+  sobre el azul en todas las versiones, teléfono y tableta incluidos (en modo
+  claro el texto oscuro casi no se leía).
 - **Configuración en dos columnas**. Cerrar sesión es un botón rojo con borde,
   debajo de las opciones y alineado con ellas, como en las apps del sistema; la
   franja roja a todo lo ancho se veía turbia porque su sombra se traslucía. La
@@ -401,12 +402,30 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 975 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 987 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS y del APK de Android. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`
 actualizó el paquete `printing` (cambió la firma de `layoutPdf`). En macOS la app abrió en 1280×800 centrada. La compilación nativa de Windows queda pendiente de una
 computadora Windows.
+
+## Entrar con Google: siempre se elige la cuenta
+
+En Android e iOS la hoja nativa de Google recordaba la última cuenta y, al
+volver a entrar, la devolvía sin mostrar el selector (cerrar sesión solo
+cerraba la de Supabase): no había forma de entrar con otra. Ahora
+`elegirCuentaDeGoogle` (`data/services/cuenta_de_google.dart`) la olvida
+antes de cada inicio, al entrar y al crear cuenta, sin importar cómo se cerró
+la sesión. En computadora y Huawei (por navegador) ya se pedía con
+`prompt=select_account`.
+
+**Token vencido ("Bad ID token").** Los servicios de Google de Android
+guardan el último token de cada cuenta y lo vuelven a entregar al elegirla;
+dura una hora. Al volver a entrar con la misma cuenta más tarde (pasó al
+borrar la cuenta y crearla otra vez) llegaba vencido y Supabase lo rechazaba.
+`entrarConGoogle` desconecta la cuenta de Google (eso obliga a pedir un token
+nuevo) y lo intenta una vez más; si tampoco, el mensaje pide revisar la fecha
+y la hora del dispositivo en vez de mostrar "Bad ID token".
 
 ## Tableta y teléfono acostados
 
@@ -425,6 +444,17 @@ y de configuración inicial van en dos columnas en vez de una columna angosta:
   con el ícono arriba y letra más grande.
 - Precios: los precios (dos por fila) a la izquierda; la inscripción y el
   código a la derecha.
+
+- Cobrar una venta: lo que se cobra a la izquierda; "Total a cobrar" en
+  grande, el método de pago y cuánto entregó a la derecha; "Cancelar" y
+  "Cobrar venta" fijos abajo, siempre a la vista (antes era una columna
+  angosta y había que desplazarse para cobrar). En el teléfono de lado la
+  hoja usa todo el ancho (`constraintsHoja`). La tableta de pie abre una
+  ventana más ancha (640).
+
+Con letra grande, la cabecera de Venta e Inventario (buscador y filtros)
+se desplaza con la lista: `CabeceraConLista` mide la altura dividida entre
+el tamaño de letra (con letra al 200 % en un teléfono de pie se salía).
 
 De pie todo sigue igual (teléfono y tableta), y la computadora también.
 Capturas del teléfono acostado: `--plain-name 844`

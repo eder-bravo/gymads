@@ -612,10 +612,13 @@ Future<T?> mostrarHojaAdaptable<T>(
   bool showDragHandle = false,
   Color? backgroundColor,
   ShapeBorder? shape,
+  BoxConstraints? constraintsHoja,
 }) {
   if (!PlataformaApp.pantallaGrande) {
     return showModalBottomSheet<T>(
       context: context,
+      // Por defecto, Material no la deja pasar de 640 de ancho.
+      constraints: constraintsHoja,
       isScrollControlled: isScrollControlled,
       useSafeArea: useSafeArea,
       showDragHandle: showDragHandle,

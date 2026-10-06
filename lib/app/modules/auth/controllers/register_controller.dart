@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gymads/app/data/models/gym_settings_model.dart';
 import '../../../data/providers/staff_profile_provider.dart';
+import '../../../data/services/cuenta_de_google.dart';
 import '../../../data/services/google_play_services.dart';
 import '../../../data/services/google_browser_auth.dart';
 import '../../../data/services/tenant_context_service.dart';
@@ -223,7 +224,9 @@ class RegisterController extends GetxController {
       if (attempt != _googleAttempt) return;
       AppLogger.error(
           'RegisterController', 'Fallo de autenticación con Google', e);
-      errorMessage.value = 'Error con Google: ${e.message}';
+      errorMessage.value = tokenRechazado(e)
+          ? mensajeTokenRechazado
+          : 'Error con Google: ${e.message}';
     } catch (e) {
       if (attempt != _googleAttempt) return;
       AppLogger.error('RegisterController', 'Google sign-in error', e);
@@ -247,25 +250,22 @@ class RegisterController extends GetxController {
       scopes: ['email', 'profile'],
     );
 
-    final googleUser = await googleSignIn.signIn();
-    if (googleUser == null) {
+    // Elige la cuenta y entra a Supabase con su token (si llega vencido, pide
+    // otro).
+    final entrada = await entrarConGoogle(
+      googleSignIn,
+      (idToken, accessToken) => _supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      ),
+    );
+    if (entrada == null) {
       isLoading.value = false;
       return;
     }
-
-    final googleAuth = await googleUser.authentication;
-    final idToken = googleAuth.idToken;
-    final accessToken = googleAuth.accessToken;
-
-    if (idToken == null) {
-      throw Exception('No se pudo obtener el token de Google');
-    }
-
-    final authResponse = await _supabase.auth.signInWithIdToken(
-      provider: OAuthProvider.google,
-      idToken: idToken,
-      accessToken: accessToken,
-    );
+    final googleUser = entrada.cuenta;
+    final authResponse = entrada.respuesta;
 
     if (authResponse.user == null) {
       throw Exception('Error al autenticar con Google');

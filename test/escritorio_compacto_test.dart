@@ -376,6 +376,24 @@ class _Asistente extends AgregarLectorController {
 }
 
 /// Una pantalla vacía que abre un diálogo o una ventana al mostrarse.
+/// Venta con la hoja de cobro abierta.
+class _VentaCobrando extends StatefulWidget {
+  @override
+  State<_VentaCobrando> createState() => _VentaCobrandoState();
+}
+
+class _VentaCobrandoState extends State<_VentaCobrando> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => const PointOfSaleView().mostrarCobro(context));
+  }
+
+  @override
+  Widget build(BuildContext context) => const PointOfSaleView();
+}
+
 class _AbreAlMostrar extends StatefulWidget {
   const _AbreAlMostrar(this.abrir);
   final void Function(BuildContext context) abrir;
@@ -719,6 +737,14 @@ void main() {
       c.addProductToCart(c.availableProducts.first);
       return const PointOfSaleView();
     },
+    'Cobro de venta': () {
+      final c = Get.put<PointOfSaleController>(_Venta());
+      c.availableProducts.addAll(_productos());
+      for (final i in [0, 1, 4]) {
+        c.addProductToCart(c.availableProducts[i]);
+      }
+      return _VentaCobrando();
+    },
     'Producto nuevo': () {
       Get.put<InventarioController>(_Inventario());
       return _AbreAlMostrar(
@@ -1050,6 +1076,50 @@ void main() {
         variant: const TargetPlatformVariant(
             {TargetPlatform.android, TargetPlatform.iOS}));
   }
+
+  testWidgets(
+      'cobrar una venta: de lado en dos columnas y "Cobrar venta" siempre '
+      'a la vista', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    for (final (tamano, deLado) in [
+      (const Size(844, 390), true), // teléfono acostado
+      (const Size(1180, 820), true), // tableta acostada
+      (const Size(390, 844), false),
+      (const Size(820, 1180), false),
+    ]) {
+      for (final escala in [1.0, 1.3, 2.0]) {
+        tester.view.physicalSize = tamano;
+        Get.reset();
+        await tester.pumpWidget(GetMaterialApp(
+            theme: AppTheme.oscuro,
+            builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(escala)),
+                child: VentanaEscritorio(child: child!)),
+            home: pantallas['Cobro de venta']!()));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull,
+            reason: '$tamano, texto $escala');
+        expect(
+            find.text('Total a cobrar'), deLado ? findsOneWidget : findsNothing,
+            reason: '$tamano');
+        if (deLado) {
+          // Sin desplazar: el pie queda fijo.
+          expect(find.text('Cobrar venta').hitTestable(), findsOneWidget,
+              reason: '$tamano, texto $escala');
+          if (escala == 1) {
+            expect(tester.getRect(find.text('Agua natural 1 L').last).right,
+                lessThan(tester.getRect(find.text('Método de pago')).left),
+                reason: '$tamano');
+          }
+        }
+        await tester.pumpWidget(const SizedBox());
+      }
+    }
+  },
+      variant: const TargetPlatformVariant(
+          {TargetPlatform.android, TargetPlatform.iOS}));
 
   for (final entry in pantallas.entries) {
     testWidgets('${entry.key} permite reducir y ampliar con texto aumentado',

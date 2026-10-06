@@ -2,7 +2,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
-import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/core/theme/app_theme.dart';
 
 /// Los filtros de categoría (Venta e Inventario) que no caben en el ancho se
@@ -162,27 +161,28 @@ void main() {
       .style
       ?.color;
 
-  testWidgets('escritorio: el filtro elegido va en blanco, también en claro',
-      (tester) async {
-    for (final tema in [AppTheme.claro, AppTheme.oscuro]) {
-      await _mostrar(tester,
-          tamano: const Size(1000, 800), categorias: 3, tema: tema);
-      expect(colorDelElegido(tester), Colors.white);
+  testWidgets(
+      'el filtro elegido va en blanco, también en claro, en todas las '
+      'versiones', (tester) async {
+    // Teléfono, tableta y computadora.
+    for (final tamano in [
+      const Size(390, 844),
+      const Size(1180, 820),
+      const Size(1000, 800),
+    ]) {
+      for (final tema in [AppTheme.claro, AppTheme.oscuro]) {
+        await _mostrar(tester, tamano: tamano, categorias: 3, tema: tema);
+        expect(colorDelElegido(tester), Colors.white, reason: '$tamano');
+      }
     }
   },
       variant: const TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.iOS,
         TargetPlatform.macOS,
         TargetPlatform.windows,
         TargetPlatform.linux
       }));
-
-  testWidgets('teléfono: el filtro elegido conserva su color', (tester) async {
-    await _mostrar(tester,
-        tamano: const Size(390, 844), categorias: 3, tema: AppTheme.claro);
-    expect(colorDelElegido(tester), ColoresTema.claro.textPrimary);
-  },
-      variant: const TargetPlatformVariant(
-          {TargetPlatform.android, TargetPlatform.iOS}));
 
   testWidgets('teléfono: la lista de siempre, sin barra ni espacio nuevo',
       (tester) async {

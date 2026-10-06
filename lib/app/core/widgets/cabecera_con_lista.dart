@@ -34,7 +34,11 @@ class CabeceraConLista extends StatelessWidget {
     // reconstruía, perdía el foco y el teclado se cerraba (no se podía
     // escribir el precio de un abono libre, ni buscar). El tamaño de la
     // pantalla no cambia con el teclado: solo al girar el teléfono.
-    final alto = MediaQuery.sizeOf(context).height;
+    // Con letra grande la cabecera crece: cuenta como una pantalla más baja
+    // (con letra al 200 % en un teléfono de pie se salía 128 puntos). El
+    // tamaño de letra tampoco cambia con el teclado.
+    final alto = MediaQuery.sizeOf(context).height /
+        MediaQuery.textScalerOf(context).scale(1);
     // En una ventana de escritorio el tamaño puede cambiar continuamente.
     // Conservar el mismo desplazable evita recrear el buscador y perder foco.
     // En tableta, igual: acostada, la cabecera de Entradas (periodo, totales

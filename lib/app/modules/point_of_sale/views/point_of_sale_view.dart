@@ -435,7 +435,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
         tooltip: 'Vaciar carrito',
       );
       final cobrar = ElevatedButton(
-        onPressed: () => _showPaymentDialog(context),
+        onPressed: () => mostrarCobro(context),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
@@ -550,8 +550,12 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
     );
   }
 
-  void _showPaymentDialog(BuildContext context) {
+  /// La hoja para cobrar la venta: lo que se cobra, el método de pago y el
+  /// botón. Pública para las capturas de prueba.
+  void mostrarCobro(BuildContext context) {
     final c = context.colores;
+    // Tableta o teléfono de lado: en dos columnas (`_cobroDeLado`).
+    final deLado = pantallaAcostada(context);
     // En escritorio, ventana centrada junto al carrito lateral.
     mostrarHojaAdaptable(
       context,
@@ -559,7 +563,14 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
       // Sin esto, de lado la hoja llega hasta debajo de la barra de estado.
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      anchoMaximo: 520,
+      // La tableta de pie tiene espacio para una ventana más ancha.
+      anchoMaximo: deLado
+          ? 960
+          : PlataformaApp.tableta
+              ? 640
+              : 520,
+      // El teléfono de lado: la hoja de todo el ancho, para las dos columnas.
+      constraintsHoja: deLado ? const BoxConstraints(maxWidth: 960) : null,
       builder: (context) => Container(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -568,226 +579,383 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
           color: c.cardBackground,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        // Desplazable: de lado, o con el teclado abierto para la referencia,
-        // el resumen y los métodos de pago no caben.
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Handle
-              if (!PlataformaApp.pantallaGrande) ...[
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: c.textSecondary,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-
-              // Título
-              Text(
-                'Cobrar',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: c.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-
-              // Aviso de faltantes: el cobro sigue adelante, pero el stock de
-              // estos productos quedará en negativo.
-              Obx(() {
-                final sinExistencias = controller.itemsSinExistencias;
-                if (sinExistencias.isEmpty) return const SizedBox.shrink();
-                final cuantos = sinExistencias.length;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: AppColors.error.withOpacity(0.35)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded,
-                          color: AppColors.error, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          cuantos == 1
-                              ? '${sinExistencias.first.productName} quedará como faltante'
-                              : '$cuantos productos quedarán como faltantes',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.error,
+        // Desplazable: con el teclado abierto para la referencia, el resumen
+        // y los métodos de pago no caben.
+        child: deLado
+            ? _cobroDeLado(context)
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Handle
+                    if (!PlataformaApp.pantallaGrande) ...[
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: c.textSecondary,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                       ),
+                      const SizedBox(height: 20),
                     ],
-                  ),
-                );
-              }),
 
-              // Lo que se está cobrando, para revisarlo antes de cobrar.
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
-                decoration: BoxDecoration(
-                  color: c.containerBackground,
-                  borderRadius: BorderRadius.circular(16),
+                    // Título
+                    Text(
+                      'Cobrar',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: c.textPrimary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+
+                    _avisoFaltantes(context),
+
+                    _resumenCobro(context),
+                    const SizedBox(height: 20),
+
+                    ..._pagoYMonto(context),
+
+                    // En escritorio, "Cancelar" y "Cobrar venta" lado a lado y a
+                    // la derecha, como en cualquier ventana.
+                    if (PlataformaApp.pantallaGrande)
+                      _botonesEnFila(context)
+                    else ...[
+                      // Botón procesar
+                      Obx(() => BotonGuardar(
+                            texto: 'Cobrar venta',
+                            guardando: controller.isProcessingPayment,
+                            onPressed: controller.canProcessSale()
+                                ? () => _processSale(context)
+                                : null,
+                          )),
+                      const SizedBox(height: 12),
+
+                      // Botón cancelar
+                      BotonCancelar(onPressed: () => Navigator.pop(context)),
+                    ],
+                  ],
                 ),
-                child: Obx(() => Column(
-                      children: [
-                        ListaCarrito(
-                          items: controller.cartItems.toList(),
-                          onCambiarCantidad: (item, cantidad) async {
-                            await controller.updateCartItemQuantity(
-                                item.productId, cantidad);
-                            // Sin productos ya no hay nada que cobrar.
-                            if (controller.cartItems.isEmpty &&
-                                context.mounted) {
-                              Navigator.pop(context);
-                            }
-                          },
-                        ),
-                        if (controller.discountAmount > 0) ...[
-                          const SizedBox(height: 8),
-                          _buildSummaryRow(context, 'Descuento',
-                              '-${dinero(controller.discountAmount)}'),
-                        ],
-                        const Divider(height: 24),
-                        _buildSummaryRow(
-                          context,
-                          'TOTAL',
-                          dinero(controller.finalAmount),
-                          isBold: true,
-                        ),
-                      ],
-                    )),
               ),
-              const SizedBox(height: 20),
+      ),
+    );
+  }
 
-              // Método de pago
+  /// Si algún producto quedará en negativo (el cobro sigue adelante).
+  Widget _avisoFaltantes(BuildContext context) {
+    return Obx(() {
+      final sinExistencias = controller.itemsSinExistencias;
+      if (sinExistencias.isEmpty) return const SizedBox.shrink();
+      final cuantos = sinExistencias.length;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.error.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.error.withOpacity(0.35)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded,
+                color: AppColors.error, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                cuantos == 1
+                    ? '${sinExistencias.first.productName} quedará como faltante'
+                    : '$cuantos productos quedarán como faltantes',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.error,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  /// Lo que se está cobrando, para revisarlo antes de cobrar. De lado el
+  /// total va aparte, en grande ([conTotal] false).
+  Widget _resumenCobro(BuildContext context, {bool conTotal = true}) {
+    final c = context.colores;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+      decoration: BoxDecoration(
+        color: c.containerBackground,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Obx(() => Column(
+            children: [
+              ListaCarrito(
+                items: controller.cartItems.toList(),
+                onCambiarCantidad: (item, cantidad) async {
+                  await controller.updateCartItemQuantity(
+                      item.productId, cantidad);
+                  // Sin productos ya no hay nada que cobrar.
+                  if (controller.cartItems.isEmpty && context.mounted) {
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+              if (controller.discountAmount > 0) ...[
+                const SizedBox(height: 8),
+                _buildSummaryRow(context, 'Descuento',
+                    '-${dinero(controller.discountAmount)}'),
+              ],
+              if (conTotal) ...[
+                const Divider(height: 24),
+                _buildSummaryRow(
+                  context,
+                  'TOTAL',
+                  dinero(controller.finalAmount),
+                  isBold: true,
+                ),
+              ],
+            ],
+          )),
+    );
+  }
+
+  /// El método de pago, cuánto entregó (efectivo) y la referencia (tarjeta y
+  /// transferencia).
+  List<Widget> _pagoYMonto(BuildContext context) {
+    final c = context.colores;
+    return [
+      // Método de pago
+      Text(
+        'Método de pago',
+        style: TextStyle(
+          color: c.textSecondary,
+          fontSize: 14,
+        ),
+      ),
+      const SizedBox(height: 10),
+      _buildPaymentMethodChips(context),
+      const SizedBox(height: 16),
+
+      // Campo monto recibido (solo efectivo)
+      Obx(() {
+        if (controller.selectedPaymentMethod == 'efectivo') {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                'Método de pago',
+                'Monto recibido',
                 style: TextStyle(
                   color: c.textSecondary,
                   fontSize: 14,
                 ),
               ),
-              const SizedBox(height: 10),
-              _buildPaymentMethodChips(context),
+              const SizedBox(height: 8),
+              TextField(
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+                style: TextStyle(color: c.textPrimary, fontSize: 18),
+                decoration: _decoracionCampoCobro(
+                  hintText: 'Cuánto te entregó',
+                ).copyWith(
+                  prefixText: '\$ ',
+                  prefixStyle:
+                      const TextStyle(color: AppColors.accent, fontSize: 18),
+                ),
+                onChanged: (value) {
+                  final amount = double.tryParse(value) ?? 0.0;
+                  controller.setReceivedAmount(amount);
+                },
+              ),
+              if (controller.changeAmount > 0) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Cambio: ${dinero(controller.changeAmount)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.success,
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
+            ],
+          );
+        }
+        return const SizedBox.shrink();
+      }),
 
-              // Campo monto recibido (solo efectivo)
-              Obx(() {
-                if (controller.selectedPaymentMethod == 'efectivo') {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      // Folio / referencia (tarjeta y transferencia): escrita o
+      // escaneada del comprobante.
+      Obx(() => controller.usaReferenciaPago
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: CampoReferenciaPago(controlador: controller),
+            )
+          : const SizedBox.shrink()),
+    ];
+  }
+
+  /// "Cancelar" y "Cobrar venta" lado a lado y a la derecha.
+  Widget _botonesEnFila(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      runSpacing: 8,
+      children: [
+        BotonCancelar(onPressed: () => Navigator.pop(context)),
+        Obx(() => BotonGuardar(
+              texto: 'Cobrar venta',
+              guardando: controller.isProcessingPayment,
+              onPressed: controller.canProcessSale()
+                  ? () => _processSale(context)
+                  : null,
+            )),
+      ],
+    );
+  }
+
+  /// El total, grande y a la vista junto al método de pago.
+  Widget _totalACobrar(BuildContext context) {
+    final c = context.colores;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          // Con letra grande baja a dos renglones.
+          Flexible(
+            child: Text(
+              'Total a cobrar',
+              style: TextStyle(color: c.textSecondary, fontSize: 16),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Obx(() => Text(
+                    dinero(controller.finalAmount),
+                    style: const TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tableta o teléfono de lado: lo que se cobra a la izquierda; el total,
+  /// el método de pago y el cambio a la derecha; los botones fijos abajo,
+  /// siempre a la vista. Antes era una columna angosta y había que
+  /// desplazarse para llegar a "Cobrar venta".
+  Widget _cobroDeLado(BuildContext context) {
+    final c = context.colores;
+    return Column(
+      children: [
+        if (!PlataformaApp.pantallaGrande)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: c.textSecondary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+          child: Text(
+            'Cobrar',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: c.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 10, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'Monto recibido',
-                        style: TextStyle(
-                          color: c.textSecondary,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d+\.?\d{0,2}')),
-                        ],
-                        style: TextStyle(color: c.textPrimary, fontSize: 18),
-                        decoration: _decoracionCampoCobro(
-                          hintText: 'Cuánto te entregó',
-                        ).copyWith(
-                          prefixText: '\$ ',
-                          prefixStyle: const TextStyle(
-                              color: AppColors.accent, fontSize: 18),
-                        ),
-                        onChanged: (value) {
-                          final amount = double.tryParse(value) ?? 0.0;
-                          controller.setReceivedAmount(amount);
-                        },
-                      ),
-                      if (controller.changeAmount > 0) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          'Cambio: ${dinero(controller.changeAmount)}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.success,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
+                      _avisoFaltantes(context),
+                      _resumenCobro(context, conTotal: false),
                     ],
-                  );
-                }
-                return const SizedBox.shrink();
-              }),
-
-              // Folio / referencia (tarjeta y transferencia): escrita o
-              // escaneada del comprobante.
-              Obx(() => controller.usaReferenciaPago
-                  ? Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: CampoReferenciaPago(controlador: controller),
-                    )
-                  : const SizedBox.shrink()),
-
-              // En escritorio, "Cancelar" y "Cobrar venta" lado a lado y a
-              // la derecha, como en cualquier ventana.
-              if (PlataformaApp.pantallaGrande)
-                Wrap(
-                  alignment: WrapAlignment.end,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    BotonCancelar(onPressed: () => Navigator.pop(context)),
-                    Obx(() => BotonGuardar(
-                          texto: 'Cobrar venta',
-                          guardando: controller.isProcessingPayment,
-                          onPressed: controller.canProcessSale()
-                              ? () => _processSale(context)
-                              : null,
-                        )),
-                  ],
-                )
-              else ...[
-                // Botón procesar
-                Obx(() => BotonGuardar(
+                  ),
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(10, 8, 20, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _totalACobrar(context),
+                      const SizedBox(height: 20),
+                      ..._pagoYMonto(context),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Divider(height: 1, color: c.divisor),
+        // Siempre a la vista, a la derecha.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              BotonCancelar(onPressed: () => Navigator.pop(context)),
+              const SizedBox(width: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 220),
+                child: Obx(() => BotonGuardar(
                       texto: 'Cobrar venta',
+                      compacto: true,
                       guardando: controller.isProcessingPayment,
                       onPressed: controller.canProcessSale()
                           ? () => _processSale(context)
                           : null,
                     )),
-                const SizedBox(height: 12),
-
-                // Botón cancelar
-                BotonCancelar(onPressed: () => Navigator.pop(context)),
-              ],
+              ),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -802,6 +970,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
   Widget _buildSummaryRow(BuildContext context, String label, String value,
       {bool isBold = false}) {
     final c = context.colores;
+    // Con letra grande, el importe se encoge antes de salirse.
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -813,12 +982,19 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
             fontSize: isBold ? 18 : 14,
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            color: isBold ? AppColors.accent : c.textPrimary,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            fontSize: isBold ? 18 : 14,
+        const SizedBox(width: 12),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(
+              value,
+              style: TextStyle(
+                color: isBold ? AppColors.accent : c.textPrimary,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                fontSize: isBold ? 18 : 14,
+              ),
+            ),
           ),
         ),
       ],

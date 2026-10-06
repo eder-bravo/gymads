@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   bonsoir_windows
   camera_windows
+  desktop_multi_window
   desktop_webview_window
   file_selector_windows
   just_audio_windows

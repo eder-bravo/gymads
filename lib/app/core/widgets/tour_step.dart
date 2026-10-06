@@ -3,6 +3,7 @@ import 'package:showcaseview/showcaseview.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../data/services/welcome_tour_service.dart';
+import '../utils/plataforma_app.dart';
 
 /// Un paso del tour de bienvenida.
 ///
@@ -53,7 +54,8 @@ class TourStep extends StatelessWidget {
       if (!isLastStep)
         TooltipActionButton(
           type: TooltipDefaultActionType.skip,
-          name: 'Saltar',
+          // En computadora, Esc también salta.
+          name: PlataformaApp.escritorio ? 'Saltar (Esc)' : 'Saltar',
           backgroundColor: Colors.transparent,
           textStyle: TextStyle(
             color: c.textSecondary.withOpacity(0.7),

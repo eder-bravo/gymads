@@ -63,7 +63,7 @@ dependencies:
     path: packages/camera_desktop
   just_audio_media_kit: ^2.1.0
   media_kit_libs_linux: ^1.2.1
-
+  desktop_multi_window: ^0.3.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

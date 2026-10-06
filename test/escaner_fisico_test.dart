@@ -13,31 +13,44 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    EscanerFisicoService.configuracion.value = const ConfiguracionEscaner();
   });
   tearDown(() {
     debugDefaultTargetPlatformOverride = null;
     Get.reset();
   });
 
-  test('preserva ceros y quita solo el prefijo y sufijo definidos', () {
-    const config = ConfiguracionEscaner(prefijo: ']C1', sufijo: '#');
-    expect(config.interpretar(']C100012345#'), '00012345');
-    expect(config.interpretar('00012345#'), isNull);
-    expect(config.interpretar(']C100012345'), isNull);
-    expect(config.interpretar(']C1#'), isNull);
-    expect(const ConfiguracionEscaner().interpretar('AB\nCD'), isNull);
+  test('preserva ceros y rechaza lecturas vacías o con control', () {
+    expect(EscanerFisicoService.codigoDe('00012345'), '00012345');
+    expect(EscanerFisicoService.codigoDe('  00012345 '), '00012345');
+    expect(EscanerFisicoService.codigoDe(''), isNull);
+    expect(EscanerFisicoService.codigoDe('AB\nCD'), isNull);
+    expect(EscanerFisicoService.codigoDe('1' * 257), isNull);
   });
 
-  test('recupera configuración local después de reiniciar', () async {
-    await EscanerFisicoService.guardar(const ConfiguracionEscaner(
-        terminador: TerminadorEscaner.tab, prefijo: 'PRE', sufijo: 'FIN'));
-    EscanerFisicoService.configuracion.value = const ConfiguracionEscaner();
-    await EscanerFisicoService.cargar();
-    expect(EscanerFisicoService.configuracion.value.teclaFinal,
-        LogicalKeyboardKey.tab);
-    expect(EscanerFisicoService.configuracion.value.interpretar('PRE00123FIN'),
-        '00123');
+  test(
+      'Enter, Enter del teclado numérico y Tab cierran la lectura, sin '
+      'configurar nada', () {
+    for (final tecla in [
+      LogicalKeyboardKey.enter,
+      LogicalKeyboardKey.numpadEnter,
+      LogicalKeyboardKey.tab,
+    ]) {
+      expect(EscanerFisicoService.esFinDeLectura(tecla), isTrue);
+    }
+    expect(
+        EscanerFisicoService.esFinDeLectura(LogicalKeyboardKey.space), isFalse);
+  });
+
+  test('borra los ajustes de versiones anteriores', () async {
+    SharedPreferences.setMockInitialValues({
+      'escaner_terminador': 'tab',
+      'escaner_prefijo': 'PRE',
+      'escaner_sufijo': 'FIN',
+      'otra_cosa': 'se queda',
+    });
+    await EscanerFisicoService.olvidarAjustesViejos();
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getKeys(), {'otra_cosa'});
   });
 
   for (final plataforma in [
@@ -84,8 +97,6 @@ void main() {
 
   testWidgets('Tab finaliza sin cambiar el foco; una tecla normal no finaliza',
       (tester) async {
-    EscanerFisicoService.configuracion.value =
-        const ConfiguracionEscaner(terminador: TerminadorEscaner.tab);
     final recibidos = <String>[];
     await tester.pumpWidget(GetMaterialApp(
         home: EscanerFisicoView(
@@ -96,7 +107,7 @@ void main() {
             })));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'ABC123');
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
     expect(recibidos, isEmpty);
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pumpAndSettle();

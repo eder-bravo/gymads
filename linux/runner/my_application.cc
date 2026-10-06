@@ -7,6 +7,19 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
+#include <desktop_multi_window/desktop_multi_window_plugin.h>
+
+// La pantalla para clientes (monitor extra): otro motor de Flutter. Solo se
+// le pone título y tamaño; no se le registran plugins (Bluetooth,
+// notificaciones o enlaces se duplicarían).
+static void al_crear_ventana(FlPluginRegistry* registro) {
+  GtkWidget* ventana = gtk_widget_get_toplevel(GTK_WIDGET(registro));
+  if (!GTK_IS_WINDOW(ventana)) return;
+  gtk_window_set_title(GTK_WINDOW(ventana), "GymOne · Pantalla para clientes");
+  gtk_window_resize(GTK_WINDOW(ventana), 1024, 768);
+  gtk_window_set_position(GTK_WINDOW(ventana), GTK_WIN_POS_CENTER);
+}
+
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
@@ -66,6 +79,12 @@ static void my_application_activate(GApplication* application) {
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+  desktop_multi_window_plugin_set_window_created_callback(al_crear_ventana);
+
+  // Al cerrar la ventana principal se cierra la app, aunque siga abierta la
+  // pantalla para clientes: sin la principal ya no le llegan avisos.
+  g_signal_connect_swapped(window, "destroy", G_CALLBACK(g_application_quit),
+                           application);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

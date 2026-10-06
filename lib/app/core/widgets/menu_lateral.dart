@@ -64,10 +64,13 @@ class PasoDelMenu {
 /// Al cambiar de sección se vuelve a Inicio y se abre la nueva encima: Inicio
 /// queda siempre debajo, que es donde se muestran los avisos del lector.
 class MenuLateral extends StatelessWidget {
-  const MenuLateral({super.key, this.pasos = const {}});
+  const MenuLateral({super.key, this.pasos = const {}, this.pasoBoton});
 
   /// Pasos del recorrido de Inicio, por ruta de la sección.
   final Map<String, PasoDelMenu> pasos;
+
+  /// Paso del recorrido de Inicio sobre el botón que oculta la barra.
+  final PasoDelMenu? pasoBoton;
 
   static const ancho = 232.0;
 
@@ -277,7 +280,10 @@ class MenuLateral extends StatelessWidget {
       return TourStep(
         tourKey: paso.clave,
         title: paso.titulo,
-        description: paso.descripcion,
+        // Con su atajo: así se aprende sin buscarlo.
+        description: atajo == null
+            ? paso.descripcion
+            : '${paso.descripcion} Atajo: $atajo.',
         borderRadius: 12,
         isLastStep: paso.ultimo,
         child: fila,
@@ -323,7 +329,17 @@ class MenuLateral extends StatelessWidget {
                     ),
                     // Arriba, junto al logo, como en las apps de Mac: en el
                     // mismo lugar con el menú abierto y oculto.
-                    const BotonDelMenu(),
+                    if (pasoBoton case final paso?)
+                      TourStep(
+                        tourKey: paso.clave,
+                        title: paso.titulo,
+                        description: paso.descripcion,
+                        borderRadius: 12,
+                        isLastStep: paso.ultimo,
+                        child: const BotonDelMenu(),
+                      )
+                    else
+                      const BotonDelMenu(),
                   ],
                 ),
               ),

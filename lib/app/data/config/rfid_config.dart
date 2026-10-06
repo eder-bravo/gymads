@@ -644,34 +644,64 @@ class RfidConfig {
   }
 
   /// Libera el lector para que otro gimnasio pueda reclamarlo.
-  static Future<bool> desvincular() async {
+  ///
+  /// El lector contesta y, 1.5 s después, se reinicia sin WiFi. A veces esa
+  /// respuesta no llega aunque sí se liberó (pasó en macOS): la app decía que
+  /// no se pudo y el registro del lector decía lo contrario. Por eso, sin
+  /// respuesta, se le pregunta cómo quedó ([_quedoLibre]). Y antes de pedirlo
+  /// se comprueba que conteste, para no confundir "se reinició" con "estaba
+  /// apagado".
+  static Future<DesvinculoResultado> desvincular() async {
     final base = baseUrl;
     final gymId = gymIdActual();
-    if (base == null || gymId == null) return false;
-
-    try {
-      final response = await http
-          .post(
-            Uri.parse('$base/unclaim'),
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode({'gym_id': gymId}),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final id = _idLector;
-        if (id != null) {
-          await LectorRepository().quitar(gymId: gymId, id: id);
-          _registrados = _registrados.where((r) => r.id != id).toList();
-        }
-        await clearConfig();
-        return true;
-      }
-      return false;
-    } catch (e) {
-      AppLogger.error('RfidConfig', 'Error al desvincular el lector', e);
-      return false;
+    final ip = getCurrentIP();
+    if (base == null || gymId == null || ip == null) {
+      return DesvinculoResultado.sinConexion;
     }
+
+    final antes = await servicioRed(gymId).consultar(ip);
+    if (antes == null) return DesvinculoResultado.sinConexion;
+
+    // Ya estaba libre (lo desvincularon desde otro equipo): solo se olvida.
+    var liberado = !antes.mine;
+    if (!liberado) {
+      try {
+        final response = await http
+            .post(
+              Uri.parse('$base/unclaim'),
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode({'gym_id': gymId}),
+            )
+            .timeout(const Duration(seconds: 10));
+        liberado = response.statusCode == 200;
+        if (!liberado) {
+          AppLogger.warning('RfidConfig',
+              'El lector no aceptó desvincularse (${response.statusCode})');
+        }
+      } catch (e) {
+        AppLogger.warning('RfidConfig', 'Desvincular sin respuesta: $e');
+        liberado = await _quedoLibre(gymId, ip);
+      }
+    }
+    if (!liberado) return DesvinculoResultado.error;
+
+    final id = _idLector ?? antes.id;
+    if (id != null) {
+      await repositorio().quitar(gymId: gymId, id: id);
+      _registrados = _registrados.where((r) => r.id != id).toList();
+    }
+    await clearConfig();
+    return DesvinculoResultado.ok;
+  }
+
+  /// Tras pedirle desvincularse sin recibir respuesta. Libre si contesta que
+  /// ya no es de este gimnasio, o si ya no contesta: un momento antes sí
+  /// contestaba, así que se liberó y se reinició sin WiFi. Si dice que sigue
+  /// siendo de este gimnasio, no se liberó.
+  static Future<bool> _quedoLibre(String gymId, String ip) async {
+    final lector = await servicioRed(gymId)
+        .consultar(ip, timeout: const Duration(seconds: 2));
+    return lector == null || !lector.mine;
   }
 
   // Mostrar configuración actual
@@ -707,6 +737,18 @@ class _Prueba {
   /// Contestó un lector, pero dijo que no es de este gimnasio (libre o de
   /// otro). Distinto de no contestar: eso puede ser que esté apagado.
   final bool respondioQueNoEsMio;
+}
+
+/// En qué puede acabar desvincular el lector.
+enum DesvinculoResultado {
+  ok,
+
+  /// No contestó antes de pedírselo: apagado, otra IP u otra red. No se le
+  /// mandó nada.
+  sinConexion,
+
+  /// Contestó que sigue siendo de este gimnasio.
+  error,
 }
 
 /// En qué puede acabar un intento de vincular un lector.

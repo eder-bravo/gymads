@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
@@ -6,6 +7,7 @@ import 'package:showcaseview/showcaseview.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/permissions/staff_role.dart';
+import '../../core/utils/plataforma_app.dart';
 import 'tenant_context_service.dart';
 
 /// Identificadores de los recorridos guiados: uno por pantalla principal.
@@ -200,7 +202,31 @@ class WelcomeTourService extends GetxService {
       onFinish: _onFinish,
       onDismiss: (_) => _onDismiss(),
     );
+    // En computadora, Esc salta el recorrido que está en pantalla.
+    if (PlataformaApp.escritorio) {
+      FocusManager.instance.addEarlyKeyEventHandler(_escapeSalta);
+    }
     return this;
+  }
+
+  @visibleForTesting
+  void dejarDeEscuchar() =>
+      FocusManager.instance.removeEarlyKeyEventHandler(_escapeSalta);
+
+  /// Esc hace lo mismo que "Saltar": quita el recorrido de esta pantalla y lo
+  /// da por visto. Se atiende antes que nada (también antes que el Esc que
+  /// cierra una ventana modal), pero solo con un recorrido a la vista; si
+  /// no, Esc sigue con su uso de siempre.
+  KeyEventResult _escapeSalta(KeyEvent evento) {
+    if (evento.logicalKey != LogicalKeyboardKey.escape) {
+      return KeyEventResult.ignored;
+    }
+    final vista = _showcaseView;
+    if (!recorridoEnCurso.value || vista == null || !vista.isShowcaseRunning) {
+      return KeyEventResult.ignored;
+    }
+    if (evento is KeyDownEvent) vista.dismiss();
+    return KeyEventResult.handled;
   }
 
   /// Marca todos los recorridos del dueño como pendientes para el gimnasio

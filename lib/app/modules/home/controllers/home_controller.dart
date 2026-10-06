@@ -28,6 +28,12 @@ class HomeController extends GetxController {
   final keyIngresos = GlobalKey();
   final keyEntradas = GlobalKey();
   final keyConfiguracion = GlobalKey();
+  // Solo en el panel de escritorio.
+  final keyNumeros = GlobalKey();
+  final keyAccesosRapidos = GlobalKey();
+  final keyActividad = GlobalKey();
+  final keyPantallaClientes = GlobalKey();
+  final keyMenu = GlobalKey();
 
   bool _checkingOnboarding = false;
 
@@ -65,8 +71,27 @@ class HomeController extends GetxController {
   ///
   /// Un paso apuntando a un widget que no existe deja el tour colgado, así que
   /// se filtra con el mismo permiso que oculta la tarjeta.
-  List<GlobalKey> get _tourSteps => [
+  ///
+  /// En escritorio, además, lo del panel del día (números, accesos rápidos y
+  /// actividad, con los mismos permisos que los dibujan) y, al final, el
+  /// botón que oculta la barra lateral.
+  List<GlobalKey> get tourSteps => [
         keyHeader,
+        if (PlataformaApp.escritorio) ...[
+          if (can(Permission.verIngresos) ||
+              can(Permission.verAccesos) ||
+              can(Permission.gestionarClientes))
+            keyNumeros,
+          if (can(Permission.vender) ||
+              can(Permission.cobrarAbonos) ||
+              can(Permission.gestionarClientes))
+            keyAccesosRapidos,
+          if (can(Permission.verAccesos) ||
+              can(Permission.verIngresos) ||
+              can(Permission.gestionarClientes))
+            keyActividad,
+          keyPantallaClientes,
+        ],
         if (can(Permission.gestionarClientes)) keyClientes,
         if (can(Permission.cobrarAbonos)) keyAbonar,
         if (can(Permission.vender)) keyVender,
@@ -74,6 +99,7 @@ class HomeController extends GetxController {
         if (can(Permission.verIngresos)) keyIngresos,
         if (can(Permission.verAccesos)) keyEntradas,
         keyConfiguracion,
+        if (PlataformaApp.escritorio) keyMenu,
       ];
 
   // Función para obtener el saludo según la hora
@@ -138,7 +164,7 @@ class HomeController extends GetxController {
           await WelcomeTourService.to.isPending(AppTours.home)) {
         MenuLateral.mostrarParaRecorrido();
       }
-      await WelcomeTourService.to.startIfPending(AppTours.home, _tourSteps);
+      await WelcomeTourService.to.startIfPending(AppTours.home, tourSteps);
     } finally {
       _checkingOnboarding = false;
     }

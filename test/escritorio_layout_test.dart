@@ -23,7 +23,6 @@ import 'package:gymads/app/data/services/lector_ble_service.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/models/staff_profile_model.dart';
-import 'package:gymads/app/data/services/escaner_fisico_service.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/global_widgets/cliente_card.dart';
@@ -242,7 +241,6 @@ void main() {
     Get.put(resumenDePrueba());
     tour = ShowcaseView.register();
     WelcomeTourService.recorridoEnCurso.value = false;
-    EscanerFisicoService.configuracion.value = const ConfiguracionEscaner();
   });
   tearDown(() {
     tour.unregister();
@@ -338,6 +336,54 @@ void main() {
     expect(find.text('4:23 p. m.'), findsOneWidget);
     expect(find.text('1:20 p. m.'), findsOneWidget);
     expect(find.text('10:23 a. m.'), findsNothing);
+  }, variant: _escritorio);
+
+  testWidgets('el recorrido de Inicio enseña el panel, la barra y sus atajos',
+      (tester) async {
+    Get.put<TenantContextService>(_Tenant());
+    final inicio = Get.put<HomeController>(_Inicio());
+    await _mostrarApp(tester);
+    await _tamano(tester, const Size(1280, 800));
+    const atajo = MenuLateral.textoAtajo;
+    // Cada paso, por un trozo de su texto, en el orden en que debe salir.
+    final esperados = [
+      'Te enseñamos lo principal',
+      'Lo cobrado, quién entró y quién vence pronto',
+      'Lo que más se hace en el mostrador',
+      'Las últimas entradas y cobros',
+      'Ábrela y llévala a un monitor extra',
+      // ⌘1 es Inicio: las secciones siguen desde ⌘2.
+      'Tus miembros y cuándo vence su abono. Atajo: ${atajo('2')}.',
+      'Cobra y renueva membresías. Atajo: ${atajo('3')}.',
+      'Atajo: ${atajo('4')}.',
+      'Atajo: ${atajo('5')}.',
+      'Atajo: ${atajo('6')}.',
+      'Quién entró y a qué hora. Atajo: ${atajo('7')}.',
+      'lector y permisos. Atajo: ${atajo(',')}.',
+      'Oculta la barra para que la pantalla use todo el ancho',
+    ];
+    // El botón para abrir la pantalla para clientes, junto a Actualizar.
+    expect(find.widgetWithText(OutlinedButton, 'Pantalla para clientes'),
+        findsOneWidget);
+    expect(inicio.tourSteps, hasLength(esperados.length));
+    // La burbuja se mueve sin parar: se avanza a mano, sin pumpAndSettle.
+    Future<void> esperar() async {
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+    }
+
+    tour.startShowCase(inicio.tourSteps);
+    await esperar();
+    for (var i = 0; i < esperados.length; i++) {
+      expect(find.textContaining(esperados[i]), findsOneWidget,
+          reason: 'paso ${i + 1}');
+      final ultimo = i == esperados.length - 1;
+      await tester.tap(find.text(ultimo ? 'Entendido' : 'Siguiente'));
+      await esperar();
+    }
+    expect(tour.isShowcaseRunning, isFalse);
+    expect(tester.takeException(), isNull);
   }, variant: _escritorio);
 
   testWidgets('el panel del día cabe en la ventana sin desplazarse',

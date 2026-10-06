@@ -1,5 +1,6 @@
 import Cocoa
 import FlutterMacOS
+import desktop_multi_window
 import AVFoundation
 import CoreBluetooth
 import UserNotifications
@@ -20,6 +21,25 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     permisos = PermisosEscritorio(messenger: flutterViewController.engine.binaryMessenger)
+
+    // La pantalla para clientes (monitor extra): otro motor de Flutter. No se
+    // le registran plugins (solo usa los suyos de ventanas, que se registran
+    // solos): Bluetooth, notificaciones o enlaces se duplicarían.
+    FlutterMultiWindowPlugin.setOnWindowCreatedCallback { controlador in
+      guard let ventana = controlador.view.window else { return }
+      ventana.title = "GymOne · Pantalla para clientes"
+      ventana.contentMinSize = NSSize(width: 480, height: 360)
+      ventana.setContentSize(NSSize(width: 1024, height: 768))
+      ventana.center()
+    }
+
+    // Al cerrar la ventana principal se cierra la app, aunque siga abierta
+    // la pantalla para clientes: sin la principal ya no le llegan avisos.
+    NotificationCenter.default.addObserver(
+      forName: NSWindow.willCloseNotification, object: self, queue: .main
+    ) { _ in
+      NSApp.terminate(nil)
+    }
 
     super.awakeFromNib()
   }

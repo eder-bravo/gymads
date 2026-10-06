@@ -173,8 +173,9 @@ escritorio; el teléfono queda idéntico):
   la computadora como primer ícono, errores en un recuadro, botones de "Buscar
   de nuevo" / "Escribir otra red" que bajan de renglón con texto grande (antes
   se salían de la pantalla). Los interruptores del lector explican qué hacen.
-- **Escáner de códigos:** tres formas de conectarlo con ícono; prefijo,
-  sufijo y modo serie dentro de "Opciones avanzadas".
+- **Escáner de códigos:** tres formas de conectarlo con ícono y "Probar mi
+  lector". Sin ajustes: se quitaron "Ajuste" (tecla final) y "Opciones
+  avanzadas" (prefijo y sufijo), que nadie entendía.
 - **Otros:** precios en dos columnas, tooltips en los íconos que no tenían,
   "Subir" y "Bajar" como alternativa a arrastrar categorías, la cámara con
   ancho de lectura y el error técnico en "Ver detalles".
@@ -208,10 +209,13 @@ muestra ahora lo de hoy:
 Las horas de entradas y cobros se muestran tal como se guardaron, igual que
 en Entradas e Ingresos: la app guarda la hora del gimnasio sin zona y la base
 la regresa marcada como UTC. El panel (y el detalle de un cobro) la pasaba a
-hora local y le restaba 6 horas en México. Pendiente: el registro de visitas
-(`registrar_visita`) y el límite de una entrada por jornada usan `now()`, que
-sí es UTC real; habría que guardar todo en UTC real (app, consultas y datos
-ya guardados) para que coincidan.
+hora local y le restaba 6 horas en México. En el servidor, la migración
+`20261006051859_horas_del_gimnasio` usa la misma forma: `hora_del_gimnasio()`
+(America/Monterrey escrita como UTC) en `registrar_visita`, en los valores por
+defecto de `access_logs.access_time` e `ingresos.fecha` y en el límite de una
+entrada por jornada, que antes contaba el día con 6 horas de diferencia
+(rechazaba a quien vino en la noche y regresaba antes de las 7 a. m.). Las
+visitas ya guardadas con `now()` se corrigieron.
 
 El panel ocupa la ventana sin desplazarse: la actividad llena lo que queda y
 cada lista muestra solo las filas que caben enteras (las demás, en "Ver
@@ -222,8 +226,48 @@ una página normal.
 Todo se pide según los permisos del rol, se vuelve a pedir cada vez que Inicio
 regresa al frente o con "Actualizar", y se actualiza solo cuando otro equipo
 (o el lector) registra un cobro o una entrada. Si un dato no carga se muestra
-"—" sin afectar a los demás. El recorrido de bienvenida empieza en la cabecera
-del panel y sigue por las secciones de la barra lateral. En una ventana de
+"—" sin afectar a los demás. El recorrido de bienvenida va: bienvenida, lo
+de hoy, accesos rápidos, actividad, cada sección de la barra con su atajo
+(⌘/Ctrl + 2…7, Configuración con ⌘/Ctrl + coma) y, al final, el botón que
+oculta la barra (⌘/Ctrl + B). Cada parte del panel solo entra si ese rol la
+ve. En Configuración, Cuenta va primero y luego el escáner de códigos, que
+también tiene su paso.
+
+**Esc salta el recorrido** (solo en computadora): hace lo mismo que
+"Saltar" (que ahí dice "Saltar (Esc)"): quita el recorrido de esa pantalla y
+lo da por visto; los de otras pantallas siguen saliendo. Se atiende antes que
+nada, pero solo con un recorrido a la vista: si no, Esc sigue cerrando las
+ventanas modales (`WelcomeTourService._escapeSalta`).
+
+**Pantalla para clientes** (monitor extra, solo computadora). El botón
+"Pantalla para clientes" de la cabecera de Inicio (junto a "Actualizar")
+abre una segunda ventana, o la trae al frente si ya está abierta; se arrastra
+al otro monitor y se pone en pantalla completa. En espera muestra el logo,
+"Pasa tu tarjeta", la hora y la fecha. Cada pase del lector sale ahí con el
+diseño del aviso de siempre (`WelcomeScreenWidget(paraClientes: true)`) pero
+solo con información: nombre, foto, días restantes, "Tu membresía venció
+el…" y "Pasa al mostrador para renovarla"; nunca el número de la tarjeta ni
+botones. El mostrador sigue viendo su aviso con Abonar, Editar y Registrar.
+Le llega en cada pase, aunque el mostrador esté en otra pantalla o en otra
+app, y vuelve a la espera a los 4 s (6 s si se rechaza).
+- `desktop_multi_window` 0.3.1: la ventana es otro motor de Flutter. `main`
+  la reconoce por sus argumentos (`multi_window`, id, `pantalla_clientes`) y
+  corre solo `correrPantallaClientes`, sin Supabase, GetX ni el lector.
+- Los pases van como JSON (`AvisoParaClientes`, en
+  `data/services/pantalla_clientes.dart`) con la foto ya firmada.
+- En los runners nativos solo se le pone título y tamaño (1024×768,
+  centrada); no se le registran plugins, para no duplicar Bluetooth,
+  notificaciones o enlaces. Al cerrar la ventana principal se cierra la app.
+- Todo se dibuja a 1024×768 y se escala a la ventana: en un monitor grande se
+  ve grande.
+
+`escritorio_compacto_test.dart` comprueba que cada paso de cada recorrido
+(Inicio, Abonar, Configuración, Clientes, Ingresos, Inventario, Venta y
+Entradas) esté en pantalla en teléfono, tableta acostada y de pie, macOS,
+Windows y Linux: si falta uno, el recorrido entero no arranca en esa versión.
+Esa prueba encontró que en tableta acostada la cabecera de Entradas no cabía
+fija; `CabeceraConLista` ahora se desplaza completa en tableta, como en
+escritorio. En una ventana de
 menos de 720 puntos (solo posible sin el mínimo nativo) se usa la lista del
 teléfono.
 
@@ -345,7 +389,7 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 798 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 889 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`
@@ -372,16 +416,18 @@ el sistema operativo. La ventana de GymOne debe estar activa.
 
 La captura automática de escritorio reconoce los caracteres rápidos que envía
 el lector y su terminador Enter o Tab (incluye Enter numérico), con hasta
-100 ms entre teclas. Conserva ceros iniciales, prefijo/sufijo y lecturas
-repetidas. Si se escanea con el buscador seleccionado, recupera la búsqueda
-anterior. Ahí los códigos de menos de tres caracteres deben estar registrados
-o llevar el prefijo configurado, para distinguirlos de la escritura normal.
+100 ms entre teclas. Conserva ceros iniciales y lecturas repetidas. Si se
+escanea con el buscador seleccionado, recupera la búsqueda anterior. Ahí los
+códigos de menos de tres caracteres deben estar registrados, para
+distinguirlos de la escritura normal.
 
-En **Configuración → Escáner de códigos** se guarda por equipo:
-
-- Terminador Enter o Tab (incluye Enter del teclado numérico).
-- Prefijo y sufijo literales que se quitan del código recibido.
-- Prueba de lectura sin modificar productos o ventas.
+No hay nada que configurar (`EscanerFisicoService`): se acepta Enter, Enter
+del teclado numérico o Tab al final de cada lectura, y el código se usa tal
+cual llega. Un Tab o Enter suelto (sin ráfaga antes) sigue siendo la tecla
+normal. Los ajustes que guardaban las versiones anteriores (tecla final,
+prefijo y sufijo) se borran al abrir la app. **Configuración → Escáner de
+códigos** solo explica cómo conectarlo y ofrece una lectura de prueba, sin
+modificar productos o ventas.
 
 Cada lectura terminada cuenta una vez. Escanear el mismo producto dos veces
 cuenta dos unidades; las lecturas que llegan al campo mientras se procesa una
@@ -400,8 +446,7 @@ con ⌘, Ctrl o Alt (atajos del sistema y menús) o dentro de un campo de texto,
 donde deben llegar a la escritura. En macOS, además, la ventana ignora las
 teclas que nadie usó (`keyDown` en `MainFlutterWindow.swift`).
 
-Estos ajustes adaptan la app al lector; **no reprograman su firmware**.
-Para cambiar HID/serie, idioma del teclado, terminador o simbologías se usan los
+La app no reprograma el lector. Para cambiar HID/serie, idioma del teclado, terminador o simbologías se usan los
 códigos del manual de cada fabricante. Aún falta identificar los modelos del
 hardware del usuario. Los lectores configurados exclusivamente como serie/COM,
 SPP o BLE GATT necesitan un transporte específico y no están cubiertos por HID.
@@ -472,6 +517,15 @@ sigue suponiendo redes /24, como el código previo; para redes con otra máscara
 o adaptadores VPN pueden hacer falta ajustes adicionales. El firewall debe
 permitir la red local. No se implementó provisión del RFID por cable: conectar
 USB a ese firmware no lo convierte en escáner HID ni en canal de configuración.
+
+**Desvincular** (`RfidConfig.desvincular`). El lector contesta y, 1.5 s
+después, se reinicia sin WiFi. En macOS la respuesta llegó a perderse: la app
+decía "No se pudo desvincular" y el registro del lector decía que sí. Ahora,
+antes de pedirlo, la app comprueba que el lector conteste (si no, "No se
+encontró el lector", sin mandar nada). Si después la respuesta no llega, le
+vuelve a preguntar: si dice que ya no es de este gimnasio, o ya no contesta
+porque se reinició, cuenta como desvinculado; si sigue siendo nuestro, es
+error. Si ya estaba libre (desde otro equipo), solo se olvida.
 
 ## Renderizador de macOS
 
@@ -572,7 +626,8 @@ flutter build windows --debug
 flutter build web --debug
 ```
 
-Pruebas cubren terminadores, repetición/cola, ceros iniciales, persistencia,
+Pruebas cubren terminadores, repetición/cola, ceros iniciales, borrado de
+ajustes viejos,
 ausencia de escáner de cámara en escritorio, permisos TCC/Windows, falta de BLE,
 filtro de lectores, reserva y liberación del firmware, cámaras virtuales,
 selección guardada, cámara desconectada y cierre durante inicialización.

@@ -37,7 +37,9 @@ class CabeceraConLista extends StatelessWidget {
     final alto = MediaQuery.sizeOf(context).height;
     // En una ventana de escritorio el tamaño puede cambiar continuamente.
     // Conservar el mismo desplazable evita recrear el buscador y perder foco.
-    if (!PlataformaApp.escritorio && alto >= alturaMinima) {
+    // En tableta, igual: acostada, la cabecera de Entradas (periodo, totales
+    // y la gráfica por hora) no cabía fija y se salía 84 puntos por abajo.
+    if (!PlataformaApp.pantallaGrande && alto >= alturaMinima) {
       return Column(
         children: [
           ...cabecera,

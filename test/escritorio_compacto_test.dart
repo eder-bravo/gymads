@@ -5,6 +5,7 @@ import 'package:camera_macos/camera_macos.dart' as mac;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:gymads/app/data/models/abono_prices_model.dart';
 import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
@@ -739,6 +740,109 @@ void main() {
       return const AccessLogsView();
     },
   };
+  // Cada paso de cada recorrido existe en cada versión. Si falta uno, el
+  // recorrido entero no arranca ahí: espera a que aparezca y se rinde.
+  final recorridos = <String, List<GlobalKey> Function()>{
+    'Inicio': () => Get.find<HomeController>().tourSteps,
+    'Abonar buscar': () => Get.find<AbonarController>().tourSteps,
+    'Configuración': () => Get.find<ConfiguracionController>().tourSteps,
+    'Clientes': () => Get.find<ClientesController>().tourSteps,
+    'Ingresos': () => Get.find<IngresosController>().tourSteps,
+    'Inventario': () => Get.find<InventarioController>().tourSteps,
+    'Venta': () => Get.find<PointOfSaleController>().tourSteps,
+    'Entradas': () => Get.find<AccessLogsController>().tourSteps,
+  };
+  final versiones = <({String nombre, Size tamano, TargetPlatform plataforma})>[
+    (
+      nombre: 'teléfono',
+      tamano: const Size(390, 844),
+      plataforma: TargetPlatform.android
+    ),
+    (
+      nombre: 'tableta acostada',
+      tamano: const Size(1180, 820),
+      plataforma: TargetPlatform.iOS
+    ),
+    (
+      nombre: 'tableta de pie',
+      tamano: const Size(820, 1180),
+      plataforma: TargetPlatform.android
+    ),
+    (
+      nombre: 'macOS',
+      tamano: const Size(1280, 800),
+      plataforma: TargetPlatform.macOS
+    ),
+    (
+      nombre: 'Windows',
+      tamano: const Size(1920, 1000),
+      plataforma: TargetPlatform.windows
+    ),
+    (
+      nombre: 'Linux',
+      tamano: const Size(960, 600),
+      plataforma: TargetPlatform.linux
+    ),
+  ];
+  for (final version in versiones) {
+    for (final recorrido in recorridos.entries) {
+      testWidgets('recorrido de ${recorrido.key} completo en ${version.nombre}',
+          (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = version.tamano;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(GetMaterialApp(
+            theme: AppTheme.oscuro,
+            builder: (context, child) => VentanaEscritorio(child: child!),
+            home: pantallas[recorrido.key]!()));
+        await tester.pumpAndSettle();
+        final pasos = recorrido.value();
+        expect(pasos, isNotEmpty);
+        final faltan = [
+          for (var i = 0; i < pasos.length; i++)
+            if (!tour.isTargetRendered(pasos[i])) i + 1,
+        ];
+        expect(faltan, isEmpty,
+            reason: 'Pasos (1 = primero) sin su widget en pantalla');
+        await tester.pumpWidget(const SizedBox());
+      }, variant: TargetPlatformVariant.only(version.plataforma));
+    }
+  }
+
+  testWidgets(
+      'Configuración: Cuenta antes que todo, y el escáner en el '
+      'recorrido', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 800);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(GetMaterialApp(
+        theme: AppTheme.oscuro,
+        builder: (context, child) => VentanaEscritorio(child: child!),
+        home: const ConfiguracionView()));
+    await tester.pumpAndSettle();
+    final c = Get.find<ConfiguracionController>();
+    final escaner = PlataformaApp.escanerFisico;
+    expect(c.tourSteps.take(escaner ? 3 : 2), [
+      c.keyCuenta,
+      if (escaner) c.keyEscaner,
+      c.keyApariencia,
+    ]);
+    expect(find.text('Escáner de códigos'),
+        escaner ? findsOneWidget : findsNothing);
+    if (escaner) {
+      // En la rejilla, Cuenta es la primera tarjeta y el escáner va después.
+      final cuenta = tester.getTopLeft(find.text('Cuenta'));
+      final lector = tester.getTopLeft(find.text('Escáner de códigos'));
+      expect(cuenta.dy < lector.dy || cuenta.dx < lector.dx, isTrue);
+    }
+  },
+      variant: const TargetPlatformVariant({
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+        TargetPlatform.android,
+      }));
+
   // Inspección visual opcional: cada pantalla maximizada en 2560×1410, con
   // las sombras reales (en pruebas Flutter las dibuja como un borde negro).
   const capturas = bool.fromEnvironment('CAPTURAS_ESCRITORIO');

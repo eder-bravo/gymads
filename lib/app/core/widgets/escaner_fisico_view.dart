@@ -29,10 +29,7 @@ class _EscanerFisicoViewState extends State<EscanerFisicoView> {
   }
 
   KeyEventResult _tecla(FocusNode _, KeyEvent evento) {
-    final config = EscanerFisicoService.configuracion.value;
-    if (evento.logicalKey != config.teclaFinal &&
-        !(config.terminador == TerminadorEscaner.enter &&
-            evento.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+    if (!EscanerFisicoService.esFinDeLectura(evento.logicalKey)) {
       return KeyEventResult.ignored;
     }
     if (evento is KeyDownEvent) _recibir();
@@ -41,13 +38,11 @@ class _EscanerFisicoViewState extends State<EscanerFisicoView> {
 
   void _recibir() {
     if (_devuelto) return;
-    final codigo =
-        EscanerFisicoService.configuracion.value.interpretar(_texto.text);
+    final codigo = EscanerFisicoService.codigoDe(_texto.text);
     _texto.clear();
     _foco.requestFocus();
     if (codigo == null) {
-      setState(() =>
-          _aviso = 'Lectura vacía o distinta del prefijo/sufijo configurado.');
+      setState(() => _aviso = 'No llegó ningún código. Vuelve a escanearlo.');
       return;
     }
     if (widget.alLeer == null) {
@@ -125,9 +120,9 @@ class _EscanerFisicoViewState extends State<EscanerFisicoView> {
                             child: Text(_aviso!, textAlign: TextAlign.center)),
                       const SizedBox(height: 20),
                       const Text(
-                          'Si no aparece el código, haz clic en el campo. Usa el modo HID/teclado '
-                          'y el terminador elegido en Configuración → Escáner de códigos. '
-                          'Sin Bluetooth puedes usar cable o un receptor USB compatible.',
+                          'Si no aparece el código, haz clic en el campo. El lector debe estar '
+                          'en modo teclado (HID). Sin Bluetooth puedes usar cable o un receptor '
+                          'USB compatible.',
                           textAlign: TextAlign.center),
                     ]))),
       );

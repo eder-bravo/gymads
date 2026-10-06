@@ -76,20 +76,35 @@ class _PanelDelDiaState extends State<_PanelDelDia> {
         widget.pasoCabecera(_cabecera(context)),
         if (widget.datos.isNotEmpty) ...[
           const SizedBox(height: 24),
-          SizedBox(
-            height: 120 * escala,
-            child: _filaDeTarjetas([
-              for (final d in widget.datos)
-                _TarjetaDato(dato: d, cargando: resumen.cargando),
-            ]),
+          TourStep(
+            tourKey: home.keyNumeros,
+            title: 'Lo de hoy',
+            description: 'Lo cobrado, quién entró y quién vence pronto. '
+                'Haz clic en uno para ver el detalle.',
+            borderRadius: 18,
+            child: SizedBox(
+              height: 120 * escala,
+              child: _filaDeTarjetas([
+                for (final d in widget.datos)
+                  _TarjetaDato(dato: d, cargando: resumen.cargando),
+              ]),
+            ),
           ),
         ],
         if (accesos.isNotEmpty) ...[
           const SizedBox(height: 32),
           const _TituloDelPanel('Accesos rápidos'),
           const SizedBox(height: 12),
-          _rejillaDeTarjetas(accesos,
-              porFila: porFilaAccesos, alto: 96 * escala),
+          TourStep(
+            tourKey: home.keyAccesosRapidos,
+            title: 'Accesos rápidos',
+            description: 'Lo que más se hace en el mostrador, a un clic: '
+                'vender, cobrar un abono o una visita y dar de alta a un '
+                'cliente.',
+            borderRadius: 18,
+            child: _rejillaDeTarjetas(accesos,
+                porFila: porFilaAccesos, alto: 96 * escala),
+          ),
         ],
         if (listas.isNotEmpty) ...[
           const SizedBox(height: 32),
@@ -129,7 +144,7 @@ class _PanelDelDiaState extends State<_PanelDelDia> {
             children: [
               ...arriba,
               Expanded(
-                child: Column(
+                child: _pasoActividad(Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (var i = 0; i < listas.length; i += porFilaListas) ...[
@@ -142,7 +157,7 @@ class _PanelDelDiaState extends State<_PanelDelDia> {
                       ),
                     ],
                   ],
-                ),
+                )),
               ),
             ],
           ),
@@ -155,61 +170,113 @@ class _PanelDelDiaState extends State<_PanelDelDia> {
           children: [
             ...arriba,
             if (listas.isNotEmpty)
-              _rejillaDeTarjetas(
+              _pasoActividad(_rejillaDeTarjetas(
                 listas,
                 porFila: porFilaListas,
                 alto: (68 + _filasPorLista * 58) * escala,
-              ),
+              )),
           ],
         ),
       );
     });
   }
 
+  Widget _pasoActividad(Widget listas) => TourStep(
+        tourKey: home.keyActividad,
+        title: 'Actividad',
+        description: 'Las últimas entradas y cobros, y quién vence esta '
+            'semana: con "Cobrar" le renuevas sin buscarlo. "Ver todo" abre '
+            'la lista completa.',
+        borderRadius: 18,
+        child: listas,
+      );
+
   Widget _cabecera(BuildContext context) {
     final c = context.colores;
     final hoy = fechaLarga(DateTime.now(), conDia: true);
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Inicio',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: c.textPrimary,
-                  letterSpacing: 0.3,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                hoy[0].toUpperCase() + hoy.substring(1),
-                style: TextStyle(fontSize: 15, color: c.textSecondary),
-              ),
-            ],
-          ),
-        ),
-        Obx(() => resumen.cargando.value
-            ? const Padding(
-                padding: EdgeInsets.only(right: 12),
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+    final escala = MediaQuery.textScalerOf(context).scale(14) / 14;
+    // Un botón de la cabecera: con su texto si cabe; si no, solo el ícono
+    // (con su nombre al pasar el mouse).
+    Widget boton(IconData icono, String texto, VoidCallback alPulsar,
+            bool conTexto) =>
+        conTexto
+            ? OutlinedButton.icon(
+                onPressed: alPulsar,
+                icon: Icon(icono, size: 20),
+                label: Text(texto),
+                style: estiloBotonEscritorio(),
               )
-            : const SizedBox()),
-        OutlinedButton.icon(
-          onPressed: widget.recargar,
-          icon: const Icon(Icons.refresh, size: 20),
-          label: const Text('Actualizar'),
-          style: estiloBotonEscritorio(),
-        ),
-      ],
-    );
+            : Tooltip(
+                message: texto,
+                child: IconButton.outlined(
+                  onPressed: alPulsar,
+                  icon: Icon(icono),
+                  iconSize: 22,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    side: BorderSide(color: c.divisor),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              );
+    return LayoutBuilder(builder: (context, limites) {
+      // Los dos botones con texto miden unos 430; el título necesita ~280.
+      final conTexto = limites.maxWidth >= 720 * escala;
+      return Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Inicio',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: c.textPrimary,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hoy[0].toUpperCase() + hoy.substring(1),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 15, color: c.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Obx(() => resumen.cargando.value
+              ? const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : const SizedBox()),
+          // Abre (o trae al frente) la ventana para un monitor extra donde
+          // el cliente ve su aviso al pasar la tarjeta.
+          TourStep(
+            tourKey: home.keyPantallaClientes,
+            title: 'Pantalla para clientes',
+            description: 'Ábrela y llévala a un monitor extra: ahí el '
+                'cliente ve su aviso al pasar la tarjeta, solo con su '
+                'información.',
+            borderRadius: 12,
+            child: boton(Icons.connected_tv_outlined, 'Pantalla para clientes',
+                PantallaClientes.abrir, conTexto),
+          ),
+          SizedBox(width: conTexto ? 12 : 8),
+          boton(Icons.refresh, 'Actualizar', widget.recargar, conTexto),
+        ],
+      );
+    });
   }
 
   List<Widget> _accesos() {

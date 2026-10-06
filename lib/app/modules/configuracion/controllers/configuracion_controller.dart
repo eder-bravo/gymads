@@ -235,15 +235,19 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   Future<void> desvincularLector() async {
     comprobandoLector.value = true;
     try {
-      if (await RfidConfig.desvincular()) {
-        estadoLector.value = EstadoLector.sinConfigurar;
-        esp32IpAddress.value = '';
-        esp32Connected.value = false;
-        _detenerSondeo();
-        SnackbarHelper.success('Listo',
-            'El lector quedó libre y olvidó el WiFi. Ya puedes llevarlo a otro lugar.');
-      } else {
-        SnackbarHelper.error('Error', 'No se pudo desvincular el lector.');
+      switch (await RfidConfig.desvincular()) {
+        case DesvinculoResultado.ok:
+          estadoLector.value = EstadoLector.sinConfigurar;
+          esp32IpAddress.value = '';
+          esp32Connected.value = false;
+          _detenerSondeo();
+          SnackbarHelper.success('Listo',
+              'El lector quedó libre y olvidó el WiFi. Ya puedes llevarlo a otro lugar.');
+        case DesvinculoResultado.sinConexion:
+          SnackbarHelper.error('No se encontró el lector',
+              'Revisa que esté encendido y en el mismo WiFi, y vuelve a intentar.');
+        case DesvinculoResultado.error:
+          SnackbarHelper.error('Error', 'No se pudo desvincular el lector.');
       }
     } finally {
       comprobandoLector.value = false;
@@ -341,6 +345,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
 
   // ─── Tour de bienvenida ───
   final keyCuenta = GlobalKey();
+  final keyEscaner = GlobalKey();
   final keyApariencia = GlobalKey();
   final keyPrecios = GlobalKey();
   final keyCategorias = GlobalKey();
@@ -367,6 +372,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   @override
   List<GlobalKey> get tourSteps => [
         keyCuenta,
+        if (PlataformaApp.escanerFisico) keyEscaner,
         keyApariencia,
         if (can(Permission.gestionarPreciosAbonos)) keyPrecios,
         if (can(Permission.gestionarCategorias)) keyCategorias,

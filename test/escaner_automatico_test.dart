@@ -9,7 +9,6 @@ import 'package:showcaseview/showcaseview.dart';
 import 'package:gymads/app/core/permissions/permissions.dart';
 import 'package:gymads/app/core/widgets/escaner_automatico.dart';
 import 'package:gymads/app/data/models/product_model.dart';
-import 'package:gymads/app/data/services/escaner_fisico_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/modules/inventario/controllers/inventario_controller.dart';
 import 'package:gymads/app/modules/inventario/views/inventario_view.dart';
@@ -94,7 +93,6 @@ class _Inventario extends InventarioController {
 void main() {
   late ShowcaseView tour;
   setUp(() {
-    EscanerFisicoService.configuracion.value = const ConfiguracionEscaner();
     WelcomeTourService.recorridoEnCurso.value = false;
     tour = ShowcaseView.register();
   });
@@ -135,21 +133,15 @@ void main() {
     expect(find.text('+1 567890'), findsOneWidget);
   }, variant: _escritorio);
 
-  testWidgets('respeta Tab, prefijo, sufijo y Enter del teclado numérico',
+  testWidgets('acepta Tab y Enter del teclado numérico sin configurar nada',
       (tester) async {
     final recibidos = <String>[];
     await captura(tester, (codigo) async {
       recibidos.add(codigo);
       return null;
     });
-    EscanerFisicoService.configuracion.value = const ConfiguracionEscaner(
-      terminador: TerminadorEscaner.tab,
-      prefijo: 'PRE',
-      sufijo: 'FIN',
-    );
-    await _leer(tester, 'PRE000123FIN', finalizador: LogicalKeyboardKey.tab);
+    await _leer(tester, '000123', finalizador: LogicalKeyboardKey.tab);
     expect(recibidos, ['000123']);
-    EscanerFisicoService.configuracion.value = const ConfiguracionEscaner();
     await _leer(tester, '456789', finalizador: LogicalKeyboardKey.numpadEnter);
     expect(recibidos, ['000123', '456789']);
   }, variant: _escritorio);
@@ -227,8 +219,7 @@ void main() {
     expect(recibidos, isEmpty);
   }, variant: _escritorio);
 
-  testWidgets('un prefijo incorrecto no activa el botón seleccionado',
-      (tester) async {
+  testWidgets('una lectura no activa el botón seleccionado', (tester) async {
     final foco = FocusNode();
     addTearDown(foco.dispose);
     var pulsaciones = 0;
@@ -246,13 +237,10 @@ void main() {
         ]));
     foco.requestFocus();
     await tester.pump();
-    EscanerFisicoService.configuracion.value =
-        const ConfiguracionEscaner(prefijo: 'PRE');
     await _leer(tester, '001234');
-    expect(lecturas, 0);
+    expect(lecturas, 1);
+    // El Enter del lector no "presiona" el botón que tenía el foco.
     expect(pulsaciones, 0);
-    expect(find.text('Lectura inválida. Revisa la configuración del escáner.'),
-        findsOneWidget);
     // Enter sin una lectura conserva el uso normal del botón por teclado.
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();

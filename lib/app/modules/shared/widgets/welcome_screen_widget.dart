@@ -22,6 +22,15 @@ class WelcomeScreenWidget extends StatefulWidget {
   final VoidCallback? onEditar;
   final VoidCallback? onRegister; // Para cuando no se encuentra tarjeta
 
+  /// La foto ya lista, en lugar de [CachedUserImage]. La usa la pantalla para
+  /// clientes, que corre en otra ventana sin Supabase: recibe el enlace ya
+  /// firmado.
+  final Widget Function(double tamano)? foto;
+
+  /// En la pantalla para clientes (monitor extra): solo información, dicha
+  /// al cliente ("Tu membresía venció el…", "Pasa al mostrador…").
+  final bool paraClientes;
+
   const WelcomeScreenWidget({
     super.key,
     required this.userName,
@@ -36,6 +45,8 @@ class WelcomeScreenWidget extends StatefulWidget {
     this.onAbonar,
     this.onEditar,
     this.onRegister,
+    this.foto,
+    this.paraClientes = false,
   });
 
   @override
@@ -261,6 +272,8 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                             color: Colors.white,
                                           ),
                                         )
+                                      : widget.foto != null
+                                          ? widget.foto!(photoSize * value)
                                       : (widget.userPhotoUrl.isNotEmpty
                                           ? CachedUserImage(
                                               imageUrl: widget.userPhotoUrl,
@@ -361,7 +374,9 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                                       Padding(
                                         padding: const EdgeInsets.only(top: 8.0),
                                         child: Text(
-                                          'Hasta qué fecha puede entrar: ${DateFormat('dd/MM/yyyy').format(widget.expirationDate!)}',
+                                          widget.paraClientes && widget.isExpired
+                                              ? 'Tu membresía venció el ${DateFormat('dd/MM/yyyy').format(widget.expirationDate!)}'
+                                              : 'Hasta qué fecha puede entrar: ${DateFormat('dd/MM/yyyy').format(widget.expirationDate!)}',
                                           style: TextStyle(
                                             fontSize: infoTextSize * 0.85,
                                             color: c.contraste.withOpacity(0.9),
@@ -388,9 +403,15 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
                           return Opacity(
                             opacity: safeOpacity,
                               child: Text(
-                                widget.isNotFound 
-                                    ? 'Acude a recepción para registrar tu acceso'
-                                    : (widget.isExpired ? '¡Por favor pasa a recepción!' : '¡Que tengas un excelente entrenamiento!'),
+                                widget.isNotFound
+                                    ? (widget.paraClientes
+                                        ? 'Pasa al mostrador para registrar tu tarjeta'
+                                        : 'Acude a recepción para registrar tu acceso')
+                                    : widget.isExpired
+                                        ? (widget.paraClientes
+                                            ? 'Pasa al mostrador para renovarla'
+                                            : '¡Por favor pasa a recepción!')
+                                        : '¡Que tengas un excelente entrenamiento!',
                                 style: TextStyle(
                                   fontSize: isTabletSize
                                       ? 20.0

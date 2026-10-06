@@ -23,6 +23,8 @@ import '../config/rfid_config.dart';
 import 'permisos_app.dart';
 import 'fotos_de_clientes.dart';
 import 'captura_de_tarjeta.dart';
+import 'pantalla_clientes.dart';
+import 'storage_service.dart';
 
 /// Servicio global para escaneo RFID en segundo plano
 /// Se ejecuta continuamente y maneja las detecciones de tarjetas
@@ -520,6 +522,33 @@ class BackgroundRfidService extends GetxService {
     _ocultarAviso = Timer(duracion, cerrarAviso);
   }
 
+  /// El mismo pase, en la pantalla para clientes (monitor extra) si está
+  /// abierta: solo información, sin "Abonar" ni "Registrar". Va también con
+  /// la app en segundo plano o fuera de Inicio, porque el cliente está frente
+  /// a ese monitor aunque el mostrador esté en otra cosa. La foto va con su
+  /// enlace ya firmado: esa ventana no tiene Supabase.
+  void _avisarAClientes(TipoAviso tipo,
+      {UserModel? user, required Duration duracion}) {
+    if (!PantallaClientes.abierta.value) return;
+    unawaited(() async {
+      String? foto;
+      final guardada = user?.photoUrl;
+      if (guardada != null && guardada.isNotEmpty) {
+        try {
+          foto = await StorageService.instance.signedUrl(guardada);
+        } catch (_) {}
+      }
+      PantallaClientes.mostrar(
+        tipo: tipo,
+        nombre: user?.name ?? '',
+        fotoUrl: foto,
+        diasRestantes: user?.daysRemaining ?? 0,
+        vence: user?.expirationDate,
+        duracion: duracion,
+      );
+    }());
+  }
+
   /// Quita el aviso ya (botón "Cerrar" o un toque en la pantalla).
   void cerrarAviso() {
     _ocultarAviso?.cancel();
@@ -665,6 +694,7 @@ class BackgroundRfidService extends GetxService {
     ));
 
     currentUser.value = null;
+    _avisarAClientes(TipoAviso.noRegistrada, duracion: _duracionRechazo);
     if (segundoPlano) return;
 
     final currentRoute = Get.currentRoute;
@@ -727,6 +757,8 @@ class BackgroundRfidService extends GetxService {
     ));
 
     currentUser.value = user;
+    _avisarAClientes(TipoAviso.vencida,
+        user: user, duracion: _duracionRechazo);
     if (segundoPlano) return;
 
     final currentRoute = Get.currentRoute;
@@ -779,6 +811,10 @@ class BackgroundRfidService extends GetxService {
       verificationType: 'rfid',
     ));
 
+    _avisarAClientes(
+        accessType == 'salida' ? TipoAviso.salida : TipoAviso.entrada,
+        user: user,
+        duracion: _duracionBienvenida);
     if (segundoPlano) return;
 
     // Mostrar interfaz según la vista actual

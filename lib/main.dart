@@ -25,6 +25,8 @@ import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 import 'package:gymads/app/data/services/fotos_de_clientes.dart';
 import 'package:gymads/app/data/services/avisos_sistema_service.dart';
 import 'package:gymads/app/data/services/permisos_app.dart';
+import 'package:gymads/app/data/services/pantalla_clientes.dart';
+import 'package:gymads/app/modules/pantalla_clientes/pantalla_clientes_app.dart';
 import 'package:gymads/app/data/services/tema_service.dart';
 import 'package:gymads/core/theme/app_theme.dart';
 import 'package:gymads/app/data/services/escaner_fisico_service.dart';
@@ -36,7 +38,16 @@ final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
 /// Stores the initial route after checking session
 String _initialRoute = Routes.LOGIN;
 
-void main() async {
+void main(List<String> args) async {
+  // La pantalla para clientes (monitor extra) arranca aquí mismo, como otro
+  // motor: desktop_multi_window le pasa ["multi_window", id, argumento]. Se
+  // salta todo lo de abajo (Supabase, lector, servicios).
+  if (args.length >= 3 &&
+      args[0] == 'multi_window' &&
+      args[2] == PantallaClientes.argumento) {
+    await correrPantallaClientes(args[1]);
+    return;
+  }
   WidgetsFlutterBinding.ensureInitialized();
   // En iPad (iPadOS 26+), cuánto ocupan los botones de la ventana.
   VentanaEscritorio.escucharControlesDeVentana();
@@ -70,7 +81,7 @@ void main() async {
 
   // Si en este teléfono ya se pidieron los permisos (pantalla antes de Inicio).
   await PermisosApp.cargar();
-  await EscanerFisicoService.cargar();
+  await EscanerFisicoService.olvidarAjustesViejos();
 
   // Inicializa Supabase (cliente principal) - SOLO UNA VEZ
   await Supabase.initialize(

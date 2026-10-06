@@ -84,16 +84,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
   Widget _buildConfigurationOptions(BuildContext context) {
     final c = context.colores;
     final opciones = <Widget>[
-      // Opción de Cuenta
-      if (PlataformaApp.escanerFisico) ...[
-        _buildOptionTile(context,
-            icon: Icons.barcode_reader,
-            iconColor: AppColors.accent,
-            title: 'Escáner de códigos',
-            subtitle: 'Conexión USB o Bluetooth, ajustes y prueba',
-            onTap: () => Get.to(() => const EscanerConfiguracionView())),
-        const SizedBox(height: 16),
-      ],
+      // Cuenta va primero que todo.
       TourStep(
         tourKey: controller.keyCuenta,
         title: 'Cuenta',
@@ -111,6 +102,25 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
           trailing: _buildStatusIndicator(true),
         ),
       ),
+
+      // El escáner de códigos solo existe en computadora y web.
+      if (PlataformaApp.escanerFisico) ...[
+        const SizedBox(height: 12),
+        TourStep(
+          tourKey: controller.keyEscaner,
+          title: 'Escáner de códigos',
+          description: 'Cómo conectar tu lector de códigos de barras y '
+              'probarlo.',
+          borderRadius: 12,
+          isLastStep: controller.esUltimoPasoDelTour(controller.keyEscaner),
+          child: _buildOptionTile(context,
+              icon: Icons.barcode_reader,
+              iconColor: AppColors.accent,
+              title: 'Escáner de códigos',
+              subtitle: 'Cómo conectarlo y probarlo',
+              onTap: () => Get.to(() => const EscanerConfiguracionView())),
+        ),
+      ],
 
       // Claro, oscuro o como el teléfono. Se guarda en este teléfono y la
       // ve cualquier rol. Sin paso de tour: no vuelve a mostrar el tour a

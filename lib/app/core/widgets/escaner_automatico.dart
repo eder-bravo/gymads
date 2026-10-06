@@ -121,17 +121,15 @@ class _EscanerAutomaticoState extends State<EscanerAutomatico> {
             evento.timeStamp - _ultimaTecla! > _intervalo)) {
       _limpiar();
     }
-    final config = EscanerFisicoService.configuracion.value;
-    final esFinal = evento.logicalKey == config.teclaFinal ||
-        (config.terminador == TerminadorEscaner.enter &&
-            evento.logicalKey == LogicalKeyboardKey.numpadEnter);
-    if (esFinal) {
-      final codigo = _descartar ? null : config.interpretar(_entrada);
+    // Enter o Tab: la que traiga el lector. Una pulsación suelta (sin
+    // ráfaga antes) sigue siendo la tecla normal.
+    if (EscanerFisicoService.esFinDeLectura(evento.logicalKey)) {
+      final codigo =
+          _descartar ? null : EscanerFisicoService.codigoDe(_entrada);
       // Un HID envía una ráfaga y un terminador. En el buscador, los códigos
-      // cortos se reconocen si ya están registrados o usan un prefijo.
+      // cortos se reconocen si ya están registrados.
       final completa = (_entrada.isNotEmpty || _descartar) &&
           (_entrada.length >= 3 ||
-              config.prefijo.isNotEmpty ||
               editable == null ||
               (codigo != null &&
                   widget.codigoRegistrado?.call(codigo) == true));
@@ -150,10 +148,9 @@ class _EscanerAutomaticoState extends State<EscanerAutomatico> {
         buscador.widget.onChanged?.call(busqueda.text);
       }
       if (codigo == null) {
-        // Incluso una lectura con prefijo erróneo consume el Enter: no debe
-        // activar por accidente el botón de producto o cobro seleccionado.
-        _estado.value =
-            'Lectura inválida. Revisa la configuración del escáner.';
+        // Incluso una lectura inválida consume el Enter: no debe activar por
+        // accidente el botón de producto o cobro seleccionado.
+        _estado.value = 'No se pudo leer el código. Vuelve a escanearlo.';
       } else {
         _cola.add(codigo);
         scheduleMicrotask(_procesar);
@@ -166,7 +163,7 @@ class _EscanerAutomaticoState extends State<EscanerAutomatico> {
       return KeyEventResult.ignored;
     }
     if (caracter == null || caracter.isEmpty) {
-      // Shift forma parte de algunos prefijos/sufijos; no rompe la lectura.
+      // Shift forma parte de los códigos con mayúsculas; no rompe la lectura.
       if (evento.logicalKey != LogicalKeyboardKey.shiftLeft &&
           evento.logicalKey != LogicalKeyboardKey.shiftRight) {
         _limpiar();

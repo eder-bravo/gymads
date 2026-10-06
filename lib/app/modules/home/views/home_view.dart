@@ -10,6 +10,7 @@ import '../../../core/utils/plataforma_app.dart';
 import '../../../core/widgets/menu_lateral.dart';
 import '../../../core/widgets/tour_step.dart';
 
+import '../../../data/services/pantalla_clientes.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
 import '../../abonar/controllers/abonar_controller.dart';
@@ -473,7 +474,7 @@ class HomeView extends GetView<HomeController> {
     return ScaffoldAdaptable(
       anchoMaximo: 1280,
       backgroundColor: context.colores.backgroundColor,
-      menu: MenuLateral(pasos: _pasosDelMenu()),
+      menu: MenuLateral(pasos: _pasosDelMenu(), pasoBoton: _pasoOcultarMenu),
       body: _PanelDelDia(
         home: controller,
         resumen: resumen,
@@ -482,8 +483,8 @@ class HomeView extends GetView<HomeController> {
         pasoCabecera: (cabecera) => TourStep(
           tourKey: controller.keyHeader,
           title: '¡Te damos la bienvenida!',
-          description: 'Este es tu panel del día: lo cobrado, quién entró y '
-              'quién vence pronto. Las secciones están a la izquierda.',
+          description: 'Este es tu panel del día. Te enseñamos lo principal '
+              'en unos pasos.',
           borderRadius: 16,
           isFirstStep: true,
           child: cabecera,
@@ -529,9 +530,18 @@ class HomeView extends GetView<HomeController> {
           clave: controller.keyConfiguracion,
           titulo: 'Configuración',
           descripcion: 'Tu cuenta, precios, categorías, lector y permisos.',
-          ultimo: true,
         ),
       };
+
+  /// El último paso del recorrido de escritorio: el botón de la barra.
+  PasoDelMenu get _pasoOcultarMenu => PasoDelMenu(
+        clave: controller.keyMenu,
+        titulo: 'Más espacio',
+        descripcion: 'Oculta la barra para que la pantalla use todo el ancho; '
+            'aquí mismo la vuelves a mostrar. Atajo: '
+            '${MenuLateral.textoAtajo('B')}.',
+        ultimo: true,
+      );
 
   /// Si el rol actual puede entrar a esta entrada del menú.
   ///

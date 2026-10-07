@@ -8,8 +8,8 @@ import 'package:gymads/core/theme/app_colors.dart';
 
 /// Registration view — single-form with email/password + Google option
 ///
-/// Acostada (tableta o teléfono de lado), "Datos personales" y "Tu gimnasio"
-/// van lado a lado.
+/// En escritorio y tableta, las secciones van en vertical y los campos
+/// relacionados comparten fila cuando hay espacio y la letra lo permite.
 class RegisterView extends GetView<RegisterController> {
   const RegisterView({super.key});
 
@@ -20,15 +20,20 @@ class RegisterView extends GetView<RegisterController> {
       body: Container(
         decoration: BoxDecoration(gradient: c.fondoAcceso),
         child: ContenidoEscritorio(
-          // De lado, las dos tarjetas una junto a la otra.
-          anchoMaximo: pantallaAcostada(context) ? 1100 : 720,
+          // La columna conserva un ancho cómodo en escritorio y tableta.
+          anchoMaximo: _dosTarjetas(context) ? 1100 : 720,
           child: SafeArea(
             child: Column(
               children: [
                 _buildHeader(context),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                    key: const Key('formulario_registro'),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: PlataformaApp.pantallaGrande
+                        ? const EdgeInsets.fromLTRB(20, 12, 20, 20)
+                        : const EdgeInsets.fromLTRB(24, 16, 24, 32),
                     child: _buildForm(context),
                   ),
                 ),
@@ -82,19 +87,20 @@ class RegisterView extends GetView<RegisterController> {
 
   Widget _buildForm(BuildContext context) {
     final c = context.colores;
-    final acostada = pantallaAcostada(context);
+    final acostada = _dosTarjetas(context);
+    final botonesCentrados = PlataformaApp.pantallaGrande || acostada;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Google Sign-In button
-        _angosto(acostada, _buildGoogleButton(context)),
-        const SizedBox(height: 20),
+        _angosto(botonesCentrados, _buildGoogleButton(context)),
+        SizedBox(height: PlataformaApp.pantallaGrande ? 14 : 20),
 
         // Divider
-        _buildDivider(context),
-        const SizedBox(height: 20),
+        _angosto(botonesCentrados, _buildDivider(context)),
+        SizedBox(height: PlataformaApp.pantallaGrande ? 14 : 20),
 
-        // Datos personales y del gimnasio: de lado, uno junto al otro.
+        // En pantallas grandes, primero la cuenta y debajo el gimnasio.
         if (acostada)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,7 +123,7 @@ class RegisterView extends GetView<RegisterController> {
             : const SizedBox.shrink()),
 
         // Register button
-        _angosto(acostada, _buildRegisterButton()),
+        _angosto(botonesCentrados, _buildRegisterButton()),
         const SizedBox(height: 16),
 
         // Login link
@@ -131,14 +137,18 @@ class RegisterView extends GetView<RegisterController> {
             ),
             GestureDetector(
               onTap: () => Get.back(),
-              child: const Text(
+              child: Text(
                 'Iniciar sesión',
                 style: TextStyle(
-                  color: AppColors.accent,
+                  color: PlataformaApp.pantallaGrande
+                      ? c.titleColor
+                      : AppColors.accent,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   decoration: TextDecoration.underline,
-                  decorationColor: AppColors.accent,
+                  decorationColor: PlataformaApp.pantallaGrande
+                      ? c.titleColor
+                      : AppColors.accent,
                 ),
               ),
             ),
@@ -148,8 +158,24 @@ class RegisterView extends GetView<RegisterController> {
     );
   }
 
-  /// De lado, los botones no cruzan toda la pantalla.
-  Widget _angosto(bool acostada, Widget boton) => acostada
+  bool _dosTarjetas(BuildContext context) =>
+      !PlataformaApp.pantallaGrande && pantallaAcostada(context);
+
+  /// Los campos vuelven a una columna al ampliar la letra o reducir el ancho.
+  Widget _camposRelacionados(List<Widget> campos) =>
+      PlataformaApp.pantallaGrande
+          ? ResumenAdaptable(anchoMinimo: 270, espacio: 14, children: campos)
+          : Column(
+              children: [
+                for (var i = 0; i < campos.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 14),
+                  campos[i],
+                ],
+              ],
+            );
+
+  /// Las acciones principales mantienen un ancho cómodo para leerlas.
+  Widget _angosto(bool limitarAncho, Widget boton) => limitarAncho
       ? Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
@@ -165,21 +191,22 @@ class RegisterView extends GetView<RegisterController> {
       title: 'Datos Personales',
       icon: Icons.person_outline,
       children: [
-        _buildTextField(
-          context,
-          controller: controller.firstNameController,
-          label: 'Nombre(s)',
-          icon: Icons.person,
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 14),
-        _buildTextField(
-          context,
-          controller: controller.lastNameController,
-          label: 'Apellidos',
-          icon: Icons.person_outline,
-          textInputAction: TextInputAction.next,
-        ),
+        _camposRelacionados([
+          _buildTextField(
+            context,
+            controller: controller.firstNameController,
+            label: 'Nombre(s)',
+            icon: Icons.person,
+            textInputAction: TextInputAction.next,
+          ),
+          _buildTextField(
+            context,
+            controller: controller.lastNameController,
+            label: 'Apellidos',
+            icon: Icons.person_outline,
+            textInputAction: TextInputAction.next,
+          ),
+        ]),
         const SizedBox(height: 14),
         _buildTextField(
           context,
@@ -208,55 +235,56 @@ class RegisterView extends GetView<RegisterController> {
           );
         }),
         const SizedBox(height: 14),
-        Obx(() => _buildTextField(
-              context,
-              controller: controller.passwordController,
-              label: 'Contraseña',
-              icon: Icons.lock_outline,
-              obscureText: controller.obscurePassword.value,
-              textInputAction: TextInputAction.next,
-              suffixIcon: IconButton(
-                icon: Icon(
-                  controller.obscurePassword.value
-                      ? Icons.visibility_off
-                      : Icons.visibility,
-                  color: c.contraste.withOpacity(0.54),
-                  size: 20,
+        _camposRelacionados([
+          Obx(() => _buildTextField(
+                context,
+                controller: controller.passwordController,
+                label: 'Contraseña',
+                icon: Icons.lock_outline,
+                obscureText: controller.obscurePassword.value,
+                textInputAction: TextInputAction.next,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    controller.obscurePassword.value
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: c.contraste.withOpacity(0.54),
+                    size: 20,
+                  ),
+                  tooltip: PlataformaApp.escritorio
+                      ? (controller.obscurePassword.value
+                          ? 'Mostrar contraseña'
+                          : 'Ocultar contraseña')
+                      : null,
+                  onPressed: () => controller.obscurePassword.value =
+                      !controller.obscurePassword.value,
                 ),
-                tooltip: PlataformaApp.escritorio
-                    ? (controller.obscurePassword.value
-                        ? 'Mostrar contraseña'
-                        : 'Ocultar contraseña')
-                    : null,
-                onPressed: () => controller.obscurePassword.value =
-                    !controller.obscurePassword.value,
-              ),
-            )),
-        const SizedBox(height: 14),
-        Obx(() => _buildTextField(
-              context,
-              controller: controller.confirmPasswordController,
-              label: 'Confirmar contraseña',
-              icon: Icons.lock_outline,
-              obscureText: controller.obscureConfirmPassword.value,
-              textInputAction: TextInputAction.next,
-              suffixIcon: IconButton(
-                icon: Icon(
-                  controller.obscureConfirmPassword.value
-                      ? Icons.visibility_off
-                      : Icons.visibility,
-                  color: c.contraste.withOpacity(0.54),
-                  size: 20,
+              )),
+          Obx(() => _buildTextField(
+                context,
+                controller: controller.confirmPasswordController,
+                label: 'Confirmar contraseña',
+                icon: Icons.lock_outline,
+                obscureText: controller.obscureConfirmPassword.value,
+                textInputAction: TextInputAction.next,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    controller.obscureConfirmPassword.value
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: c.contraste.withOpacity(0.54),
+                    size: 20,
+                  ),
+                  tooltip: PlataformaApp.escritorio
+                      ? (controller.obscureConfirmPassword.value
+                          ? 'Mostrar contraseña'
+                          : 'Ocultar contraseña')
+                      : null,
+                  onPressed: () => controller.obscureConfirmPassword.value =
+                      !controller.obscureConfirmPassword.value,
                 ),
-                tooltip: PlataformaApp.escritorio
-                    ? (controller.obscureConfirmPassword.value
-                        ? 'Mostrar contraseña'
-                        : 'Ocultar contraseña')
-                    : null,
-                onPressed: () => controller.obscureConfirmPassword.value =
-                    !controller.obscureConfirmPassword.value,
-              ),
-            )),
+              )),
+        ]),
       ],
     );
   }
@@ -267,22 +295,23 @@ class RegisterView extends GetView<RegisterController> {
       title: 'Tu Gimnasio',
       icon: Icons.fitness_center,
       children: [
-        _buildTextField(
-          context,
-          controller: controller.gymNameController,
-          label: 'Nombre del gimnasio',
-          icon: Icons.store,
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 14),
-        _buildTextField(
-          context,
-          controller: controller.locationController,
-          label: 'Ubicación',
-          icon: Icons.location_on_outlined,
-          textInputAction: TextInputAction.done,
-          hint: 'Ej: Col. Centro, Monterrey',
-        ),
+        _camposRelacionados([
+          _buildTextField(
+            context,
+            controller: controller.gymNameController,
+            label: 'Nombre del gimnasio',
+            icon: Icons.store,
+            textInputAction: TextInputAction.next,
+          ),
+          _buildTextField(
+            context,
+            controller: controller.locationController,
+            label: 'Ubicación',
+            icon: Icons.location_on_outlined,
+            textInputAction: TextInputAction.done,
+            hint: 'Ej: Col. Centro, Monterrey',
+          ),
+        ]),
         const SizedBox(height: 14),
         Obx(() => HorarioSelector(
               apertura: controller.horaApertura.value,
@@ -359,6 +388,7 @@ class RegisterView extends GetView<RegisterController> {
         children: [
           Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
           Flexible(
+            flex: PlataformaApp.pantallaGrande ? 3 : 1,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
@@ -402,7 +432,7 @@ class RegisterView extends GetView<RegisterController> {
     final c = context.colores;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(PlataformaApp.pantallaGrande ? 16 : 20),
       decoration: BoxDecoration(
         color: c.tarjetaAcceso,
         borderRadius: BorderRadius.circular(20),

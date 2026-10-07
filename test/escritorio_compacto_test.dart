@@ -1106,7 +1106,8 @@ void main() {
     return;
   }
   // Tableta y teléfono acostados: las pantallas de entrada y de
-  // configuración inicial van en dos columnas (de pie, en una). Por cada
+  // configuración inicial van en dos columnas (de pie, en una). Registro
+  // conserva las secciones en vertical en tabletas. Por cada
   // una, lo que va a la izquierda y lo que va a la derecha.
   final acostadas = <String, (String, String)>{
     'Login': ('GYMONE', 'Correo electrónico'),
@@ -1118,7 +1119,10 @@ void main() {
   };
   for (final MapEntry(key: nombre, value: (izquierda, derecha))
       in acostadas.entries) {
-    testWidgets('$nombre: de lado en dos columnas, de pie en una',
+    testWidgets(
+        nombre == 'Registro'
+            ? '$nombre: secciones verticales en escritorio y tableta'
+            : '$nombre: de lado en dos columnas, de pie en una',
         (tester) async {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -1144,7 +1148,9 @@ void main() {
           if (escala != 1) continue;
           final a = tester.getRect(find.text(izquierda).first);
           final b = tester.getRect(find.text(derecha).first);
-          if (deLado) {
+          final dosColumnas =
+              deLado && !(nombre == 'Registro' && PlataformaApp.tableta);
+          if (dosColumnas) {
             expect(a.right, lessThan(b.left), reason: '$nombre $tamano');
           } else {
             expect(a.bottom, lessThan(b.top), reason: '$nombre $tamano');
@@ -1222,6 +1228,7 @@ void main() {
         for (final size in [
           const Size(480, 360),
           const Size(600, 360),
+          if (entry.key == 'Registro') const Size(960, 1200),
           const Size(1920, 1000),
           const Size(168, 360),
           const Size(103, 360),

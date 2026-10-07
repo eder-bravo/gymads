@@ -210,6 +210,7 @@ class _MyAppState extends State<MyApp> {
       defaultTransition: PlataformaApp.escritorio ? Transition.fadeIn : null,
       // La barra lateral sabe de qué sección es cada pantalla de detalle.
       navigatorObservers: [
+        WelcomeTourService.observador,
         if (PlataformaApp.escritorio) MenuLateral.observador,
       ],
       transitionDuration:

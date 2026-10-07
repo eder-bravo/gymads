@@ -12,6 +12,7 @@ import '../../../data/repositories/sale_repository.dart';
 
 import '../../../core/utils/referencia_de_pago.dart';
 import '../../../data/services/tenant_context_service.dart';
+import '../../../data/services/carrito_guardado.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../ingresos/controllers/ingresos_controller.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
@@ -19,8 +20,45 @@ import 'package:gymads/app/core/widgets/formulario.dart';
 
 class PointOfSaleController extends GetxController
     with ScreenTourMixin, RecargaEnVivoMixin, ReferenciaDePago {
+  PointOfSaleController({
+    CarritoGuardado? carritoGuardado,
+    SaleRepository? saleRepository,
+  })  : _carritoGuardado = carritoGuardado,
+        _saleRepositoryOverride = saleRepository;
+
+  CarritoGuardado? _carritoGuardado;
+  Future<void>? _cargaCarrito;
+  bool _carritoModificado = false;
+
+  /// Se comparte la misma carga entre el arranque y la primera interacción.
+  Future<void> restaurarCarrito() => _cargaCarrito ??= _restaurarCarrito();
+
+  Future<void> _restaurarCarrito() async {
+    _carritoGuardado ??= CarritoGuardado.deSesionActual();
+    final borrador = await _carritoGuardado?.leer();
+    if (_carritoModificado) {
+      await guardarCarrito();
+    } else if (borrador != null && !isClosed) {
+      _cartItems.assignAll(borrador.items);
+      _discountAmount.value = borrador.descuento;
+      _taxRate.value = borrador.impuesto;
+      _calculateTotals(guardar: false);
+    }
+  }
+
+  Future<void> guardarCarrito() async {
+    _carritoModificado = true;
+    await _carritoGuardado?.guardar(
+      _cartItems,
+      descuento: discountAmount,
+      impuesto: taxRate,
+    );
+  }
+
   late final ProductRepository _productRepository = ProductRepository();
-  late final SaleRepository _saleRepository = SaleRepository();
+  final SaleRepository? _saleRepositoryOverride;
+  late final SaleRepository _saleRepository =
+      _saleRepositoryOverride ?? SaleRepository();
 
   // Estado del carrito
   final RxList<SaleItem> _cartItems = <SaleItem>[].obs;
@@ -182,6 +220,7 @@ class PointOfSaleController extends GetxController
   @override
   void onInit() {
     super.onInit();
+    restaurarCarrito();
     loadProducts();
     loadCategories();
     _loadPinnedProducts();
@@ -313,6 +352,8 @@ class PointOfSaleController extends GetxController
   /// igual y el stock queda negativo (el faltante). Solo pide confirmación la
   /// primera vez que un producto cruza a negativo dentro de esta venta.
   Future<void> addProductToCart(Product product, {int quantity = 1}) async {
+    await restaurarCarrito();
+    if (isClosed || quantity <= 0) return;
     final existingIndex =
         _cartItems.indexWhere((item) => item.productId == product.id);
     final cantidadActual =
@@ -339,6 +380,8 @@ class PointOfSaleController extends GetxController
 
   /// Actualizar cantidad de un item en el carrito
   Future<void> updateCartItemQuantity(String productId, int newQuantity) async {
+    await restaurarCarrito();
+    if (isClosed) return;
     if (newQuantity <= 0) {
       removeFromCart(productId);
       return;
@@ -401,13 +444,14 @@ class PointOfSaleController extends GetxController
   void clearCart() {
     _cartItems.clear();
     _faltantesConfirmados.clear();
+    _discountAmount.value = 0.0;
     _calculateTotals();
     _receivedAmount.value = 0.0;
     _changeAmount.value = 0.0;
   }
 
   /// Calcular totales
-  void _calculateTotals() {
+  void _calculateTotals({bool guardar = true}) {
     _totalAmount.value = _cartItems.fold(0.0, (sum, item) => sum + item.total);
     _taxAmount.value = _totalAmount.value * _taxRate.value;
     _finalAmount.value =
@@ -417,6 +461,7 @@ class PointOfSaleController extends GetxController
     if (_receivedAmount.value > 0) {
       _changeAmount.value = _receivedAmount.value - _finalAmount.value;
     }
+    if (guardar) guardarCarrito();
   }
 
   /// Establecer método de pago
@@ -460,6 +505,8 @@ class PointOfSaleController extends GetxController
 
   /// Procesar venta
   Future<bool> processSale() async {
+    await restaurarCarrito();
+    if (isClosed || isProcessingPayment) return false;
     if (!canProcessSale()) {
       SnackbarHelper.error(
           'Error', 'No se puede procesar la venta. Verifique los datos.');
@@ -511,6 +558,7 @@ class PointOfSaleController extends GetxController
 
         // Limpiar carrito y estado
         clearCart();
+        await guardarCarrito();
         _selectedPaymentMethod.value = 'efectivo';
         limpiarReferencia();
 

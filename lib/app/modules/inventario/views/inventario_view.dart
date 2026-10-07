@@ -260,6 +260,10 @@ class InventarioView extends GetView<InventarioController> {
         ),
         margin: const EdgeInsets.all(16),
         child: ResumenAdaptable(
+          // En el teléfono los tres indicadores caben en una fila. El mínimo
+          // de escritorio (160) los apilaba y ocupaba casi toda la pantalla.
+          anchoMinimo: PlataformaApp.pantallaGrande ? 160 : 72,
+          espacio: PlataformaApp.pantallaGrande ? 12 : 8,
           children: [
             _buildStatItem(
                 context,
@@ -371,16 +375,20 @@ class InventarioView extends GetView<InventarioController> {
     final c = context.colores;
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppColors.accent,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.accent,
+            ),
           ),
         ),
         Text(
           label,
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: legible(12),
             color: c.textSecondary,

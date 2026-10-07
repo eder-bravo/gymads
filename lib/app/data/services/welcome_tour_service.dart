@@ -103,6 +103,21 @@ SesionTour _sesionActual() {
 /// (sale en silencio por su guarda interna `_mounted`). Registrándolo una sola
 /// vez para toda la vida de la app, ese problema desaparece.
 class WelcomeTourService extends GetxService {
+  static final NavigatorObserver observador = _ObservadorDelTour();
+
+  /// Si una acción externa reemplaza la pantalla (por ejemplo, un cambio de
+  /// sesión), la guía anterior no debe quedar flotando sobre la nueva.
+  static void comprobarPantalla() => _alSiguienteFrame(() {
+        final servicio = _instancia;
+        final pasos = servicio?._pasosEnCurso;
+        if (servicio == null || pasos == null) return;
+        if (!_alFrente(pasos) ||
+            pasos.any((paso) =>
+                !(servicio._showcaseView?.isTargetRendered(paso) ?? false))) {
+          servicio.cancelarRecorridoEnCurso();
+        }
+      });
+
   /// Si hay un recorrido en pantalla. Mientras tanto la pantalla queda fija:
   /// `TourStep` bloquea los gestos del elemento resaltado (por su hueco se
   /// colaban a la pantalla y se podía desplazar a mitad del tour). Se suelta
@@ -198,15 +213,18 @@ class WelcomeTourService extends GetxService {
       onStart: (_, __) {
         _activeTourShown = true;
         recorridoEnCurso.value = true;
+        final foco = FocusManager.instance.primaryFocus;
+        if (foco?.context?.findAncestorStateOfType<EditableTextState>() != null) {
+          foco?.unfocus();
+        }
+        comprobarPantalla();
       },
       onFinish: _onFinish,
       onDismiss: (_) => _onDismiss(),
     );
-    // En computadora, con un recorrido a la vista el teclado solo sirve
-    // para saltarlo con Esc.
-    if (PlataformaApp.escritorio) {
-      FocusManager.instance.addEarlyKeyEventHandler(_tecladoDelRecorrido);
-    }
+    // También bloquea el teclado externo de teléfonos y tabletas.
+    // En computadora Esc sigue sirviendo para saltar el recorrido.
+    FocusManager.instance.addEarlyKeyEventHandler(_tecladoDelRecorrido);
     return this;
   }
 
@@ -228,7 +246,8 @@ class WelcomeTourService extends GetxService {
     if (!recorridoEnCurso.value || vista == null || !vista.isShowcaseRunning) {
       return KeyEventResult.ignored;
     }
-    if (evento.logicalKey == LogicalKeyboardKey.escape) {
+    if (PlataformaApp.escritorio &&
+        evento.logicalKey == LogicalKeyboardKey.escape) {
       if (evento is KeyDownEvent) vista.dismiss();
       return KeyEventResult.handled;
     }
@@ -573,4 +592,22 @@ class WelcomeTourService extends GetxService {
   @visibleForTesting
   Future<void> marcarVistosParaPruebas(List<String> tourIds, {String? rol}) =>
       _markSeen(tourIds, rol: rol);
+}
+
+class _ObservadorDelTour extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      WelcomeTourService.comprobarPantalla();
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      WelcomeTourService.comprobarPantalla();
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      WelcomeTourService.comprobarPantalla();
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
+      WelcomeTourService.comprobarPantalla();
 }

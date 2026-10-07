@@ -144,12 +144,17 @@ class TourStep extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: WelcomeTourService.recorridoEnCurso,
       child: child,
-      builder: (context, enCurso, hijo) => GestureDetector(
-        behavior:
-            enCurso ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
-        onVerticalDragStart: enCurso ? (_) {} : null,
-        onHorizontalDragStart: enCurso ? (_) {} : null,
-        child: AbsorbPointer(absorbing: enCurso, child: hijo),
+      builder: (context, enCurso, hijo) => PopScope(
+        // Se registra en la ruta, también si el paso está fuera de pantalla.
+        // Bloquea Atrás de Android y el gesto desde el borde de iOS/GetX.
+        canPop: !enCurso,
+        child: GestureDetector(
+          behavior:
+              enCurso ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
+          onVerticalDragStart: enCurso ? (_) {} : null,
+          onHorizontalDragStart: enCurso ? (_) {} : null,
+          child: AbsorbPointer(absorbing: enCurso, child: hijo),
+        ),
       ),
     );
   }

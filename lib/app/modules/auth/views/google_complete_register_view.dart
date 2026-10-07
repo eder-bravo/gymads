@@ -63,27 +63,16 @@ class GoogleCompleteRegisterView extends GetView<RegisterController> {
         ],
       );
 
-  /// El ícono, el saludo y la cuenta de Google con la que entra.
+  /// El logo, el saludo y la cuenta de Google con la que entra.
   List<Widget> _bienvenida(BuildContext context) {
     final c = context.colores;
     return [
-      // Welcome icon
-      Container(
+      Image.asset(
+        'assets/images/logo_app.png',
         width: 100,
         height: 100,
-        decoration: BoxDecoration(
-          color: AppColors.accent.withOpacity(0.15),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: AppColors.accent.withOpacity(0.3),
-            width: 2,
-          ),
-        ),
-        child: const Icon(
-          Icons.fitness_center,
-          size: 48,
-          color: AppColors.accent,
-        ),
+        fit: BoxFit.contain,
+        semanticLabel: 'Logo de GymOne',
       ),
       const SizedBox(height: 28),
 

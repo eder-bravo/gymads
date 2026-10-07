@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../utils/confirmador_codigo.dart';
+import '../utils/permiso_de_camara.dart';
 import '../../../core/theme/siempre_oscuro.dart';
 import '../utils/plataforma_app.dart';
 import 'escaner_automatico.dart';
@@ -107,11 +109,101 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
   String? _aviso;
   Timer? _ocultarAviso;
 
+  /// La cámara se pide al abrir el escáner. Null mientras se pregunta.
+  bool? _camaraPermitida;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!PlataformaApp.escanerFisico) _revisarCamara();
+  }
+
+  Future<void> _revisarCamara() async {
+    final permitida =
+        await pedirCamara(para: 'escanear códigos', avisar: false);
+    if (mounted) setState(() => _camaraPermitida = permitida);
+  }
+
   @override
   void dispose() {
     _ocultarAviso?.cancel();
-    if (!PlataformaApp.escanerFisico) _controlador.dispose();
+    if (!PlataformaApp.escanerFisico && _camaraPermitida == true) {
+      _controlador.dispose();
+    }
     super.dispose();
+  }
+
+  /// Mientras se pregunta por la cámara, o si no se permitió: en vez de la
+  /// pantalla negra, qué hacer. En la tableta el lector de códigos sigue
+  /// sirviendo.
+  Widget _sinCamara(BuildContext context) {
+    final preguntando = _camaraPermitida == null;
+    return SiempreOscuro(
+        child: Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(widget.titulo),
+      ),
+      body: Center(
+        child: preguntando
+            ? const CircularProgressIndicator(color: AppColors.accent)
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.no_photography,
+                        color: Colors.white70, size: 56),
+                    const SizedBox(height: 16),
+                    Text(
+                      textoPermisoCamara('escanear códigos'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    if (PlataformaApp.lectorDeTeclado) ...[
+                      const SizedBox(height: 8),
+                      const Text(
+                        'También puedes escanear con tu lector de códigos.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white70, fontSize: 15),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: openAppSettings,
+                          icon: const Icon(Icons.settings),
+                          label: const Text('Abrir ajustes'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 48),
+                          ),
+                        ),
+                        OutlinedButton(
+                          onPressed: () {
+                            setState(() => _camaraPermitida = null);
+                            _revisarCamara();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 48),
+                          ),
+                          child: const Text('Intentar de nuevo'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    ));
   }
 
   void _alDetectar(BarcodeCapture captura) {
@@ -206,6 +298,7 @@ class _EscanerCodigoViewState extends State<EscanerCodigoView> {
   }
 
   Widget _camara(BuildContext context) {
+    if (_camaraPermitida != true) return _sinCamara(context);
     return SiempreOscuro(
         child: Scaffold(
       backgroundColor: Colors.black,

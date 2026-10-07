@@ -24,7 +24,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 import 'package:gymads/app/data/services/fotos_de_clientes.dart';
 import 'package:gymads/app/data/services/avisos_sistema_service.dart';
-import 'package:gymads/app/data/services/permisos_app.dart';
 import 'package:gymads/app/data/services/pantalla_clientes.dart';
 import 'package:gymads/app/modules/pantalla_clientes/pantalla_clientes_app.dart';
 import 'package:gymads/app/data/services/tema_service.dart';
@@ -79,8 +78,6 @@ void main(List<String> args) async {
   // teléfono). Antes del primer cuadro, para que no parpadee.
   Get.put(TemaService(), permanent: true);
 
-  // Si en este teléfono ya se pidieron los permisos (pantalla antes de Inicio).
-  await PermisosApp.cargar();
   await EscanerFisicoService.olvidarAjustesViejos();
 
   // Inicializa Supabase (cliente principal) - SOLO UNA VEZ
@@ -164,10 +161,6 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initRfidServiceIfEnabled() async {
-    // Hablarle al lector dispara avisos del sistema (red local en iPhone,
-    // notificaciones): se espera a que se pidan todos juntos en su pantalla.
-    await PermisosApp.listos;
-
     // "Usar el lector" es de cada gimnasio. Si nunca se tocó, sigue a si el
     // gimnasio tiene lector: por eso primero se carga la configuración.
     await RfidConfig.loadConfig();

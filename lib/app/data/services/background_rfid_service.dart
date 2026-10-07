@@ -20,7 +20,6 @@ import '../../core/utils/auth_utils.dart';
 import '../../routes/app_pages.dart';
 import '../../modules/clientes/controllers/clientes_controller.dart';
 import '../config/rfid_config.dart';
-import 'permisos_app.dart';
 import 'fotos_de_clientes.dart';
 import 'captura_de_tarjeta.dart';
 import 'pantalla_clientes.dart';
@@ -309,10 +308,8 @@ class BackgroundRfidService extends GetxService {
 
   /// Iniciar el escaneo en segundo plano
   Future<void> startScanning() async {
-    // Escuchar al lector dispara avisos del sistema (red local en iPhone,
-    // notificaciones): primero se piden todos juntos en su pantalla.
-    await PermisosApp.listos;
-
+    // Los permisos que pide el lector (notificaciones; en iPhone, la red
+    // local) salen aquí, al empezar a usarlo, y no en una pantalla aparte.
     if (isScanning.value) {
       AppLogger.warning('BackgroundRfidService', 'El escaneo ya está activo');
       return;

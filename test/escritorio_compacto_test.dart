@@ -9,12 +9,9 @@ import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:gymads/app/data/models/abono_prices_model.dart';
 import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
-import 'package:gymads/app/data/services/permisos_app.dart';
 import 'package:gymads/app/modules/abonar/controllers/abonar_controller.dart';
 import 'package:gymads/app/modules/abonar/views/abonar_view.dart';
 import 'package:gymads/app/modules/clientes/views/cliente_detail_view.dart';
-import 'package:gymads/app/modules/permisos/controllers/permisos_controller.dart';
-import 'package:gymads/app/modules/permisos/views/permisos_view.dart';
 import 'package:gymads/app/modules/shared/views/desktop_camera_view.dart';
 import 'package:gymads/app/core/permissions/staff_role.dart';
 import 'package:gymads/app/data/models/staff_acceso_model.dart';
@@ -205,6 +202,10 @@ class _Personal extends GetxController implements StaffAccesosController {
 }
 
 class _Precios extends GetxController implements AbonoPricesController {
+  _Precios({this.inicial = false});
+
+  final bool inicial;
+
   @override
   final dayController = TextEditingController();
   @override
@@ -224,7 +225,9 @@ class _Precios extends GetxController implements AbonoPricesController {
   @override
   final codigoRepetidoController = TextEditingController();
   @override
-  bool get pideCodigoInicial => false;
+  bool get pideCodigoInicial => inicial;
+  @override
+  final configurarCodigoInicial = false.obs;
   @override
   final guardandoCodigo = false.obs;
   @override
@@ -232,7 +235,7 @@ class _Precios extends GetxController implements AbonoPricesController {
   @override
   final isSaving = false.obs;
   @override
-  bool get isOnboarding => false;
+  bool get isOnboarding => inicial;
   @override
   void onClose() {
     for (final c in [
@@ -519,21 +522,6 @@ class _SinCamaras extends mac.CameraMacOSPlatform {
       [];
 }
 
-class _Solicitud implements SolicitudPermisos {
-  @override
-  List<PermisoApp> get permisos =>
-      [PermisoApp.camara, PermisoApp.bluetooth, PermisoApp.notificaciones];
-  @override
-  Future<Map<PermisoApp, EstadoPermiso>> estados() async =>
-      {for (final p in permisos) p: EstadoPermiso.sinDato};
-  @override
-  Future<Map<PermisoApp, EstadoPermiso>> pedirTodos() => estados();
-  @override
-  Future<void> abrirAjustes() async {}
-  @override
-  void cancelar() {}
-}
-
 UserModel _cliente() => UserModel(
     id: '1',
     name: 'María Fernanda González Rodríguez',
@@ -571,13 +559,6 @@ void main() {
     },
     'Cámara sin dispositivo': () =>
         DesktopCameraView(onPhotoTaken: (_) {}, onCancel: () {}),
-    'Permisos pendientes': () {
-      final c = Get.put(PermisosController(
-          solicitud: _Solicitud(), desdeConfiguracion: true));
-      c.estados
-          .assignAll({for (final p in c.permisos) p: EstadoPermiso.sinDato});
-      return const PermisosView();
-    },
     'Detalle del cliente': () {
       Get.put<ClientesController>(_Clientes());
       return ClienteDetailView(cliente: _cliente());
@@ -651,6 +632,10 @@ void main() {
     },
     'Precios': () {
       Get.put<AbonoPricesController>(_Precios());
+      return const AbonoPricesView();
+    },
+    'Precios iniciales': () {
+      Get.put<AbonoPricesController>(_Precios(inicial: true));
       return const AbonoPricesView();
     },
     'Modo de cobro': () {
@@ -900,6 +885,100 @@ void main() {
         TargetPlatform.android,
       }));
 
+  testWidgets('Precios de tableta caben sin desplazarse, también con código',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.runAsync(() async {
+      final fuente = FontLoader('PreciosPrueba')
+        ..addFont(File('assets/fonts/Roboto-Regular.ttf')
+            .readAsBytes()
+            .then(ByteData.sublistView));
+      await fuente.load();
+    });
+    final c = Get.put<AbonoPricesController>(_Precios(inicial: true));
+    for (final tamano in const [
+      Size(1180, 820),
+      Size(1366, 1024),
+      Size(820, 1180),
+      Size(1024, 1366),
+    ]) {
+      for (final crearCodigo in [false, true]) {
+        tester.view.physicalSize = tamano;
+        c.configurarCodigoInicial.value = crearCodigo;
+        await tester.pumpWidget(GetMaterialApp(
+          theme: AppTheme.oscuro.copyWith(
+              textTheme:
+                  AppTheme.oscuro.textTheme.apply(fontFamily: 'PreciosPrueba')),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.only(top: 24, bottom: 20),
+              viewPadding: const EdgeInsets.only(top: 24, bottom: 20),
+            ),
+            child: VentanaEscritorio(child: child!),
+          ),
+          home: const AbonoPricesView(),
+        ));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final desplazamiento = tester.state<ScrollableState>(find
+            .descendant(
+                of: find.byKey(const Key('formulario_precios')),
+                matching: find.byType(Scrollable))
+            .first);
+        expect(desplazamiento.position.maxScrollExtent, lessThanOrEqualTo(0.01),
+            reason: '$tamano, código $crearCodigo');
+        expect(find.byKey(const Key('precio_inscripcion')).hitTestable(),
+            findsOneWidget);
+        expect(find.byKey(const Key('codigo_activar')).hitTestable(),
+            findsOneWidget);
+        if (crearCodigo) {
+          expect(find.byKey(const Key('codigo_inicial_repetido')).hitTestable(),
+              findsOneWidget);
+        }
+      }
+    }
+  },
+      variant: const TargetPlatformVariant(
+          {TargetPlatform.android, TargetPlatform.iOS}));
+
+  testWidgets(
+      'Precios de tableta permiten llegar al código con teclado o letra grande',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1180, 820);
+    addTearDown(tester.view.reset);
+    final c = Get.put<AbonoPricesController>(_Precios(inicial: true));
+    c.configurarCodigoInicial.value = true;
+    c.monthController.text = '500';
+    c.codigoNuevoController.text = '1234';
+    c.codigoRepetidoController.text = '1234';
+    for (final (escala, teclado) in [(2.0, 0.0), (1.0, 320.0)]) {
+      await tester.pumpWidget(GetMaterialApp(
+        theme: AppTheme.oscuro,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(escala),
+            viewInsets: EdgeInsets.only(bottom: teclado),
+          ),
+          child: VentanaEscritorio(child: child!),
+        ),
+        home: const AbonoPricesView(),
+      ));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester
+          .ensureVisible(find.byKey(const Key('codigo_inicial_repetido')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('codigo_inicial_repetido')).hitTestable(),
+          findsOneWidget);
+      expect(c.monthController.text, '500');
+      expect(c.codigoRepetidoController.text, '1234');
+    }
+  },
+      variant: const TargetPlatformVariant(
+          {TargetPlatform.android, TargetPlatform.iOS}));
+
   // Inspección visual opcional: cada pantalla maximizada en 2560×1410, con
   // las sombras reales (en pruebas Flutter las dibuja como un borde negro).
   const capturas = bool.fromEnvironment('CAPTURAS_ESCRITORIO');
@@ -1034,7 +1113,8 @@ void main() {
     'Registro': ('Datos Personales', 'Tu Gimnasio'),
     'Registro Google': ('¡Bienvenido a GymOne!', 'Tu Gimnasio'),
     'Modo de cobro': ('Costos fijos', 'Abonos libres'),
-    'Precios': ('Deja vacío el que no ofrezcas.', 'Solo para clientes nuevos.'),
+    'Precios': ('Precios', 'Código para abono libre'),
+    'Precios iniciales': ('Precios', '¿También cobrarás abonos libres?'),
   };
   for (final MapEntry(key: nombre, value: (izquierda, derecha))
       in acostadas.entries) {

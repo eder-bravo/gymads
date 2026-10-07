@@ -465,6 +465,54 @@ void main() {
     expect(leido, '7501234567890');
   }, variant: tabletas);
 
+  /// El sistema contesta la cámara como bloqueada.
+  void camaraBloqueada() {
+    const canal = MethodChannel('flutter.baseflow.com/permissions/methods');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(canal, (llamada) async {
+      // Permission.camera es 1; permanentlyDenied es 4.
+      if (llamada.method == 'requestPermissions') return {1: 4};
+      if (llamada.method == 'checkPermissionStatus') return 4;
+      return null;
+    });
+    addTearDown(() => TestDefaultBinaryMessengerBinding
+        .instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(canal, null));
+  }
+
+  testWidgets(
+      'tableta sin permiso de cámara: lo explica y el lector sigue leyendo',
+      (tester) async {
+    comoTableta(tester);
+    camaraBloqueada();
+    String? leido;
+    await tester.pumpWidget(const GetMaterialApp(home: Scaffold()));
+    Get.to<String>(() => const EscanerCodigoView())!
+        .then((codigo) => leido = codigo);
+    await tester.pumpAndSettle();
+    expect(
+        find.textContaining('permite el acceso a la cámara'), findsOneWidget);
+    expect(find.text('Abrir ajustes'), findsOneWidget);
+    expect(find.text('También puedes escanear con tu lector de códigos.'),
+        findsOneWidget);
+    await _leer(tester, '7501234567890');
+    await tester.pumpAndSettle();
+    expect(leido, '7501234567890');
+  }, variant: tabletas);
+
+  testWidgets(
+      'teléfono sin permiso de cámara: lo explica, sin hablar de lector',
+      (tester) async {
+    camaraBloqueada();
+    await tester.pumpWidget(const GetMaterialApp(home: Scaffold()));
+    Get.to<String>(() => const EscanerCodigoView());
+    await tester.pumpAndSettle();
+    expect(
+        find.textContaining('permite el acceso a la cámara'), findsOneWidget);
+    expect(find.text('Intentar de nuevo'), findsOneWidget);
+    expect(find.textContaining('lector'), findsNothing);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
   testWidgets('teléfono acostado sigue sin captura automática', (tester) async {
     tester.view.physicalSize = const Size(1688, 780);
     tester.view.devicePixelRatio = 2;

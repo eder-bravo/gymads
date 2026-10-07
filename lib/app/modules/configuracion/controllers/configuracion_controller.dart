@@ -352,7 +352,6 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   final keyAccesos = GlobalKey();
   final keyControlAccesos = GlobalKey();
   final keyLector = GlobalKey();
-  final keyPermisos = GlobalKey();
 
   /// Las opciones de administración solo existen para el dueño.
   ///
@@ -379,7 +378,6 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
         if (can(Permission.gestionarAccesosStaff)) keyAccesos,
         if (can(Permission.gestionarControlAccesos)) keyControlAccesos,
         if (can(Permission.gestionarControlAccesos)) keyLector,
-        keyPermisos,
       ];
 
   @override
@@ -826,10 +824,6 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   /// El lector de tarjetas: a qué IP está y a qué gimnasio pertenece.
   void openLector() {
     Get.toNamed(Routes.LECTOR);
-  }
-
-  void openPermisos() {
-    Get.toNamed(Routes.PERMISOS, arguments: {'desdeConfiguracion': true});
   }
 
   // =================== CONTROL DE ACCESOS ===================

@@ -211,12 +211,17 @@ class CobrarVisitaView extends GetView<CobrarVisitaController> {
                   style: TextStyle(color: c.textPrimary, fontSize: 18),
                   decoration: InputDecoration(
                     labelText: 'Monto *',
-                    prefixText: '\$ ',
-                    prefixStyle:
-                        const TextStyle(color: AppColors.accent, fontSize: 18),
-                    helperText: controller.precioDia == null
-                        ? 'No hay precio por día configurado'
-                        : 'Precio por día',
+                    prefixIcon: Center(
+                      widthFactor: 1,
+                      heightFactor: 1,
+                      child: Text('\$',
+                          style: TextStyle(color: c.titleColor, fontSize: 18)),
+                    ),
+                    helperText: controller.precioDia == null ||
+                            controller.precioDia! <= 0
+                        ? 'Escribe cuánto cobrarás por esta visita.'
+                        : 'Se usa el precio por día. Puedes cambiarlo para esta visita.',
+                    helperMaxLines: 6,
                   ),
                 ),
                 const SizedBox(height: 20),

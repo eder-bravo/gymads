@@ -33,7 +33,10 @@ void main() {
       (tester) async {
     final c = await abrir(tester, precioDia: 50);
     expect(c.montoCtrl.text, '50');
-    expect(find.text('Precio por día'), findsOneWidget);
+    expect(
+        find.text(
+            'Se usa el precio por día. Puedes cambiarlo para esta visita.'),
+        findsOneWidget);
     await tester.enterText(find.byKey(const Key('monto_visita')), '65.5');
     expect(c.monto, 65.5);
   });
@@ -44,7 +47,15 @@ void main() {
       llamadas++;
       return null;
     });
-    expect(find.text('No hay precio por día configurado'), findsOneWidget);
+    expect(
+        find.text('Escribe cuánto cobrarás por esta visita.'), findsOneWidget);
+    expect(
+        find
+            .descendant(
+                of: find.byKey(const Key('monto_visita')),
+                matching: find.text('\$'))
+            .hitTestable(),
+        findsOneWidget);
     await tester.tap(find.text('Cobrar visita').last);
     await tester.pump();
     expect(find.text('Escribe el monto de la visita'), findsOneWidget);
@@ -72,8 +83,8 @@ void main() {
       return respuesta.future;
     });
 
-    await tester.enterText(find.widgetWithText(TextField, 'Nombre (opcional)'),
-        '  Juan  ');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Nombre (opcional)'), '  Juan  ');
     await tester.tap(find.text('Tarjeta de débito'));
     await tester.pump();
     c.setReferenciaPago('004521');

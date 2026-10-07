@@ -354,7 +354,7 @@ class HomeView extends GetView<HomeController> {
             child: TourStep(
               tourKey: controller.keyConfiguracion,
               title: 'Configuración',
-              description: 'Tu cuenta, precios, categorías, lector y permisos.',
+              description: 'Tu cuenta, precios, categorías y lector.',
               borderRadius: 14,
               isLastStep: true,
               // Con su nombre: un engrane solo no se entiende a la primera.
@@ -529,7 +529,7 @@ class HomeView extends GetView<HomeController> {
         Routes.CONFIGURACION: PasoDelMenu(
           clave: controller.keyConfiguracion,
           titulo: 'Configuración',
-          descripcion: 'Tu cuenta, precios, categorías, lector y permisos.',
+          descripcion: 'Tu cuenta, precios, categorías y lector.',
         ),
       };
 
@@ -685,7 +685,7 @@ class HomeView extends GetView<HomeController> {
             : const Color(0xFFB0BEC5),
         onTap: () => Get.toNamed(Routes.CONFIGURACION),
         showcaseKey: controller.keyConfiguracion,
-        tourDescription: 'Tu cuenta, precios, categorías, lector y permisos.',
+        tourDescription: 'Tu cuenta, precios, categorías y lector.',
       ));
 
     return Padding(

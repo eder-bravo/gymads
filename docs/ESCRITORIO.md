@@ -39,7 +39,6 @@ computadoras:
   en `main.dart`; Windows sigue con `just_audio_windows`. mimalloc enlazado en
   `linux/CMakeLists.txt`.
 - Notificaciones de pases: `flutter_local_notifications` con su parte de Linux.
-- Permisos no ofrece "Abrir ajustes": en Linux no hay permisos del sistema.
 
 Para compilar en Linux (Ubuntu/Debian):
 
@@ -73,8 +72,7 @@ señala sus secciones; lo elegido no se pierde.
 
 La barra va dentro de `ScaffoldAdaptable`, no encima del navegador: así los
 diálogos la cubren y el recorrido de bienvenida la encuentra. No aparece en
-ventanas modales, en el inicio de sesión, en el asistente de modo de cobro ni
-en los permisos de la primera vez. Al cambiar de sección se regresa a Inicio y
+ventanas modales, en el inicio de sesión ni en el asistente de modo de cobro. Al cambiar de sección se regresa a Inicio y
 la sección se abre encima, con un fundido corto: Inicio queda siempre debajo,
 que es donde sale el aviso de pantalla completa del lector. Las pantallas
 principales de cada sección no llevan flecha atrás; sus subpantallas sí. Si la
@@ -163,7 +161,7 @@ escritorio; el teléfono queda idéntico):
   se ven como botones ("Editar", "Stock", "Cambiar rol", "Código nuevo") y el
   resto va en "Más" (`AccionesDeFila`). Clic en un producto lo abre para
   editar. Mi cuenta y Control de accesos dicen "Editar" y "Cambiar hora".
-- **Botones a su ancho y en fila** (`FilaDeBotones`): Lector, Permisos,
+- **Botones a su ancho y en fila** (`FilaDeBotones`): Lector,
   Escáner, asistente del lector y el cobro de venta. Los formularios en
   ventana tienen "Cancelar" junto a guardar, y Escape los cierra.
 - **Letra legible:** ningún texto informativo por debajo de 14 (`legible()`).
@@ -402,7 +400,7 @@ formulario de producto y la selección de clientes en Abonar en macOS y Windows
 simulados, con texto al 100, 130 y 200 % y ciclos desde 1920×1000 hasta
 103×120 puntos.
 
-Verificación de esta revisión: 987 pruebas aprobadas de la batería completa,
+Verificación de esta revisión: 980 pruebas aprobadas de la batería completa,
 análisis sin incidencias nuevas y compilación de macOS y del APK de Android. Fallan dos archivos
 ajenos a este trabajo: `test/widget_test.dart` (preexistente) y
 `test/impresion_pdf_test.dart`, que no compila desde que `pubspec.lock`
@@ -641,28 +639,27 @@ muestran completa; las miniaturas siguen redondas. Las fotos que ya se habían
 recortado se quedan así. Los controladores se liberan al
 cambiar cámara y al cerrar, incluso si la inicialización termina después.
 
-## Permisos y lector RFID
+## Permisos: se piden al usar cada función
 
-| Plataforma | Comportamiento |
+Ya no hay pantalla de permisos antes de Inicio ni "Permisos de la app" en
+Configuración: pedirlos todos juntos fallaba seguido (en la tableta no se
+podía usar la cámara). Cada función pide lo suyo al usarse:
+
+| Permiso | Cuándo se pide |
 | --- | --- |
-| macOS | Cámara, notificaciones y Bluetooth consultados/solicitados con APIs nativas TCC. Se agregaron descripción de Bluetooth, tipos Bonjour y entitlement Bluetooth en Debug/Release. |
-| Windows | No pide Bluetooth Scan, Bluetooth Connect ni ubicación de Android. La webcam se habilita en Privacidad, incluyendo acceso para aplicaciones de escritorio. Se muestra Sin confirmar: el plugin de permisos existente devuelve granted sin comprobar ese bloqueo. |
-| Web | No pide permisos nativos de móvil. El lector de barras es HID. El asistente BLE del RFID remite a las apps nativas. |
+| Cámara | Al tomar la foto del cliente, al abrir el escáner de códigos con cámara y al tomar la foto del comprobante de pago (`pedirCamara`, `core/utils/permiso_de_camara.dart`). |
+| Bluetooth | Al buscar el lector para configurarlo (`flutter_blue_plus` lo pide; si se niega, el asistente explica dónde activarlo). |
+| Notificaciones | Al empezar a usar el lector de tarjetas (`AvisosSistema.pedirPermiso`). |
+| Red local (iPhone) | La pide iOS la primera vez que la app habla con el lector. |
 
-En macOS se solicitan primero cámara y Bluetooth. Las notificaciones se
-solicitan sin esperar a que se conteste el aviso del sistema: una autorización
-pendiente aparece como **Sin confirmar**, nunca como concedida. Las consultas
-nativas tienen un límite de 5 segundos, y los diálogos de cámara/Bluetooth de
-45 segundos; Dart también limita la espera si el canal no responde. Al volver
-de los ajustes se consultan los estados otra vez.
-
-**Continuar sin esperar** permanece disponible durante la solicitud. Detiene
-los permisos que aún no se pidieron e ignora respuestas tardías al cerrar la
-pantalla. Un diálogo que el sistema ya abrió se contesta en el propio sistema.
-Los errores de permisos permiten continuar. En Windows se ofrece **Comprobar**
-y el enlace a Privacidad; no se espera un diálogo de permiso de Android/iOS.
-Después de modificar el código nativo de macOS hay que cerrar y volver a
-ejecutar la app: hot reload/hot restart no recompilan Swift ni los entitlements.
+- Negado en el aviso: no se insiste; se vuelve a preguntar la próxima vez.
+- Bloqueado (ya no se puede pedir desde la app): "Se necesita la cámara" con
+  "Abrir ajustes". El escáner con cámara lo explica en su pantalla, con
+  "Abrir ajustes" e "Intentar de nuevo"; en la tableta el lector de códigos
+  sigue funcionando sin cámara.
+- En computadora, las vistas de cámara (macOS y Windows) piden y explican el
+  permiso al abrirse, como antes.
+- El lector ya no espera a que se contesten los permisos para arrancar.
 
 El RFID sigue usando el protocolo de configuración del firmware por BLE y,
 después, trabaja por la red del gimnasio. `flutter_blue_plus` se conserva para
@@ -777,7 +774,7 @@ La primera compilación de WinRT puede descargar CppWinRT mediante NuGet.
 ```sh
 flutter pub get
 flutter analyze
-flutter test test/escaner_automatico_test.dart test/escaner_fisico_test.dart test/permisos_escritorio_test.dart test/lector_windows_test.dart test/camaras_escritorio_test.dart
+flutter test test/escaner_automatico_test.dart test/escaner_fisico_test.dart test/permiso_de_camara_test.dart test/lector_windows_test.dart test/camaras_escritorio_test.dart
 flutter build macos --debug
 # Ejecutar en una computadora Windows:
 flutter build windows --debug

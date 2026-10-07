@@ -17,6 +17,12 @@ class LoginView extends GetView<AuthController> {
   @override
   Widget build(BuildContext context) {
     final c = context.colores;
+    if (PlataformaApp.escritorio) {
+      return Scaffold(
+        backgroundColor: c.backgroundColor,
+        body: SafeArea(child: _escritorio(context)),
+      );
+    }
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(gradient: c.fondoAcceso),
@@ -45,6 +51,168 @@ class LoginView extends GetView<AuthController> {
                 ),
         ),
       ),
+    );
+  }
+
+  Widget _escritorio(BuildContext context) {
+    return LayoutBuilder(builder: (context, limits) {
+      final compacto = limits.maxWidth < 960;
+      if (compacto) {
+        return SingleChildScrollView(
+          child: Column(
+            children: [
+              _panelMarca(context, compacto: true),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 30, 24, 48),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: _formularioEscritorio(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(flex: 9, child: _panelMarca(context)),
+          Expanded(
+            flex: 11,
+            child: Center(
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: _formularioEscritorio(context),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
+  Widget _panelMarca(BuildContext context, {bool compacto = false}) {
+    return Container(
+      width: double.infinity,
+      constraints: compacto ? const BoxConstraints(minHeight: 210) : null,
+      padding: EdgeInsets.all(compacto ? 28 : 56),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF10264E), Color(0xFF17498F), Color(0xFF1764F5)],
+        ),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 20,
+              runSpacing: 16,
+              children: [
+                Image.asset('assets/images/logo_app.png',
+                    width: compacto ? 72 : 88, height: compacto ? 72 : 88),
+                Text('GYMONE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: compacto ? 34 : 40,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2,
+                    )),
+              ],
+            ),
+            if (!compacto) ...[
+              const SizedBox(height: 76),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Tu gimnasio,\nmejor organizado.',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 42,
+                        fontWeight: FontWeight.w800,
+                        height: 1.12,
+                      )),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Clientes, cobros y actividad en un solo lugar.',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.85),
+                      fontSize: 18,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 76),
+              Text('Sistema de gestión de gimnasio',
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.7), fontSize: 14)),
+            ] else ...[
+              const SizedBox(height: 20),
+              const Text('Tu gimnasio, mejor organizado.',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 25,
+                      fontWeight: FontWeight.w700)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _formularioEscritorio(BuildContext context) {
+    final c = context.colores;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Inicia sesión',
+            style: TextStyle(
+              color: c.contraste,
+              fontSize: 34,
+              fontWeight: FontWeight.w800,
+            )),
+        const SizedBox(height: 8),
+        Text('Entra a tu gimnasio con tu cuenta.',
+            style:
+                TextStyle(color: c.contraste.withOpacity(0.7), fontSize: 16)),
+        const SizedBox(height: 32),
+        _buildEmailField(context),
+        const SizedBox(height: 18),
+        _buildPasswordField(context),
+        const SizedBox(height: 20),
+        Obx(() => controller.errorMessage.value != null
+            ? _buildErrorMessage()
+            : const SizedBox.shrink()),
+        _buildLoginButton(),
+        const SizedBox(height: 22),
+        Row(children: [
+          Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('o',
+                style: TextStyle(color: c.contraste.withOpacity(0.6))),
+          ),
+          Expanded(child: Divider(color: c.contraste.withOpacity(0.2))),
+        ]),
+        const SizedBox(height: 22),
+        _buildGoogleButton(context),
+        const SizedBox(height: 14),
+        _buildStaffButton(context),
+        const SizedBox(height: 30),
+        _crearCuenta(context),
+      ],
     );
   }
 
@@ -81,6 +249,8 @@ class LoginView extends GetView<AuthController> {
 
   Widget _crearCuenta(BuildContext context) {
     final c = context.colores;
+    final colorEnlace =
+        PlataformaApp.escritorio ? c.titleColor : AppColors.accent;
     return Wrap(
       alignment: WrapAlignment.center,
       children: [
@@ -93,14 +263,14 @@ class LoginView extends GetView<AuthController> {
         ),
         GestureDetector(
           onTap: () => Get.toNamed(Routes.REGISTER),
-          child: const Text(
+          child: Text(
             'Crear cuenta',
             style: TextStyle(
-              color: AppColors.accent,
+              color: colorEnlace,
               fontSize: 14,
               fontWeight: FontWeight.bold,
               decoration: TextDecoration.underline,
-              decorationColor: AppColors.accent,
+              decorationColor: colorEnlace,
             ),
           ),
         ),
@@ -255,7 +425,9 @@ class LoginView extends GetView<AuthController> {
             const SizedBox(width: 12),
             Flexible(
                 child: Text(
-              'Entrar como staff',
+              PlataformaApp.escritorio
+                  ? 'Entrar como personal'
+                  : 'Entrar como staff',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: c.contraste,

@@ -131,7 +131,7 @@ class AuthController extends GetxController {
     // de los pasos del tour.
     Get.until((ruta) => ruta.settings.name == Routes.HOME || ruta.isFirst);
     final ruta = Get.currentRoute;
-    if (ruta != Routes.HOME && ruta != Routes.PERMISOS) {
+    if (ruta != Routes.HOME) {
       Get.offAllNamed(Routes.HOME);
     }
 

@@ -359,7 +359,7 @@ void main() {
       'Atajo: ${atajo('5')}.',
       'Atajo: ${atajo('6')}.',
       'Quién entró y a qué hora. Atajo: ${atajo('7')}.',
-      'lector y permisos. Atajo: ${atajo(',')}.',
+      'categorías y lector. Atajo: ${atajo(',')}.',
       'Oculta la barra para que la pantalla use todo el ancho',
     ];
     // El botón para abrir la pantalla para clientes, junto a Actualizar.
@@ -759,8 +759,8 @@ void main() {
     Get.put<TenantContextService>(_Tenant());
     Get.put<HomeController>(_Inicio());
     await _mostrarApp(tester);
-    // Así regresan a Inicio los permisos de la primera vez y el asistente de
-    // modo de cobro: por un momento hay dos Inicio montados.
+    // Así regresa a Inicio el asistente de modo de cobro: por un momento
+    // hay dos Inicio montados.
     Get.toNamed(Routes.CLIENTES);
     await tester.pumpAndSettle();
     Get.offAllNamed(Routes.HOME);

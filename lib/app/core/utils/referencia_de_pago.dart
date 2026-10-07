@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../data/services/ocr_referencia_service.dart';
 import 'app_logger.dart';
+import 'permiso_de_camara.dart';
 import 'snackbar_helper.dart';
 import 'plataforma_app.dart';
 
@@ -84,6 +85,11 @@ mixin ReferenciaDePago on GetxController {
     if (!PlataformaApp.ocrMovil) {
       SnackbarHelper.info('Referencia de pago',
           'Escribe el folio del comprobante en el campo de referencia.');
+      return;
+    }
+    // La cámara se pide aquí, al usarla.
+    if (desdeCamara &&
+        !await pedirCamara(para: 'tomar la foto del comprobante')) {
       return;
     }
     File? foto;

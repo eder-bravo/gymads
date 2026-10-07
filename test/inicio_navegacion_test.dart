@@ -92,7 +92,6 @@ Future<void> _app(WidgetTester tester, Size tamano) async {
     getPages: [
       GetPage(name: Routes.HOME, page: () => const HomeView()),
       seccion(Routes.CLIENTES, 'Clientes'),
-      seccion(Routes.PERMISOS, 'Permisos'),
       seccion(Routes.ONBOARDING_PAYMENT_MODE, 'Modo de cobro'),
     ],
   ));
@@ -127,8 +126,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'al volver');
 
-      // Volver reemplazando la pila, desde los permisos y el modo de cobro.
-      for (final ruta in [Routes.PERMISOS, Routes.ONBOARDING_PAYMENT_MODE]) {
+      // Volver reemplazando la pila, desde el modo de cobro.
+      for (final ruta in [Routes.ONBOARDING_PAYMENT_MODE]) {
         Get.toNamed(ruta);
         await tester.pumpAndSettle();
         Get.offAllNamed(Routes.HOME);

@@ -42,6 +42,7 @@ class AbonoPricesController extends GetxController {
   /// opcional, se escribe dos veces.
   final codigoNuevoController = TextEditingController();
   final codigoRepetidoController = TextEditingController();
+  final configurarCodigoInicial = false.obs;
 
   final isLoading = false.obs;
   final isSaving = false.obs;
@@ -147,10 +148,12 @@ class AbonoPricesController extends GetxController {
     }
 
     // El código del encargado (opcional) se revisa antes de guardar nada.
-    final codigo = pideCodigoInicial ? codigoNuevoController.text.trim() : '';
-    if (pideCodigoInicial) {
+    final codigo = pideCodigoInicial && configurarCodigoInicial.value
+        ? codigoNuevoController.text.trim()
+        : '';
+    if (pideCodigoInicial && configurarCodigoInicial.value) {
       final error = errorDeCodigo(codigo, codigoRepetidoController.text.trim(),
-          opcional: true);
+          opcional: false);
       if (error != null) {
         SnackbarHelper.error('Revisa el código', error);
         return false;

@@ -308,16 +308,17 @@ void main() {
     testWidgets('la inscripción se configura junto con los precios',
         (tester) async {
       final repo = await precios(tester);
+      expect(find.text('También se usa para cobrar una visita de un día.'),
+          findsOneWidget);
       expect(find.text('Costo de inscripción'), findsOneWidget);
       expect(find.text('200.00'), findsOneWidget);
       await tester.enterText(
-          find.widgetWithText(TextField, 'Costo de inscripción'), '350');
+          find.byKey(const Key('precio_inscripcion')), '350');
       await Get.find<AbonoPricesController>().savePrices();
       expect(repo.guardados?.priceInscripcion, 350);
       expect(repo.guardados?.priceMonth, 500);
       // Vacía: no se cobra inscripción.
-      await tester.enterText(
-          find.widgetWithText(TextField, 'Costo de inscripción'), '');
+      await tester.enterText(find.byKey(const Key('precio_inscripcion')), '');
       await Get.find<AbonoPricesController>().savePrices();
       expect(repo.guardados?.priceInscripcion, isNull);
       // El aviso "Precios actualizados" se quita solo.
@@ -332,8 +333,13 @@ void main() {
           argumentos: {'fromOnboarding': true},
           inicial: const AbonoPricesModel(priceMonth: 500));
       final c = Get.find<AbonoPricesController>();
-      expect(find.text('Código para abono libre'), findsOneWidget);
+      expect(find.text('¿También cobrarás abonos libres?'), findsOneWidget);
       expect(find.byKey(const Key('crear_codigo')), findsNothing);
+      expect(find.byKey(const Key('codigo_inicial')), findsNothing);
+      await tester.ensureVisible(find.byKey(const Key('codigo_activar')));
+      await tester.tap(find.byKey(const Key('codigo_activar')));
+      await tester.pump();
+      expect(find.byKey(const Key('codigo_inicial')), findsOneWidget);
       // No coinciden: no se guarda nada.
       c.codigoNuevoController.text = '1234';
       c.codigoRepetidoController.text = '4321';
@@ -354,12 +360,84 @@ void main() {
       final repo = await precios(tester,
           argumentos: {'fromOnboarding': true},
           inicial: const AbonoPricesModel(priceMonth: 500));
+      await tester.ensureVisible(find.byKey(const Key('codigo_activar')));
+      await tester.tap(find.byKey(const Key('codigo_activar')));
+      await tester.pump();
+      final c = Get.find<AbonoPricesController>();
+      c.codigoNuevoController.text = '1234';
+      c.codigoRepetidoController.text = '4321';
+      await tester.tap(find.byKey(const Key('codigo_no_ahora')));
+      await tester.pump();
+      expect(find.byKey(const Key('codigo_inicial')), findsNothing);
       await Get.find<AbonoPricesController>().savePrices();
       expect(repo.guardados?.priceMonth, 500);
       expect(codigo.guardados, isEmpty);
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
     });
+
+    testWidgets('en tableta los precios y el código son fáciles de distinguir',
+        (tester) async {
+      await precios(tester,
+          argumentos: {'fromOnboarding': true},
+          inicial: const AbonoPricesModel(priceMonth: 500));
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1180, 820);
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(
+          tester.getRect(find.text('Precios')).right,
+          lessThan(tester
+              .getRect(find.text('¿También cobrarás abonos libres?'))
+              .left));
+      expect(find.byKey(const Key('codigo_inicial')), findsNothing);
+      await tester.tap(find.byKey(const Key('codigo_activar')));
+      await tester.pump();
+      expect(find.byKey(const Key('codigo_inicial')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('el símbolo de moneda se ve aun con los precios vacíos',
+        (tester) async {
+      await precios(tester,
+          argumentos: {'fromOnboarding': true},
+          inicial: const AbonoPricesModel());
+      tester.view.devicePixelRatio = 1;
+      for (final tamano in const [
+        Size(390, 844),
+        Size(844, 390),
+        Size(820, 1180),
+        Size(1180, 820),
+        Size(1280, 800),
+      ]) {
+        tester.view.physicalSize = tamano;
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: '$tamano');
+        expect(find.text('\$'), findsNWidgets(5));
+        for (final campo in find.byType(TextField).evaluate()) {
+          final campoFinder = find.byWidget(campo.widget);
+          await tester.ensureVisible(campoFinder);
+          await tester.pumpAndSettle();
+          expect(
+              find
+                  .descendant(of: campoFinder, matching: find.text('\$'))
+                  .hitTestable(),
+              findsOneWidget,
+              reason: '$tamano: moneda visible sin escribir ni enfocar');
+        }
+        expect(find.text('¿También cobrarás abonos libres?'), findsOneWidget);
+        expect(find.textContaining('se usa para cobrar una visita de un día.'),
+            findsOneWidget);
+      }
+    },
+        variant: const TargetPlatformVariant({
+          TargetPlatform.android,
+          TargetPlatform.iOS,
+          TargetPlatform.macOS,
+          TargetPlatform.windows,
+          TargetPlatform.linux,
+        }));
 
     testWidgets(
         'en el asistente con abono libre solo se pregunta la '

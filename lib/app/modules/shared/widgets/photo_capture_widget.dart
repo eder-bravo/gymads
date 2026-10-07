@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../core/utils/permiso_de_camara.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../core/widgets/cached_user_image.dart';
 import '../views/circular_camera_view.dart';
@@ -53,44 +53,10 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
 
   bool get _faltaFoto => widget.mostrarFalta && !_tieneFoto;
 
-  /// Sin permiso no se abre la cámara (fallaría en negro); se explica cómo
-  /// darlo.
-  Future<bool> _permisoDeCamara() async {
-    // El controlador nativo de escritorio solicita el permiso al abrir.
-    if (PlataformaApp.escritorio) return true;
-    final c = context.colores;
-    final estado = await Permission.camera.request();
-    if (estado.isGranted || estado.isLimited) return true;
-    if (!mounted) return false;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: c.cardBackground,
-        title: Text('Se necesita la cámara',
-            style: TextStyle(color: c.textPrimary)),
-        content: Text(
-          'Para tomar la foto del cliente, permite el acceso a la cámara en '
-          'los ajustes ${PlataformaApp.delAparato}.',
-          style: TextStyle(color: c.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Ahora no', style: TextStyle(color: c.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              openAppSettings();
-            },
-            child: const Text('Abrir ajustes',
-                style: TextStyle(color: AppColors.accent)),
-          ),
-        ],
-      ),
-    );
-    return false;
-  }
+  /// Sin permiso no se abre la cámara (fallaría en negro). Se pide aquí,
+  /// al tomar la foto.
+  Future<bool> _permisoDeCamara() =>
+      pedirCamara(para: 'tomar la foto del cliente');
 
   Future<void> _tomarFoto() async {
     if (!await _permisoDeCamara()) return;

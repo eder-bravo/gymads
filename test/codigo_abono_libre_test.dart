@@ -158,6 +158,8 @@ void main() {
                   matching: find.byType(Scrollable))
               .first);
     }
+    await tester.ensureVisible(find.text('Abono libre'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Abono libre'));
     await tester.pumpAndSettle();
   }

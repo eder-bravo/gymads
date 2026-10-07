@@ -34,7 +34,8 @@ class _Impresion extends PrintingPlatform {
       bool dynamicLayout,
       bool usePrinterSettings,
       OutputType outputType,
-      bool forceCustomPrintPaper) async {
+      bool forceCustomPrintPaper,
+      bool preview) async {
     // La plataforma soporta layout dinámico, pero estos reportes deben llegar
     // listos antes de abrir el panel nativo que bloqueaba el hilo en macOS.
     if (dynamicLayout) throw StateError('Impresión dinámica bloqueante');

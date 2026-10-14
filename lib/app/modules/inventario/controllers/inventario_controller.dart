@@ -53,13 +53,9 @@ class InventarioController extends GetxController
   // Estado observable para productos
   final RxList<Product> products = <Product>[].obs;
   final RxList<Product> filteredProducts = <Product>[].obs;
-  final RxList<ProductCategory> categories = <ProductCategory>[].obs;
 
   // Estado para la búsqueda
   final RxString searchQuery = ''.obs;
-
-  /// Id de la categoría filtrada. `null` significa "todas".
-  final RxnString selectedCategoryId = RxnString();
 
   /// Muestra solo lo que hay que reponer (stock negativo).
   final RxBool soloFaltantes = false.obs;
@@ -84,7 +80,6 @@ class InventarioController extends GetxController
   // ─── Tour de bienvenida ───
   final keyEscanear = GlobalKey();
   final keyAgregar = GlobalKey();
-  final keyCategorias = GlobalKey();
   final keyBuscar = GlobalKey();
   final keyLista = GlobalKey();
 
@@ -97,13 +92,9 @@ class InventarioController extends GetxController
   bool can(Permission permiso) => TenantContextService.to.can(permiso);
 
   /// Los pasos del tour, sin los botones que este rol no tiene delante.
-  ///
-  /// El orden sigue al de la pantalla: en la barra superior Categorías va
-  /// antes que Agregar, y al revés el recorrido saltaba hacia atrás.
   @override
   List<GlobalKey> get tourSteps => [
         if (can(Permission.ajustarStock)) keyEscanear,
-        if (can(Permission.gestionarCategorias)) keyCategorias,
         if (can(Permission.gestionarProductos)) keyAgregar,
         keyBuscar,
         keyLista,
@@ -113,14 +104,12 @@ class InventarioController extends GetxController
   void onInit() {
     super.onInit();
     loadProducts();
-    loadCategories();
     loadInventoryStats();
-    // Existencias que bajan con una venta en otro teléfono, productos y
-    // categorías nuevos: aparecen solos.
+    // Existencias que bajan con una venta en otro teléfono y productos
+    // nuevos: aparecen solos.
     recargarAlCambiar(
-      {TablaEnVivo.productos, TablaEnVivo.categorias},
+      {TablaEnVivo.productos},
       () => Future.wait([
-        loadCategories(),
         loadProducts(silencioso: true),
         loadInventoryStats(),
       ]),
@@ -161,34 +150,9 @@ class InventarioController extends GetxController
     }
   }
 
-  Future<void> loadCategories() async {
-    try {
-      // Se cargan también las inactivas: hacen falta para resolver el nombre
-      // de un producto cuya categoría se desactivó.
-      categories.value = await productRepository.getAllCategories();
-      filterProducts();
-    } catch (e) {
-      AppLogger.error('InventarioController', 'Error al cargar categorías', e);
-    }
-  }
-
-  /// Categorías que se pueden elegir al crear o filtrar.
-  List<ProductCategory> get activeCategories =>
-      categories.where((c) => c.isActive).toList();
-
-  /// Búsqueda por id para resolver el nombre y el icono de un producto.
-  Map<String, ProductCategory> get categoryById => {
-        for (final c in categories) c.id: c,
-      };
-
-  String categoryNameFor(Product product) =>
-      categoryById[product.categoryId]?.name ?? 'Sin categoría';
-
-  /// Recarga todo. El botón de refrescar solo llamaba a `loadProducts`, así
-  /// que una categoría creada en otro dispositivo nunca aparecía.
+  /// Recarga los productos y las estadísticas.
   Future<void> refreshAll() async {
     await Future.wait([
-      loadCategories(),
       loadProducts(),
       loadInventoryStats(),
     ]);
@@ -232,17 +196,11 @@ class InventarioController extends GetxController
       // escáner no lee (envase arrugado, poca luz) sin cambiar de pantalla.
       bool matchesSearch = searchQuery.isEmpty ||
           product.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          product.description
-              .toLowerCase()
-              .contains(searchQuery.toLowerCase()) ||
           (product.barcode ?? '').contains(searchQuery.trim());
-
-      bool matchesCategory = selectedCategoryId.value == null ||
-          product.categoryId == selectedCategoryId.value;
 
       bool matchesFaltante = !soloFaltantes.value || product.stock < 0;
 
-      return matchesSearch && matchesCategory && matchesFaltante;
+      return matchesSearch && matchesFaltante;
     }).toList();
   }
 
@@ -255,11 +213,6 @@ class InventarioController extends GetxController
 
   void setSearchQuery(String query) {
     searchQuery.value = query;
-    filterProducts();
-  }
-
-  void setSelectedCategory(String? categoryId) {
-    selectedCategoryId.value = categoryId;
     filterProducts();
   }
 
@@ -291,8 +244,6 @@ class InventarioController extends GetxController
 
         final updatedProduct = currentProduct.value!.copyWith(
           name: productData['name'],
-          description: productData['description'],
-          categoryId: productData['category_id'],
           price: double.parse(productData['price']),
           isActive: true,
           barcode: (barcodeEditado?.isEmpty ?? true) ? null : barcodeEditado,
@@ -315,8 +266,6 @@ class InventarioController extends GetxController
         final newProduct = Product(
           id: _idProductoNuevo ??= const Uuid().v4(),
           name: productData['name'],
-          description: productData['description'],
-          categoryId: productData['category_id'],
           price: double.parse(productData['price']),
           stock: int.parse(productData['stock']),
           isActive: true,

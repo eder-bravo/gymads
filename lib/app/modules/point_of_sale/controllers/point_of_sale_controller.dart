@@ -78,10 +78,6 @@ class PointOfSaleController extends GetxController
   final RxList<Product> _availableProducts = <Product>[].obs;
   final RxString _searchQuery = ''.obs;
 
-  // Filtro de categoría. `null` = todas.
-  final RxList<ProductCategory> _categories = <ProductCategory>[].obs;
-  final RxnString _selectedCategoryId = RxnString();
-
   /// Productos fijados arriba, los que más se venden. Se guardan por gimnasio
   /// en el dispositivo: es una comodidad del mostrador, no un dato del negocio.
   final RxSet<String> _pinnedProductIds = <String>{}.obs;
@@ -114,25 +110,13 @@ class PointOfSaleController extends GetxController
   List<Product> get availableProducts => _availableProducts;
   List<Product> get filteredProducts {
     final query = _searchQuery.value.toLowerCase();
-    final byId = categoryById;
 
-    final matches = _availableProducts.where((product) {
-      final matchesCategory = _selectedCategoryId.value == null ||
-          product.categoryId == _selectedCategoryId.value;
-
-      // La búsqueda también mira el nombre de la categoría, como antes; ahora
-      // hay que resolverlo por el mapa porque el producto solo guarda el id.
-      final categoryName = (byId[product.categoryId]?.name ?? '').toLowerCase();
-
-      // El código de barras entra para poder teclearlo cuando el escáner no
-      // lo lee (envase arrugado, poca luz).
-      final matchesSearch = query.isEmpty ||
-          product.name.toLowerCase().contains(query) ||
-          categoryName.contains(query) ||
-          (product.barcode ?? '').toLowerCase().contains(query.trim());
-
-      return matchesCategory && matchesSearch;
-    });
+    // El código de barras entra para poder teclearlo cuando el escáner no lo
+    // lee (envase arrugado, poca luz).
+    final matches = _availableProducts.where((product) =>
+        query.isEmpty ||
+        product.name.toLowerCase().contains(query) ||
+        (product.barcode ?? '').toLowerCase().contains(query.trim()));
 
     // Los fijados primero. Se reparte en dos listas en vez de ordenar porque
     // `List.sort` no es estable y revolvería el orden dentro de cada grupo.
@@ -181,20 +165,8 @@ class PointOfSaleController extends GetxController
     await prefs.setStringList(key, _pinnedProductIds.toList());
   }
 
-  /// Búsqueda por id para resolver nombre e icono de la categoría.
-  Map<String, ProductCategory> get categoryById => {
-        for (final c in _categories) c.id: c,
-      };
-
-  /// Categorías que se ofrecen en el filtro.
-  List<ProductCategory> get activeCategories =>
-      _categories.where((c) => c.isActive).toList();
-
   String get searchQuery => _searchQuery.value;
   double get taxRate => _taxRate.value;
-
-  List<ProductCategory> get categories => _categories;
-  String? get selectedCategoryId => _selectedCategoryId.value;
 
   // Métodos de pago disponibles (los mismos que en Abonar, más mixto).
   final List<String> paymentMethods = [...metodosDePago, 'mixto'];
@@ -206,7 +178,6 @@ class PointOfSaleController extends GetxController
   // ─── Tour de bienvenida ───
   final keyEscanear = GlobalKey();
   final keyBuscar = GlobalKey();
-  final keyCategorias = GlobalKey();
   final keyProductos = GlobalKey();
   final keyCarrito = GlobalKey();
 
@@ -215,30 +186,27 @@ class PointOfSaleController extends GetxController
 
   @override
   List<GlobalKey> get tourSteps =>
-      [keyEscanear, keyBuscar, keyCategorias, keyProductos, keyCarrito];
+      [keyEscanear, keyBuscar, keyProductos, keyCarrito];
 
   @override
   void onInit() {
     super.onInit();
     restaurarCarrito();
     loadProducts();
-    loadCategories();
     _loadPinnedProducts();
-    // El stock cambia con las ventas de otro teléfono; un producto o una
-    // categoría nuevos aparecen solos.
-    recargarAlCambiar({TablaEnVivo.productos, TablaEnVivo.categorias},
-        () => Future.wait([loadProducts(silencioso: true), loadCategories()]));
+    // El stock cambia con las ventas de otro teléfono; un producto nuevo
+    // aparece solo.
+    recargarAlCambiar(
+        {TablaEnVivo.productos}, () => loadProducts(silencioso: true));
   }
 
   /// Recarga todo lo que se ve en el mostrador.
   ///
-  /// Recarga las tres cosas y no solo los productos: el stock cambia con cada
-  /// venta, pero una categoría nueva o un producto fijado desde otro
-  /// dispositivo tampoco aparecerían nunca.
+  /// Recarga también los fijados: el stock cambia con cada venta, pero un
+  /// producto fijado desde otro dispositivo no aparecería nunca.
   Future<void> refrescar() async {
     await Future.wait([
       loadProducts(),
-      loadCategories(),
       _loadPinnedProducts(),
     ]);
   }
@@ -264,20 +232,6 @@ class PointOfSaleController extends GetxController
     } finally {
       if (!silencioso) _isLoading.value = false;
     }
-  }
-
-  /// Cargar categorías disponibles para el filtro
-  Future<void> loadCategories() async {
-    try {
-      _categories.value = await _productRepository.getAllCategories();
-    } catch (e) {
-      AppLogger.error('PointOfSaleController', 'Error al cargar categorías', e);
-    }
-  }
-
-  /// Establecer la categoría seleccionada del filtro. `null` = todas.
-  void setSelectedCategory(String? categoryId) {
-    _selectedCategoryId.value = categoryId;
   }
 
   /// Buscar productos

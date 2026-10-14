@@ -170,28 +170,6 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
         ),
       ],
 
-      // Categorías de productos (inventario y punto de venta)
-      if (controller.can(Permission.gestionarCategorias)) ...[
-        const SizedBox(height: 12),
-        TourStep(
-          tourKey: controller.keyCategorias,
-          title: 'Categorías de productos',
-          description: 'Para agrupar tus productos.',
-          borderRadius: 12,
-          isLastStep: controller.esUltimoPasoDelTour(controller.keyCategorias),
-          child: _buildOptionTile(
-            context,
-            icon: Icons.category,
-            iconColor: AppColors.accent,
-            title: 'Categorías de productos',
-            subtitle: 'Organiza el inventario y el punto de venta',
-            onTap: () => controller.openCategorias(),
-            trailing:
-                Icon(Icons.arrow_forward_ios, size: 16, color: c.textSecondary),
-          ),
-        ),
-      ],
-
       // Accesos del personal: el dueño y el encargado, cada uno solo sobre
       // los roles por debajo del suyo.
       if (controller.can(Permission.gestionarAccesosStaff)) ...[

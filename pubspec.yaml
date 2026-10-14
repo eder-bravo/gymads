@@ -64,6 +64,9 @@ dependencies:
   just_audio_media_kit: ^2.1.0
   media_kit_libs_linux: ^1.2.1
   desktop_multi_window: ^0.3.1
+  # QR del acceso del personal (el mismo código de un solo uso).
+  qr_flutter: ^4.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

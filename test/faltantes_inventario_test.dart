@@ -6,8 +6,6 @@ Product _producto(String nombre, {required int stock, required double precio}) {
   return Product(
     id: nombre,
     name: nombre,
-    description: '',
-    categoryId: null,
     price: precio,
     stock: stock,
     isActive: true,

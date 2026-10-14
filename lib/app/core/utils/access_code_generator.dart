@@ -91,6 +91,20 @@ class AccessCodeGenerator {
     return '${acotado.substring(0, 4)}-${acotado.substring(4)}';
   }
 
+  /// El código que trae un QR leído, ya como `XXXX-XXXX`, o null si ese QR
+  /// no es un código de acceso.
+  ///
+  /// El QR del acceso lleva solo el código, pero se acepta también el
+  /// mensaje completo que se comparte (alguien pudo hacer un QR con él).
+  static String? codigoDesdeQr(String texto) {
+    final limpio = texto.trim();
+    if (esFormatoValido(limpio) && limpio.length <= _largo + 1) {
+      return formatear(limpio);
+    }
+    final incrustado = _buscarIncrustado(limpio);
+    return incrustado == null ? null : formatear(incrustado);
+  }
+
   /// Busca un código de verdad dentro de un texto más largo.
   ///
   /// Recorre las "palabras" del texto —tandas de letras, dígitos y guiones,

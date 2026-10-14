@@ -49,8 +49,6 @@ Future<void> _leer(
 Product _producto() => Product(
       id: 'agua',
       name: 'Agua',
-      description: 'Agua natural',
-      categoryId: null,
       barcode: '001234567890',
       price: 15,
       stock: 10,

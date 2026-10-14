@@ -45,8 +45,6 @@ void main() {
         Product(
             id: 'agua',
             name: 'Agua',
-            description: 'Botella',
-            categoryId: null,
             price: 20,
             stock: 100,
             isActive: true,

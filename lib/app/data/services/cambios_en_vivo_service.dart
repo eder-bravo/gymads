@@ -11,7 +11,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 enum TablaEnVivo {
   clientes('users'),
   productos('products'),
-  categorias('product_categories'),
   ingresos('ingresos'),
   accesos('access_logs'),
 
@@ -36,7 +35,9 @@ enum TablaEnVivo {
 ///
 /// Los borrados no llegan: Postgres solo manda la llave del registro
 /// borrado, sin `gym_id` para filtrarlo. Se ven al siguiente cambio o al
-/// refrescar.
+/// refrescar. La excepción es el perfil propio ([esBorradoDeMiPerfil]): al
+/// eliminar el acceso o regenerar el código se borra, y quien lo usa debe
+/// salir en ese momento, igual que al revocarlo.
 class CambiosEnVivoService extends GetxService with WidgetsBindingObserver {
   /// [seguirSesion] en false solo para pruebas: no abre el canal.
   CambiosEnVivoService({this.seguirSesion = true});
@@ -110,7 +111,7 @@ class CambiosEnVivoService extends GetxService with WidgetsBindingObserver {
     final tenant = TenantContextService.to;
     final gymId = tenant.currentGymId;
     final userId = tenant.userId;
-    final clave = '$gymId|$userId';
+    final clave = '$gymId|$userId|${tenant.staffProfile?.id}';
     if (clave == _claveDelCanal && _canal != null) return;
 
     _cerrarCanal();
@@ -131,6 +132,21 @@ class CambiosEnVivoService extends GetxService with WidgetsBindingObserver {
           value: esMiPerfil ? userId! : gymId,
         ),
         callback: (_) => anotar([tabla]),
+      );
+    }
+    // El borrado del perfil propio. Realtime no filtra borrados: llegan los
+    // de todos los perfiles, solo con su `id`, y se compara con el propio.
+    final miPerfilId = tenant.staffProfile?.id;
+    if (miPerfilId != null && miPerfilId.isNotEmpty) {
+      canal = canal.onPostgresChanges(
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: TablaEnVivo.miPerfil.nombre,
+        callback: (cambio) {
+          if (esBorradoDeMiPerfil(cambio.oldRecord, miPerfilId)) {
+            anotar([TablaEnVivo.miPerfil]);
+          }
+        },
       );
     }
 
@@ -177,6 +193,13 @@ class CambiosEnVivoService extends GetxService with WidgetsBindingObserver {
       _cambios.add(cambiadas);
     });
   }
+}
+
+/// Si el registro borrado [registroBorrado] (de `staff_profiles`, que solo
+/// trae su llave) es el perfil [miPerfilId] de quien usa la app.
+bool esBorradoDeMiPerfil(Map<String, dynamic> registroBorrado, String? miPerfilId) {
+  if (miPerfilId == null || miPerfilId.isEmpty) return false;
+  return registroBorrado['id']?.toString() == miPerfilId;
 }
 
 /// Para controladores de pantallas que deben recargarse solas cuando otro

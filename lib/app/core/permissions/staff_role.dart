@@ -14,7 +14,7 @@ enum StaffRole {
   /// ni da de alta productos.
   branchStaff('branch_staff', 'Staff', 50),
 
-  /// Solo inventario: productos, precios de producto, categorías y stock.
+  /// Solo inventario: productos, precios de producto y stock.
   almacen('almacen', 'Almacén', 50),
 
   /// Recepción. El único que recibe las alertas del lector de tarjetas.

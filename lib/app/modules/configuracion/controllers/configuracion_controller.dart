@@ -348,7 +348,6 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   final keyEscaner = GlobalKey();
   final keyApariencia = GlobalKey();
   final keyPrecios = GlobalKey();
-  final keyCategorias = GlobalKey();
   final keyAccesos = GlobalKey();
   final keyControlAccesos = GlobalKey();
   final keyLector = GlobalKey();
@@ -374,7 +373,6 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
         if (PlataformaApp.escanerFisico || PlataformaApp.tableta) keyEscaner,
         keyApariencia,
         if (can(Permission.gestionarPreciosAbonos)) keyPrecios,
-        if (can(Permission.gestionarCategorias)) keyCategorias,
         if (can(Permission.gestionarAccesosStaff)) keyAccesos,
         if (can(Permission.gestionarControlAccesos)) keyControlAccesos,
         if (can(Permission.gestionarControlAccesos)) keyLector,
@@ -805,10 +803,6 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   /// Abrir configuración de precios de abonos (precio fijo por periodo)
   void openAbonoPrices() {
     Get.toNamed(Routes.ABONO_PRICES);
-  }
-
-  void openCategorias() {
-    Get.toNamed(Routes.CATEGORIAS);
   }
 
   /// Accesos del personal. Solo para el dueño.

@@ -15,6 +15,8 @@ import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/modules/ingresos/controllers/ingresos_controller.dart';
 import 'dart:async';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/app/data/services/captura_de_tarjeta.dart';
+import 'package:gymads/app/routes/app_pages.dart';
 
 import '../vigencia.dart';
 
@@ -252,6 +254,9 @@ class AbonarController extends GetxController
     }
     alTerminar = alTerminarDesde(Get.arguments);
 
+    // Pasar la tarjeta de un cliente abre su cobro.
+    _soltarTarjeta = CapturaDeTarjeta.tomar(_alPasarTarjeta);
+
     // Escuchar cambios en el buscador
     searchController.addListener(_applyFilter);
 
@@ -345,6 +350,7 @@ class AbonarController extends GetxController
 
   @override
   void onClose() {
+    _soltarTarjeta?.call();
     searchController.dispose();
     cantidadLibreController.dispose();
     montoLibreController.dispose();
@@ -401,6 +407,35 @@ class AbonarController extends GetxController
       buffer.write(index == -1 ? char : plain[index]);
     }
     return buffer.toString();
+  }
+
+  VoidCallback? _soltarTarjeta;
+
+  /// Con Abonar a la vista, la tarjeta de un cliente abre su cobro. Nunca se
+  /// queda con el pase: el lector sigue como siempre (registra la entrada si
+  /// está vigente, avisa si está vencida o si la tarjeta no es de nadie).
+  bool _alPasarTarjeta(String uid, UserModel? dueno) {
+    if (dueno != null && _abonarALaVista && !isLoading.value) {
+      abrirCobroDe(dueno);
+    }
+    return false;
+  }
+
+  /// Sin otra pantalla, diálogo u hoja encima, y con la app abierta.
+  bool get _abonarALaVista =>
+      Get.currentRoute == Routes.ABONAR &&
+      Get.isDialogOpen != true &&
+      Get.isBottomSheetOpen != true &&
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+  /// Abre el cobro de [client], aunque se estuviera cobrando a otro o ya
+  /// saliera el éxito del anterior. Si ya era él, sigue donde iba.
+  @visibleForTesting
+  void abrirCobroDe(UserModel client) {
+    final actual = selectedClient.value;
+    if (!isSuccess.value && actual != null && actual.id == client.id) return;
+    if (actual != null || isSuccess.value) clearSelection();
+    selectClient(client);
   }
 
   void selectClient(UserModel client) {

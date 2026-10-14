@@ -20,7 +20,6 @@ abstract class Routes {
   static const ACCESS_LOGS = _Paths.ACCESS_LOGS;
   static const GOOGLE_COMPLETE = _Paths.GOOGLE_COMPLETE;
   static const ONBOARDING_PAYMENT_MODE = _Paths.ONBOARDING_PAYMENT_MODE;
-  static const CATEGORIAS = _Paths.CATEGORIAS;
   static const STAFF_ACCESOS = _Paths.STAFF_ACCESOS;
   static const CONTROL_ACCESOS = _Paths.CONTROL_ACCESOS;
   static const LECTOR = _Paths.LECTOR;
@@ -46,7 +45,6 @@ abstract class _Paths {
   static const ACCESS_LOGS = '/access-logs';
   static const GOOGLE_COMPLETE = '/google-complete-register';
   static const ONBOARDING_PAYMENT_MODE = '/onboarding/modo-cobro';
-  static const CATEGORIAS = '/inventario/categorias';
   static const STAFF_ACCESOS = '/configuracion/accesos';
   static const CONTROL_ACCESOS = '/configuracion/control-accesos';
   static const LECTOR = '/configuracion/lector';

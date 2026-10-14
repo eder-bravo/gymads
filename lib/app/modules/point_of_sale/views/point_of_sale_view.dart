@@ -6,7 +6,6 @@ import '../controllers/point_of_sale_controller.dart';
 import '../../../data/models/product_model.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
-import '../../../core/utils/category_icons.dart';
 import '../../../core/widgets/tour_step.dart';
 import '../../../core/widgets/cabecera_con_lista.dart';
 import '../../../core/widgets/refrescable.dart';
@@ -79,7 +78,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                       const AvisoEscanerAutomatico(soloTrasLeer: true),
                     // Barra de búsqueda
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                      padding: const EdgeInsets.all(12),
                       child: TourStep(
                         tourKey: controller.keyBuscar,
                         title: 'Buscador',
@@ -89,27 +88,6 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                           hintText: 'Buscar productos...',
                           onChanged: controller.searchProducts,
                         )),
-                      ),
-                    ),
-
-                    // Filtro de categorías
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: TourStep(
-                        tourKey: controller.keyCategorias,
-                        title: 'Categorías',
-                        description: 'Filtra los productos por categoría.',
-                        child: Obx(() => CategoryFilterChips(
-                              categories: controller.activeCategories
-                                  .map((c) => CategoryChipData(
-                                        id: c.id,
-                                        label: c.name,
-                                        icon: CategoryIcons.resolve(c.icon),
-                                      ))
-                                  .toList(),
-                              selectedId: controller.selectedCategoryId,
-                              onSelected: controller.setSelectedCategory,
-                            )),
                       ),
                     ),
                   ],
@@ -253,7 +231,7 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Ícono de categoría + badge de stock
+                      // Ícono + badge de stock
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -264,9 +242,8 @@ class PointOfSaleView extends GetView<PointOfSaleController> {
                               color: c.containerBackground,
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(
-                              CategoryIcons.resolve(controller
-                                  .categoryById[product.categoryId]?.icon),
+                            child: const Icon(
+                              Icons.shopping_bag,
                               color: AppColors.accent,
                               size: 20,
                             ),

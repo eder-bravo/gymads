@@ -25,9 +25,6 @@ enum Permission {
   /// Sumar o restar existencias. No incluye tocar el precio.
   ajustarStock('ajustar_stock'),
 
-  /// Categorías de producto.
-  gestionarCategorias('gestionar_categorias'),
-
   /// Historial de pagos y ventas.
   verIngresos('ver_ingresos'),
 
@@ -70,7 +67,6 @@ const Map<StaffRole, Set<Permission>> kPermisosPorRol = {
     Permission.verInventario,
     Permission.gestionarProductos,
     Permission.ajustarStock,
-    Permission.gestionarCategorias,
     Permission.verIngresos,
     Permission.verAccesos,
     Permission.gestionarPreciosAbonos,
@@ -86,7 +82,6 @@ const Map<StaffRole, Set<Permission>> kPermisosPorRol = {
     Permission.verInventario,
     Permission.gestionarProductos,
     Permission.ajustarStock,
-    Permission.gestionarCategorias,
     Permission.verIngresos,
     Permission.verAccesos,
     Permission.gestionarPreciosAbonos,
@@ -107,7 +102,6 @@ const Map<StaffRole, Set<Permission>> kPermisosPorRol = {
     Permission.verInventario,
     Permission.gestionarProductos,
     Permission.ajustarStock,
-    Permission.gestionarCategorias,
   },
   StaffRole.mostrador: {
     Permission.gestionarClientes,

@@ -351,8 +351,6 @@ void main() {
     await c.addProductToCart(Product(
       id: '1',
       name: 'Agua natural 1 L',
-      description: '',
-      categoryId: null,
       price: 15,
       stock: 10,
       isActive: true,

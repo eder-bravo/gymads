@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
-import 'package:gymads/app/core/utils/category_icons.dart';
 import '../controllers/inventario_controller.dart';
 import '../../../core/utils/plataforma_app.dart';
 import '../../../routes/app_pages.dart';
@@ -36,11 +35,9 @@ class _ProductFormViewState extends State<ProductFormView> {
   final controller = Get.find<InventarioController>();
   final formKey = GlobalKey<FormState>();
   final nameController = TextEditingController();
-  final descriptionController = TextEditingController();
   final priceController = TextEditingController();
   final stockController = TextEditingController();
   final barcodeController = TextEditingController();
-  final selectedCategoryId = RxnString(null);
   late final bool isEditing;
 
   @override
@@ -54,11 +51,9 @@ class _ProductFormViewState extends State<ProductFormView> {
     if (isEditing && controller.currentProduct.value != null) {
       final product = controller.currentProduct.value!;
       nameController.text = product.name;
-      descriptionController.text = product.description;
       priceController.text = product.price.toString();
       stockController.text = product.stock.toString();
       barcodeController.text = product.barcode ?? '';
-      selectedCategoryId.value = product.categoryId;
     } else if (arguments['barcode'] is String) {
       // Llega desde "Código no registrado" al escanear en el inventario.
       barcodeController.text = arguments['barcode'] as String;
@@ -77,14 +72,12 @@ class _ProductFormViewState extends State<ProductFormView> {
   void dispose() {
     for (final campo in [
       nameController,
-      descriptionController,
       priceController,
       stockController,
       barcodeController
     ]) {
       campo.dispose();
     }
-    selectedCategoryId.close();
     super.dispose();
   }
 
@@ -122,8 +115,6 @@ class _ProductFormViewState extends State<ProductFormView> {
                 if (formKey.currentState!.validate()) {
                   controller.saveProduct({
                     'name': nameController.text,
-                    'description': descriptionController.text,
-                    'category_id': selectedCategoryId.value,
                     'price': priceController.text,
                     'barcode': barcodeController.text,
                     // Al editar el stock no se toca aquí.
@@ -170,85 +161,6 @@ class _ProductFormViewState extends State<ProductFormView> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: descriptionController,
-                      style: TextStyle(color: c.textPrimary),
-                      decoration: InputDecoration(
-                        labelText: 'Descripción',
-                        hintText:
-                            'Describe las características del producto...',
-                        prefixIcon: const Icon(Icons.description),
-                        helperText: 'Opcional - Máximo 500 caracteres',
-                        helperStyle: TextStyle(
-                            fontSize: legible(11), color: c.textSecondary),
-                      ),
-                      maxLines: 3,
-                      textCapitalization: TextCapitalization.sentences,
-                      inputFormatters: [
-                        LengthLimitingTextInputFormatter(500),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Category dropdown — reactive with Obx
-                    Obx(() {
-                      // Solo las activas se pueden asignar a un producto.
-                      final cats = controller.activeCategories;
-                      final currentVal = selectedCategoryId.value;
-
-                      // Red de seguridad por si la categoría se borró estando
-                      // el formulario abierto (con ids esto ya es raro).
-                      final validValue = cats.any((c) => c.id == currentVal)
-                          ? currentVal
-                          : null;
-
-                      return DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        value: validValue,
-                        style: TextStyle(color: c.textPrimary),
-                        decoration: const InputDecoration(
-                          labelText: 'Categoría *',
-                          prefixIcon: Icon(Icons.category),
-                        ),
-                        dropdownColor: c.cardBackground,
-                        items: cats.map((category) {
-                          return DropdownMenuItem<String>(
-                            value: category.id,
-                            child: Row(
-                              children: [
-                                Icon(CategoryIcons.resolve(category.icon),
-                                    size: 18, color: AppColors.accent),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    category.name,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(color: c.textPrimary),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          selectedCategoryId.value = value;
-                        },
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor selecciona una categoría';
-                          }
-                          return null;
-                        },
-                        hint: Text(
-                          cats.isEmpty
-                              ? 'Crea categorías desde Configuración'
-                              : 'Selecciona una categoría',
-                          style: TextStyle(
-                              color: c.textSecondary.withOpacity(0.6)),
-                        ),
-                      );
-                    }),
                   ],
                 ),
 

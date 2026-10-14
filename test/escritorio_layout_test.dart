@@ -141,7 +141,7 @@ Future<void> _mostrarApp(WidgetTester tester, {bool claro = false}) async {
       seccion(Routes.ABONAR, 'Abonar'),
       seccion(Routes.POINT_OF_SALE, 'Vender'),
       seccion(Routes.INVENTARIO, 'Inventario'),
-      seccion(Routes.CATEGORIAS, 'Categorías'),
+      seccion(Routes.PRODUCT_FORM, 'Producto'),
       seccion(Routes.INGRESOS, 'Ingresos'),
       seccion(Routes.ACCESS_LOGS, 'Entradas'),
       seccion(Routes.CONFIGURACION, 'Configuración'),
@@ -160,8 +160,6 @@ List<Product> _productos() => List.generate(
             'Bebida isotónica',
             'Toalla deportiva'
           ][i % 4],
-          description: 'Presentación individual',
-          categoryId: null,
           barcode: '1234567890$i',
           price: 15 + i * 5,
           stock: 12 + i,
@@ -359,7 +357,7 @@ void main() {
       'Atajo: ${atajo('5')}.',
       'Atajo: ${atajo('6')}.',
       'Quién entró y a qué hora. Atajo: ${atajo('7')}.',
-      'categorías y lector. Atajo: ${atajo(',')}.',
+      'precios y lector. Atajo: ${atajo(',')}.',
       'Oculta la barra para que la pantalla use todo el ancho',
     ];
     // El botón para abrir la pantalla para clientes, junto a Actualizar.
@@ -718,7 +716,7 @@ void main() {
     await atajo(LogicalKeyboardKey.digit5);
     expect(Get.currentRoute, Routes.INVENTARIO);
     // Una subpantalla sigue marcando su sección y sí lleva flecha atrás.
-    Get.toNamed(Routes.CATEGORIAS);
+    Get.toNamed(Routes.PRODUCT_FORM);
     await tester.pumpAndSettle();
     expect(find.byType(BackButton), findsOneWidget);
     expect(tester.widget<Text>(find.text('Inventario').last).style!.fontWeight,
@@ -949,7 +947,7 @@ void main() {
     await _mostrar(tester, const InventarioView());
     // Nada importante queda detrás de un ícono solo.
     expect(find.text('Nuevo producto'), findsOneWidget);
-    expect(find.text('Categorías'), findsOneWidget);
+    expect(find.text('Categorías'), findsNothing);
     expect(find.text('Editar'), findsNWidgets(2));
     expect(find.text('Stock'), findsNWidgets(2));
     expect(find.text('Más'), findsNWidgets(2));

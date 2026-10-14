@@ -166,8 +166,8 @@ class MenuLateral extends StatelessWidget {
     color: Color(0xFF90A4AE),
   );
 
-  /// La sección a la que pertenece una ruta ("/inventario/categorias" es de
-  /// Inventario). null para pantallas sin nombre de sección.
+  /// La sección a la que pertenece una ruta ("/configuracion/lector" es de
+  /// Configuración). null para pantallas sin nombre de sección.
   static String? seccionDe(String? ruta) {
     if (ruta == null) return null;
     for (final s in [...secciones, configuracion]) {

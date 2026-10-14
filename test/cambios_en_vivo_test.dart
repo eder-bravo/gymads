@@ -49,14 +49,14 @@ void main() {
   testWidgets('cada pantalla recarga solo con los cambios de sus tablas',
       (tester) async {
     final clientes = _Pantalla({TablaEnVivo.clientes});
-    final pos = _Pantalla({TablaEnVivo.productos, TablaEnVivo.categorias});
+    final pos = _Pantalla({TablaEnVivo.productos});
 
     servicio.anotar([TablaEnVivo.clientes]);
     await tester.pump(const Duration(seconds: 2));
     expect(clientes.recargas, 1);
     expect(pos.recargas, 0);
 
-    servicio.anotar([TablaEnVivo.categorias]);
+    servicio.anotar([TablaEnVivo.productos]);
     await tester.pump(const Duration(seconds: 2));
     expect(clientes.recargas, 1);
     expect(pos.recargas, 1);
@@ -100,5 +100,21 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(avisos, isEmpty);
     await sub.cancel();
+  });
+
+  group('esBorradoDeMiPerfil', () {
+    test('el borrado del perfil propio sí cuenta', () {
+      expect(esBorradoDeMiPerfil({'id': 'p1'}, 'p1'), isTrue);
+    });
+
+    test('el de otro perfil, o sin llave, no', () {
+      expect(esBorradoDeMiPerfil({'id': 'p2'}, 'p1'), isFalse);
+      expect(esBorradoDeMiPerfil({}, 'p1'), isFalse);
+    });
+
+    test('sin sesión no hay perfil propio', () {
+      expect(esBorradoDeMiPerfil({'id': 'p1'}, null), isFalse);
+      expect(esBorradoDeMiPerfil({'id': ''}, ''), isFalse);
+    });
   });
 }

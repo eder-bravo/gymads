@@ -7,6 +7,7 @@ import '../../../core/utils/app_logger.dart';
 import '../../../data/models/staff_profile_model.dart';
 import '../../../data/services/tenant_context_service.dart';
 import '../../../routes/app_pages.dart';
+import '../views/escanear_qr_acceso_view.dart';
 
 /// Entrada del personal con un código de un solo uso.
 ///
@@ -31,6 +32,15 @@ class StaffCodeController extends GetxController {
   }
 
   void clearError() => errorMessage.value = null;
+
+  /// Lee el QR del acceso con la cámara y entra con su código.
+  Future<void> escanearQr() async {
+    if (isLoading.value) return;
+    final codigo = await Get.to<String>(() => const EscanearQrAccesoView());
+    if (codigo == null) return;
+    codigoController.text = codigo;
+    await entrar();
+  }
 
   /// Canjea el código y entra. Devuelve true si lo consiguió.
   Future<bool> entrar() async {

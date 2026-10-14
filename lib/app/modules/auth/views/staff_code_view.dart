@@ -10,7 +10,10 @@ import 'package:gymads/core/theme/app_colors.dart';
 
 /// Entrada del personal con su código de acceso.
 ///
-/// Un único campo: ni correo ni contraseña. Comparte el fondo y el estilo del
+/// En teléfono y tableta lo principal es escanear el QR; el campo queda
+/// debajo para escribir el código. En la computadora no hay cámara: solo el
+/// campo (un lector de códigos que escribe como teclado también sirve).
+/// Ni correo ni contraseña. Comparte el fondo y el estilo del
 /// login para que se lea como parte del mismo flujo.
 class StaffCodeView extends GetView<StaffCodeController> {
   const StaffCodeView({super.key});
@@ -79,7 +82,9 @@ class StaffCodeView extends GetView<StaffCodeController> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Escribe el código que te dio el dueño del gimnasio',
+          _conCamara
+              ? 'Escanea el QR que te dio el dueño del gimnasio'
+              : 'Escribe el código que te dio el dueño del gimnasio',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -110,6 +115,18 @@ class StaffCodeView extends GetView<StaffCodeController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_conCamara) ...[
+            _buildScanButton(),
+            const SizedBox(height: 20),
+            Text(
+              'o escribe tu código',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: c.contraste.withOpacity(0.6),
+                fontSize: legible(13),
+              ),
+            ),
+          ],
           _buildCodeField(context),
           const SizedBox(height: 24),
           Obx(() => controller.errorMessage.value != null
@@ -118,7 +135,9 @@ class StaffCodeView extends GetView<StaffCodeController> {
           _buildEnterButton(),
           const SizedBox(height: 20),
           Text(
-            'El código solo sirve una vez.',
+            _conCamara
+                ? 'El QR y el código solo sirven una vez.'
+                : 'El código solo sirve una vez.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: c.contraste.withOpacity(0.5),
@@ -135,7 +154,8 @@ class StaffCodeView extends GetView<StaffCodeController> {
     final c = context.colores;
     return TextField(
       controller: controller.codigoController,
-      autofocus: true,
+      // Con cámara, el teclado abierto taparía el botón del QR.
+      autofocus: !_conCamara,
       textAlign: TextAlign.center,
       textCapitalization: TextCapitalization.characters,
       textInputAction: TextInputAction.go,
@@ -163,6 +183,32 @@ class StaffCodeView extends GetView<StaffCodeController> {
         contentPadding: const EdgeInsets.symmetric(vertical: 20),
       ),
     );
+  }
+
+  /// Teléfono o tableta: hay cámara para leer el QR.
+  bool get _conCamara => !PlataformaApp.escanerFisico;
+
+  Widget _buildScanButton() {
+    return Obx(() => SizedBox(
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed:
+                controller.isLoading.value ? null : controller.escanearQr,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            icon: const Icon(Icons.qr_code_scanner, size: 24),
+            label: const Text(
+              'Escanear QR',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ));
   }
 
   Widget _buildErrorMessage() {
@@ -194,20 +240,23 @@ class StaffCodeView extends GetView<StaffCodeController> {
           height: 50,
           child: ElevatedButton(
             onPressed: controller.isLoading.value ? null : controller.entrar,
+            // Con cámara el botón principal es el del QR: este va más tenue.
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
+              backgroundColor: _conCamara
+                  ? AppColors.accent.withOpacity(0.18)
+                  : AppColors.accent,
+              foregroundColor: _conCamara ? AppColors.accent : Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               elevation: 0,
             ),
             child: controller.isLoading.value
-                ? const SizedBox(
+                ? SizedBox(
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: _conCamara ? AppColors.accent : Colors.white,
                       strokeWidth: 2,
                     ),
                   )

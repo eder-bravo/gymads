@@ -1,15 +1,22 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/snackbar_helper.dart';
 
-/// Muestra el código de acceso recién generado.
+/// Muestra el código de acceso recién generado, como QR y escrito.
 ///
-/// Es la única vez que ese código es visible: en el servidor solo se guarda su
+/// El QR es lo principal: el empleado lo escanea en "Entrar como staff" y
+/// entra sin teclear. Lleva el mismo código, así que también es de un solo
+/// uso. Es la única vez que ese código es visible: en el servidor solo se guarda su
 /// hash. Por eso el diálogo no se cierra tocando fuera y lo dice de forma
 /// explícita — si se pierde, la salida es regenerarlo, no recuperarlo.
 Future<void> showCodigoGeneradoDialog({
@@ -45,8 +52,8 @@ class _CodigoGeneradoDialog extends StatelessWidget {
   String get _mensajeCompartir =>
       'Hola $nombre, este es tu código para entrar a $gymName:\n\n'
       '$codigo\n\n'
-      'Abre la app, toca "Entrar como staff" y escríbelo. '
-      'Solo funciona una vez.';
+      'Abre la app, toca "Entrar como staff" y escanea el QR o escribe el '
+      'código. Solo funciona una vez.';
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +98,7 @@ class _CodigoGeneradoDialog extends StatelessWidget {
             Text(
               esRegenerado
                   ? 'El código anterior de $nombre dejó de servir.'
-                  : 'Comparte este código con $nombre.',
+                  : 'Que $nombre lo escanee en "Entrar como staff".',
               style: TextStyle(
                 color: c.textSecondary.withOpacity(0.85),
                 fontSize: 14,
@@ -99,24 +106,46 @@ class _CodigoGeneradoDialog extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // El código, protagonista de la pantalla.
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              decoration: BoxDecoration(
-                color: c.containerBackground,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.accent.withOpacity(0.5)),
+            // El QR, protagonista de la pantalla. Fondo blanco siempre: en
+            // modo oscuro un QR claro sobre oscuro muchas cámaras no lo leen.
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.accent.withOpacity(0.5)),
+                ),
+                child: QrImageView(
+                  data: codigo,
+                  size: 200,
+                  padding: EdgeInsets.zero,
+                  backgroundColor: Colors.white,
+                  semanticsLabel: 'QR del código de acceso',
+                ),
               ),
-              child: Center(
-                child: SelectableText(
-                  codigo,
-                  style: const TextStyle(
-                    color: AppColors.accent,
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 4,
-                    fontFamily: 'monospace',
-                  ),
+            ),
+            const SizedBox(height: 14),
+
+            // El código escrito, por si no se puede escanear.
+            Text(
+              'O que escriba el código',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: c.textSecondary.withOpacity(0.85),
+                fontSize: legible(12.5),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Center(
+              child: SelectableText(
+                codigo,
+                style: const TextStyle(
+                  color: AppColors.accent,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 4,
+                  fontFamily: 'monospace',
                 ),
               ),
             ),
@@ -233,6 +262,41 @@ class _CodigoGeneradoDialog extends StatelessWidget {
       );
     }
 
-    await Share.share(_mensajeCompartir, sharePositionOrigin: origen);
+    // Con la imagen del QR, para escanearla desde otra pantalla o elegirla
+    // como foto. Si no se puede (sin archivos en esa plataforma), solo el
+    // texto, que también trae el código.
+    try {
+      final qr = await _archivoDelQr();
+      await Share.shareXFiles(
+        [XFile(qr.path, mimeType: 'image/png')],
+        text: _mensajeCompartir,
+        sharePositionOrigin: origen,
+      );
+    } catch (_) {
+      await Share.share(_mensajeCompartir, sharePositionOrigin: origen);
+    }
+  }
+
+  /// El QR como PNG, con fondo blanco y margen para que se lea en cualquier
+  /// chat (en modo oscuro un PNG transparente queda negro sobre negro).
+  Future<File> _archivoDelQr() async {
+    const lado = 600.0;
+    const margen = 48.0;
+    final grabadora = ui.PictureRecorder();
+    final lienzo = Canvas(grabadora)
+      ..drawRect(const Rect.fromLTWH(0, 0, lado, lado),
+          Paint()..color = Colors.white)
+      ..translate(margen, margen);
+    QrPainter(data: codigo, version: QrVersions.auto, gapless: true)
+        .paint(lienzo, const Size.square(lado - 2 * margen));
+    final imagen =
+        await grabadora.endRecording().toImage(lado.toInt(), lado.toInt());
+    final png = await imagen.toByteData(format: ui.ImageByteFormat.png);
+    imagen.dispose();
+
+    final carpeta = await getTemporaryDirectory();
+    final archivo = File('${carpeta.path}/codigo_de_acceso.png');
+    await archivo.writeAsBytes(png!.buffer.asUint8List(), flush: true);
+    return archivo;
   }
 }

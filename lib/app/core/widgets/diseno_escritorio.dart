@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -721,131 +720,6 @@ class VentanaFormulario extends StatelessWidget {
   }
 }
 
-/// Una fila de [children] que se desplaza de lado cuando no caben (los
-/// filtros de categoría).
-///
-/// En el teléfono es la lista de siempre, que se arrastra con el dedo. En
-/// pantalla grande se le añade lo que un mouse necesita para llegar a lo que
-/// no cabe: una barra visible que se arrastra, la rueda del mouse (que mueve
-/// la fila de lado) y arrastrar con el mouse. En tableta la barra muestra que
-/// hay más a los lados. La barra solo aparece si algo no cabe.
-class FilaDesplazable extends StatefulWidget {
-  const FilaDesplazable({
-    super.key,
-    required this.children,
-    this.alto = 50,
-  });
-
-  final List<Widget> children;
-
-  /// Alto de la fila, sin contar la barra.
-  final double alto;
-
-  @override
-  State<FilaDesplazable> createState() => _FilaDesplazableState();
-}
-
-class _FilaDesplazableState extends State<FilaDesplazable> {
-  final _controlador = ScrollController();
-
-  /// Espacio que ocupa la barra bajo la fila, solo mientras hay algo que
-  /// desplazar.
-  static const _alturaBarra = 12.0;
-  bool _desborda = false;
-
-  @override
-  void dispose() {
-    _controlador.dispose();
-    super.dispose();
-  }
-
-  /// La rueda vertical mueve la fila de lado; con trackpad o rueda lateral ya
-  /// se mueve sola. Solo si la fila se desplaza: si no, la rueda sigue para la
-  /// pantalla de abajo.
-  void _alRueda(PointerSignalEvent evento) {
-    if (evento is! PointerScrollEvent || !_controlador.hasClients) return;
-    final posicion = _controlador.position;
-    if (posicion.maxScrollExtent <= 0) return;
-    final delta = evento.scrollDelta;
-    if (delta.dy == 0 || delta.dx != 0) return;
-    GestureBinding.instance.pointerSignalResolver.register(evento, (_) {
-      _controlador.jumpTo((posicion.pixels + delta.dy)
-          .clamp(posicion.minScrollExtent, posicion.maxScrollExtent));
-    });
-  }
-
-  bool _alMedir(ScrollMetricsNotification n) {
-    final desborda = n.metrics.maxScrollExtent > 0;
-    if (desborda != _desborda) {
-      // Se avisa al terminar el cuadro: esto llega mientras se mide.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && desborda != _desborda) {
-          setState(() => _desborda = desborda);
-        }
-      });
-    }
-    return false;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!PlataformaApp.pantallaGrande) {
-      return SizedBox(
-        height: widget.alto,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          children: widget.children,
-        ),
-      );
-    }
-    final barra = _desborda ? _alturaBarra : 0.0;
-    return NotificationListener<ScrollMetricsNotification>(
-      onNotification: _alMedir,
-      child: Listener(
-        onPointerSignal: _alRueda,
-        child: ScrollConfiguration(
-          behavior: ScrollConfiguration.of(context).copyWith(
-            // La barra es la de abajo, siempre visible: la de siempre solo
-            // aparece al desplazar.
-            scrollbars: false,
-            dragDevices: {
-              ...ScrollConfiguration.of(context).dragDevices,
-              PointerDeviceKind.mouse,
-            },
-          ),
-          // A todo lo ancho: sin esto la fila toma el ancho de sus filtros y,
-          // si caben, se centra en vez de empezar a la izquierda.
-          child: SizedBox(
-            width: double.infinity,
-            height: widget.alto + barra,
-            child: Scrollbar(
-              controller: _controlador,
-              thumbVisibility: _desborda,
-              trackVisibility: _desborda,
-              interactive: true,
-              thickness: 8,
-              radius: const Radius.circular(4),
-              // No un ListView: este mide sus elementos conforme los dibuja y
-              // calcula el largo total por estimación, y la barra no llegaría
-              // al último. Aquí son pocos y se miden todos.
-              child: SingleChildScrollView(
-                controller: _controlador,
-                scrollDirection: Axis.horizontal,
-                // La barra va debajo de las fichas, no encima.
-                padding: EdgeInsets.only(bottom: barra),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: widget.children,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Respuesta al mouse para fichas hechas a mano (sin `InkWell`): cursor de
 /// mano y un estado [encima] para resaltar el borde. En el teléfono no hay
 /// mouse: [builder] recibe siempre `false`.
@@ -900,8 +774,8 @@ class AccionDeBarra extends StatelessWidget {
   final VoidCallback? onPressed;
   final Widget movil;
 
-  /// Una acción de apoyo (abrir Categorías, Cobrar visita): botón de texto,
-  /// sin relleno, para que la principal siga destacando.
+  /// Una acción de apoyo (Cobrar visita): botón de texto, sin relleno, para
+  /// que la principal siga destacando.
   final bool secundaria;
 
   @override

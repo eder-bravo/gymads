@@ -23,7 +23,7 @@ class TenantQueryHelper {
   /// Adds gym_id filter to a query (for gym-level data)
   ///
   /// Use this for tables that are shared across branches:
-  /// membership_types, product_categories
+  /// membership_types
   static PostgrestFilterBuilder<T> byGym<T>(
     PostgrestFilterBuilder<T> query,
   ) {

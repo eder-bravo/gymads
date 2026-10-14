@@ -126,8 +126,6 @@ class ProductRepository {
           .from('products')
           .update({
             'name': product.name,
-            'description': product.description,
-            'category_id': product.categoryId,
             'price': product.price,
             'is_active': product.isActive,
             'barcode': product.barcode,
@@ -256,148 +254,6 @@ class ProductRepository {
     }
   }
 
-  // ══════════════════════════════════════════════════════════
-  // CATEGORÍAS
-  //
-  // A diferencia del resto del repositorio, estos métodos LANZAN en vez de
-  // devolver null: un nombre duplicado o un borrado bloqueado tienen que
-  // llegar al usuario como mensaje, no desaparecer en silencio.
-  // ══════════════════════════════════════════════════════════
-
-  /// Categorías del gimnasio actual, ordenadas como las colocó el usuario.
-  ///
-  /// Por defecto devuelve también las inactivas: hacen falta para resolver el
-  /// nombre de un producto cuya categoría se desactivó. Usa `activeOnly` para
-  /// las listas donde el usuario elige.
-  Future<List<ProductCategory>> getAllCategories({bool activeOnly = false}) async {
-    try {
-      final gymId = TenantQueryHelper.gymIdOrNull;
-      if (gymId == null) return [];
-
-      var query =
-          _supabase.from('product_categories').select().eq('gym_id', gymId);
-      if (activeOnly) query = query.eq('is_active', true);
-
-      final response = await query
-          .order('sort_order', ascending: true)
-          .order('name', ascending: true);
-
-      return response
-          .map<ProductCategory>((json) => ProductCategory.fromJson(json))
-          .toList();
-    } catch (e) {
-      AppLogger.error('ProductRepository', 'Error al obtener categorías', e);
-      return [];
-    }
-  }
-
-  /// Crea una categoría. Lanza [CategoryException] si el nombre ya existe.
-  Future<ProductCategory> createCategory(ProductCategory category) async {
-    try {
-      final response = await _supabase
-          .from('product_categories')
-          .insert(TenantQueryHelper.withGym(category.toJsonForInsert()))
-          .select()
-          .single();
-
-      return ProductCategory.fromJson(response);
-    } catch (e) {
-      AppLogger.error('ProductRepository', 'Error al crear categoría', e);
-      throw _mapCategoryError(e);
-    }
-  }
-
-  /// Actualiza nombre, descripción, icono o estado de una categoría.
-  Future<ProductCategory> updateCategory(ProductCategory category) async {
-    try {
-      final response = await _supabase
-          .from('product_categories')
-          .update(category.toJsonForUpdate())
-          .eq('id', category.id)
-          .select()
-          .single();
-
-      return ProductCategory.fromJson(response);
-    } catch (e) {
-      AppLogger.error('ProductRepository', 'Error al actualizar categoría', e);
-      throw _mapCategoryError(e);
-    }
-  }
-
-  /// Borrado definitivo. Solo el dueño (política RLS) y solo si no tiene
-  /// productos (clave foránea con RESTRICT).
-  Future<void> deleteCategory(String categoryId) async {
-    try {
-      final response = await _supabase
-          .from('product_categories')
-          .delete()
-          .eq('id', categoryId)
-          .select();
-
-      // Un borrado bloqueado por RLS no lanza: simplemente no toca ninguna
-      // fila. Sin esta comprobación parecería que funcionó.
-      if ((response as List).isEmpty) {
-        throw const CategoryException(CategoryFailure.notAllowed);
-      }
-    } on CategoryException {
-      rethrow;
-    } catch (e) {
-      AppLogger.error('ProductRepository', 'Error al eliminar categoría', e);
-      throw _mapCategoryError(e);
-    }
-  }
-
-  /// Cuántos productos usa cada categoría, en una sola consulta.
-  Future<Map<String, int>> countProductsByCategory() async {
-    try {
-      final branchId = TenantQueryHelper.branchIdOrNull;
-      if (branchId == null) return {};
-
-      final response = await _supabase
-          .from('products')
-          .select('category_id')
-          .eq('branch_id', branchId);
-
-      final counts = <String, int>{};
-      for (final row in response) {
-        final id = row['category_id'] as String?;
-        if (id != null) counts[id] = (counts[id] ?? 0) + 1;
-      }
-      return counts;
-    } catch (e) {
-      AppLogger.error('ProductRepository', 'Error al contar productos', e);
-      return {};
-    }
-  }
-
-  /// Guarda el nuevo orden de las categorías de una pasada.
-  Future<void> reorderCategories(List<String> orderedIds) async {
-    try {
-      await _supabase.rpc(
-        'reorder_product_categories',
-        params: {'p_ids': orderedIds},
-      );
-    } catch (e) {
-      AppLogger.error('ProductRepository', 'Error al reordenar categorías', e);
-      throw _mapCategoryError(e);
-    }
-  }
-
-  /// Traduce los códigos SQLSTATE de Postgres a un fallo que la UI entiende.
-  CategoryException _mapCategoryError(Object e) {
-    if (e is PostgrestException) {
-      switch (e.code) {
-        case '23505': // unique_violation
-          return const CategoryException(CategoryFailure.duplicateName);
-        case '23503': // foreign_key_violation
-          return const CategoryException(CategoryFailure.hasProducts);
-        case '42501': // insufficient_privilege
-          return const CategoryException(CategoryFailure.notAllowed);
-      }
-    }
-    return const CategoryException(CategoryFailure.unknown);
-  }
-
   // Eliminar producto permanentemente
   Future<bool> deleteProduct(String productId) async {
     try {
@@ -456,49 +312,6 @@ class ProductRepository {
       return _emptyInventoryStats;
     }
   }
-}
-
-/// Motivos por los que una operación sobre categorías puede fallar.
-enum CategoryFailure {
-  /// Ya existe una categoría con ese nombre en el gimnasio (ignora
-  /// mayúsculas y espacios).
-  duplicateName,
-
-  /// La categoría todavía tiene productos asignados.
-  hasProducts,
-
-  /// La política RLS lo rechazó: solo el dueño puede borrar categorías.
-  notAllowed,
-
-  unknown,
-}
-
-class CategoryException implements Exception {
-  final CategoryFailure kind;
-  const CategoryException(this.kind);
-
-  /// Mensaje listo para mostrar. [categoryName] y [productCount] enriquecen
-  /// el texto cuando el llamador los conoce.
-  String message({String? categoryName, int? productCount}) {
-    switch (kind) {
-      case CategoryFailure.duplicateName:
-        return 'Ya existe una categoría con ese nombre.';
-      case CategoryFailure.hasProducts:
-        final nombre = categoryName == null ? 'Esta categoría' : '"$categoryName"';
-        final cuantos = productCount == null
-            ? 'productos asignados'
-            : '$productCount producto${productCount == 1 ? '' : 's'}';
-        return 'No puedes eliminar $nombre porque tiene $cuantos. '
-            'Cámbialos de categoría o desactívala.';
-      case CategoryFailure.notAllowed:
-        return 'Solo el dueño puede eliminar categorías.';
-      case CategoryFailure.unknown:
-        return 'No se pudo completar la operación. Intenta de nuevo.';
-    }
-  }
-
-  @override
-  String toString() => 'CategoryException($kind)';
 }
 
 /// El código de barras que se intentó guardar ya pertenece a otro producto

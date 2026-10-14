@@ -18,8 +18,6 @@ import 'package:gymads/app/data/models/staff_acceso_model.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
 import 'package:gymads/app/data/models/gym_settings_model.dart';
-import 'package:gymads/app/modules/categorias/controllers/categorias_controller.dart';
-import 'package:gymads/app/modules/categorias/views/categorias_view.dart';
 import 'package:gymads/app/modules/staff_accesos/controllers/staff_accesos_controller.dart';
 import 'package:gymads/app/modules/staff_accesos/views/staff_accesos_view.dart';
 import 'package:gymads/app/modules/configuracion/controllers/abono_prices_controller.dart';
@@ -40,7 +38,6 @@ import 'package:gymads/app/modules/point_of_sale/views/point_of_sale_view.dart';
 import 'package:gymads/app/modules/point_of_sale/controllers/point_of_sale_controller.dart';
 import 'package:gymads/app/modules/ingresos/widgets/detalle_ingreso_sheet.dart';
 import 'package:gymads/app/modules/staff_accesos/views/codigo_generado_dialog.dart';
-import 'package:gymads/app/modules/categorias/views/category_form_dialog.dart';
 import 'package:gymads/app/modules/inventario/views/stock_adjust_dialog.dart';
 import 'package:gymads/app/modules/inventario/views/inventario_view.dart';
 import 'package:gymads/app/modules/configuracion/views/agregar_lector_view.dart';
@@ -173,21 +170,6 @@ class _Inventario extends InventarioController {
   void onReady() {}
   @override
   bool can(Permission permiso) => true;
-}
-
-class _Categorias extends GetxController implements CategoriasController {
-  @override
-  final categories = <ProductCategory>[].obs;
-  @override
-  final isLoading = false.obs;
-  @override
-  final isSaving = false.obs;
-  @override
-  bool get puedeGestionar => true;
-  @override
-  int countFor(String id) => 1234;
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _Personal extends GetxController implements StaffAccesosController {
@@ -425,8 +407,6 @@ List<Product> _productos() => List.generate(
             'Barra de proteína',
             'Toalla deportiva'
           ][i % 3],
-          description: 'Presentación individual',
-          categoryId: null,
           barcode: '75010000$i',
           price: 15 + i * 10,
           stock: i == 2 ? -3 : 12 + i,
@@ -461,42 +441,6 @@ IngresoModel _ingreso() => IngresoModel(
     metodoPago: 'transferencia',
     fecha: DateTime(2026, 10, 1),
     usuarioStaff: 'Mostrador');
-ProductCategory _categoria() => ProductCategory(
-    id: 'bebidas',
-    name: 'Bebidas y suplementos para entrenamiento',
-    description: '',
-    icon: 'shopping_bag',
-    sortOrder: 0,
-    isActive: false,
-    createdAt: DateTime(2026),
-    updatedAt: DateTime(2026));
-
-/// Categorías de sobra: los filtros no caben en una pantalla y hay que
-/// desplazarlos.
-List<ProductCategory> _muchasCategorias() => [
-      for (final (i, nombre) in [
-        'Bebidas',
-        'Suplementos',
-        'Barras de proteína',
-        'Ropa deportiva',
-        'Accesorios',
-        'Toallas',
-        'Guantes',
-        'Cinturones',
-        'Snacks',
-        'Equipo de entrenamiento',
-      ].indexed)
-        ProductCategory(
-            id: 'c$i',
-            name: nombre,
-            description: '',
-            icon: 'shopping_bag',
-            sortOrder: i,
-            isActive: true,
-            createdAt: DateTime(2026),
-            updatedAt: DateTime(2026)),
-    ];
-
 class _RepoPrecios implements AbonoPricesRepository {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -612,11 +556,6 @@ void main() {
       c.montoLibre.value = 1500;
       return const AbonarView();
     },
-    'Categorías': () {
-      final c = Get.put<CategoriasController>(_Categorias());
-      c.categories.add(_categoria());
-      return const CategoriasView();
-    },
     'Personal': () {
       final c = Get.put<StaffAccesosController>(_Personal());
       c.accesos.add(StaffAccesoModel(
@@ -701,21 +640,6 @@ void main() {
           {'totalProducts': 6, 'totalStock': 69, 'totalValue': 2350.0});
       return const InventarioView();
     },
-    'Venta con muchas categorías': () {
-      final c = Get.put<PointOfSaleController>(_Venta());
-      c.categories.addAll(_muchasCategorias());
-      c.availableProducts.addAll(_productos());
-      return const PointOfSaleView();
-    },
-    'Inventario con muchas categorías': () {
-      final c = Get.put<InventarioController>(_Inventario());
-      c.categories.addAll(_muchasCategorias());
-      c.products.addAll(_productos());
-      c.filterProducts();
-      c.inventoryStats.assignAll(
-          {'totalProducts': 6, 'totalStock': 69, 'totalValue': 2350.0});
-      return const InventarioView();
-    },
     'Venta': () {
       final c = Get.put<PointOfSaleController>(_Venta());
       c.availableProducts.addAll(_productos());
@@ -738,10 +662,6 @@ void main() {
     'Ajuste de stock': () {
       Get.put<InventarioController>(_Inventario());
       return _AbreAlMostrar((_) => showStockAdjustDialog(_productos()[1]));
-    },
-    'Categoría nueva': () {
-      Get.put<CategoriasController>(_Categorias());
-      return _AbreAlMostrar((_) => showCategoryFormDialog());
     },
     'Código generado': () => _AbreAlMostrar((_) => showCodigoGeneradoDialog(
         nombre: 'María Fernanda', codigo: 'K7P2-9QXA', gymName: 'Gimnasio')),
@@ -1260,16 +1180,7 @@ void main() {
 
   testWidgets('producto conserva texto, selección y foco al reducir y ampliar',
       (tester) async {
-    final ctrl = Get.put<InventarioController>(_Inventario());
-    ctrl.categories.add(ProductCategory(
-        id: 'bebidas',
-        name: 'Bebidas y suplementos para entrenamiento',
-        description: '',
-        icon: 'shopping_bag',
-        sortOrder: 0,
-        isActive: true,
-        createdAt: DateTime(2026),
-        updatedAt: DateTime(2026)));
+    Get.put<InventarioController>(_Inventario());
     tester.view.physicalSize = const Size(900, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -1277,12 +1188,6 @@ void main() {
         theme: AppTheme.oscuro,
         builder: (_, child) => VentanaEscritorio(child: child!),
         home: const ProductFormView()));
-    await tester.pumpAndSettle();
-    final categoria = find.byType(DropdownButtonFormField<String>);
-    await tester.tap(categoria);
-    await tester.pumpAndSettle();
-    await tester
-        .tap(find.text('Bebidas y suplementos para entrenamiento').last);
     await tester.pumpAndSettle();
     final nombre = find.widgetWithText(TextFormField, 'Nombre del producto *');
     await tester.enterText(nombre, 'Proteína de prueba');
@@ -1301,7 +1206,6 @@ void main() {
       expect(campo.text, 'Proteína de prueba');
       expect(campo.selection, seleccion);
       expect(FocusManager.instance.primaryFocus, same(foco));
-      expect(tester.state<FormFieldState<String>>(categoria).value, 'bebidas');
       if (size.width < VentanaEscritorio.minimo.width ||
           size.height < VentanaEscritorio.minimo.height) {
         await tester.ensureVisible(find.text('Guardar producto'));

@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gymads/app/data/models/product_model.dart';
 import 'package:gymads/core/theme/app_colors.dart';
-import 'package:gymads/app/routes/app_pages.dart';
 import 'package:gymads/app/global_widgets/app_header.dart';
-import 'package:gymads/app/core/utils/category_icons.dart';
 import 'package:gymads/app/core/widgets/tour_step.dart';
 import '../../../core/permissions/permissions.dart';
 import '../../../core/widgets/cabecera_con_lista.dart';
@@ -57,34 +55,6 @@ class InventarioView extends GetView<InventarioController> {
             onPressed: () => controller.refreshAll(),
             tooltip: PlataformaApp.escritorio ? 'Actualizar' : null,
           ),
-          // Las categorías las ordena quien gestiona el inventario.
-          if (controller.can(Permission.gestionarCategorias))
-            TourStep(
-              tourKey: controller.keyCategorias,
-              isFirstStep:
-                  controller.esPrimerPasoDelTour(controller.keyCategorias),
-              title: 'Categorías',
-              description: 'Agrupa tus productos por categoría.',
-              borderRadius: 24,
-              child: AccionDeBarra(
-                texto: 'Categorías',
-                icono: Icons.category_outlined,
-                secundaria: true,
-                onPressed: () async {
-                  await Get.toNamed(Routes.CATEGORIAS);
-                  controller.loadCategories();
-                },
-                movil: IconButton(
-                  icon: const Icon(Icons.category_outlined),
-                  tooltip: 'Categorías',
-                  onPressed: () async {
-                    await Get.toNamed(Routes.CATEGORIAS);
-                    // Al volver pueden haber cambiado nombres, iconos u orden.
-                    controller.loadCategories();
-                  },
-                ),
-              ),
-            ),
           // Dar de alta un producto fija su precio: es de quien gestiona el
           // inventario, no de quien solo mueve existencias.
           if (controller.can(Permission.gestionarProductos))
@@ -141,7 +111,6 @@ class InventarioView extends GetView<InventarioController> {
               isFirstStep: controller.esPrimerPasoDelTour(controller.keyBuscar),
               child: _buildSearchBar(),
             ),
-            _buildCategoryFilter(),
           ],
           lista: TourStep(
             tourKey: controller.keyLista,
@@ -399,33 +368,15 @@ class InventarioView extends GetView<InventarioController> {
   }
 
   Widget _buildSearchBar() {
+    // Sin filtros debajo: el espacio que dejaban queda bajo el buscador.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: BusquedaConEscaner(
           child: AppSearchField(
         hintText: 'Buscar productos...',
         onChanged: controller.setSearchQuery,
       )),
     );
-  }
-
-  Widget _buildCategoryFilter() {
-    return Obx(() {
-      return Container(
-        margin: const EdgeInsets.all(16),
-        child: CategoryFilterChips(
-          categories: controller.activeCategories
-              .map((c) => CategoryChipData(
-                    id: c.id,
-                    label: c.name,
-                    icon: CategoryIcons.resolve(c.icon),
-                  ))
-              .toList(),
-          selectedId: controller.selectedCategoryId.value,
-          onSelected: controller.setSelectedCategory,
-        ),
-      );
-    });
   }
 
   Widget _buildProductList(BuildContext context) {
@@ -477,8 +428,6 @@ class InventarioView extends GetView<InventarioController> {
       // Hay productos, pero ninguno pasa el filtro. Antes esto no se
       // comprobaba y quedaba un hueco en blanco sin ningún mensaje.
       if (controller.filteredProducts.isEmpty) {
-        final hayFiltroDeCategoria =
-            controller.selectedCategoryId.value != null;
         return Refrescable.centrado(
           onRefresh: controller.refreshAll,
           child: Padding(
@@ -490,24 +439,13 @@ class InventarioView extends GetView<InventarioController> {
                     size: 56, color: c.textSecondary.withOpacity(0.5)),
                 const SizedBox(height: 16),
                 Text(
-                  hayFiltroDeCategoria
-                      ? 'No hay productos en esta categoría'
-                      : 'Ningún producto coincide con la búsqueda',
+                  'Ningún producto coincide con la búsqueda',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: c.textSecondary,
                     fontSize: 16,
                   ),
                 ),
-                if (hayFiltroDeCategoria) ...[
-                  const SizedBox(height: 16),
-                  TextButton.icon(
-                    onPressed: () => controller.setSelectedCategory(null),
-                    icon: const Icon(Icons.clear, color: AppColors.accent),
-                    label: const Text('Ver todas',
-                        style: TextStyle(color: AppColors.accent)),
-                  ),
-                ],
               ],
             ),
           ),
@@ -574,12 +512,6 @@ class InventarioView extends GetView<InventarioController> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              product.description,
-              style: TextStyle(color: c.textSecondary),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
             const SizedBox(height: 4),
             Wrap(
               spacing: 4,
@@ -732,26 +664,13 @@ class InventarioView extends GetView<InventarioController> {
                   ),
                   const SizedBox(width: 14),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(product.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: c.textPrimary)),
-                        if (product.description.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(product.description,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  color: c.textSecondary, fontSize: 14)),
-                        ],
-                      ],
-                    ),
+                    child: Text(product.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: c.textPrimary)),
                   ),
                   const SizedBox(width: 12),
                   Text(

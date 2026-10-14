@@ -39,8 +39,6 @@ class _CargaLenta extends CarritoGuardado {
 Product producto(String id, {double precio = 20}) => Product(
       id: id,
       name: id,
-      description: '',
-      categoryId: null,
       price: precio,
       stock: 100,
       isActive: true,

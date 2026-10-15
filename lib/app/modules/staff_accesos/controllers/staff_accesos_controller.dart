@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 import '../../../core/permissions/permissions.dart';
@@ -6,6 +9,7 @@ import '../../../core/utils/app_logger.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../data/models/staff_acceso_model.dart';
 import '../../../data/repositories/staff_acceso_repository.dart';
+import '../../../data/services/cambios_en_vivo_service.dart';
 import '../../../data/services/tenant_context_service.dart';
 
 /// Accesos del personal del gimnasio.
@@ -15,8 +19,22 @@ import '../../../data/services/tenant_context_service.dart';
 /// escritura exigen `staff_puede('gestionar_accesos_staff')`. Además, cada uno
 /// solo puede tocar accesos con un rol por debajo del suyo, de modo que un
 /// encargado no puede nombrar ni degradar a otro encargado.
-class StaffAccesosController extends GetxController {
-  final StaffAccesoRepository _repository = StaffAccesoRepository();
+///
+/// Se recarga sola cuando cambia un acceso (Realtime), para que el canje de un
+/// código se vea al momento: el acceso pasa de "pendiente" a "activo" sin
+/// salir de la pantalla. Como respaldo, mientras haya un código sin usar se
+/// revisa también cada [_revisarPendientesCada]: si el aviso de Realtime no
+/// llega (red, canal caído), el canje se ve igual en unos segundos.
+class StaffAccesosController extends GetxController with RecargaEnVivoMixin {
+  StaffAccesosController({StaffAccesoRepository? repository})
+      : _repository = repository ?? StaffAccesoRepository();
+
+  final StaffAccesoRepository _repository;
+
+  static const _revisarPendientesCada = Duration(seconds: 4);
+  Timer? _revisarPendientes;
+  Worker? _alCambiarAccesos;
+  bool _revisando = false;
 
   final RxList<StaffAccesoModel> accesos = <StaffAccesoModel>[].obs;
 
@@ -41,7 +59,50 @@ class StaffAccesosController extends GetxController {
   void onInit() {
     super.onInit();
     load();
+    recargarAlCambiar({TablaEnVivo.personal}, _recargarEnSilencio);
+    _alCambiarAccesos = ever(accesos, (_) => _vigilarPendientes());
   }
+
+  @override
+  void onClose() {
+    _alCambiarAccesos?.dispose();
+    _revisarPendientes?.cancel();
+    super.onClose();
+  }
+
+  /// Revisa la lista cada pocos segundos solo mientras haya un código
+  /// pendiente; en cuanto no queda ninguno, deja de hacerlo.
+  void _vigilarPendientes() {
+    final hayPendientes = accesos.any((a) => a.estaPendiente);
+    if (!hayPendientes) {
+      _revisarPendientes?.cancel();
+      _revisarPendientes = null;
+      return;
+    }
+    _revisarPendientes ??=
+        Timer.periodic(_revisarPendientesCada, (_) => _revisarSiSeUsaron());
+  }
+
+  Future<void> _revisarSiSeUsaron() async {
+    // En segundo plano no: al volver, CambiosEnVivo recarga todo.
+    final estado = WidgetsBinding.instance.lifecycleState;
+    if (_revisando || isClosed || isLoading.value) return;
+    if (estado != null && estado != AppLifecycleState.resumed) return;
+    _revisando = true;
+    try {
+      await _recargarEnSilencio();
+    } catch (e) {
+      AppLogger.warning('StaffAccesosController',
+          'No se pudo revisar si se usaron los códigos: $e');
+    } finally {
+      _revisando = false;
+    }
+  }
+
+  /// Sin spinner ni mensajes: el usuario no pidió la recarga. Si falla, el
+  /// mixin lo deja en el registro.
+  Future<void> _recargarEnSilencio() async =>
+      accesos.assignAll(await _repository.getAll());
 
   Future<void> load() async {
     isLoading.value = true;
@@ -56,17 +117,18 @@ class StaffAccesosController extends GetxController {
     }
   }
 
-  /// Crea el acceso y devuelve el código en claro para mostrarlo una vez.
-  /// Devuelve null si falló (el usuario ya fue avisado).
-  Future<String?> crear(String nombre, StaffRole rol) async {
+  /// Crea el acceso y devuelve su id y el código en claro para mostrarlo una
+  /// vez. Devuelve null si falló (el usuario ya fue avisado).
+  Future<({String id, String codigo})?> crear(
+      String nombre, StaffRole rol) async {
     if (isSaving.value) return null;
     isSaving.value = true;
     try {
-      final codigo = await _repository.crear(nombre, rol);
-      // Se relee en vez de construir la fila a mano: el id, el estado y las
-      // fechas los pone la base.
+      final creado = await _repository.crear(nombre, rol);
+      // Se relee en vez de construir la fila a mano: el estado y las fechas
+      // los pone la base.
       await load();
-      return codigo;
+      return creado;
     } on StaffAccesoException catch (e) {
       SnackbarHelper.error('No se pudo crear', e.message());
       return null;

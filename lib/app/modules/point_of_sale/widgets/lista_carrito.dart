@@ -10,17 +10,20 @@ import '../../../data/models/sale_model.dart';
 /// Con letra y botones grandes, para que se lea sin lentes y se corrija con el
 /// dedo sin atinarle a un botón chico. El − en la última unidad quita el
 /// producto de la venta.
+///
+/// Sin [onCambiarCantidad] es solo para leer (mientras se cobra): sin
+/// botones, con el importe de cada renglón a la derecha.
 class ListaCarrito extends StatelessWidget {
   const ListaCarrito({
     super.key,
     required this.items,
-    required this.onCambiarCantidad,
+    this.onCambiarCantidad,
   });
 
   final List<SaleItem> items;
 
   /// Recibe el producto y la cantidad nueva (0 = quitarlo).
-  final void Function(SaleItem item, int cantidad) onCambiarCantidad;
+  final void Function(SaleItem item, int cantidad)? onCambiarCantidad;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +41,8 @@ class ListaCarrito extends StatelessWidget {
 
   Widget _renglon(BuildContext context, SaleItem item) {
     final c = context.colores;
+    final cambiar = onCambiarCantidad;
+    if (cambiar == null) return _renglonFijo(context, item);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
@@ -71,7 +76,7 @@ class ListaCarrito extends StatelessWidget {
             icono: item.quantity == 1 ? Icons.delete_outline : Icons.remove,
             tooltip: item.quantity == 1 ? 'Quitar' : 'Uno menos',
             color: item.quantity == 1 ? AppColors.error : c.textPrimary,
-            onPressed: () => onCambiarCantidad(item, item.quantity - 1),
+            onPressed: () => cambiar(item, item.quantity - 1),
           ),
           SizedBox(
             width: 36,
@@ -90,7 +95,72 @@ class ListaCarrito extends StatelessWidget {
             icono: Icons.add,
             tooltip: 'Uno más',
             color: AppColors.accent,
-            onPressed: () => onCambiarCantidad(item, item.quantity + 1),
+            onPressed: () => cambiar(item, item.quantity + 1),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Mientras se cobra: cuántos, el nombre y el importe, como en un ticket.
+  Widget _renglonFijo(BuildContext context, SaleItem item) {
+    final c = context.colores;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 32),
+            child: Text(
+              '${item.quantity}',
+              style: TextStyle(
+                color: c.textSecondary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.productName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (item.quantity > 1)
+                  Text(
+                    '${dinero(item.unitPrice)} c/u',
+                    style: TextStyle(color: c.textSecondary, fontSize: 14),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Con letra grande en un panel angosto, el importe se encoge
+          // antes de salirse.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 120),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topRight,
+              child: Text(
+                dinero(item.total),
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
           ),
         ],
       ),

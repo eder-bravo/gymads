@@ -147,13 +147,40 @@ void main() {
       expect(await tours.isPending(AppTours.home), isTrue);
     });
 
-    test('lo que ya vio se lee una sola vez de la base', () async {
+    test('lo que ya vio se lee de la base en cada pantalla', () async {
       acceso = _AccesoFalso({});
       sesion = empleado('mostrador');
       final tours = servicio();
       await tours.isPending(AppTours.home);
       await tours.isPending(AppTours.clientes);
-      expect(acceso.lecturas, 1);
+      expect(acceso.lecturas, 2);
+    });
+
+    test(
+        'tras regenerarle el código, la sesión que quedó abierta no ve nada; '
+        'con el código nuevo tampoco ve lo que ya había visto', () async {
+      acceso = _AccesoFalso({});
+      sesion = empleado('encargado');
+      final tours = servicio();
+      expect(await tours.isPending(AppTours.home), isTrue);
+      await tours.marcarVistosParaPruebas([AppTours.home]);
+      expect(await tours.isPending(AppTours.clientes), isTrue);
+      await tours.marcarVistosParaPruebas([AppTours.clientes]);
+
+      // El dueño regenera el código: la fila ya no es de esta sesión (la
+      // base devuelve null y no guardaría nada).
+      final fila = acceso.guardados;
+      acceso.guardados = null;
+      for (final tour in AppTours.all) {
+        expect(await tours.isPending(tour), isFalse, reason: tour);
+      }
+
+      // Entra con el código nuevo: la misma fila, otro perfil.
+      acceso.guardados = fila;
+      sesion = empleado('encargado', perfil: 'perfil-2');
+      expect(await tours.isPending(AppTours.home), isFalse);
+      expect(await tours.isPending(AppTours.clientes), isFalse);
+      expect(await tours.isPending(AppTours.abonar), isTrue);
     });
 
     test('sin acceso o sin red no se muestra; sin red se reintenta', () async {

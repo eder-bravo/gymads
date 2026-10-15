@@ -527,10 +527,20 @@ void main() {
     await tester.tap(find.byTooltip('Uno más'));
     await tester.pumpAndSettle();
     expect(controller.totalUnidades, 3);
-    await tester.tap(find.text('Cobrar'));
+    // Cobrar no abre otra ventana: la derecha pasa a "¿Cómo paga?" y la
+    // venta queda a la izquierda, ya sin botones para cambiarla.
+    await tester.tap(find.textContaining('Cobrar \$'));
     await tester.pumpAndSettle();
-    expect(find.byType(ListaCarrito), findsNWidgets(2));
-    expect(tester.getSize(find.byType(ListaCarrito).last).width, lessThan(900));
+    expect(find.text('¿Cómo paga?'), findsOneWidget);
+    expect(find.byType(ListaCarrito), findsOneWidget);
+    expect(find.byTooltip('Uno más'), findsNothing);
+    await _capturar(tester, 'venta-cobro');
+    await tester.tap(find.text('Regresar a la venta'));
+    await tester.pumpAndSettle();
+    // El buscador conserva lo escrito.
+    expect(find.byType(EditableText), findsOneWidget);
+    expect(tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+        'Agua');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   }, variant: _escritorio);
@@ -568,15 +578,17 @@ void main() {
     // Desde la ventana amplia hasta el mínimo que permite el sistema.
     for (final size in [const Size(1480, 800), VentanaEscritorio.minimo]) {
       await _tamano(tester, size);
-      expect(find.text('Cobrar').hitTestable(), findsOneWidget);
+      expect(find.textContaining('Cobrar \$').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
-    await tester.tap(find.text('Cobrar'));
+    await tester.tap(find.textContaining('Cobrar \$'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await tester.ensureVisible(find.text('Cobrar venta'));
+    // La barra de abajo queda fija: el botón de cobrar sigue a la vista.
+    expect(find.textContaining('Cobrar \$').hitTestable(), findsOneWidget);
+    await tester.ensureVisible(find.text('Efectivo'));
     await tester.pumpAndSettle();
-    expect(find.text('Cobrar venta').hitTestable(), findsOneWidget);
+    expect(find.text('Efectivo').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   }, variant: _escritorio);
@@ -872,7 +884,7 @@ void main() {
     await _tamano(tester, const Size(2560, 1410));
     await _capturar(tester, 'venta-maximizada');
     await _tamano(tester, VentanaEscritorio.minimo);
-    expect(find.text('Cobrar').hitTestable(), findsOneWidget);
+    expect(find.textContaining('Cobrar \$').hitTestable(), findsOneWidget);
     await _tamano(tester, const Size(2560, 1410));
     final editable = tester.state<EditableTextState>(find.byType(EditableText));
     expect(editable.widget.controller.text, 'Agua');

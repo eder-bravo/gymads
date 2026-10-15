@@ -6,7 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../utils/referencia_de_pago.dart';
 import '../utils/plataforma_app.dart';
 
-/// Los métodos de pago como botones: el elegido en naranja. Lo usan Vender
+/// Los métodos de pago como botones: el elegido en azul. Lo usan Vender
 /// y Abonar, para que cobrar se vea y funcione igual en los dos.
 class SelectorMetodoPago extends StatelessWidget {
   const SelectorMetodoPago({
@@ -14,14 +14,20 @@ class SelectorMetodoPago extends StatelessWidget {
     required this.metodos,
     required this.elegido,
     required this.onElegir,
+    this.grande = false,
   });
 
   final List<String> metodos;
   final String elegido;
   final ValueChanged<String> onElegir;
 
+  /// Fichas grandes, una por renglón o en cuadrícula según el ancho: cuando
+  /// elegir cómo paga es lo único de la pantalla (cobro de Vender).
+  final bool grande;
+
   @override
   Widget build(BuildContext context) {
+    if (grande) return _fichas(context);
     final c = context.colores;
     return Wrap(
       spacing: 8,
@@ -77,6 +83,92 @@ class SelectorMetodoPago extends StatelessWidget {
   }
 }
 
+extension on SelectorMetodoPago {
+  Widget _fichas(BuildContext context) {
+    final c = context.colores;
+    return LayoutBuilder(builder: (context, limites) {
+      const separacion = 12.0;
+      final columnas = (limites.maxWidth / 240).floor().clamp(1, 3);
+      final ancho = (limites.maxWidth - separacion * (columnas - 1)) / columnas;
+      return Wrap(
+        spacing: separacion,
+        runSpacing: separacion,
+        children: [
+          for (final metodo in metodos)
+            Builder(builder: (context) {
+              final elegida = metodo == elegido;
+              final texto = elegida ? Colors.white : c.textPrimary;
+              return SizedBox(
+                width: ancho,
+                child: Semantics(
+                  selected: elegida,
+                  button: true,
+                  child: Material(
+                    color: elegida ? AppColors.accent : c.cardBackground,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: elegida
+                            ? AppColors.accent
+                            : AppColors.accent.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => onElegir(metodo),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 68),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: elegida
+                                      ? Colors.white.withOpacity(0.18)
+                                      : AppColors.accent.withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  iconoMetodoDePago(metodo),
+                                  size: 22,
+                                  color:
+                                      elegida ? Colors.white : AppColors.accent,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  nombreMetodoDePago(metodo),
+                                  style: TextStyle(
+                                    color: texto,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              if (elegida)
+                                const Icon(Icons.check_circle,
+                                    color: Colors.white, size: 22),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+        ],
+      );
+    });
+  }
+}
+
 /// El folio o referencia de un pago con tarjeta o transferencia: se escribe
 /// o se escanea de la foto del comprobante (cámara o galería). Lo que lee la
 /// foto se SUGIERE: el campo sigue mandando, porque el reconocimiento falla
@@ -106,88 +198,89 @@ class CampoReferenciaPago extends StatelessWidget {
           onChanged: r.setReferenciaPago,
         ),
         const SizedBox(height: 10),
-        if (PlataformaApp.ocrMovil) Obx(() {
-          if (r.leyendoReferencia.value) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                children: [
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppColors.accent),
-                  ),
-                  const SizedBox(width: 12),
-                  Text('Leyendo la referencia...',
-                      style: TextStyle(color: c.textSecondary)),
-                ],
-              ),
-            );
-          }
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          r.escanearReferencia(desdeCamara: true),
-                      icon: const Icon(Icons.document_scanner_outlined,
-                          size: 18),
-                      label: const Text('Escanear referencia'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.accent,
-                        side: BorderSide(
-                            color: AppColors.accent.withOpacity(0.5)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: () =>
-                        r.escanearReferencia(desdeCamara: false),
-                    icon: const Icon(Icons.photo_library_outlined),
-                    color: AppColors.accent,
-                    tooltip: 'Elegir de la galería',
-                  ),
-                ],
-              ),
-              if (r.referenciasSugeridas.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text('Referencias encontradas — toca la correcta:',
-                    style: TextStyle(color: c.textSecondary, fontSize: 12.5)),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+        if (PlataformaApp.ocrMovil)
+          Obx(() {
+            if (r.leyendoReferencia.value) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
                   children: [
-                    for (final referencia in r.referenciasSugeridas)
-                      ActionChip(
-                        label: Text(referencia,
-                            style: const TextStyle(
-                                fontFamily: 'monospace', fontSize: 12.5)),
-                        backgroundColor: c.containerBackground,
-                        labelStyle: TextStyle(color: c.textPrimary),
-                        onPressed: () => r.usarReferenciaSugerida(referencia),
-                      ),
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.accent),
+                    ),
+                    const SizedBox(width: 12),
+                    Text('Leyendo la referencia...',
+                        style: TextStyle(color: c.textSecondary)),
                   ],
                 ),
-              ] else if (r.referenciaEscaneada.value) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'No se reconoció ninguna referencia en la foto. '
-                  'Escríbela arriba.',
-                  style: TextStyle(
-                      color: c.textSecondary.withOpacity(0.8), fontSize: 12.5),
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            r.escanearReferencia(desdeCamara: true),
+                        icon: const Icon(Icons.document_scanner_outlined,
+                            size: 18),
+                        label: const Text('Escanear referencia'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accent,
+                          side: BorderSide(
+                              color: AppColors.accent.withOpacity(0.5)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => r.escanearReferencia(desdeCamara: false),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      color: AppColors.accent,
+                      tooltip: 'Elegir de la galería',
+                    ),
+                  ],
                 ),
+                if (r.referenciasSugeridas.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('Referencias encontradas — toca la correcta:',
+                      style: TextStyle(color: c.textSecondary, fontSize: 12.5)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final referencia in r.referenciasSugeridas)
+                        ActionChip(
+                          label: Text(referencia,
+                              style: const TextStyle(
+                                  fontFamily: 'monospace', fontSize: 12.5)),
+                          backgroundColor: c.containerBackground,
+                          labelStyle: TextStyle(color: c.textPrimary),
+                          onPressed: () => r.usarReferenciaSugerida(referencia),
+                        ),
+                    ],
+                  ),
+                ] else if (r.referenciaEscaneada.value) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'No se reconoció ninguna referencia en la foto. '
+                    'Escríbela arriba.',
+                    style: TextStyle(
+                        color: c.textSecondary.withOpacity(0.8),
+                        fontSize: 12.5),
+                  ),
+                ],
               ],
-            ],
-          );
-        }),
+            );
+          }),
       ],
     );
   }

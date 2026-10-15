@@ -17,6 +17,29 @@ import '../../../data/services/welcome_tour_service.dart';
 import '../../ingresos/controllers/ingresos_controller.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
+import 'package:gymads/app/core/utils/plataforma_app.dart';
+
+/// En qué va la venta en escritorio y tableta: el panel de la derecha
+/// cambia según esto (como el autocobro del súper). En el teléfono cada
+/// momento es su propia pantalla.
+enum EtapaVenta { productos, cobro, listo }
+
+/// Lo que se cobró, para mostrarlo en "¡Listo!" después de vaciar el carrito.
+class VentaTerminada {
+  const VentaTerminada({
+    required this.total,
+    required this.metodo,
+    required this.recibido,
+    required this.cambio,
+    required this.unidades,
+  });
+
+  final double total;
+  final String metodo;
+  final double recibido;
+  final double cambio;
+  final int unidades;
+}
 
 class PointOfSaleController extends GetxController
     with ScreenTourMixin, RecargaEnVivoMixin, ReferenciaDePago {
@@ -73,6 +96,8 @@ class PointOfSaleController extends GetxController
   final RxString _selectedPaymentMethod = 'efectivo'.obs;
   final RxDouble _receivedAmount = 0.0.obs;
   final RxDouble _changeAmount = 0.0.obs;
+  final Rx<EtapaVenta> _etapa = EtapaVenta.productos.obs;
+  final Rxn<VentaTerminada> _ultimaVenta = Rxn<VentaTerminada>();
 
   // Lista de productos disponibles
   final RxList<Product> _availableProducts = <Product>[].obs;
@@ -106,6 +131,42 @@ class PointOfSaleController extends GetxController
   double get receivedAmount => _receivedAmount.value;
   double get changeAmount => _changeAmount.value;
   String get referenciaPago => referenciaTexto.value;
+  EtapaVenta get etapa => _etapa.value;
+  VentaTerminada? get ultimaVenta => _ultimaVenta.value;
+
+  /// Pasa al cobro (escritorio y tableta). Sin productos no hay qué cobrar.
+  void irACobrar() {
+    if (_cartItems.isEmpty) return;
+    _etapa.value = EtapaVenta.cobro;
+  }
+
+  /// Vuelve a los productos para corregir la venta antes de cobrar.
+  void regresarALaVenta() => _etapa.value = EtapaVenta.productos;
+
+  /// Después de "¡Listo!": empieza otra venta.
+  void nuevaVenta() {
+    _ultimaVenta.value = null;
+    _etapa.value = EtapaVenta.productos;
+  }
+
+  /// Qué falta para poder cobrar, o null si ya se puede.
+  String? get faltaParaCobrar {
+    if (_cartItems.isEmpty) return 'Agrega productos a la venta';
+    if (_selectedPaymentMethod.value != 'efectivo') return null;
+    if (_receivedAmount.value <= 0) return 'Escribe con cuánto paga';
+    final falta = _finalAmount.value - _receivedAmount.value;
+    return falta > 0.004 ? 'Faltan ${dinero(falta)}' : null;
+  }
+
+  /// Atajos para el efectivo: el monto exacto y los billetes que le siguen.
+  List<double> get montosRapidos {
+    final total = _finalAmount.value;
+    if (total <= 0) return const [];
+    final billetes = [20.0, 50.0, 100.0, 200.0, 500.0, 1000.0]
+        .where((b) => b > total)
+        .take(3);
+    return [total, ...billetes];
+  }
 
   List<Product> get availableProducts => _availableProducts;
   List<Product> get filteredProducts {
@@ -308,6 +369,8 @@ class PointOfSaleController extends GetxController
   Future<void> addProductToCart(Product product, {int quantity = 1}) async {
     await restaurarCarrito();
     if (isClosed || quantity <= 0) return;
+    // Agregar (o escanear) en "¡Listo!" empieza la venta siguiente.
+    if (_etapa.value == EtapaVenta.listo) nuevaVenta();
     final existingIndex =
         _cartItems.indexWhere((item) => item.productId == product.id);
     final cantidadActual =
@@ -392,6 +455,9 @@ class PointOfSaleController extends GetxController
     _cartItems.removeWhere((item) => item.productId == productId);
     _faltantesConfirmados.remove(productId);
     _calculateTotals();
+    if (_cartItems.isEmpty && _etapa.value == EtapaVenta.cobro) {
+      _etapa.value = EtapaVenta.productos;
+    }
   }
 
   /// Limpiar carrito
@@ -402,6 +468,8 @@ class PointOfSaleController extends GetxController
     _calculateTotals();
     _receivedAmount.value = 0.0;
     _changeAmount.value = 0.0;
+    // Sin productos no hay cobro abierto.
+    if (_etapa.value == EtapaVenta.cobro) _etapa.value = EtapaVenta.productos;
   }
 
   /// Calcular totales
@@ -507,11 +575,19 @@ class PointOfSaleController extends GetxController
       }
 
       if (result != null) {
-        // La notificación de éxito la muestra la vista tras cerrar el modal,
-        // para evitar el doble snackbar que se auto-cancelaba con clearSnackBars().
+        // Lo cobrado se guarda antes de vaciar el carrito: "¡Listo!" muestra
+        // el total y el cambio.
+        _ultimaVenta.value = VentaTerminada(
+          total: _finalAmount.value,
+          metodo: _selectedPaymentMethod.value,
+          recibido: _receivedAmount.value,
+          cambio: _changeAmount.value > 0 ? _changeAmount.value : 0,
+          unidades: totalUnidades,
+        );
 
         // Limpiar carrito y estado
         clearCart();
+        _etapa.value = EtapaVenta.listo;
         await guardarCarrito();
         _selectedPaymentMethod.value = 'efectivo';
         limpiarReferencia();

@@ -18,16 +18,17 @@ import '../controllers/staff_accesos_controller.dart';
 /// que regenerar el código). El empleado no tiene correo ni contraseña: entra
 /// con el código.
 ///
-/// Devuelve el nombre y el código en claro al crear, y null al renombrar.
-Future<({String nombre, String codigo})?> showStaffAccesoFormDialog({
+/// Devuelve el id del acceso, el nombre y el código en claro al crear, y null
+/// al renombrar.
+Future<({String id, String nombre, String codigo})?> showStaffAccesoFormDialog({
   StaffAccesoModel? existing,
 }) {
   if (existing == null) {
-    return abrirFormulario<({String nombre, String codigo})>(
+    return abrirFormulario<({String id, String nombre, String codigo})>(
       () => const _StaffAccesoFormDialog(),
     );
   }
-  return Get.dialog<({String nombre, String codigo})>(
+  return Get.dialog<({String id, String nombre, String codigo})>(
     _StaffAccesoFormDialog(existing: existing),
     barrierDismissible: false,
   );
@@ -89,8 +90,10 @@ class _StaffAccesoFormDialogState extends State<_StaffAccesoFormDialog> {
       return;
     }
 
-    final codigo = await _controller.crear(nombre, _rol);
-    if (codigo != null) Get.back(result: (nombre: nombre, codigo: codigo));
+    final creado = await _controller.crear(nombre, _rol);
+    if (creado != null) {
+      Get.back(result: (id: creado.id, nombre: nombre, codigo: creado.codigo));
+    }
   }
 
   /// Una opción del selector: el nombre del rol y, debajo, qué alcance tiene.

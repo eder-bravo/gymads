@@ -51,6 +51,13 @@ class AppTours {
 /// - un código nuevo no le vuelve a mostrar nada;
 /// - un rol que nunca usó le enseña los recorridos de ese rol;
 /// - al regresar a un rol que ya tuvo, ya estaban vistos.
+///
+/// Se guardan en la fila cuyo `user_id` es el de la sesión. Al regenerar el
+/// código, ese `user_id` se vacía: la app que siga abierta con la sesión
+/// vieja ya no puede guardar nada (el guardado no falla, simplemente no
+/// encuentra la fila). Por eso [vistos] se consulta cada vez y no se recuerda:
+/// a esa sesión le devuelve null y no se le muestra ningún recorrido que
+/// luego se perdería.
 abstract class ToursDelEmpleado {
   /// Los recorridos ya vistos con el rol [rol]. Null si quien usa la app no
   /// es un empleado con acceso.
@@ -135,12 +142,8 @@ class WelcomeTourService extends GetxService {
   final ToursDelEmpleado _toursDelEmpleado;
   final SesionTour Function() _sesion;
 
-  /// Recorridos ya vistos por el empleado en sesión con su rol actual, leídos
-  /// una vez de la base. Null mientras no se han leído.
-  Set<String>? _vistosEmpleado;
-
   /// De quién, y con qué rol, es lo que se recuerda en memoria (recorridos
-  /// iniciados, intentos y [_vistosEmpleado]).
+  /// iniciados e intentos).
   String? _sesionEnMemoria;
 
   ShowcaseView? _showcaseView;
@@ -282,6 +285,8 @@ class WelcomeTourService extends GetxService {
       final vistos = await _vistosDelEmpleado(sesion.rol);
       // Sin acceso (null) o sin red no se muestra: mejor no enseñar un
       // recorrido que repetirlo. Sin red se reintenta en la siguiente visita.
+      // Sin acceso también es la sesión que quedó abierta tras regenerarle el
+      // código: lo que viera ahí no se podría guardar (ver ToursDelEmpleado).
       return vistos != null && !vistos.contains(tourId);
     }
 
@@ -289,11 +294,13 @@ class WelcomeTourService extends GetxService {
     return prefs.getBool(_pendingKey(gymId, tourId)) ?? false;
   }
 
+  /// Siempre de la base, nunca de memoria: una lista leída antes de que le
+  /// regeneraran el código seguiría mostrando recorridos que ya no se pueden
+  /// guardar. Es una consulta por pantalla, solo mientras su recorrido no ha
+  /// salido en esta sesión ([_startedTours]).
   Future<Set<String>?> _vistosDelEmpleado(String rol) async {
-    final enMemoria = _vistosEmpleado;
-    if (enMemoria != null) return enMemoria;
     try {
-      return _vistosEmpleado = await _toursDelEmpleado.vistos(rol);
+      return await _toursDelEmpleado.vistos(rol);
     } catch (e) {
       AppLogger.warning('WelcomeTourService',
           'No se pudieron leer los recorridos vistos: $e');
@@ -308,7 +315,6 @@ class WelcomeTourService extends GetxService {
     final clave = '${sesion.perfilId}|${sesion.rol}';
     if (clave == _sesionEnMemoria) return;
     _sesionEnMemoria = clave;
-    _vistosEmpleado = null;
     _startedTours.clear();
     _attempts.clear();
     _pausa = null;
@@ -568,14 +574,12 @@ class WelcomeTourService extends GetxService {
 
     if (sesion.esEmpleado) {
       final rolVisto = rol ?? sesion.rol;
-      // Lo que se recuerda en memoria es del rol actual.
-      if (rolVisto == sesion.rol) _vistosEmpleado?.addAll(tourIds);
       for (final tourId in tourIds) {
         try {
           await _toursDelEmpleado.marcarVisto(rolVisto, tourId);
         } catch (e) {
-          // En esta sesión ya no se repite (queda en memoria); si no llegó a
-          // la base, se volverá a ver una vez más en otra sesión.
+          // En esta sesión ya no se repite (sigue en _startedTours); si no
+          // llegó a la base, se volverá a ver una vez más en otra sesión.
           AppLogger.warning('WelcomeTourService',
               'No se pudo guardar el recorrido visto: $e');
         }

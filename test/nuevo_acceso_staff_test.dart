@@ -22,9 +22,10 @@ class _ControladorFalso extends GetxController
       ];
 
   @override
-  Future<String?> crear(String nombre, StaffRole rol) async {
+  Future<({String id, String codigo})?> crear(
+      String nombre, StaffRole rol) async {
     creados.add((nombre, rol));
-    return 'ABCD2345';
+    return (id: 'acceso-1', codigo: 'ABCD2345');
   }
 
   @override
@@ -39,7 +40,7 @@ void main() {
     final controlador = _ControladorFalso();
     Get.put<StaffAccesosController>(controlador);
 
-    ({String nombre, String codigo})? resultado;
+    ({String id, String nombre, String codigo})? resultado;
     await tester.pumpWidget(GetMaterialApp(
       home: Scaffold(
         body: Builder(
@@ -69,6 +70,7 @@ void main() {
 
     expect(controlador.creados, [('María López', StaffRole.mostrador)]);
     expect(resultado?.codigo, 'ABCD2345');
+    expect(resultado?.id, 'acceso-1');
     expect(find.text('Nuevo acceso'), findsNothing, reason: 'se cerró');
   });
 }

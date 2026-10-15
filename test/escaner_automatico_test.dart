@@ -309,11 +309,12 @@ void main() {
     await tester.pumpAndSettle();
     await _leer(tester, '001234567890');
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cobrar'));
+    await tester.tap(find.textContaining('Cobrar \$'));
     await tester.pumpAndSettle();
+    expect(find.text('¿Cómo paga?'), findsOneWidget);
     await _leer(tester, '001234567890');
     expect(controller.totalUnidades, 1);
-    Get.back<void>();
+    await tester.tap(find.text('Regresar a la venta'));
     await tester.pumpAndSettle();
     await _leer(tester, '001234567890');
     await tester.pumpAndSettle();

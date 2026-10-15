@@ -361,7 +361,8 @@ class _Asistente extends AgregarLectorController {
 }
 
 /// Una pantalla vacía que abre un diálogo o una ventana al mostrarse.
-/// Venta con la hoja de cobro abierta.
+/// Venta ya cobrando: "¿Cómo paga?" en pantalla grande, el paso para
+/// revisar la venta en el teléfono.
 class _VentaCobrando extends StatefulWidget {
   @override
   State<_VentaCobrando> createState() => _VentaCobrandoState();
@@ -665,6 +666,24 @@ void main() {
     },
     'Código generado': () => _AbreAlMostrar((_) => showCodigoGeneradoDialog(
         nombre: 'María Fernanda', codigo: 'K7P2-9QXA', gymName: 'Gimnasio')),
+    // El mismo diálogo cuando el empleado ya usó el código.
+    'Código usado': () {
+      final c = Get.put<StaffAccesosController>(_Personal());
+      c.accesos.add(StaffAccesoModel(
+          id: '1',
+          gymId: 'g',
+          branchId: 'b',
+          nombre: 'María Fernanda',
+          rol: StaffRole.mostrador,
+          estado: 'activo',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026)));
+      return _AbreAlMostrar((_) => showCodigoGeneradoDialog(
+          nombre: 'María Fernanda',
+          codigo: 'K7P2-9QXA',
+          gymName: 'Gimnasio',
+          accesoId: '1'));
+    },
     'Detalle de ingreso': () {
       Get.put<IngresosController>(_Ingresos());
       return _AbreAlMostrar(
@@ -1084,15 +1103,15 @@ void main() {
   }
 
   testWidgets(
-      'cobrar una venta: de lado en dos columnas y "Cobrar venta" siempre '
-      'a la vista', (tester) async {
+      'cobrar una venta: en tableta "¿Cómo paga?" junto a la venta; en el '
+      'teléfono, el paso para revisarla', (tester) async {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    for (final (tamano, deLado) in [
-      (const Size(844, 390), true), // teléfono acostado
+    for (final (tamano, tableta) in [
+      (const Size(844, 390), false), // teléfono acostado
       (const Size(1180, 820), true), // tableta acostada
       (const Size(390, 844), false),
-      (const Size(820, 1180), false),
+      (const Size(820, 1180), true),
     ]) {
       for (final escala in [1.0, 1.3, 2.0]) {
         tester.view.physicalSize = tamano;
@@ -1107,18 +1126,21 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull,
             reason: '$tamano, texto $escala');
-        expect(
-            find.text('Total a cobrar'), deLado ? findsOneWidget : findsNothing,
-            reason: '$tamano');
-        if (deLado) {
-          // Sin desplazar: el pie queda fijo.
-          expect(find.text('Cobrar venta').hitTestable(), findsOneWidget,
+        if (tableta) {
+          expect(find.text('¿Cómo paga?'), findsOneWidget, reason: '$tamano');
+          // Sin desplazar: la barra de abajo queda fija.
+          expect(find.textContaining('Cobrar \$').hitTestable(), findsOneWidget,
               reason: '$tamano, texto $escala');
           if (escala == 1) {
-            expect(tester.getRect(find.text('Agua natural 1 L').last).right,
-                lessThan(tester.getRect(find.text('Método de pago')).left),
+            expect(tester.getRect(find.text('Venta actual')).right,
+                lessThan(tester.getRect(find.text('¿Cómo paga?')).left),
                 reason: '$tamano');
           }
+        } else {
+          expect(find.text('Revisa la venta'), findsOneWidget,
+              reason: '$tamano');
+          expect(find.text('Ir a cobrar').hitTestable(), findsOneWidget,
+              reason: '$tamano, texto $escala');
         }
         await tester.pumpWidget(const SizedBox());
       }

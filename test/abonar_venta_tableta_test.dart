@@ -343,7 +343,7 @@ void main() {
     }
   }, variant: _tabletas);
 
-  testWidgets('venta acostada: el carrito al lado, como en escritorio',
+  testWidgets('venta en tableta: la venta a la izquierda, de pie y acostada',
       (tester) async {
     final c = Get.put<PointOfSaleController>(_Venta());
     await mostrar(tester, const PointOfSaleView(), const Size(1180, 820));
@@ -359,9 +359,11 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.byType(ListaCarrito), findsOneWidget);
-    // De pie no cabe: el resumen va abajo, como antes.
+    // De pie también: el ticket a la izquierda y los productos al lado.
     await mostrar(tester, const PointOfSaleView(), const Size(820, 1180));
-    expect(find.text('Venta actual'), findsNothing);
+    expect(find.text('Venta actual'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('Venta actual')).dx,
+        lessThan(tester.getTopLeft(find.text('Escanea o elige un producto')).dx));
     expect(tester.takeException(), isNull);
   }, variant: _tabletas);
 }

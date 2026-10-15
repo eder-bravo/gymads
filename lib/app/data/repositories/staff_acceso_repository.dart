@@ -37,24 +37,26 @@ class StaffAccesoRepository {
     }
   }
 
-  /// Crea un acceso con el rol indicado y devuelve el código en claro.
+  /// Crea un acceso con el rol indicado y devuelve su id y el código en
+  /// claro.
   ///
   /// Es la ÚNICA vez que ese código existe fuera del dispositivo: al servidor
   /// solo viaja su hash. Si el dueño lo pierde, hay que regenerarlo.
   ///
   /// El servidor vuelve a comprobar el rol: solo se puede entregar uno por
   /// debajo del propio, así que un encargado no puede nombrar a otro.
-  Future<String> crear(String nombre, StaffRole rol) async {
+  Future<({String id, String codigo})> crear(
+      String nombre, StaffRole rol) async {
     try {
       final codigo = AccessCodeGenerator.generar();
 
-      await _supabase.rpc('crear_acceso_staff', params: {
+      final id = await _supabase.rpc('crear_acceso_staff', params: {
         'p_nombre': nombre.trim(),
         'p_codigo_hash': AccessCodeGenerator.hash(codigo),
         'p_role': rol.value,
       });
 
-      return codigo;
+      return (id: id as String, codigo: codigo);
     } catch (e) {
       AppLogger.error('StaffAccesoRepository', 'Error al crear acceso', e);
       throw _mapError(e);

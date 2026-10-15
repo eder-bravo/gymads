@@ -76,6 +76,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
       nombre: creado.nombre,
       codigo: creado.codigo,
       gymName: TenantContextService.to.gymName ?? 'el gimnasio',
+      accesoId: creado.id,
     );
   }
 
@@ -169,6 +170,7 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
       nombre: acceso.nombre,
       codigo: codigo,
       gymName: TenantContextService.to.gymName ?? 'el gimnasio',
+      accesoId: acceso.id,
       esRegenerado: true,
     );
   }

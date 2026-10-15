@@ -14,6 +14,11 @@ enum TablaEnVivo {
   ingresos('ingresos'),
   accesos('access_logs'),
 
+  /// Los accesos del personal: el canje de un código, y lo que otro teléfono
+  /// cree, revoque o regenere. Por RLS solo le llegan a quien puede
+  /// gestionarlos (dueño y encargado).
+  personal('staff_accesos'),
+
   /// El perfil de quien usa la app (su rol, si sigue activo). A diferencia de
   /// las demás, no se filtra por gimnasio sino por su `user_id`: solo importa
   /// la fila propia.

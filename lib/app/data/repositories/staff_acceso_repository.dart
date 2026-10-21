@@ -155,7 +155,7 @@ class StaffAccesoRepository {
         return const StaffAccesoException(StaffAccesoFailure.notAllowed);
       }
     }
-    return const StaffAccesoException(StaffAccesoFailure.unknown);
+    return StaffAccesoException(StaffAccesoFailure.unknown, causa: e);
   }
 }
 
@@ -174,7 +174,11 @@ enum StaffAccesoFailure {
 
 class StaffAccesoException implements Exception {
   final StaffAccesoFailure kind;
-  const StaffAccesoException(this.kind);
+
+  /// En [StaffAccesoFailure.unknown], el error original: así se puede decir
+  /// si fue la conexión.
+  final Object? causa;
+  const StaffAccesoException(this.kind, {this.causa});
 
   String message() {
     switch (kind) {

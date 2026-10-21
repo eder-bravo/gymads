@@ -584,7 +584,7 @@ void main() {
     },
     'Visita': () {
       Get.put(
-          CobrarVisitaController(precioDia: 100, registrar: (_) async => null));
+          CobrarVisitaController(precioDia: 100, registrar: (_) async {}));
       return const CobrarVisitaView();
     },
     'Login': () {

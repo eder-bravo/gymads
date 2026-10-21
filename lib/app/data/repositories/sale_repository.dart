@@ -18,20 +18,16 @@ class SaleRepository {
   /// [sale] llega null solo cuando no se registró nada, y los productos cuyo
   /// stock no se pudo mover se devuelven aparte en [stockFallido] para avisar
   /// que hay que corregirlos a mano.
+  ///
+  /// Si el ingreso no se pudo insertar, el error sale tal cual: así quien
+  /// cobra ve si fue la conexión o la base de datos.
   Future<({Sale? sale, List<String> stockFallido})> createSale(Sale sale) async {
-    final Sale createdSale;
-    try {
-      final response = await _supabase
-          .from('ingresos')
-          .insert(TenantQueryHelper.withTenant(sale.toJson()))
-          .select()
-          .single();
-
-      createdSale = Sale.fromJson(response);
-    } catch (e) {
-      AppLogger.error('SaleRepository', 'Error al crear venta', e);
-      return (sale: null, stockFallido: const <String>[]);
-    }
+    final response = await _supabase
+        .from('ingresos')
+        .insert(TenantQueryHelper.withTenant(sale.toJson()))
+        .select()
+        .single();
+    final createdSale = Sale.fromJson(response);
 
     // A partir de aquí la venta ya está cobrada.
     final stockFallido = <String>[];

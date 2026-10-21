@@ -315,9 +315,9 @@ class StaffAccesosView extends GetView<StaffAccesosController> {
     final color = _colorEstado(acceso);
 
     return Card(
-      elevation: 3,
+      elevation: TarjetaPlana.elevacion(3),
       color: c.cardBackground,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: TarjetaPlana.forma(context),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(

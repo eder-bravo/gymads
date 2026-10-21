@@ -21,8 +21,9 @@ class SelectorMetodoPago extends StatelessWidget {
   final String elegido;
   final ValueChanged<String> onElegir;
 
-  /// Fichas grandes, una por renglón o en cuadrícula según el ancho: cuando
-  /// elegir cómo paga es lo único de la pantalla (cobro de Vender).
+  /// Fichas grandes, una por renglón o en cuadrícula según el ancho: en
+  /// tableta y escritorio (Vender, Abonar, Cobrar visita) y en el paso de
+  /// cómo paga del teléfono.
   final bool grande;
 
   @override

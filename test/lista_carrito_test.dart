@@ -15,13 +15,15 @@ SaleItem _item(String nombre, int cantidad, double precio) => SaleItem(
 void main() {
   late List<(String, int)> cambios;
 
-  Future<void> mostrar(WidgetTester tester, List<SaleItem> items) {
+  Future<void> mostrar(WidgetTester tester, List<SaleItem> items,
+      {bool conUnoMas = true}) {
     cambios = [];
     return tester.pumpWidget(MaterialApp(
       theme: AppTheme.oscuro,
       home: Scaffold(
         body: ListaCarrito(
           items: items,
+          conUnoMas: conUnoMas,
           onCambiarCantidad: (item, cantidad) =>
               cambios.add((item.productId, cantidad)),
         ),
@@ -55,5 +57,15 @@ void main() {
     await tester.tap(find.byTooltip('Quitar'));
 
     expect(cambios, [('Barra', 0)]);
+  });
+
+  testWidgets('sin + solo se resta (el mostrador agrega desde los productos)',
+      (tester) async {
+    await mostrar(tester, [_item('Agua 1L', 2, 15)], conUnoMas: false);
+
+    expect(find.byTooltip('Uno más'), findsNothing);
+    await tester.tap(find.byTooltip('Uno menos'));
+
+    expect(cambios, [('Agua 1L', 1)]);
   });
 }

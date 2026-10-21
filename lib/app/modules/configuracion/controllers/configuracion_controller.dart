@@ -25,6 +25,7 @@ import '../../../routes/app_pages.dart';
 import '../../../data/services/lector_red_service.dart';
 import '../../../data/services/estado_configuracion_lector.dart';
 import '../../../data/services/regreso_del_lector.dart';
+import '../../../core/widgets/espera_global.dart';
 import '../../../core/widgets/formulario.dart';
 import '../../../core/utils/fallo_al_guardar.dart';
 import '../views/cambiar_contrasena_view.dart';
@@ -439,40 +440,54 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
 
   // =================== UPDATE GYM ===================
 
-  Future<void> updateGymName(String value) async {
+  /// Devuelve si se guardó: la ventana solo se cierra en ese caso.
+  Future<bool> updateGymName(String value) async {
     final gymId = TenantContextService.to.currentGymId;
-    if (gymId == null) return;
+    if (gymId == null) return false;
     try {
-      await Supabase.instance.client
-          .from('gyms')
-          .update({'name': value}).eq('id', gymId);
+      final hecho = await EsperaGlobal.to.guardar(
+        () async {
+          await Supabase.instance.client
+              .from('gyms')
+              .update({'name': value}).eq('id', gymId);
+          return true;
+        },
+        queHace: 'cambiar el nombre del gimnasio',
+        generico: 'No se pudo actualizar el nombre. Intenta de nuevo.',
+      );
+      if (hecho == null) return false;
       gymName.value = value;
       // Refresh the staff profile to update cached gym name
       await _refreshTenantProfile();
       SnackbarHelper.success('¡Listo!', 'Nombre del gimnasio actualizado');
+      return true;
     } catch (e) {
       AppLogger.error('ConfiguracionController',
           'Fallo al actualizar el nombre del gimnasio', e);
       SnackbarHelper.error('Error', 'No se pudo actualizar el nombre');
+      return false;
     }
   }
 
   /// Renombra la sucursal actual. Solo el dueño puede hacerlo (política RLS
   /// "Owner can update their branches").
-  Future<void> updateBranchName(String value) async {
+  Future<bool> updateBranchName(String value) async {
     final branchId = TenantContextService.to.currentBranchId;
-    if (branchId == null) return;
-    try {
-      await Supabase.instance.client
-          .from('branches')
-          .update({'name': value}).eq('id', branchId);
-      branchName.value = value;
-      SnackbarHelper.success('¡Listo!', 'Nombre de la sucursal actualizado');
-    } catch (e) {
-      AppLogger.error('ConfiguracionController',
-          'Fallo al actualizar el nombre de la sucursal', e);
-      SnackbarHelper.error('Error', 'No se pudo actualizar el nombre');
-    }
+    if (branchId == null) return false;
+    final hecho = await EsperaGlobal.to.guardar(
+      () async {
+        await Supabase.instance.client
+            .from('branches')
+            .update({'name': value}).eq('id', branchId);
+        return true;
+      },
+      queHace: 'cambiar el nombre de la sucursal',
+      generico: 'No se pudo actualizar el nombre. Intenta de nuevo.',
+    );
+    if (hecho == null) return false;
+    branchName.value = value;
+    SnackbarHelper.success('¡Listo!', 'Nombre de la sucursal actualizado');
+    return true;
   }
 
   Future<void> _refreshTenantProfile() async {
@@ -500,43 +515,55 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
 
   // =================== UPDATE PROFILE ===================
 
-  Future<void> updateFirstName(String value) async {
-    await _updateProfileField('first_name', value);
+  Future<bool> updateFirstName(String value) async {
+    if (!await _updateProfileField('first_name', value)) return false;
     firstName.value = value;
     _refreshDisplayName();
+    return true;
   }
 
-  Future<void> updateLastName(String value) async {
-    await _updateProfileField('last_name', value);
+  Future<bool> updateLastName(String value) async {
+    if (!await _updateProfileField('last_name', value)) return false;
     lastName.value = value;
     _refreshDisplayName();
+    return true;
   }
 
-  Future<void> _updateProfileField(String field, String value) async {
+  Future<bool> _updateProfileField(String field, String value) async {
     try {
       isLoading.value = true;
       final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return;
+      if (userId == null) return false;
 
       // Build display_name
       String newFirst = field == 'first_name' ? value : firstName.value;
       String newLast = field == 'last_name' ? value : lastName.value;
       String displayName = '$newFirst $newLast'.trim();
 
-      await Supabase.instance.client.from('staff_profiles').update({
-        field: value,
-        'display_name': displayName,
-      }).eq('user_id', userId);
+      final hecho = await EsperaGlobal.to.guardar(
+        () async {
+          await Supabase.instance.client.from('staff_profiles').update({
+            field: value,
+            'display_name': displayName,
+          }).eq('user_id', userId);
+          return true;
+        },
+        queHace: 'guardar tu nombre',
+        generico: 'No se pudo actualizar. Intenta de nuevo.',
+      );
+      if (hecho == null) return false;
 
       // Refrescar el caché. Debe hacerse con el join de `gyms`, si no se
       // pierden el nombre del gimnasio y su fecha de creación.
       await _refreshTenantProfile();
 
       SnackbarHelper.success('Guardado', 'Información actualizada');
+      return true;
     } catch (e) {
       AppLogger.error(
           'ConfiguracionController', 'Fallo al actualizar el perfil', e);
-      SnackbarHelper.error('Error', 'No se pudo actualizar: $e');
+      SnackbarHelper.error('Error', 'No se pudo actualizar. Intenta de nuevo.');
+      return false;
     } finally {
       isLoading.value = false;
     }
@@ -841,12 +868,17 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
     final anterior = accesosSettings.value;
     accesosSettings.value = nuevos;
 
-    final ok = await GymSettingsService.to.save(nuevos);
-    if (!ok) {
-      accesosSettings.value = anterior;
-      SnackbarHelper.error('Error',
-          'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.');
-    }
+    final ok = await EsperaGlobal.to.guardar(
+      () async {
+        if (!await GymSettingsService.to.save(nuevos)) {
+          throw Exception('No se guardó la configuración de accesos');
+        }
+        return true;
+      },
+      queHace: 'guardar el cambio',
+      generico: 'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.',
+    );
+    if (ok == null) accesosSettings.value = anterior;
   }
 
   Future<void> setRegistrarSalidas(bool valor) =>
@@ -876,42 +908,51 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   /// Primero vuelve a entrar con la actual: confirma que es la persona y deja
   /// la sesión reciente, por si Supabase la exige para cambiarla.
   Future<String?> cambiarContrasena(String actual, String nueva) async {
-    const generico = 'No se pudo cambiar la contraseña. Intenta de nuevo.';
     final auth = Supabase.instance.client.auth;
     final correo = auth.currentUser?.email;
     if (correo == null || correo.isEmpty) {
       return 'Esta cuenta no usa contraseña.';
     }
+    // Lo que dice Supabase de la contraseña vuelve como texto, para el
+    // formulario; la conexión y la base de datos, a la espera, que deja
+    // reintentar.
+    final r = await EsperaGlobal.to.guardar(
+      () async => (error: await _cambiarContrasena(correo, actual, nueva)),
+      queHace: 'cambiar la contraseña',
+      generico: _noSeCambio,
+    );
+    return r == null ? 'No se cambió la contraseña.' : r.error;
+  }
 
+  static const _noSeCambio =
+      'No se pudo cambiar la contraseña. Intenta de nuevo.';
+
+  Future<String?> _cambiarContrasena(
+      String correo, String actual, String nueva) async {
+    final auth = Supabase.instance.client.auth;
     try {
-      await auth
-          .signInWithPassword(email: correo, password: actual)
-          .timeout(limiteAlGuardar);
+      await auth.signInWithPassword(email: correo, password: actual);
     } on AuthException catch (e) {
       if (e.statusCode == '400' || e.code == 'invalid_credentials') {
         return 'La contraseña actual no es correcta';
       }
-      return generico;
-    } catch (e) {
-      return mensajeDeFallo(e, generico: generico);
+      if (esFalloDeConexion(e)) rethrow;
+      return _noSeCambio;
     }
 
     try {
-      await auth
-          .updateUser(UserAttributes(password: nueva))
-          .timeout(limiteAlGuardar);
+      await auth.updateUser(UserAttributes(password: nueva));
       return null;
     } on AuthException catch (e) {
       AppLogger.warning('ConfiguracionController',
           'No se cambió la contraseña: ${e.code} ${e.message}');
+      if (esFalloDeConexion(e)) rethrow;
       return switch (e.code) {
         'same_password' => 'La nueva debe ser distinta',
         'weak_password' =>
           'Esa contraseña es muy fácil de adivinar. Elige otra.',
-        _ => generico,
+        _ => _noSeCambio,
       };
-    } catch (e) {
-      return mensajeDeFallo(e, generico: generico);
     }
   }
 
@@ -1031,14 +1072,19 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
       // borrar el gimnasio ya no se sabe cuáles eran (las fotos no llevan el
       // gimnasio en el nombre) y la sesión ya no puede borrarlas. Si algo no
       // se borra, se corta aquí, con todo lo demás intacto, para reintentar.
-      if (!await StorageService.instance.borrarFotosDelGimnasio(gymId)) {
-        SnackbarHelper.error('Error',
-            'No se pudieron borrar las fotos. Revisa tu conexión e inténtalo de nuevo.');
-        return;
-      }
-
-      await Supabase.instance.client
-          .rpc('delete_gym_cascade', params: {'p_gym_id': gymId});
+      final borrado = await EsperaGlobal.to.guardar(
+        () async {
+          if (!await StorageService.instance.borrarFotosDelGimnasio(gymId)) {
+            throw Exception('No se pudieron borrar las fotos');
+          }
+          await Supabase.instance.client
+              .rpc('delete_gym_cascade', params: {'p_gym_id': gymId});
+          return true;
+        },
+        queHace: 'borrar el gimnasio',
+        generico: 'No se pudo borrar. Revisa tu conexión e inténtalo de nuevo.',
+      );
+      if (borrado == null) return;
 
       // La cuenta ya no existe en el servidor: cerrar sesión para no dejar
       // el token guardado en el dispositivo.

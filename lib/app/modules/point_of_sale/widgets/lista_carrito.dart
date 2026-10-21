@@ -13,17 +13,23 @@ import '../../../data/models/sale_model.dart';
 ///
 /// Sin [onCambiarCantidad] es solo para leer (mientras se cobra): sin
 /// botones, con el importe de cada renglón a la derecha.
+///
+/// Sin [conUnoMas] no hay +: en el mostrador se agrega desde los productos
+/// de la derecha y la venta solo resta.
 class ListaCarrito extends StatelessWidget {
   const ListaCarrito({
     super.key,
     required this.items,
     this.onCambiarCantidad,
+    this.conUnoMas = true,
   });
 
   final List<SaleItem> items;
 
   /// Recibe el producto y la cantidad nueva (0 = quitarlo).
   final void Function(SaleItem item, int cantidad)? onCambiarCantidad;
+
+  final bool conUnoMas;
 
   @override
   Widget build(BuildContext context) {
@@ -90,13 +96,14 @@ class ListaCarrito extends StatelessWidget {
               ),
             ),
           ),
-          _boton(
-            context,
-            icono: Icons.add,
-            tooltip: 'Uno más',
-            color: AppColors.accent,
-            onPressed: () => cambiar(item, item.quantity + 1),
-          ),
+          if (conUnoMas)
+            _boton(
+              context,
+              icono: Icons.add,
+              tooltip: 'Uno más',
+              color: AppColors.accent,
+              onPressed: () => cambiar(item, item.quantity + 1),
+            ),
         ],
       ),
     );

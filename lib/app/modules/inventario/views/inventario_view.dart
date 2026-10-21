@@ -22,7 +22,7 @@ class InventarioView extends GetView<InventarioController> {
   Widget build(BuildContext context) {
     final c = context.colores;
     final pantalla = ScaffoldAdaptable(
-      anchoMaximo: 1200,
+      anchoMaximo: ScaffoldAdaptable.anchoSeccion,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Inventario',
@@ -636,7 +636,8 @@ class InventarioView extends GetView<InventarioController> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: c.cardBackground,
-      elevation: 2,
+      elevation: 0,
+      shape: TarjetaPlana.forma(context),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: puedeEditar

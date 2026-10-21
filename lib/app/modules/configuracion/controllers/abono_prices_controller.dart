@@ -4,6 +4,7 @@ import 'package:gymads/app/data/models/abono_prices_model.dart';
 import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
 import 'package:gymads/app/data/repositories/codigo_abono_libre_repository.dart';
 import '../../../core/utils/snackbar_helper.dart';
+import '../../../core/widgets/espera_global.dart';
 import '../../../routes/app_pages.dart';
 import '../../onboarding/controllers/onboarding_controller.dart';
 
@@ -109,11 +110,17 @@ class AbonoPricesController extends GetxController {
   Future<bool> _cambiarCodigo(String? pin, {required String listo}) async {
     guardandoCodigo.value = true;
     try {
-      final ok = await codigoRepository.guardar(pin);
-      if (!ok) {
-        SnackbarHelper.error('Error', 'No se pudo guardar el código');
-        return false;
-      }
+      final ok = await EsperaGlobal.to.guardar(
+        () async {
+          if (!await codigoRepository.guardar(pin)) {
+            throw Exception('No se guardó el código');
+          }
+          return true;
+        },
+        queHace: 'guardar el código',
+        generico: 'No se pudo guardar el código. Intenta de nuevo.',
+      );
+      if (ok == null) return false;
       hayCodigo.value = pin != null;
       SnackbarHelper.success('Listo', listo);
       return true;
@@ -162,26 +169,30 @@ class AbonoPricesController extends GetxController {
 
     isSaving.value = true;
     try {
-      final success = await repository.savePrices(prices);
-
-      if (!success) {
-        SnackbarHelper.error('Error', 'No se pudieron guardar los precios');
-        return false;
-      }
-
-      if (codigo.isNotEmpty && !await codigoRepository.guardar(codigo)) {
-        SnackbarHelper.error('Error', 'No se pudo guardar el código');
-        return false;
-      }
+      // Precios, código y modo de cobro van juntos: volver a mandarlos da lo
+      // mismo, así que si algo falla se puede reintentar todo.
+      final ok = await EsperaGlobal.to.guardar(
+        () async {
+          if (!await repository.savePrices(prices)) {
+            throw Exception('No se guardaron los precios');
+          }
+          if (codigo.isNotEmpty && !await codigoRepository.guardar(codigo)) {
+            throw Exception('No se guardó el código');
+          }
+          if (isOnboarding &&
+              !await _guardarModo(
+                  soloInscripcion ? PaymentModes.libre : PaymentModes.fijo)) {
+            throw Exception('No se guardó el modo de cobro');
+          }
+          return true;
+        },
+        queHace: 'guardar los precios',
+        generico: 'No se pudieron guardar los precios. Revisa tu conexión '
+            'e inténtalo de nuevo.',
+      );
+      if (ok == null) return false;
 
       if (isOnboarding) {
-        final modeSaved = await _guardarModo(
-            soloInscripcion ? PaymentModes.libre : PaymentModes.fijo);
-        if (!modeSaved) {
-          SnackbarHelper.error('Error',
-              'No se pudo guardar el modo de cobro. Intenta de nuevo.');
-          return false;
-        }
         Get.offAllNamed(Routes.HOME);
         return true;
       }
@@ -214,3 +225,4 @@ class AbonoPricesController extends GetxController {
     return value;
   }
 }
+

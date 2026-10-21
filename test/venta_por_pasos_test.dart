@@ -195,16 +195,12 @@ void main() {
       await tester.tap(find.text('Barra de proteína'));
       await tester.pumpAndSettle();
 
-      // Agregar en la ficha; cambiar cantidades, solo en la venta.
-      expect(
-          find.descendant(
-              of: find.byType(FichaProducto),
-              matching: find.byTooltip('Uno más')),
-          findsNothing);
+      // Agregar, solo en la ficha; en la venta solo se resta.
+      expect(find.byTooltip('Uno más'), findsNothing);
       expect(
           find.descendant(
               of: find.byType(ListaCarrito),
-              matching: find.byTooltip('Uno más')),
+              matching: find.byTooltip('Uno menos')),
           findsOneWidget);
       expect(tester.getRect(find.byType(ListaCarrito)).right,
           lessThan(tester.getRect(find.byType(FichaProducto).first).left));
@@ -213,8 +209,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('¿Cómo paga?'), findsOneWidget);
       // Mientras se cobra, la venta se lee pero no se cambia.
-      expect(find.byTooltip('Uno más'), findsNothing);
+      expect(find.byTooltip('Uno menos'), findsNothing);
       expect(find.text('Escribe con cuánto paga'), findsOneWidget);
+      // El aviso va junto al botón: al cambiar de forma de pago (y con ello
+      // el aviso) la venta no brinca.
+      final total = tester.getRect(find.text('Total'));
+      await tester.tap(find.text('Tarjeta de débito'));
+      await tester.pumpAndSettle();
+      expect(find.text('Escribe con cuánto paga'), findsNothing);
+      expect(tester.getRect(find.text('Total')), total);
+      await tester.tap(find.text('Efectivo'));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Exacto'));
       await tester.pumpAndSettle();

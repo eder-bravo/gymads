@@ -18,7 +18,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
   Widget build(BuildContext context) {
     final c = context.colores;
     return ScaffoldAdaptable(
-      anchoMaximo: 960,
+      anchoMaximo: ScaffoldAdaptable.anchoSeccion,
       backgroundColor: c.backgroundColor,
       appBar: const GymAppBar(title: 'Configuración'),
       body: SafeArea(
@@ -41,9 +41,9 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
   Widget _buildUserHeader(BuildContext context) {
     final c = context.colores;
     return Card(
-      elevation: 4,
+      elevation: TarjetaPlana.elevacion(4),
       color: c.cardBackground,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: TarjetaPlana.forma(context, radio: 16),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
@@ -161,7 +161,8 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
             context,
             icon: Icons.attach_money,
             iconColor: AppColors.success,
-            title: 'Precios de Abonos',
+            title: PlataformaApp.elegir(
+                escritorio: 'Precios de abonos', movil: 'Precios de Abonos'),
             subtitle: 'Precio por día, semana, mes, año e inscripción',
             onTap: () => controller.openAbonoPrices(),
             trailing:
@@ -300,9 +301,9 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
   }) {
     final c = context.colores;
     return Card(
-      elevation: 3,
+      elevation: TarjetaPlana.elevacion(3),
       color: enabled ? c.cardBackground : c.disabled,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: TarjetaPlana.forma(context),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         enabled: enabled,
@@ -363,7 +364,7 @@ class ConfiguracionView extends GetView<ConfiguracionController> {
 
   Widget _buildDangerousActions() {
     return Card(
-      elevation: 3,
+      elevation: TarjetaPlana.elevacion(3),
       color: AppColors.error.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(

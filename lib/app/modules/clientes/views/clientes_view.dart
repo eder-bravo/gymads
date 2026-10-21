@@ -19,7 +19,7 @@ class ClientesView extends GetView<ClientesController> {
   Widget build(BuildContext context) {
     final c = context.colores;
     return ScaffoldAdaptable(
-      anchoMaximo: 1200,
+      anchoMaximo: ScaffoldAdaptable.anchoSeccion,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Clientes',

@@ -22,8 +22,8 @@ import '../widgets/resumen_totales.dart';
 /// (elegir productos, cómo paga, ¡Listo!) y abajo, a todo lo ancho, las
 /// acciones de ese momento.
 ///
-/// Cada acción vive en un solo lugar: los productos de la derecha solo
-/// agregan; las cantidades se corrigen en la venta.
+/// Cada acción vive en un solo lugar: los productos de la derecha
+/// agregan; la venta solo resta o quita.
 class MostradorView extends GetView<PointOfSaleController> {
   const MostradorView({super.key});
 
@@ -114,6 +114,7 @@ class _PanelVenta extends GetView<PointOfSaleController> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: ListaCarrito(
             items: items,
+            conUnoMas: false,
             // Mientras se cobra no se cambia: se regresa a la venta para
             // corregirla.
             onCambiarCantidad: cobrando
@@ -385,7 +386,10 @@ class _Listo extends GetView<PointOfSaleController> {
 
 /// Abajo, a todo lo ancho: lo que se puede hacer en este momento. A la
 /// izquierda lo secundario (vaciar, regresar); a la derecha, el botón
-/// principal.
+/// principal y, junto a él, lo que falta para poder pulsarlo.
+///
+/// La barra mide siempre lo mismo: si creciera con el aviso, la venta y el
+/// total brincarían al cambiar de forma de pago.
 class _BarraDeAcciones extends GetView<PointOfSaleController> {
   const _BarraDeAcciones();
 
@@ -407,6 +411,7 @@ class _BarraDeAcciones extends GetView<PointOfSaleController> {
             final total = dinero(controller.finalAmount);
             final List<Widget> izquierda;
             final Widget principal;
+            String? aviso;
             switch (etapa) {
               case EtapaVenta.productos:
                 izquierda = [
@@ -428,7 +433,7 @@ class _BarraDeAcciones extends GetView<PointOfSaleController> {
                   onPressed: vacia ? null : controller.irACobrar,
                 );
               case EtapaVenta.cobro:
-                final falta = controller.faltaParaCobrar;
+                aviso = controller.faltaParaCobrar;
                 izquierda = [
                   TextButton.icon(
                     onPressed: controller.isProcessingPayment
@@ -444,24 +449,11 @@ class _BarraDeAcciones extends GetView<PointOfSaleController> {
                     ),
                   ),
                 ];
-                principal = Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (falta != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Text(falta,
-                            style: TextStyle(
-                                color: c.textSecondary, fontSize: 15)),
-                      ),
-                    BotonGuardar(
-                      texto: 'Cobrar $total',
-                      icono: Icons.check,
-                      guardando: controller.isProcessingPayment,
-                      onPressed: falta == null ? controller.processSale : null,
-                    ),
-                  ],
+                principal = BotonGuardar(
+                  texto: 'Cobrar $total',
+                  icono: Icons.check,
+                  guardando: controller.isProcessingPayment,
+                  onPressed: aviso == null ? controller.processSale : null,
                 );
               case EtapaVenta.listo:
                 izquierda = const [];
@@ -471,6 +463,31 @@ class _BarraDeAcciones extends GetView<PointOfSaleController> {
                   onPressed: controller.nuevaVenta,
                 );
             }
+            final textoAviso = aviso == null
+                ? null
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.info_outline,
+                          size: 20, color: c.textSecondary),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          aviso,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style:
+                              TextStyle(color: c.textSecondary, fontSize: 15),
+                        ),
+                      ),
+                    ],
+                  );
+            // El mismo tamaño en todos los momentos de la venta.
+            final boton = ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 240),
+              child: SizedBox(height: 52, child: principal),
+            );
             // En una fila: lo secundario a la izquierda, el botón principal
             // a la derecha. Con letra muy grande no caben: pasa a renglones,
             // todos a la derecha.
@@ -480,15 +497,42 @@ class _BarraDeAcciones extends GetView<PointOfSaleController> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: 12,
                 runSpacing: 8,
-                children: [...izquierda, principal],
+                children: [
+                  ...izquierda,
+                  if (textoAviso != null) textoAviso,
+                  principal
+                ],
               );
             }
+            // Dos grupos en los extremos (spaceBetween): lo secundario
+            // pegado a la izquierda y el botón principal pegado a la
+            // derecha, como el "Pagar" del súper. Antes el botón flotaba a
+            // media barra: la izquierda apartaba espacio que no usaba.
             return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                for (final accion in izquierda) Flexible(child: accion),
-                const Spacer(),
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final accion in izquierda) Flexible(child: accion),
+                    ],
+                  ),
+                ),
                 const SizedBox(width: 12),
-                principal,
+                Flexible(
+                  flex: 2,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (textoAviso != null) ...[
+                        Flexible(child: textoAviso),
+                        const SizedBox(width: 16),
+                      ],
+                      boton,
+                    ],
+                  ),
+                ),
               ],
             );
           }),

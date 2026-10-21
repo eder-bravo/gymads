@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/foundation.dart';
@@ -72,8 +73,10 @@ class PantallaClientesApp extends StatelessWidget {
 /// En espera: logo, "Pasa tu tarjeta" y la hora. Al pasar una tarjeta, el
 /// aviso de siempre pero solo con información, y luego vuelve a la espera.
 ///
-/// Todo se dibuja a 1024×768 y se escala a la ventana: en un monitor grande
-/// en pantalla completa se ve grande, sin cambiar el diseño.
+/// Todo se dibuja como mínimo a 1024×768 y se escala a la ventana: en un
+/// monitor grande en pantalla completa se ve grande, sin cambiar el diseño.
+/// El lado que sobra (un monitor 16:9) se agranda en vez de dejar franjas
+/// vacías, así la foto del aviso llena la pantalla de orilla a orilla.
 class PantallaClientesVista extends StatefulWidget {
   const PantallaClientesVista({super.key, required this.avisos, this.ahora});
 
@@ -130,17 +133,21 @@ class _PantallaClientesVistaState extends State<PantallaClientesVista> {
     const base = PantallaClientesVista.tamanoBase;
     return Scaffold(
       backgroundColor: c.backgroundColor,
-      body: SizedBox.expand(
-        child: FittedBox(
+      body: LayoutBuilder(builder: (context, limites) {
+        final escala = math.min(
+            limites.maxWidth / base.width, limites.maxHeight / base.height);
+        final tamano =
+            Size(limites.maxWidth / escala, limites.maxHeight / escala);
+        return FittedBox(
           child: SizedBox.fromSize(
-            size: base,
+            size: tamano,
             child: MediaQuery(
-              data: MediaQuery.of(context).copyWith(size: base),
+              data: MediaQuery.of(context).copyWith(size: tamano),
               child: aviso == null ? _espera(context) : _avisoDe(aviso),
             ),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 
@@ -193,45 +200,8 @@ class _PantallaClientesVistaState extends State<PantallaClientesVista> {
       isNotFound: aviso.tipo == TipoAviso.noRegistrada,
       isSalida: aviso.tipo == TipoAviso.salida,
       paraClientes: true,
-      foto: url == null || url.isEmpty
-          ? null
-          : (tamano) => ClipOval(
-                child: Image.network(
-                  url,
-                  width: tamano,
-                  height: tamano,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, _, __) =>
-                      _Iniciales(nombre: aviso.nombre, tamano: tamano),
-                ),
-              ),
-    );
-  }
-}
-
-/// Si la foto no carga: las iniciales del cliente.
-class _Iniciales extends StatelessWidget {
-  const _Iniciales({required this.nombre, required this.tamano});
-
-  final String nombre;
-  final double tamano;
-
-  @override
-  Widget build(BuildContext context) {
-    final partes = nombre.trim().split(RegExp(r'\s+'));
-    final iniciales = partes
-        .where((p) => p.isNotEmpty)
-        .take(2)
-        .map((p) => p[0].toUpperCase())
-        .join();
-    return CircleAvatar(
-      radius: tamano / 2,
-      backgroundColor: AppColors.accent,
-      child: Text(iniciales,
-          style: TextStyle(
-              color: Colors.white,
-              fontSize: tamano / 3,
-              fontWeight: FontWeight.w700)),
+      // Si no carga, el aviso pone las iniciales.
+      foto: url == null || url.isEmpty ? null : NetworkImage(url),
     );
   }
 }

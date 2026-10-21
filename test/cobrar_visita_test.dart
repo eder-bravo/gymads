@@ -3,12 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:gymads/app/core/utils/fallo_al_guardar.dart';
+import 'package:gymads/app/core/widgets/espera_global.dart';
 import 'package:gymads/app/data/models/ingreso_model.dart';
 import 'package:gymads/app/modules/abonar/views/cobrar_visita_view.dart';
 import 'package:gymads/core/theme/app_theme.dart';
 
 void main() {
-  tearDown(Get.reset);
+  tearDown(() {
+    EsperaGlobal.to.reiniciar();
+    Get.reset();
+  });
 
   Future<CobrarVisitaController> abrir(
     WidgetTester tester, {
@@ -20,10 +25,11 @@ void main() {
     addTearDown(tester.view.reset);
     final c = Get.put(CobrarVisitaController(
       precioDia: precioDia,
-      registrar: registrar ?? (_) async => null,
+      registrar: registrar ?? (_) async {},
     ));
     await tester.pumpWidget(GetMaterialApp(
       theme: AppTheme.claro,
+      builder: (context, child) => CapaDeEspera(child: child!),
       home: const CobrarVisitaView(),
     ));
     return c;
@@ -45,7 +51,6 @@ void main() {
     var llamadas = 0;
     await abrir(tester, registrar: (_) async {
       llamadas++;
-      return null;
     });
     expect(
         find.text('Escribe cuánto cobrarás por esta visita.'), findsOneWidget);
@@ -74,9 +79,10 @@ void main() {
     expect(find.text('Escanear referencia'), findsNothing);
   });
 
-  testWidgets('manda nombre, monto, método y referencia, y dice "Guardando…"',
-      (tester) async {
-    final respuesta = Completer<String?>();
+  testWidgets(
+      'manda nombre, monto, método y referencia, dice "Guardando…" y si '
+      'falla lo explica', (tester) async {
+    final respuesta = Completer<void>();
     DatosVisita? enviado;
     final c = await abrir(tester, precioDia: 50, registrar: (d) {
       enviado = d;
@@ -97,10 +103,19 @@ void main() {
     expect(enviado!.metodoPago, 'tarjeta_debito');
     expect(enviado!.referencia, '004521');
 
-    respuesta.complete('No se pudo cobrar la visita. Intenta de nuevo.');
+    respuesta.completeError(
+        const GuardadoFallido('Tu rol no puede cobrar visitas.'));
+    await tester.pump(EsperaGlobal.minimo);
     await tester.pump();
-    expect(find.text('No se pudo cobrar la visita. Intenta de nuevo.'),
-        findsOneWidget);
+    expect(find.text('No se pudo cobrar la visita'), findsOneWidget);
+    expect(find.text('Tu rol no puede cobrar visitas.'), findsOneWidget);
+    // Lo mismo daría lo mismo: no se ofrece reintentar.
+    expect(find.text('Reintentar'), findsNothing);
+    await tester.tap(find.text('Entendido'));
+    await tester.pumpAndSettle();
+    expect(find.text('No se pudo cobrar la visita'), findsNothing);
+    // El formulario sigue con lo capturado.
+    expect(c.nombreCtrl.text, '  Juan  ');
   });
 
   testWidgets('sin nombre y en efectivo no manda nombre ni referencia',
@@ -108,10 +123,11 @@ void main() {
     DatosVisita? enviado;
     final c = await abrir(tester, precioDia: 40, registrar: (d) async {
       enviado = d;
-      return null;
     });
     c.setReferenciaPago('no-debe-ir');
-    expect(await c.cobrar(), 40);
+    final cobrada = c.cobrar();
+    await tester.pump(EsperaGlobal.minimo);
+    expect(await cobrada, 40);
     expect(enviado!.nombre, isNull);
     expect(enviado!.referencia, isNull);
     expect(enviado!.metodoPago, 'efectivo');

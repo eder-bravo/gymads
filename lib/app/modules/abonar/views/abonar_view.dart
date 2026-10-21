@@ -26,7 +26,8 @@ class AbonarView extends GetView<AbonarController> {
   Widget build(BuildContext context) {
     final c = context.colores;
     return ScaffoldAdaptable(
-      anchoMaximo: PlataformaApp.pantallaGrande ? 1200 : 800,
+      anchoMaximo:
+          PlataformaApp.pantallaGrande ? ScaffoldAdaptable.anchoSeccion : 800,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Abonar',
@@ -461,7 +462,10 @@ class AbonarView extends GetView<AbonarController> {
         Obx(() => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Las fichas grandes, como en el cobro de Vender: cobrar se
+                // ve igual en toda la app.
                 SelectorMetodoPago(
+                  grande: true,
                   metodos: controller.paymentMethods,
                   elegido: controller.paymentMethod.value,
                   onElegir: controller.setPaymentMethod,

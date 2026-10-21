@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
 import 'package:gymads/app/core/utils/referencia_de_pago.dart';
+import 'package:gymads/app/core/widgets/espera_global.dart';
 import 'package:gymads/app/data/models/abono_prices_model.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/repositories/abono_prices_repository.dart';
@@ -546,13 +547,13 @@ class AbonarController extends GetxController
         accessHistory: client.accessHistory,
       );
 
-      // Actualizar en base de datos
-      final success =
-          await userRepository.updateUser(client.id!, updatedClient);
-
-      if (success) {
-        // Registrar el Ingreso
-        try {
+      // El cliente y su ingreso, juntos: si el ingreso no se guarda, antes
+      // el cliente quedaba al corriente sin que el cobro apareciera en
+      // Ingresos, y nadie se enteraba. Volver a mandar el cliente da lo
+      // mismo (misma fecha de vencimiento).
+      final guardado = await EsperaGlobal.to.guardar(
+        () async {
+          await userRepository.actualizarCliente(client.id!, updatedClient);
           await ingresoService.registrarAbono(
             clienteId: client.id!,
             clienteNombre: client.name,
@@ -569,13 +570,17 @@ class AbonarController extends GetxController
             periodoInicio: periodStartDate,
             periodoFin: newExpirationDate,
           );
+          return true;
+        },
+        queHace: 'registrar el abono',
+        generico: 'El abono no se registró. Intenta de nuevo.',
+        siQuedoEnDuda: 'Puede que el abono sí se haya registrado. Revisa '
+            'Ingresos antes de volver a cobrar.',
+      );
 
-          if (Get.isRegistered<IngresosController>()) {
-            IngresosController.refreshIngresosGlobally();
-          }
-        } catch (e) {
-          AppLogger.error('AbonarController', 'Error registrando ingreso', e);
-          // No bloqueamos el éxito si el ingreso falla
+      if (guardado != null) {
+        if (Get.isRegistered<IngresosController>()) {
+          IngresosController.refreshIngresosGlobally();
         }
 
         selectedClient.value = updatedClient;
@@ -593,12 +598,11 @@ class AbonarController extends GetxController
 
         isSuccess.value = true;
         _showSnackbar('Éxito', 'Abono registrado correctamente');
-      } else {
-        _showSnackbar('Error', 'No se pudo actualizar el cliente',
-            isError: true);
       }
     } catch (e) {
-      _showSnackbar('Error', 'Ocurrió un error: $e', isError: true);
+      AppLogger.error('AbonarController', 'No se pudo registrar el abono', e);
+      _showSnackbar('Error', 'No se pudo registrar el abono. Intenta de nuevo.',
+          isError: true);
     } finally {
       isLoading.value = false;
     }

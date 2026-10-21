@@ -8,6 +8,7 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/material_localizations_12h.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
+import 'package:gymads/app/core/widgets/espera_global.dart';
 import 'package:gymads/app/core/widgets/menu_lateral.dart';
 import 'package:gymads/app/bindings/initial_binding.dart';
 import 'package:gymads/app/data/config/rfid_config.dart';
@@ -48,6 +49,9 @@ void main(List<String> args) async {
     return;
   }
   WidgetsFlutterBinding.ensureInitialized();
+  // Mientras se guarda algo, "atrás" no cierra la pantalla. Antes de runApp,
+  // para que este aviso llegue antes que el de la app.
+  EsperaGlobal.to.vigilarRegreso();
   // En iPad (iPadOS 26+), cuánto ocupan los botones de la ventana.
   VentanaEscritorio.escucharControlesDeVentana();
   // En computadora, sin el sonido de "tecla no válida" (p. ej. al usar el
@@ -235,7 +239,11 @@ class _MyAppState extends State<MyApp> {
       // lo quiere.
       builder: (context, child) => GestureDetector(
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: VentanaEscritorio(child: child ?? const SizedBox.shrink()),
+        child: VentanaEscritorio(
+          // La barra de "guardando" y su velo, encima de todo (también de
+          // las ventanas de escritorio).
+          child: CapaDeEspera(child: child ?? const SizedBox.shrink()),
+        ),
       ),
       theme: AppTheme.claro,
       darkTheme: AppTheme.oscuro,

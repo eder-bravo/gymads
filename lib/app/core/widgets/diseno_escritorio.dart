@@ -195,6 +195,22 @@ bool pantallaAcostada(BuildContext context) {
   return tamano.width > tamano.height && tamano.width >= 640;
 }
 
+/// Las tarjetas en escritorio y tableta: planas y con borde, como las de
+/// Inicio (antes unas tenían sombra y otras no). En el teléfono conservan su
+/// sombra.
+abstract final class TarjetaPlana {
+  static double elevacion(double enTelefono) =>
+      PlataformaApp.pantallaGrande ? 0 : enTelefono;
+
+  static ShapeBorder forma(BuildContext context, {double radio = 12}) =>
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radio),
+        side: PlataformaApp.pantallaGrande
+            ? BorderSide(color: context.colores.borde)
+            : BorderSide.none,
+      );
+}
+
 /// El contenido mantiene un ancho legible al ampliar la ventana. Los márgenes
 /// pertenecen a la pantalla; no se cambia el tamaño de letra ni el MediaQuery.
 class ContenidoEscritorio extends StatelessWidget {
@@ -246,6 +262,11 @@ class ScaffoldAdaptable extends StatelessWidget {
   final bool extendBodyBehindAppBar;
   final bool? resizeToAvoidBottomInset;
   final double anchoMaximo;
+
+  /// El ancho de las secciones de la barra lateral (Clientes, Abonar,
+  /// Inventario, Ingresos, Entradas, Configuración): el mismo en todas para
+  /// que el título y el contenido no cambien de lugar al pasar de una a otra.
+  static const anchoSeccion = 1200.0;
 
   /// En escritorio, la barra lateral de secciones. false en pantallas de
   /// antes de entrar (permisos iniciales, modo de cobro).

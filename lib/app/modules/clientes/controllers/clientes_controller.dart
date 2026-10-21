@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:gymads/app/core/utils/app_logger.dart';
 import 'package:gymads/app/core/utils/fallo_al_guardar.dart';
 import 'package:gymads/app/core/utils/screen_tour_mixin.dart';
+import 'package:gymads/app/core/widgets/espera_global.dart';
 import 'package:gymads/app/data/models/user_model.dart';
 import 'package:gymads/app/data/repositories/user_repository.dart';
 import 'package:gymads/app/data/services/image_cache_service.dart';
@@ -296,24 +297,32 @@ class ClientesController extends GetxController
     }
     guardandoCliente.value = true;
     try {
-      UserModel guardado;
-      try {
-        guardado = await userRepository.crearCliente(
-          newClient,
-          photoFile: photoFile,
-        );
-      } on NumeroDeClienteEnUso {
-        // Otro cliente ya tiene ese número (lo registraron en otro teléfono
-        // después de cargar la lista): se le asigna otro y se intenta una vez
-        // más.
-        final numero = _nuevoNumeroDeCliente();
-        userNumberController.text = numero;
-        newClient = newClient.copyWith(userNumber: numero);
-        guardado = await userRepository.crearCliente(
-          newClient,
-          photoFile: photoFile,
-        );
-      }
+      // Si falla, la espera muestra el motivo y deja reintentar; el
+      // formulario sigue abierto con lo capturado.
+      final guardado = await EsperaGlobal.to.guardar(
+        () async {
+          try {
+            return await userRepository.crearCliente(
+              newClient,
+              photoFile: photoFile,
+            );
+          } on NumeroDeClienteEnUso {
+            // Otro cliente ya tiene ese número (lo registraron en otro
+            // teléfono después de cargar la lista): se le asigna otro y se
+            // intenta una vez más.
+            final numero = _nuevoNumeroDeCliente();
+            userNumberController.text = numero;
+            newClient = newClient.copyWith(userNumber: numero);
+            return await userRepository.crearCliente(
+              newClient,
+              photoFile: photoFile,
+            );
+          }
+        },
+        queHace: 'registrar al cliente',
+        generico: 'No se pudo agregar el cliente. Intenta de nuevo.',
+      );
+      if (guardado == null) return false;
 
       Get.back(); // Cerrar el formulario
       // La lista se actualiza por detrás: esperar a recargarla entera dejaba
@@ -379,11 +388,19 @@ class ClientesController extends GetxController
     }
 
     try {
-      await userRepository.actualizarCliente(
-        id,
-        updatedClient,
-        photoFile: photoFile,
+      final guardado = await EsperaGlobal.to.guardar(
+        () async {
+          await userRepository.actualizarCliente(
+            id,
+            updatedClient,
+            photoFile: photoFile,
+          );
+          return true;
+        },
+        queHace: 'guardar los cambios del cliente',
+        generico: 'No se pudo guardar el cliente. Intenta de nuevo.',
       );
+      if (guardado == null) return false;
       unawaited(fetchClientes(silencioso: true));
       _showSnackbarSafe('Éxito', 'Cliente actualizado correctamente');
       return true;
@@ -415,22 +432,27 @@ class ClientesController extends GetxController
       AppLogger.warning('ClientesController', 'No se pudo pausar servicio RFID');
     }
 
-    isLoading.value = true;
     try {
-      final success = await userRepository.deleteUser(id);
-      if (success) {
-        await fetchClientes();
-        _showSnackbarSafe('Éxito', 'Cliente eliminado correctamente');
-        return true;
-      } else {
-        _showSnackbarSafe('Error', 'No se pudo eliminar el cliente', isError: true);
-        return false;
-      }
+      final borrado = await EsperaGlobal.to.guardar(
+        () async {
+          if (!await userRepository.deleteUser(id)) {
+            throw Exception('No se pudo eliminar el cliente');
+          }
+          return true;
+        },
+        queHace: 'eliminar al cliente',
+        generico: 'No se pudo eliminar el cliente. Intenta de nuevo.',
+      );
+      if (borrado == null) return false;
+      unawaited(fetchClientes(silencioso: true));
+      _showSnackbarSafe('Éxito', 'Cliente eliminado correctamente');
+      return true;
     } catch (e) {
-      _showSnackbarSafe('Error', 'Error al eliminar cliente: $e', isError: true);
+      AppLogger.error('ClientesController', 'No se pudo eliminar el cliente', e);
+      _showSnackbarSafe('Error', 'No se pudo eliminar el cliente.',
+          isError: true);
       return false;
     } finally {
-      isLoading.value = false;
       await Future.delayed(const Duration(milliseconds: 300));
       rfidService?.resumeScanning();
     }

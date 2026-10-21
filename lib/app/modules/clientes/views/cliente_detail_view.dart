@@ -92,38 +92,57 @@ class ClienteDetailView extends GetView<ClientesController> {
                   ? () => mostrarFotoAmpliada(cliente.photoUrl!,
                       nombre: cliente.name)
                   : null,
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.accent,
-                    width: 3,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.accent.withOpacity(0.3),
-                      blurRadius: 20,
-                      spreadRadius: 3,
+              // En escritorio, la foto grande y sin aura: es lo primero
+              // con que se reconoce al cliente.
+              child: PlataformaApp.pantallaGrande
+                  ? MouseRegion(
+                      cursor: (cliente.photoUrl?.isNotEmpty ?? false)
+                          ? SystemMouseCursors.zoomIn
+                          : MouseCursor.defer,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: CachedUserImage(
+                          imageUrl: cliente.photoUrl,
+                          userName: cliente.name,
+                          size: 180,
+                          isCircular: false,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.accent,
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.accent.withOpacity(0.3),
+                            blurRadius: 20,
+                            spreadRadius: 3,
+                          ),
+                        ],
+                      ),
+                      child: UserThumbnail(
+                        imageUrl: cliente.photoUrl,
+                        userName: cliente.name,
+                        size: 130,
+                      ),
                     ),
-                  ],
-                ),
-                child: UserThumbnail(
-                  imageUrl: cliente.photoUrl,
-                  userName: cliente.name,
-                  size: 130,
-                ),
-              ),
             ),
           ),
-          const SizedBox(width: 16),
-          // Nombre del cliente
+          SizedBox(width: PlataformaApp.pantallaGrande ? 24 : 16),
+          // Nombre del cliente. En escritorio, en el color del texto: en azul
+          // parecía un enlace.
           Flexible(
             child: Text(
               cliente.name,
               style: TextStyle(
-                fontSize: 22,
+                fontSize: PlataformaApp.pantallaGrande ? 28 : 22,
                 fontWeight: FontWeight.bold,
-                color: c.titleColor,
+                color:
+                    PlataformaApp.pantallaGrande ? c.textPrimary : c.titleColor,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -227,7 +246,9 @@ class ClienteDetailView extends GetView<ClientesController> {
               ),
               if (trailing != null)
                 // En escritorio el aviso es texto: que se ajuste al ancho.
-                PlataformaApp.pantallaGrande ? Flexible(child: trailing) : trailing,
+                PlataformaApp.pantallaGrande
+                    ? Flexible(child: trailing)
+                    : trailing,
             ],
           ),
           const SizedBox(height: 12),
@@ -417,37 +438,54 @@ class ClienteDetailView extends GetView<ClientesController> {
 
   Widget _buildActionButtons(BuildContext context) {
     final c = context.colores;
-    // En escritorio, una fila de botones a la derecha, la acción principal al
-    // final, como en las ventanas del sistema.
+    // En escritorio, como en las ventanas del sistema: la acción principal
+    // (Abonar, en el azul de la app) al final a la derecha, Editar junto a
+    // ella y Eliminar aparte a la izquierda, como texto: no compite con las
+    // otras ni queda a un clic equivocado de Abonar.
     if (PlataformaApp.pantallaGrande) {
       return Padding(
         padding: const EdgeInsets.all(16),
-        child: Wrap(
-          alignment: WrapAlignment.end,
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _buildActionButton(
-              label: 'Eliminar',
-              icon: Icons.delete_outline,
-              color: AppColors.error,
-              onPressed: () => _deleteCliente(context),
-              isOutlined: true,
-            ),
-            _buildActionButton(
-              label: 'Editar',
-              icon: Icons.edit_outlined,
-              color: c.titleColor,
-              onPressed: _editCliente,
-              isOutlined: true,
-            ),
-            _buildActionButton(
-              label: 'Abonar',
-              icon: Icons.payment,
-              color: AppColors.success,
-              onPressed: _abonarCliente,
-            ),
-          ],
+        // En un renglón: Eliminar a la izquierda y el resto a la derecha.
+        // Con letra grande en una ventana angosta no caben: pasan a dos.
+        child: SizedBox(
+          width: double.infinity,
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            runSpacing: 12,
+            children: [
+              TextButton.icon(
+                onPressed: () => _deleteCliente(context),
+                icon: const Icon(Icons.delete_outline, size: 20),
+                label: const Text('Eliminar'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  minimumSize: const Size(0, 44),
+                  textStyle: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _buildActionButton(
+                    label: 'Editar',
+                    icon: Icons.edit_outlined,
+                    color: c.titleColor,
+                    onPressed: _editCliente,
+                    isOutlined: true,
+                  ),
+                  _buildActionButton(
+                    label: 'Abonar',
+                    icon: Icons.payment,
+                    color: AppColors.accent,
+                    onPressed: _abonarCliente,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -625,10 +663,11 @@ class ClienteDetailView extends GetView<ClientesController> {
             texto: 'Eliminar',
             compacto: true,
             color: AppColors.error,
-            onPressed: () {
+            onPressed: () async {
               Get.back(); // Cerrar dialog
-              Get.back(); // Volver a lista
-              controller.deleteCliente(cliente.id!);
+              // A la lista solo si se borró: si falla, sigue aquí con el
+              // aviso de por qué.
+              if (await controller.deleteCliente(cliente.id!)) Get.back();
             },
           ),
         ],

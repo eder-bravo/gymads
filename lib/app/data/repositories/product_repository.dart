@@ -200,7 +200,8 @@ class ProductRepository {
       return true;
     } catch (e) {
       AppLogger.error('ProductRepository', 'Error al desactivar producto', e);
-      return false;
+      // Sale tal cual: en pantalla se dice si fue la conexión.
+      rethrow;
     }
   }
 
@@ -231,7 +232,8 @@ class ProductRepository {
       return await ajustarStock(transaction.productId, delta);
     } catch (e) {
       AppLogger.error('ProductRepository', 'Error al registrar transacción', e);
-      return null;
+      // Sale tal cual: en pantalla se dice si fue la conexión.
+      rethrow;
     }
   }
 
@@ -261,7 +263,8 @@ class ProductRepository {
       return true;
     } catch (e) {
       AppLogger.error('ProductRepository', 'Error al eliminar producto', e);
-      return false;
+      // Sale tal cual: en pantalla se dice si fue la conexión.
+      rethrow;
     }
   }
 

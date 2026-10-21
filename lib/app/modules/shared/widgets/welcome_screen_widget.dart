@@ -1,11 +1,23 @@
-import 'package:flutter/material.dart';
-import '../../../core/utils/plataforma_app.dart';
-import 'dart:math';
-import 'package:intl/intl.dart';
-import 'package:gymads/core/theme/app_colors.dart';
-import '../../../core/widgets/cached_user_image.dart';
+import 'dart:ui' show ImageFilter;
 
-class WelcomeScreenWidget extends StatefulWidget {
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:gymads/core/theme/app_colors.dart';
+import 'package:intl/intl.dart';
+
+import '../../../core/utils/plataforma_app.dart';
+import '../../../core/widgets/formulario.dart';
+import '../../../data/services/fotos_de_clientes.dart';
+import '../../../data/services/storage_service.dart';
+
+/// El aviso al pasar la tarjeta: la foto del cliente a pantalla completa y
+/// dos franjas, arriba qué pasó (¡Bienvenido!, Membresía vencida…) y abajo
+/// quién es, cuántos días le quedan y, en el mostrador, qué hacer.
+///
+/// La foto se ve entera entre las franjas (la cara nunca se recorta, aunque
+/// sea vertical en una pantalla acostada) y los lados se llenan con la misma
+/// foto difuminada.
+class WelcomeScreenWidget extends StatelessWidget {
   final String userName;
   final String userPhotoUrl;
   final int daysLeft;
@@ -22,10 +34,10 @@ class WelcomeScreenWidget extends StatefulWidget {
   final VoidCallback? onEditar;
   final VoidCallback? onRegister; // Para cuando no se encuentra tarjeta
 
-  /// La foto ya lista, en lugar de [CachedUserImage]. La usa la pantalla para
-  /// clientes, que corre en otra ventana sin Supabase: recibe el enlace ya
-  /// firmado.
-  final Widget Function(double tamano)? foto;
+  /// La foto ya lista, en lugar de buscarla con [userPhotoUrl]. La usa la
+  /// pantalla para clientes, que corre en otra ventana sin Supabase: recibe
+  /// el enlace ya firmado.
+  final ImageProvider? foto;
 
   /// En la pantalla para clientes (monitor extra): solo información, dicha
   /// al cliente ("Tu membresía venció el…", "Pasa al mostrador…").
@@ -49,478 +61,131 @@ class WelcomeScreenWidget extends StatefulWidget {
     this.paraClientes = false,
   });
 
-  @override
-  State<WelcomeScreenWidget> createState() => _WelcomeScreenWidgetState();
-}
+  bool get _rechazo => isNotFound || isExpired;
 
-class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
-    with TickerProviderStateMixin {
-  late AnimationController _animationController;
+  String get _titulo => isNotFound
+      ? PlataformaApp.elegir(
+          escritorio: 'Tarjeta no registrada', movil: 'Tarjeta No Registrada')
+      : isExpired
+          ? PlataformaApp.elegir(
+              escritorio: 'Membresía vencida', movil: 'Membresía Vencida')
+          : isSalida
+              ? '¡Hasta pronto!'
+              : '¡Bienvenido!';
 
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(seconds: 4),
-      vsync: this,
-    );
+  IconData get _iconoTitulo => isNotFound
+      ? Icons.contactless_outlined
+      : isExpired
+          ? Icons.error_outline
+          : isSalida
+              ? Icons.logout
+              : Icons.check_circle_outline;
 
-    if (widget.isVisible) {
-      _animationController.repeat();
-    }
-  }
+  String get _mensaje => isNotFound
+      ? (paraClientes
+          ? 'Pasa al mostrador para registrar tu tarjeta'
+          : 'Acude a recepción para registrar tu acceso')
+      : isExpired
+          ? (paraClientes
+              ? 'Pasa al mostrador para renovarla'
+              : '¡Por favor pasa a recepción!')
+          : isSalida
+              ? '¡Gracias por venir!'
+              : '¡Que tengas un excelente entrenamiento!';
 
-  @override
-  void didUpdateWidget(WelcomeScreenWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isVisible && !oldWidget.isVisible) {
-      _animationController.repeat();
-    } else if (!widget.isVisible && oldWidget.isVisible) {
-      _animationController.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
+  /// "Hasta qué fecha puede entrar" o, vencida, cuándo venció.
+  String? get _fecha {
+    final vence = expirationDate;
+    if (vence == null) return null;
+    final fecha = DateFormat('dd/MM/yyyy').format(vence);
+    if (!isExpired) return 'Hasta qué fecha puede entrar: $fecha';
+    return paraClientes ? 'Tu membresía venció el $fecha' : 'Venció el $fecha';
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.isVisible) return const SizedBox.shrink();
-
-    // Determinar si es una tableta basado en el ancho de la pantalla
-    final bool isTabletSize = !PlataformaApp.escritorio &&
-        MediaQuery.sizeOf(context).shortestSide >= 600;
-    final bool isSmallPhone = MediaQuery.sizeOf(context).shortestSide < 360;
+    if (!isVisible) return const SizedBox.shrink();
+    final c = context.colores;
+    final medidas = _Medidas.de(context);
+    final colorEstado = _rechazo ? AppColors.error : AppColors.accent;
 
     // Con estilo de texto propio: en Inicio el aviso va encima de todo,
     // fuera del Scaffold, y sin esto Flutter subraya cada texto en amarillo.
-    return Material(
+    final contenido = Material(
       type: MaterialType.transparency,
-      child: _buildWelcomeScreen(context, isTabletSize, isSmallPhone),
-    );
-  }
-
-  Widget _buildWelcomeScreen(BuildContext context, bool isTabletSize, bool isSmallPhone) {
-    final c = context.colores;
-    // Tamaños responsivos para pantalla de bienvenida
-    // Con el teléfono de lado la pantalla es muy baja: la foto y el título,
-    // a tamaño normal, empujaban los días restantes fuera de la vista. Se
-    // reduce todo en proporción para que el aviso se lea sin desplazarse.
-    final escala = MediaQuery.sizeOf(context).height < 500 ? 0.55 : 1.0;
-
-    final titleSize = (isTabletSize
-            ? 60.0
-            : (isSmallPhone ? 36.0 : 48.0)) *
-        escala;
-    
-    final nameSize = (isTabletSize
-            ? 42.0
-            : (isSmallPhone ? 28.0 : 36.0)) *
-        escala;
-    
-    final infoTextSize = isTabletSize
-        ? 24.0
-        : (isSmallPhone ? 18.0 : 20.0);
-    
-    // Tamaño del círculo con foto
-    final photoSize = (isTabletSize
-            ? 320.0
-            : (isSmallPhone ? 180.0 : 250.0)) *
-        escala;
-
-    final contenido = Container(
-      // Fondo sólido: al 95 % se transparentaba Inicio por detrás (sus
-      // títulos y el borde de las tarjetas se veían como rayas).
-      color: c.backgroundColor,
-      child: Center(
-        child: AnimatedBuilder(
-          animation: _animationController,
-          builder: (context, child) {
-            // Valor fijo para la escala
-            const scale = 1.0;
-            
-            // Ligero movimiento ondulante
-            final animValue = _animationController.value * pi * 2;
-            final sinValue = sin(animValue).clamp(-1.0, 1.0);
-            final breathingEffect = 1.0 + 0.005 * sinValue;
-            
-            return Transform.scale(
-              scale: scale * breathingEffect,
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    vertical: isTabletSize ? 40 : 24
-                  ),
-                  // En escritorio, el contenido con un ancho cómodo: en una
-                  // ventana grande no se estira de lado a lado.
-                  child: Center(
-                    child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                      maxWidth:
-                          PlataformaApp.pantallaGrande ? 900 : double.infinity),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Título de bienvenida con efecto de aparición
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        duration: const Duration(milliseconds: 800),
-                        curve: Curves.easeOutBack,
-                        builder: (context, value, child) {
-                          final safeOpacity = value.clamp(0.0, 1.0);
-                          return Opacity(
-                            opacity: safeOpacity,
-                            child: Transform.translate(
-                              offset: Offset(0, 20 * (1 - value)),
-                              // Centrado y con margen: "Tarjeta No
-                              // Registrada" se parte en dos líneas.
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16),
-                                child: Text(
-                                widget.isNotFound
-                                    ? PlataformaApp.elegir(
-                                        escritorio: 'Tarjeta no registrada',
-                                        movil: 'Tarjeta No Registrada')
-                                    : widget.isExpired
-                                        ? PlataformaApp.elegir(
-                                            escritorio: 'Membresía vencida',
-                                            movil: 'Membresía Vencida')
-                                        : widget.isSalida
-                                            ? '¡Hasta pronto!'
-                                            : '¡Bienvenido!',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: widget.isNotFound ? (isTabletSize ? 50.0 : (isSmallPhone ? 30.0 : 40.0)) * escala : titleSize,
-                                  fontWeight: FontWeight.bold,
-                                  color: widget.isNotFound ? Colors.redAccent : (widget.isExpired ? Colors.redAccent : c.contraste),
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withOpacity(0.5),
-                                      offset: const Offset(2, 2),
-                                      blurRadius: 4,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              ),
-                            ),
-                          );
-                        }
-                      ),
-                      SizedBox(height: (isTabletSize ? 40 : 32) * escala),
-                      
-                      // Foto del usuario con efecto de aura
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        duration: const Duration(milliseconds: 1000),
-                        curve: Curves.easeOutCubic,
-                        builder: (context, value, child) {
-                          final safeOpacity = value.clamp(0.0, 1.0);
-                          return Opacity(
-                            opacity: safeOpacity,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Aura exterior
-                                Container(
-                                  width: (photoSize + 20) * value,
-                                  height: (photoSize + 20) * value,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: (widget.isNotFound || widget.isExpired ? Colors.red : c.backgroundColor).withOpacity(0.2),
-                                  ),
-                                ),
-                                // Aura interior
-                                Container(
-                                  width: (photoSize + 10) * value,
-                                  height: (photoSize + 10) * value,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: (widget.isNotFound || widget.isExpired ? Colors.redAccent : AppColors.accent).withOpacity(0.3),
-                                  ),
-                                ),
-                                // Foto
-                                Container(
-                                  width: photoSize * value,
-                                  height: photoSize * value,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: c.contraste,
-                                      width: 4,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (widget.isNotFound || widget.isExpired ? Colors.red : c.backgroundColor).withOpacity(0.5),
-                                        spreadRadius: 5,
-                                        blurRadius: 15,
-                                      ),
-                                    ],
-                                  ),
-                                  child: widget.isNotFound
-                                      ? CircleAvatar(
-                                          radius: photoSize/2 * value,
-                                          backgroundColor: Colors.red,
-                                          child: Icon(
-                                            Icons.contactless_outlined,
-                                            size: photoSize/2.5 * value,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : widget.foto != null
-                                          ? widget.foto!(photoSize * value)
-                                      : (widget.userPhotoUrl.isNotEmpty
-                                          ? CachedUserImage(
-                                              imageUrl: widget.userPhotoUrl,
-                                              userName: widget.userName,
-                                              size: photoSize * value,
-                                              isCircular: true,
-                                              fit: BoxFit.cover,
-                                            )
-                                          : CircleAvatar(
-                                              radius: photoSize/2 * value,
-                                              backgroundColor: widget.isExpired ? Colors.red : c.backgroundColor,
-                                              child: Icon(
-                                                Icons.person,
-                                                size: photoSize/3 * value,
-                                                color: widget.isExpired ? Colors.white : c.contraste,
-                                              ),
-                                            )),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                      ),
-                      SizedBox(height: isSmallPhone ? 20 : 24),
-                      
-                      if (!widget.isNotFound) ...[
-                        // Nombre del usuario con animación de entrada
-                        TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0.0, end: 1.0),
-                          duration: const Duration(milliseconds: 1200),
-                          curve: Curves.easeOutQuart,
-                          builder: (context, value, child) {
-                            final safeOpacity = value.clamp(0.0, 1.0);
-                            return Opacity(
-                              opacity: safeOpacity,
-                              child: Transform.translate(
-                                offset: Offset(0, 30 * (1 - value)),
-                                child: Text(
-                                  widget.userName,
-                                  style: TextStyle(
-                                    fontSize: nameSize,
-                                    fontWeight: FontWeight.bold,
-                                    color: c.contraste,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            );
-                          }
+      // Fondo sólido: se transparentaba Inicio por detrás.
+      child: Container(
+        color: c.backgroundColor,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          builder: (context, t, _) => _FotoDelCliente(
+            nombre: userName,
+            guardada: userPhotoUrl,
+            lista: foto,
+            noRegistrada: isNotFound,
+            builder: (fondo, centro) => Stack(
+              fit: StackFit.expand,
+              children: [
+                Opacity(opacity: t, child: fondo),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    FractionalTranslation(
+                      translation: Offset(0, t - 1),
+                      child: _franjaDeArriba(colorEstado, medidas),
+                    ),
+                    // La foto entera, en el hueco que dejan las franjas:
+                    // nunca queda debajo de una.
+                    Expanded(
+                      child: Opacity(
+                        opacity: t,
+                        child: Padding(
+                          padding: EdgeInsets.all(medidas.bajo ? 8 : 16),
+                          child: centro,
                         ),
-                        SizedBox(height: isSmallPhone ? 12 : 16),
-                      ],
-
-                      if (!widget.isNotFound)
-                      // Días restantes con animación de entrada
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        duration: const Duration(milliseconds: 1600),
-                        curve: Curves.easeOutQuart,
-                        builder: (context, value, child) {
-                          final safeOpacity = value.clamp(0.0, 1.0);
-                          return Opacity(
-                            opacity: safeOpacity,
-                            child: Transform.translate(
-                              offset: Offset(0, 30 * (1 - value)),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: isTabletSize ? 20 : 16, 
-                                  vertical: isTabletSize ? 12 : 8
-                                ),
-                                decoration: BoxDecoration(
-                                  color: c.contraste.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.event_available,
-                                          color: c.contraste,
-                                          size: isTabletSize ? 28 : 24,
-                                        ),
-                                        SizedBox(width: isTabletSize ? 12 : 8),
-                                        Text(
-                                          widget.isExpired ? '0 días restantes' : '${widget.daysLeft} días restantes',
-                                          style: TextStyle(
-                                            fontSize: infoTextSize,
-                                            color: c.contraste,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (widget.expirationDate != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 8.0),
-                                        child: Text(
-                                          widget.paraClientes && widget.isExpired
-                                              ? 'Tu membresía venció el ${DateFormat('dd/MM/yyyy').format(widget.expirationDate!)}'
-                                              : 'Hasta qué fecha puede entrar: ${DateFormat('dd/MM/yyyy').format(widget.expirationDate!)}',
-                                          style: TextStyle(
-                                            fontSize: infoTextSize * 0.85,
-                                            color: c.contraste.withOpacity(0.9),
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }
                       ),
-                      
-                      // Indicador de progreso
-                      SizedBox(height: isSmallPhone ? 16 : 24),
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        duration: const Duration(milliseconds: 1800),
-                        curve: Curves.easeOutQuart,
-                        builder: (context, value, child) {
-                          final safeOpacity = value.clamp(0.0, 1.0);
-                          return Opacity(
-                            opacity: safeOpacity,
-                              child: Text(
-                                widget.isNotFound
-                                    ? (widget.paraClientes
-                                        ? 'Pasa al mostrador para registrar tu tarjeta'
-                                        : 'Acude a recepción para registrar tu acceso')
-                                    : widget.isExpired
-                                        ? (widget.paraClientes
-                                            ? 'Pasa al mostrador para renovarla'
-                                            : '¡Por favor pasa a recepción!')
-                                        : '¡Que tengas un excelente entrenamiento!',
-                                style: TextStyle(
-                                  fontSize: isTabletSize
-                                      ? 20.0
-                                      : (isSmallPhone ? 14.0 : 16.0),
-                                  color: c.contraste.withOpacity(0.8),
-                                  fontStyle: FontStyle.italic,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                          );
-                        }
-                      ),
-                      
-                      // Botones de acción
-                      SizedBox(height: isSmallPhone ? 24 : 32),
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        duration: const Duration(milliseconds: 2000),
-                        curve: Curves.easeOutQuart,
-                        builder: (context, value, child) {
-                          final safeOpacity = value.clamp(0.0, 1.0);
-                          return Opacity(
-                            opacity: safeOpacity,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                if (widget.isNotFound && widget.onRegister != null)
-                                  ElevatedButton.icon(
-                                    onPressed: widget.onRegister,
-                                    icon: const Icon(Icons.person_add, color: Colors.white),
-                                    label: const Text('Registrar', style: TextStyle(color: Colors.white)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.accent,
-                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                  ),
-                                if (!widget.isNotFound && widget.onAbonar != null)
-                                  ElevatedButton.icon(
-                                    onPressed: widget.onAbonar,
-                                    icon: const Icon(Icons.payment, color: Colors.white),
-                                    label: const Text('Abonar', style: TextStyle(color: Colors.white)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.accent,
-                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                  ),
-                                if (!widget.isNotFound && widget.onAbonar != null && widget.onEditar != null)
-                                  const SizedBox(width: 16),
-                                if (!widget.isNotFound && widget.onEditar != null)
-                                  ElevatedButton.icon(
-                                    onPressed: widget.onEditar,
-                                    icon: Icon(Icons.edit, color: c.contraste),
-                                    label: Text('Editar', style: TextStyle(color: c.contraste)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: c.contraste.withOpacity(0.2),
-                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          );
-                        }
-                      ),
-                    ],
-                  ),
-                  ),
-                  ),
+                    ),
+                    FractionalTranslation(
+                      translation: Offset(0, 1 - t),
+                      child: _franjaDeAbajo(context, medidas),
+                    ),
+                  ],
                 ),
-              ),
-            );
-          },
+              ],
+            ),
+          ),
         ),
       ),
     );
 
     // Sin [onClose] (la pantalla de check-in lo controla por su cuenta) se
     // muestra tal cual.
-    final cerrar = widget.onClose;
+    final cerrar = onClose;
     if (cerrar == null) return contenido;
 
     // Se quita al momento, pero solo con la X: un toque en otro lado (al
     // acomodar el teléfono, o el cliente que se asoma) no debe cerrarlo. Se
-    // cierra solo pasados unos segundos.
+    // cierra solo pasados unos segundos. Va sobre la franja de color, así
+    // que es blanca en los dos modos.
     return Stack(
       children: [
-        contenido,
+        Positioned.fill(child: contenido),
         Positioned(
           top: 0,
           right: 0,
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(medidas.bajo ? 6 : 12),
               child: IconButton(
                 onPressed: cerrar,
                 tooltip: 'Cerrar',
                 icon: const Icon(Icons.close, size: 28),
-                color: c.contraste,
+                color: Colors.white,
                 style: IconButton.styleFrom(
-                  backgroundColor: c.contraste.withOpacity(0.2),
-                  side: BorderSide(color: c.contraste.withOpacity(0.35)),
+                  backgroundColor: Colors.white.withOpacity(0.18),
+                  side: BorderSide(color: Colors.white.withOpacity(0.4)),
                   minimumSize: const Size(52, 52),
                   shape: const CircleBorder(),
                 ),
@@ -531,4 +196,371 @@ class _WelcomeScreenWidgetState extends State<WelcomeScreenWidget>
       ],
     );
   }
+
+  Widget _franjaDeArriba(Color color, _Medidas m) {
+    return Material(
+      color: color,
+      elevation: 0,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          // A los lados deja lugar a la X: el título va centrado.
+          padding:
+              EdgeInsets.fromLTRB(76, m.rellenoFranja, 76, m.rellenoFranja),
+          // En un renglón: si no cabe junto a la X, se encoge un poco en vez
+          // de partirse en dos y comerle lugar a la foto.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_iconoTitulo, color: Colors.white, size: m.titulo * 0.9),
+                SizedBox(width: m.titulo * 0.3),
+                Text(
+                  _titulo,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: m.titulo,
+                    fontWeight: FontWeight.bold,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _franjaDeAbajo(BuildContext context, _Medidas m) {
+    final c = context.colores;
+    final fecha = _fecha;
+    final botones = <Widget>[
+      if (isNotFound && onRegister != null)
+        BotonGuardar(
+          texto: 'Registrar',
+          icono: Icons.person_add,
+          compacto: true,
+          onPressed: onRegister,
+        ),
+      if (!isNotFound && onEditar != null)
+        OutlinedButton.icon(
+          onPressed: onEditar,
+          icon: const Icon(Icons.edit, size: 20),
+          label: const Text('Editar'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: c.textPrimary,
+            side: BorderSide(color: c.borde),
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle:
+                const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
+      if (!isNotFound && onAbonar != null)
+        BotonGuardar(
+          texto: 'Abonar',
+          icono: Icons.payment,
+          compacto: true,
+          onPressed: onAbonar,
+        ),
+    ];
+    return Material(
+      color: c.cardBackground,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+              24, m.rellenoFranja * 1.2, 24, m.rellenoFranja * 1.4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!isNotFound) ...[
+                Text(
+                  userName,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: m.nombre,
+                    fontWeight: FontWeight.bold,
+                    height: 1.15,
+                  ),
+                ),
+                SizedBox(height: m.bajo ? 4 : 8),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 16,
+                  runSpacing: 2,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.event_available,
+                            size: m.dato * 1.15,
+                            color:
+                                isExpired ? AppColors.error : c.textSecondary),
+                        const SizedBox(width: 6),
+                        // Con letra grande en un teléfono angosto se parte
+                        // en dos renglones en vez de salirse.
+                        Flexible(
+                          child: Text(
+                            isExpired
+                                ? '0 días restantes'
+                                : '$daysLeft días restantes',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color:
+                                  isExpired ? AppColors.error : c.textPrimary,
+                              fontSize: m.dato,
+                              fontWeight: FontWeight.w600,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (fecha != null)
+                      Text(
+                        fecha,
+                        style: TextStyle(
+                          color: c.textSecondary,
+                          fontSize: m.dato * 0.9,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                  ],
+                ),
+                SizedBox(height: m.bajo ? 4 : 10),
+              ],
+              Text(
+                _mensaje,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: isNotFound ? m.dato : m.dato * 0.85,
+                  fontWeight: isNotFound ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+              if (botones.isNotEmpty) ...[
+                SizedBox(height: m.bajo ? 8 : 16),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: botones,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tamaños del aviso según la pantalla.
+class _Medidas {
+  const _Medidas({
+    required this.titulo,
+    required this.nombre,
+    required this.dato,
+    required this.rellenoFranja,
+    required this.bajo,
+  });
+
+  final double titulo;
+  final double nombre;
+  final double dato;
+  final double rellenoFranja;
+
+  /// Teléfono de lado: muy poca altura, todo más compacto para que la foto
+  /// conserve lugar.
+  final bool bajo;
+
+  factory _Medidas.de(BuildContext context) {
+    final tamano = MediaQuery.sizeOf(context);
+    if (tamano.height < 500) {
+      return const _Medidas(
+          titulo: 24, nombre: 22, dato: 15, rellenoFranja: 8, bajo: true);
+    }
+    if (tamano.shortestSide >= 600 || PlataformaApp.pantallaGrande) {
+      return const _Medidas(
+          titulo: 46, nombre: 40, dato: 22, rellenoFranja: 22, bajo: false);
+    }
+    if (tamano.shortestSide < 360) {
+      return const _Medidas(
+          titulo: 26, nombre: 24, dato: 16, rellenoFranja: 14, bajo: false);
+    }
+    return const _Medidas(
+        titulo: 32, nombre: 28, dato: 18, rellenoFranja: 16, bajo: false);
+  }
+}
+
+/// La foto a pantalla completa: [builder] recibe el fondo (difuminada, de
+/// orilla a orilla) y el centro (entera). Sin foto, las iniciales; con una
+/// tarjeta no registrada, el ícono.
+class _FotoDelCliente extends StatefulWidget {
+  const _FotoDelCliente({
+    required this.nombre,
+    required this.guardada,
+    required this.lista,
+    required this.noRegistrada,
+    required this.builder,
+  });
+
+  final String nombre;
+
+  /// La ruta guardada en Storage ('' sin foto).
+  final String guardada;
+
+  /// La foto ya resuelta (pantalla para clientes).
+  final ImageProvider? lista;
+
+  final bool noRegistrada;
+
+  final Widget Function(Widget fondo, Widget centro) builder;
+
+  @override
+  State<_FotoDelCliente> createState() => _FotoDelClienteState();
+}
+
+class _FotoDelClienteState extends State<_FotoDelCliente> {
+  ImageProvider? _foto;
+  bool _fallo = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolver();
+  }
+
+  @override
+  void didUpdateWidget(_FotoDelCliente anterior) {
+    super.didUpdateWidget(anterior);
+    if (anterior.guardada != widget.guardada ||
+        anterior.lista != widget.lista) {
+      _fallo = false;
+      _resolver();
+    }
+  }
+
+  /// Ya descargada (la deja lista `prepararParaMostrar` antes del aviso): al
+  /// instante y en alta resolución. Si no, con su enlace firmado.
+  Future<void> _resolver() async {
+    _foto = widget.lista;
+    final guardada = widget.guardada;
+    if (_foto != null || widget.noRegistrada || guardada.isEmpty) return;
+    final archivo = FotosDeClientes.to?.archivo(guardada);
+    if (archivo != null) {
+      _foto = FotosDeClientes.proveedorGrande(archivo);
+      return;
+    }
+    try {
+      final url = await StorageService.instance.signedUrl(guardada);
+      if (!mounted || url == null || widget.guardada != guardada) return;
+      setState(() => _foto = CachedNetworkImageProvider(url,
+          cacheKey: StorageService.instance.stableKey(guardada) ?? url));
+    } catch (_) {
+      if (mounted) setState(() => _fallo = true);
+    }
+  }
+
+  void _alFallar() {
+    if (_fallo) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _fallo = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final foto = _foto;
+    if (widget.noRegistrada) {
+      return _sustituto(
+        AppColors.error,
+        (lado) => Icon(Icons.contactless_outlined,
+            size: lado * 0.5, color: Colors.white),
+      );
+    }
+    if (foto == null || _fallo) {
+      return _sustituto(
+        AppColors.accent,
+        (lado) => Text(
+          _iniciales(widget.nombre),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: lado * 0.36,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+    return widget.builder(
+      Stack(
+        fit: StackFit.expand,
+        children: [
+          // Sin clamp las orillas se difuminan contra lo transparente y
+          // quedan oscuras.
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(
+                sigmaX: 30, sigmaY: 30, tileMode: TileMode.clamp),
+            child: Image(
+              image: foto,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (context, _, __) => const SizedBox.shrink(),
+            ),
+          ),
+          // Oscurece el difuminado para que la foto entera destaque.
+          ColoredBox(color: Colors.black.withOpacity(0.35)),
+        ],
+      ),
+      Image(
+        image: foto,
+        fit: BoxFit.contain,
+        gaplessPlayback: true,
+        errorBuilder: (context, _, __) {
+          _alFallar();
+          return const SizedBox.shrink();
+        },
+      ),
+    );
+  }
+
+  /// Sin foto: un círculo de color, del mayor tamaño que quepa entre las
+  /// franjas, sobre un fondo suave del mismo color.
+  Widget _sustituto(Color color, Widget Function(double lado) contenido) {
+    return widget.builder(
+      ColoredBox(color: color.withOpacity(0.12)),
+      LayoutBuilder(builder: (context, limites) {
+        final lado = limites.biggest.shortestSide * 0.85;
+        return Center(
+          child: Container(
+            width: lado,
+            height: lado,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            child: contenido(lado),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+String _iniciales(String nombre) {
+  final partes =
+      nombre.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).take(2);
+  final iniciales = partes.map((p) => p[0].toUpperCase()).join();
+  return iniciales.isEmpty ? '?' : iniciales;
 }

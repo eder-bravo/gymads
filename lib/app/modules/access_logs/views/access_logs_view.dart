@@ -5,6 +5,7 @@ import '../controllers/access_logs_controller.dart';
 import '../../../data/models/access_log_model.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/hora_formato.dart';
+import '../../../core/utils/plataforma_app.dart';
 import '../../../core/widgets/periodo_selector.dart';
 import '../../../core/widgets/tour_step.dart';
 import '../../../global_widgets/app_header.dart';
@@ -18,7 +19,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
   Widget build(BuildContext context) {
     final c = context.colores;
     return ScaffoldAdaptable(
-      anchoMaximo: 960,
+      anchoMaximo: ScaffoldAdaptable.anchoSeccion,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Entradas',
@@ -383,7 +384,7 @@ class AccessLogsView extends GetView<AccessLogsController> {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       color: c.cardBackground,
-      elevation: 2,
+      elevation: TarjetaPlana.elevacion(2),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
@@ -434,7 +435,13 @@ class AccessLogsView extends GetView<AccessLogsController> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  esVisita ? 'VISITA' : log.accessType.toUpperCase(),
+                  // En escritorio, con mayúscula solo al inicio, como el
+                  // resto de los textos.
+                  PlataformaApp.pantallaGrande
+                      ? (esVisita
+                          ? 'Visita'
+                          : log.accessType.capitalizeFirst ?? log.accessType)
+                      : (esVisita ? 'VISITA' : log.accessType.toUpperCase()),
                   style: TextStyle(
                     color: color,
                     fontSize: 12,

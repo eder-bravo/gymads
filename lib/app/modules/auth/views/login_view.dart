@@ -549,16 +549,18 @@ class LoginView extends GetView<AuthController> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Row(
+                    : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.login, size: 20),
-                          SizedBox(width: 8),
+                          const Icon(Icons.login, size: 20),
+                          const SizedBox(width: 8),
                           Flexible(
                               child: Text(
-                            'Iniciar Sesión',
+                            PlataformaApp.elegir(
+                                escritorio: 'Iniciar sesión',
+                                movil: 'Iniciar Sesión'),
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),

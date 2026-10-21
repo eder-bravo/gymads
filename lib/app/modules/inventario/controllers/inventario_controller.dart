@@ -12,6 +12,7 @@ import 'package:gymads/app/data/repositories/product_repository.dart';
 import 'package:gymads/app/data/services/tenant_context_service.dart';
 import 'package:gymads/app/data/services/welcome_tour_service.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/app/core/widgets/espera_global.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 
@@ -251,7 +252,13 @@ class InventarioController extends GetxController
           updatedAt: now,
         );
 
-        final result = await productRepository.updateProduct(updatedProduct);
+        final result = await EsperaGlobal.to.guardar(
+          () => productRepository.updateProduct(updatedProduct),
+          queHace: 'guardar el producto',
+          generico: 'No se pudo guardar el producto. Intenta de nuevo.',
+          mensajeDe: _codigoRepetido,
+        );
+        if (result == null) return;
 
         int index = products.indexWhere((p) => p.id == result.id);
         if (index >= 0) {
@@ -276,7 +283,13 @@ class InventarioController extends GetxController
           updatedAt: now,
         );
 
-        final result = await productRepository.createProduct(newProduct);
+        final result = await EsperaGlobal.to.guardar(
+          () => productRepository.createProduct(newProduct),
+          queHace: 'crear el producto',
+          generico: 'No se pudo guardar el producto. Intenta de nuevo.',
+          mensajeDe: _codigoRepetido,
+        );
+        if (result == null) return;
         _idProductoNuevo = null;
 
         if (!products.any((p) => p.id == result.id)) products.add(result);
@@ -305,6 +318,10 @@ class InventarioController extends GetxController
     }
   }
 
+  /// "Ese código ya es de otro producto": se dice tal cual, sin reintentar.
+  static String? _codigoRepetido(Object e) =>
+      e is BarcodeDuplicadoException ? e.mensaje : null;
+
   void editProduct(Product product) {
     currentProduct.value = product;
     isEditing.value = true;
@@ -325,9 +342,13 @@ class InventarioController extends GetxController
         return;
       }
 
-      final result = await productRepository.deactivateProduct(productId);
+      final result = await EsperaGlobal.to.guardar(
+        () => productRepository.deactivateProduct(productId),
+        queHace: 'desactivar el producto',
+        generico: 'No se pudo desactivar el producto. Intenta de nuevo.',
+      );
 
-      if (result) {
+      if (result == true) {
         // Dar tiempo al sistema antes de actualizar la UI
         await Future.delayed(const Duration(milliseconds: 100));
 
@@ -380,9 +401,13 @@ class InventarioController extends GetxController
       );
 
       if (confirmed == true) {
-        final result = await productRepository.deleteProduct(productId);
+        final result = await EsperaGlobal.to.guardar(
+          () => productRepository.deleteProduct(productId),
+          queHace: 'eliminar el producto',
+          generico: 'No se pudo eliminar el producto. Intenta de nuevo.',
+        );
 
-        if (result) {
+        if (result == true) {
           // Dar tiempo al sistema antes de actualizar la UI
           await Future.delayed(const Duration(milliseconds: 100));
 
@@ -444,12 +469,17 @@ class InventarioController extends GetxController
         createdAt: DateTime.now(),
       );
 
-      final nuevoStock = await productRepository.recordTransaction(transaction);
-      if (nuevoStock == null) {
-        _showSnackbarSafe('Error', 'No se pudo actualizar el stock',
-            isError: true);
-        return null;
-      }
+      // Un ajuste no se puede mandar dos veces: si quedó en duda, se pide
+      // revisar el stock en vez de reintentar.
+      final nuevoStock = await EsperaGlobal.to.guardar(
+        () async => (await productRepository.recordTransaction(transaction))!,
+        queHace: 'actualizar el stock',
+        generico: 'No se pudo actualizar el stock. Intenta de nuevo.',
+        siQuedoEnDuda: 'Puede que el ajuste sí se haya hecho. Revisa el '
+            'stock de ${product.name} antes de repetirlo.',
+        rapido: true,
+      );
+      if (nuevoStock == null) return null;
 
       // Refleja el nuevo stock sin recargar toda la lista: el ajuste rápido
       // con +/- se dispara muchas veces seguidas.

@@ -49,7 +49,7 @@ class IngresoService {
       return await _ingresoProvider.createIngreso(ingreso);
     } catch (e) {
       AppLogger.error('IngresoService', 'Error al registrar abono', e);
-      return false;
+      rethrow;
     }
   }
 

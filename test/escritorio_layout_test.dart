@@ -524,7 +524,9 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     expect(controller.totalUnidades, 2);
-    await tester.tap(find.byTooltip('Uno más'));
+    // Se agrega desde los productos: la venta ya no tiene +.
+    expect(find.byTooltip('Uno más'), findsNothing);
+    await tester.tap(find.text('Agua natural 1 L').last);
     await tester.pumpAndSettle();
     expect(controller.totalUnidades, 3);
     // Cobrar no abre otra ventana: la derecha pasa a "¿Cómo paga?" y la
@@ -533,8 +535,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('¿Cómo paga?'), findsOneWidget);
     expect(find.byType(ListaCarrito), findsOneWidget);
-    expect(find.byTooltip('Uno más'), findsNothing);
+    expect(find.byTooltip('Uno menos'), findsNothing);
     await _capturar(tester, 'venta-cobro');
+    await tester.tap(find.text('Tarjeta de débito'));
+    await tester.pumpAndSettle();
+    await _capturar(tester, 'venta-cobro-tarjeta');
     await tester.tap(find.text('Regresar a la venta'));
     await tester.pumpAndSettle();
     // El buscador conserva lo escrito.

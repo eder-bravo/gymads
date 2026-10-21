@@ -107,9 +107,9 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
   Widget _buildSalidasTile(GymSettingsModel ajustes) {
     final c = context.colores;
     return Card(
-      elevation: 2,
+      elevation: TarjetaPlana.elevacion(2),
       color: c.cardBackground,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: TarjetaPlana.forma(context),
       child: SwitchListTile(
         value: ajustes.registrarSalidas,
         onChanged: controller.setRegistrarSalidas,
@@ -155,9 +155,9 @@ class _ControlAccesosViewState extends State<ControlAccesosView> {
   }) {
     final c = context.colores;
     return Card(
-      elevation: 2,
+      elevation: TarjetaPlana.elevacion(2),
       color: c.cardBackground,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: TarjetaPlana.forma(context),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),

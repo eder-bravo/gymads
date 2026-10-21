@@ -22,8 +22,9 @@ import 'tenant_context_service.dart';
 /// - al abrir la sesión y cada vez que otro teléfono agrega o cambia un
 ///   cliente (actualización en vivo), se descargan las fotos que falten;
 /// - [archivo] devuelve la foto guardada al instante, sin internet;
-/// - [prepararParaMostrar] la deja decodificada en memoria (el aviso del
-///   lector la pide antes de salir, para que aparezca ya con la foto).
+/// - [prepararParaMostrar] la deja decodificada en memoria, en alta
+///   resolución (el aviso del lector la pide antes de salir, para que
+///   aparezca ya con la foto).
 class FotosDeClientes extends GetxService {
   FotosDeClientes({BaseCacheManager? cache})
       : _cache = cache ?? DefaultCacheManager();
@@ -83,6 +84,16 @@ class FotosDeClientes extends GetxService {
   static ImageProvider proveedor(File archivo) =>
       ResizeImage(FileImage(archivo), width: anchoDecodificado);
 
+  /// La del aviso del lector, a pantalla completa: hasta el tamaño con que se
+  /// guardan las fotos (1600 por lado, ver `prepararFotoCompleta`), para que
+  /// no se vea borrosa en una tableta o un monitor. Nunca la agranda.
+  static ImageProvider proveedorGrande(File archivo) => ResizeImage(
+        FileImage(archivo),
+        width: 1600,
+        height: 1600,
+        policy: ResizeImagePolicy.fit,
+      );
+
   /// Deja la foto lista para dibujarse sin espera. La descarga si hace falta.
   /// Nunca tarda más de [limite]: si no llega, el aviso sale igual.
   Future<void> prepararParaMostrar(
@@ -95,7 +106,7 @@ class FotosDeClientes extends GetxService {
         final f = archivo(guardada) ?? await _asegurar(guardada);
         final contexto = Get.context;
         if (f == null || contexto == null || !contexto.mounted) return;
-        await precacheImage(proveedor(f), contexto);
+        await precacheImage(proveedorGrande(f), contexto);
       }).timeout(limite);
     } catch (_) {
       // Sin la foto a tiempo, el aviso la carga como antes.

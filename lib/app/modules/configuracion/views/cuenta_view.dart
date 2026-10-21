@@ -177,8 +177,9 @@ class CuentaView extends GetView<ConfiguracionController> {
                         SizedBox(
                           // En escritorio, del ancho de su texto: un botón
                           // rojo de lado a lado parece la acción principal.
-                          width:
-                              PlataformaApp.pantallaGrande ? null : double.infinity,
+                          width: PlataformaApp.pantallaGrande
+                              ? null
+                              : double.infinity,
                           child: OutlinedButton.icon(
                             onPressed: controller.isLoading.value
                                 ? null
@@ -279,9 +280,9 @@ class CuentaView extends GetView<ConfiguracionController> {
   Widget _cabeceraEscritorio(BuildContext context) {
     final c = context.colores;
     return Card(
-      elevation: 2,
+      elevation: TarjetaPlana.elevacion(2),
       color: c.cardBackground,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: TarjetaPlana.forma(context, radio: 16),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Row(
@@ -369,9 +370,9 @@ class CuentaView extends GetView<ConfiguracionController> {
   }) {
     final c = context.colores;
     return Card(
-      elevation: 2,
+      elevation: TarjetaPlana.elevacion(2),
       color: c.cardBackground,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: TarjetaPlana.forma(context),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
@@ -431,7 +432,7 @@ class CuentaView extends GetView<ConfiguracionController> {
     BuildContext context, {
     required String title,
     required String currentValue,
-    required Future<void> Function(String) onSave,
+    required Future<bool> Function(String) onSave,
   }) {
     Get.dialog(
       _EditFieldDialog(
@@ -455,7 +456,8 @@ class CuentaView extends GetView<ConfiguracionController> {
 class _EditFieldDialog extends StatefulWidget {
   final String title;
   final String currentValue;
-  final Future<void> Function(String) onSave;
+  /// Devuelve si se guardó; si no, la ventana sigue abierta con lo escrito.
+  final Future<bool> Function(String) onSave;
 
   const _EditFieldDialog({
     required this.title,
@@ -489,12 +491,13 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
       return;
     }
     setState(() => _isSaving = true);
+    var guardado = false;
     try {
-      await widget.onSave(newValue);
+      guardado = await widget.onSave(newValue);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
-    if (mounted) Get.back();
+    if (guardado && mounted) Get.back();
   }
 
   @override

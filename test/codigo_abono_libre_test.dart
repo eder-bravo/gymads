@@ -51,6 +51,9 @@ class _Usuarios extends Fake implements UserRepository {
   @override
   Future<bool> updateUser(String id, UserModel user, {File? photoFile}) async =>
       true;
+  @override
+  Future<void> actualizarCliente(String id, UserModel user,
+      {File? photoFile}) async {}
 }
 
 class _Precios extends Fake implements AbonoPricesRepository {

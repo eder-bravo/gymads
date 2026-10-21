@@ -16,6 +16,7 @@ import '../../../data/services/carrito_guardado.dart';
 import '../../../data/services/welcome_tour_service.dart';
 import '../../ingresos/controllers/ingresos_controller.dart';
 import 'package:gymads/app/data/services/cambios_en_vivo_service.dart';
+import 'package:gymads/app/core/widgets/espera_global.dart';
 import 'package:gymads/app/core/widgets/formulario.dart';
 import 'package:gymads/app/core/utils/plataforma_app.dart';
 
@@ -560,8 +561,16 @@ class PointOfSaleController extends GetxController
         referenciaPago: referenciaParaGuardar,
       );
 
-      // Procesar venta en el repositorio
-      final resultado = await _saleRepository.createSale(sale);
+      // Procesar venta en el repositorio. Si falla, la espera ya lo dice
+      // (y deja reintentar); el carrito sigue como estaba.
+      final resultado = await EsperaGlobal.to.guardar(
+        () => _saleRepository.createSale(sale),
+        queHace: 'registrar la venta',
+        generico: 'La venta no se registró. Intenta de nuevo.',
+        siQuedoEnDuda: 'Puede que la venta sí se haya registrado. Revisa '
+            'Ingresos antes de volver a cobrar.',
+      );
+      if (resultado == null) return false;
       final result = resultado.sale;
 
       // El cobro salió bien pero algún stock no se movió: hay que avisarlo,

@@ -18,7 +18,7 @@ class IngresosView extends GetView<IngresosController> {
   Widget build(BuildContext context) {
     final c = context.colores;
     return ScaffoldAdaptable(
-      anchoMaximo: 960,
+      anchoMaximo: ScaffoldAdaptable.anchoSeccion,
       backgroundColor: c.backgroundColor,
       appBar: GymAppBar(
         title: 'Ingresos',

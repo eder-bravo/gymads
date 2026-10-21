@@ -95,8 +95,8 @@ class IngresoProvider {
       return true;
     } catch (e) {
       AppLogger.error('IngresoProvider', 'Error al crear ingreso', e);
-      AppLogger.info('IngresoProvider', 'Tipo de error: ${e.runtimeType}');
-      return false;
+      // Sale tal cual: quien cobra necesita saber si fue la conexión.
+      rethrow;
     }
   }
 

@@ -405,7 +405,8 @@ class UserRepository {
       return true;
     } catch (e) {
       AppLogger.error('UserRepository', 'Fallo al eliminar el usuario', e);
-      return false;
+      // Sale tal cual: quien borra necesita saber si fue la conexión.
+      rethrow;
     }
   }
 }

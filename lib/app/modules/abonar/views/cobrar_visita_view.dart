@@ -8,11 +8,11 @@ import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../core/utils/app_logger.dart';
 import '../../../core/utils/auth_utils.dart';
 import '../../../core/utils/fallo_al_guardar.dart';
 import '../../../core/utils/referencia_de_pago.dart';
 import '../../../core/utils/snackbar_helper.dart';
+import '../../../core/widgets/espera_global.dart';
 import '../../../core/widgets/formulario.dart';
 import '../../../core/widgets/metodo_de_pago.dart';
 import '../../../global_widgets/app_header.dart';
@@ -26,8 +26,8 @@ typedef DatosVisita = ({
   String? referencia,
 });
 
-/// Registra la visita y devuelve null si salió bien, o el error para mostrar.
-typedef RegistrarVisita = Future<String?> Function(DatosVisita datos);
+/// Registra la visita. Si no se pudo, lanza el error (la espera lo muestra).
+typedef RegistrarVisita = Future<void> Function(DatosVisita datos);
 
 /// Abre "Cobrar visita". [precioDia] es el precio por día configurado: llena
 /// el monto, que se puede cambiar.
@@ -57,7 +57,7 @@ Future<void> abrirCobrarVisita({double? precioDia}) async {
 
 /// Registra la visita en la base de datos: su cobro en Ingresos y su entrada
 /// en Entradas, en una sola operación (`registrar_visita`).
-Future<String?> registrarVisitaEnSupabase(DatosVisita d) async {
+Future<void> registrarVisitaEnSupabase(DatosVisita d) async {
   try {
     await Supabase.instance.client.rpc('registrar_visita', params: {
       'p_nombre': d.nombre,
@@ -65,23 +65,16 @@ Future<String?> registrarVisitaEnSupabase(DatosVisita d) async {
       'p_metodo_pago': d.metodoPago,
       'p_referencia': d.referencia,
       'p_staff': AuthUtils.getStaffIdentifier(),
-    }).timeout(limiteAlGuardar);
-    // Ingresos, si está abierto; Entradas y los demás teléfonos se enteran
-    // solos por la actualización en vivo.
-    unawaited(IngresosController.refreshIngresosGlobally());
-    return null;
+    });
   } on PostgrestException catch (e) {
-    AppLogger.error('CobrarVisita', 'No se registró la visita', e);
     if (e.message.contains('sin_permiso')) {
-      return 'Tu rol no puede cobrar visitas.';
+      throw const GuardadoFallido('Tu rol no puede cobrar visitas.');
     }
-    return mensajeDeFallo(e,
-        generico: 'No se pudo cobrar la visita. Intenta de nuevo.');
-  } catch (e) {
-    AppLogger.error('CobrarVisita', 'No se registró la visita', e);
-    return mensajeDeFallo(e,
-        generico: 'No se pudo cobrar la visita. Intenta de nuevo.');
+    rethrow;
   }
+  // Ingresos, si está abierto; Entradas y los demás teléfonos se enteran
+  // solos por la actualización en vivo.
+  unawaited(IngresosController.refreshIngresosGlobally());
 }
 
 /// Cobrar el día a quien viene a probar, sin registrarlo como cliente.
@@ -125,17 +118,22 @@ class CobrarVisitaController extends GetxController with ReferenciaDePago {
     guardando.value = true;
     try {
       final nombre = nombreCtrl.text.trim();
-      final fallo = await _registrar((
-        nombre: nombre.isEmpty ? null : nombre,
-        monto: m,
-        metodoPago: metodoPago.value,
-        referencia: usaReferenciaPago ? referenciaParaGuardar : null,
-      ));
-      if (fallo != null) {
-        error.value = fallo;
-        return null;
-      }
-      return m;
+      final hecho = await EsperaGlobal.to.guardar(
+        () async {
+          await _registrar((
+            nombre: nombre.isEmpty ? null : nombre,
+            monto: m,
+            metodoPago: metodoPago.value,
+            referencia: usaReferenciaPago ? referenciaParaGuardar : null,
+          ));
+          return true;
+        },
+        queHace: 'cobrar la visita',
+        generico: 'No se pudo cobrar la visita. Intenta de nuevo.',
+        siQuedoEnDuda: 'Puede que la visita sí se haya cobrado. Revisa '
+            'Ingresos antes de volver a cobrar.',
+      );
+      return hecho == null ? null : m;
     } finally {
       guardando.value = false;
     }
@@ -228,7 +226,10 @@ class CobrarVisitaView extends GetView<CobrarVisitaController> {
                 Text('Método de pago',
                     style: TextStyle(color: c.textSecondary, fontSize: 14)),
                 const SizedBox(height: 10),
+                // En tableta y escritorio, las fichas grandes de Vender y
+                // Abonar.
                 SelectorMetodoPago(
+                  grande: PlataformaApp.pantallaGrande,
                   metodos: metodosDePago,
                   elegido: controller.metodoPago.value,
                   onElegir: guardando ? (_) {} : controller.setMetodoPago,

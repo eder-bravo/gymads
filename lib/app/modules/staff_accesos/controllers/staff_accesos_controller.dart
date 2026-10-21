@@ -7,6 +7,7 @@ import '../../../core/permissions/permissions.dart';
 import '../../../core/permissions/staff_role.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/utils/snackbar_helper.dart';
+import '../../../core/widgets/espera_global.dart';
 import '../../../data/models/staff_acceso_model.dart';
 import '../../../data/repositories/staff_acceso_repository.dart';
 import '../../../data/services/cambios_en_vivo_service.dart';
@@ -124,14 +125,17 @@ class StaffAccesosController extends GetxController with RecargaEnVivoMixin {
     if (isSaving.value) return null;
     isSaving.value = true;
     try {
-      final creado = await _repository.crear(nombre, rol);
+      final creado = await _guardar(
+        () => _repository.crear(nombre, rol),
+        queHace: 'crear el acceso',
+        siQuedoEnDuda: 'Puede que el acceso sí se haya creado. Revisa la '
+            'lista antes de volver a crearlo.',
+      );
+      if (creado == null) return null;
       // Se relee en vez de construir la fila a mano: el estado y las fechas
       // los pone la base.
       await load();
       return creado;
-    } on StaffAccesoException catch (e) {
-      SnackbarHelper.error('No se pudo crear', e.message());
-      return null;
     } finally {
       isSaving.value = false;
     }
@@ -142,13 +146,17 @@ class StaffAccesosController extends GetxController with RecargaEnVivoMixin {
     if (isSaving.value || rol == acceso.rol) return false;
     isSaving.value = true;
     try {
-      await _repository.cambiarRol(acceso.id, rol);
+      final hecho = await _guardar(
+        () async {
+          await _repository.cambiarRol(acceso.id, rol);
+          return true;
+        },
+        queHace: 'cambiar el rol',
+      );
+      if (hecho == null) return false;
       _replace(acceso.copyWith(rol: rol));
       SnackbarHelper.success('Listo', '${acceso.nombre} ahora es ${rol.label}');
       return true;
-    } on StaffAccesoException catch (e) {
-      SnackbarHelper.error('No se pudo cambiar el rol', e.message());
-      return false;
     } finally {
       isSaving.value = false;
     }
@@ -158,13 +166,17 @@ class StaffAccesosController extends GetxController with RecargaEnVivoMixin {
     if (isSaving.value) return false;
     isSaving.value = true;
     try {
-      await _repository.renombrar(acceso.id, nombre);
+      final hecho = await _guardar(
+        () async {
+          await _repository.renombrar(acceso.id, nombre);
+          return true;
+        },
+        queHace: 'cambiar el nombre',
+      );
+      if (hecho == null) return false;
       _replace(acceso.copyWith(nombre: nombre.trim()));
       SnackbarHelper.success('Listo', 'Nombre actualizado');
       return true;
-    } on StaffAccesoException catch (e) {
-      SnackbarHelper.error('No se pudo guardar', e.message());
-      return false;
     } finally {
       isSaving.value = false;
     }
@@ -175,42 +187,80 @@ class StaffAccesosController extends GetxController with RecargaEnVivoMixin {
     if (isSaving.value) return null;
     isSaving.value = true;
     try {
-      final codigo = await _repository.regenerarCodigo(acceso.id);
+      final codigo = await _guardar(
+        () => _repository.regenerarCodigo(acceso.id),
+        queHace: 'generar el código nuevo',
+      );
+      if (codigo == null) return null;
       await load();
       return codigo;
-    } on StaffAccesoException catch (e) {
-      SnackbarHelper.error('No se pudo regenerar', e.message());
-      return null;
     } finally {
       isSaving.value = false;
     }
   }
 
   Future<void> revocar(StaffAccesoModel acceso) async {
+    if (isSaving.value) return;
     isSaving.value = true;
     try {
-      await _repository.revocar(acceso.id);
+      final hecho = await _guardar(
+        () async {
+          await _repository.revocar(acceso.id);
+          return true;
+        },
+        queHace: 'revocar el acceso',
+      );
+      if (hecho == null) return;
       await load();
       SnackbarHelper.success('Listo', 'Acceso revocado');
-    } on StaffAccesoException catch (e) {
-      SnackbarHelper.error('No se pudo revocar', e.message());
     } finally {
       isSaving.value = false;
     }
   }
 
   Future<void> eliminar(StaffAccesoModel acceso) async {
+    if (isSaving.value) return;
     isSaving.value = true;
     try {
-      await _repository.eliminar(acceso.id);
+      final hecho = await _guardar(
+        () async {
+          await _repository.eliminar(acceso.id);
+          return true;
+        },
+        queHace: 'eliminar el acceso',
+      );
+      if (hecho == null) return;
       accesos.removeWhere((a) => a.id == acceso.id);
       SnackbarHelper.success('Listo', 'Acceso eliminado');
-    } on StaffAccesoException catch (e) {
-      SnackbarHelper.error('No se pudo eliminar', e.message());
     } finally {
       isSaving.value = false;
     }
   }
+
+  /// Con la espera de toda la app. Lo que la base rechaza ("no puedes
+  /// gestionar ese acceso") se dice tal cual; la conexión deja reintentar.
+  Future<T?> _guardar<T>(
+    Future<T> Function() tarea, {
+    required String queHace,
+    String? siQuedoEnDuda,
+  }) =>
+      EsperaGlobal.to.guardar(
+        () async {
+          try {
+            return await tarea();
+          } on StaffAccesoException catch (e) {
+            final causa = e.causa;
+            if (e.kind == StaffAccesoFailure.unknown && causa != null) {
+              throw causa;
+            }
+            rethrow;
+          }
+        },
+        queHace: queHace,
+        generico: 'No se pudo completar la operación. Intenta de nuevo.',
+        mensajeDe: (e) => e is StaffAccesoException ? e.message() : null,
+        siQuedoEnDuda: siQuedoEnDuda,
+      );
 
   void _replace(StaffAccesoModel saved) {
     final index = accesos.indexWhere((a) => a.id == saved.id);

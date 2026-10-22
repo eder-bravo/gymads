@@ -38,24 +38,34 @@ class MostradorView extends GetView<PointOfSaleController> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: anchoVenta,
-                  child: TourStep(
-                    tourKey: controller.keyCarrito,
-                    title: 'Tu venta',
-                    description: 'Lo que llevas, con sus cantidades y el '
-                        'total. Abajo cobras.',
-                    isLastStep: true,
-                    child: const _PanelVenta(),
-                  ),
-                ),
-                VerticalDivider(width: 1, thickness: 1, color: c.divisor),
-                const Expanded(child: _Escenario()),
-              ],
-            ),
+            // Ya cobrada, la venta quedó vacía: el ¡Listo! ocupa todo el
+            // ancho, sin el ticket de al lado.
+            child: Obx(() => Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (controller.etapa != EtapaVenta.listo) ...[
+                      SizedBox(
+                        width: anchoVenta,
+                        child: TourStep(
+                          tourKey: controller.keyCarrito,
+                          title: 'Tu venta',
+                          description: 'Lo que llevas, con sus cantidades y '
+                              'el total. Abajo cobras.',
+                          isLastStep: true,
+                          child: const _PanelVenta(),
+                        ),
+                      ),
+                      VerticalDivider(
+                          width: 1, thickness: 1, color: c.divisor),
+                    ],
+                    // Con llave: al volver el ticket, los productos siguen
+                    // montados y el buscador conserva lo escrito.
+                    const Expanded(
+                      key: ValueKey('escenario'),
+                      child: _Escenario(),
+                    ),
+                  ],
+                )),
           ),
           const _BarraDeAcciones(),
         ],
@@ -101,9 +111,7 @@ class _PanelVenta extends GetView<PointOfSaleController> {
               Icon(Icons.shopping_basket_outlined, size: 48, color: c.textHint),
               const SizedBox(height: 12),
               Text(
-                etapa == EtapaVenta.listo
-                    ? 'Escanea o elige productos para la siguiente venta'
-                    : 'Escanea o elige productos para comenzar',
+                'Escanea o elige productos para comenzar',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: c.textSecondary, fontSize: 15),
               ),

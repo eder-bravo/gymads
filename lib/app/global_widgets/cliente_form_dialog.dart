@@ -376,6 +376,11 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
           controller: widget.phoneController,
           style: TextStyle(color: c.textPrimary, fontSize: 16),
           keyboardType: TextInputType.phone,
+          // Solo dígitos y el "+" de la lada: el teclado físico no filtra.
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[\d+]')),
+            LengthLimitingTextInputFormatter(16),
+          ],
           textInputAction: TextInputAction.next,
           decoration: const InputDecoration(
               labelText: 'Teléfono *',
@@ -399,6 +404,9 @@ class _ClienteFormDialogState extends State<ClienteFormDialog> {
       selectorTextStyle: TextStyle(color: c.textPrimary, fontSize: 16),
       textStyle: TextStyle(color: c.textPrimary, fontSize: 16),
       keyboardType: TextInputType.phone,
+      // Sin el formato al escribir el paquete solo deja pasar dígitos; con
+      // él, las letras se colaban.
+      formatInput: false,
       inputDecoration: const InputDecoration(labelText: 'Teléfono *'),
       errorMessage: 'Escribe un teléfono válido',
       validator: (valor) => (valor == null || valor.trim().isEmpty)

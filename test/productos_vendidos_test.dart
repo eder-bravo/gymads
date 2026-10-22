@@ -95,4 +95,48 @@ void main() {
     expect(find.text('A1B2'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+      'un abono muestra al cliente, el monto arriba y su desglose sin repetirlo',
+      (tester) async {
+    final cobro = IngresoModel.fromJson({
+      'id': 'm',
+      'cliente_nombre': 'Ana López',
+      'concepto': 'registro',
+      'tipo_membresia': 'Mensual',
+      'fecha': '2026-10-21T14:32:00Z',
+      'periodo_inicio': '2026-10-21T00:00:00Z',
+      'periodo_fin': '2026-11-21T00:00:00Z',
+      'monto_base': 500,
+      'cuota_registro': 100,
+      'descuento': 50,
+      'monto_final': 550,
+      'metodo_pago': 'efectivo',
+      'notas': 'Paga la inscripción completa',
+    });
+    await tester.pumpWidget(GetMaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () => mostrarDetalleIngreso(context, cobro),
+            child: const Text('abrir'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ana López'), findsOneWidget);
+    expect(find.text('Registro nuevo · 21 oct 2026, 14:32'), findsOneWidget);
+    expect(find.text('\$550.00'), findsOneWidget);
+    expect(find.text('Efectivo'), findsOneWidget);
+    expect(find.text('Mensual'), findsOneWidget);
+    expect(find.text('21 oct 2026 – 21 nov 2026'), findsOneWidget);
+    expect(find.text('\$500.00'), findsOneWidget);
+    expect(find.text('\$100.00'), findsOneWidget);
+    expect(find.text('−\$50.00'), findsOneWidget);
+    expect(find.text('Paga la inscripción completa'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

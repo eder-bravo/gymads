@@ -484,9 +484,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    // "Abono" es también el título de la hoja.
-    expect(find.text('Abono'), findsNWidgets(2));
+    // El cliente es el título; el monto va arriba una sola vez y debajo,
+    // el abono y la inscripción por separado.
+    expect(find.text('Juan Pérez'), findsOneWidget);
+    expect(find.text('\$700.00'), findsOneWidget);
+    expect(find.text('Abono'), findsOneWidget);
+    expect(find.text('\$500.00'), findsOneWidget);
     expect(find.text('Inscripción'), findsOneWidget);
-    expect(find.text('Total'), findsOneWidget);
+    expect(find.text('\$200.00'), findsOneWidget);
   });
 }

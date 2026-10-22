@@ -633,10 +633,12 @@ Future<T?> mostrarHojaAdaptable<T>(
   Color? backgroundColor,
   ShapeBorder? shape,
   BoxConstraints? constraintsHoja,
+  Color? barrierColor,
 }) {
   if (!PlataformaApp.pantallaGrande) {
     return showModalBottomSheet<T>(
       context: context,
+      barrierColor: barrierColor,
       // Por defecto, Material no la deja pasar de 640 de ancho.
       constraints: constraintsHoja,
       isScrollControlled: isScrollControlled,
@@ -649,6 +651,7 @@ Future<T?> mostrarHojaAdaptable<T>(
   }
   return showDialog<T>(
     context: context,
+    barrierColor: barrierColor,
     builder: (context) => Dialog(
       backgroundColor: Theme.of(context).colorScheme.surface,
       surfaceTintColor: Colors.transparent,

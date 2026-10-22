@@ -375,12 +375,13 @@ class RielDelMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colores;
     final actual = MenuLateral.seccionDeRuta(ModalRoute.of(context));
-    Widget icono(SeccionDelMenu s) {
+    // Al pasar el mouse, el nombre y su atajo, como en "Ocultar menú (⌘B)".
+    Widget icono(SeccionDelMenu s, String? atajo) {
       final seleccionada = s.ruta == actual;
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Tooltip(
-          message: s.etiqueta,
+          message: atajo == null ? s.etiqueta : '${s.etiqueta} ($atajo)',
           child: Semantics(
             label: s.etiqueta,
             selected: seleccionada,
@@ -423,23 +424,44 @@ class RielDelMenu extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // El mismo botón, en el mismo lugar que con el menú abierto.
+              // El logo, a la misma altura que con el menú abierto, y debajo
+              // el botón para volver a mostrarlo.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 20, 8, 8),
+                child: Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset(
+                      'assets/images/logo_app.png',
+                      width: 40,
+                      height: 40,
+                      filterQuality: FilterQuality.medium,
+                    ),
+                  ),
+                ),
+              ),
               const Padding(
-                padding: EdgeInsets.fromLTRB(8, 20, 8, 16),
+                padding: EdgeInsets.fromLTRB(8, 0, 8, 12),
                 child: Center(child: BotonDelMenu()),
               ),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   children: [
-                    for (final s in MenuLateral.visibles()) icono(s),
+                    for (final (i, s) in MenuLateral.visibles().indexed)
+                      icono(
+                          s,
+                          i < MenuLateral._digitos.length
+                              ? MenuLateral.textoAtajo('${i + 1}')
+                              : null),
                   ],
                 ),
               ),
               Divider(height: 1, color: c.divisor),
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-                child: icono(MenuLateral.configuracion),
+                child: icono(
+                    MenuLateral.configuracion, MenuLateral.textoAtajo(',')),
               ),
             ],
           ),

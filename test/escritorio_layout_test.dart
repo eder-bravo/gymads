@@ -544,7 +544,8 @@ void main() {
     await tester.pumpAndSettle();
     // El buscador conserva lo escrito.
     expect(find.byType(EditableText), findsOneWidget);
-    expect(tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+    expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
         'Agua');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
@@ -813,9 +814,16 @@ void main() {
     final anchoSinMenu = tester.getSize(find.byType(ConMenuLateral)).width;
     expect(anchoSinMenu, closeTo(1280 - MenuLateral.anchoRiel - 1, 1));
     expect(anchoSinMenu, greaterThan(anchoConMenu));
-    // Las secciones siguen a un clic, con su nombre al pasar el mouse.
-    expect(find.byTooltip('Clientes'), findsOneWidget);
-    await tester.tap(find.byTooltip('Clientes'));
+    // Las secciones siguen a un clic, con su nombre y su atajo al pasar el
+    // mouse.
+    final n =
+        MenuLateral.visibles().indexWhere((s) => s.ruta == Routes.CLIENTES);
+    final clientes =
+        find.byTooltip('Clientes (${MenuLateral.textoAtajo('${n + 1}')})');
+    expect(clientes, findsOneWidget);
+    expect(find.byTooltip('Configuración (${MenuLateral.textoAtajo(',')})'),
+        findsOneWidget);
+    await tester.tap(clientes);
     await tester.pumpAndSettle();
     expect(Get.currentRoute, Routes.CLIENTES);
     // Sigue oculto en la otra pantalla, y se muestra con el botón de la franja.

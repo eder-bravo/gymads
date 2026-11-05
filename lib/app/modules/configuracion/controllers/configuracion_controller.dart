@@ -59,6 +59,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   /// En qué estado está el lector respecto a ESTE gimnasio.
   final Rx<EstadoLector> estadoLector = EstadoLector.sinConfigurar.obs;
   final RxBool comprobandoLector = false.obs;
+  bool _comprobandoEstadoLector = false;
 
   /// Esperando a que el lector vuelva a su WiFi tras salir de "Cambiar WiFi"
   /// sin cambiarlo (ver [esperarRegresoDelLector]).
@@ -80,10 +81,21 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
   /// El aparato no devuelve nunca el gym_id que tiene guardado —si lo hiciera,
   /// el gimnasio de al lado podría copiarlo y suplantarlo—, así que contesta
   /// con dos banderas: `claimed` (¿tiene dueño?) y `mine` (¿eres tú?).
-  Future<void> comprobarLector({String? ip}) async {
-    comprobandoLector.value = true;
+  Future<void> comprobarLector(
+      {String? ip, bool mostrarProgreso = true}) async {
+    if (_comprobandoEstadoLector || comprobandoLector.value) return;
+    _comprobandoEstadoLector = true;
+    final gymId = RfidConfig.gymIdActual();
+    if (mostrarProgreso) comprobandoLector.value = true;
     try {
-      final info = await RfidConfig.getESP32Info(ip: ip);
+      var info = await RfidConfig.getESP32Info(ip: ip);
+      if (isClosed || RfidConfig.gymIdActual() != gymId) return;
+      if (!mostrarProgreso && comprobandoLector.value) return;
+      if (info == null && ip == null && await RfidConfig.redescubrir()) {
+        info = await RfidConfig.getESP32Info();
+      }
+      if (isClosed || RfidConfig.gymIdActual() != gymId) return;
+      if (!mostrarProgreso && comprobandoLector.value) return;
 
       if (info == null) {
         estadoLector.value = EstadoLector.sinConexion;
@@ -99,6 +111,7 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
         estadoLector.value = EstadoLector.libre;
         esp32StatusMessage.value = 'Lector sin vincular';
       } else if (esMio) {
+        esp32IpAddress.value = ip ?? RfidConfig.getCurrentIP() ?? '';
         estadoLector.value = EstadoLector.mio;
         esp32StatusMessage.value = 'Vinculado a tu gimnasio';
       } else {
@@ -106,7 +119,8 @@ class ConfiguracionController extends GetxController with ScreenTourMixin {
         esp32StatusMessage.value = 'Este lector es de otro gimnasio';
       }
     } finally {
-      comprobandoLector.value = false;
+      _comprobandoEstadoLector = false;
+      if (mostrarProgreso) comprobandoLector.value = false;
     }
   }
 

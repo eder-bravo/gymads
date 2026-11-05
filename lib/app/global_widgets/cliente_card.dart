@@ -106,38 +106,6 @@ class ClienteCard extends StatelessWidget {
                           fontSize: 14,
                         ),
                       ),
-                      const Spacer(),
-                      if (cliente.daysRemaining > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: c.backgroundColor,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: primaryColor, width: 1),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.timer_outlined,
-                                size: 14,
-                                color: primaryColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${cliente.daysRemaining} días',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: primaryColor,
-                                  fontSize: legible(12),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                     ],
                   ),
                 ),

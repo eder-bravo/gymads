@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:gymads/app/core/utils/plataforma_app.dart';
 import 'package:gymads/app/core/widgets/diseno_escritorio.dart';
 import 'package:flutter/material.dart';
@@ -43,16 +45,57 @@ class LectorView extends StatefulWidget {
   State<LectorView> createState() => _LectorViewState();
 }
 
-class _LectorViewState extends State<LectorView> {
+class _LectorViewState extends State<LectorView> with WidgetsBindingObserver {
   ConfiguracionController get controller => Get.find<ConfiguracionController>();
+  Timer? _actualizacionEstado;
+  bool _cargando = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     // Se pregunta al entrar, no en build: build se repite y volvería a
     // consultar al lector en cada frame.
-    _cargar();
+    unawaited(_cargar().whenComplete(() => _cargando = false));
+    _iniciarActualizacion();
+  }
+
+  void _iniciarActualizacion() {
+    _actualizacionEstado?.cancel();
+    _actualizacionEstado = Timer.periodic(const Duration(seconds: 10), (_) {
+      _actualizarEstado();
+    });
+  }
+
+  void _actualizarEstado() {
+    if (!mounted || _cargando || ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    if (controller.comprobandoLector.value ||
+        controller.reconectandoLector.value ||
+        controller.preparandoLector.value ||
+        !RfidConfig.tieneLector) {
+      return;
+    }
+    unawaited(controller.comprobarLector(mostrarProgreso: false));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _iniciarActualizacion();
+      _actualizarEstado();
+    } else {
+      _actualizacionEstado?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _actualizacionEstado?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   /// Con "Usar el lector" apagado la configuración guardada no se había

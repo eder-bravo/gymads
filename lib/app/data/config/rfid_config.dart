@@ -560,27 +560,45 @@ class RfidConfig {
 
   // Obtener información del ESP32
   static Future<Map<String, dynamic>?> getESP32Info({String? ip}) async {
+    final gymId = gymIdActual();
     final base = ip != null ? 'http://$ip/api' : baseUrl;
     if (base == null) return null;
-    return _getESP32InfoForBase(base);
+    final info = await _getESP32InfoForBase(base, gymId ?? '');
+    // Una consulta de la cuenta anterior no puede cambiar el estado actual.
+    if (gymIdActual() != gymId) return null;
+    return info;
   }
 
-  static Future<Map<String, dynamic>?> _getESP32InfoForBase(String base) async {
-    try {
-      final gymId = gymIdActual() ?? '';
-      final response = await http.get(
-        Uri.parse('$base/discover?gym_id=$gymId'),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 5));
+  static Future<Map<String, dynamic>?> _getESP32InfoForBase(
+      String base, String gymId) async {
+    // Un paquete perdido no basta para declarar ausente al lector. Cerrar
+    // también al agotar el tiempo evita dejar consultas pendientes en el ESP32.
+    for (var intento = 0; intento < 2; intento++) {
+      final cliente = http.Client();
+      try {
+        final response = await cliente.get(
+          Uri.parse('$base/discover')
+              .replace(queryParameters: {'gym_id': gymId}),
+          headers: {'Content-Type': 'application/json'},
+        ).timeout(const Duration(seconds: 5));
 
-      if (response.statusCode != 200) return null;
-      final data = json.decode(response.body);
-      return data is Map<String, dynamic> ? data : null;
-    } catch (e) {
-      AppLogger.error(
-          'RfidConfig', 'Error al obtener información del ESP32', e);
-      return null;
+        if (response.statusCode != 200) return null;
+        final data = json.decode(response.body);
+        return data is Map<String, dynamic> ? data : null;
+      } catch (e) {
+        if (intento == 1) {
+          AppLogger.error(
+              'RfidConfig', 'Error al obtener información del ESP32', e);
+        }
+      } finally {
+        cliente.close();
+      }
+      if (gymIdActual() != gymId) return null;
+      if (intento == 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
     }
+    return null;
   }
 
   /// Vincula el lector de [ip] a este gimnasio.

@@ -2,12 +2,29 @@
  * GYMONE - ESP32 RFID Reader con WiFi
  * LECTOR RFID CON CONEXIÓN WIFI AUTOMÁTICA PARA GYMONE
  *
- * Versión 6.7.0 - WiFi para trabajar, Bluetooth solo para configurar
+ * Versión 6.7.2 - Conexiones HTTP acotadas y diagnóstico de respuestas
  * Dispositivo: ESP32 (clásico, con BLE)
  *
  * Compilar con una partición grande: WiFi + BLE + servidor no caben en la
  * de 1.2 MB que trae por defecto.
  *   arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app
+ *     --libraries arduino/user_dir/libraries arduino/esp32_rfid_wifi_setup_fixed
+ *
+ * CAMBIOS v6.7.2:
+ * - Cierra conexiones sin petición a los 750 ms, en vez de ocupar el
+ *   único turno HTTP durante 5 s mientras otras apps ya agotaron su espera.
+ * - Envíos cortos sin demora TCP y con límite de 1 s por escritura.
+ * - Recuperar el servidor suelta también al cliente actual; el reinicio
+ *   preventivo espera a que no haya peticiones recientes.
+ * - /api/status incluye cierres sin petición, fallos de envío, máximo
+ *   tiempo de atención y cantidades de consultas de descubrimiento/pases.
+ *
+ * CAMBIOS v6.7.1:
+ * - Valida tamaño de respuesta y UID antes de copiarlo: una trama corta
+ *   no reutiliza la tarjeta anterior ni desborda el búfer de lectura.
+ * - Un error I2C no cuenta como tarjeta retirada ni genera otro pase.
+ * - Esperas acotadas; revisa el chip también si falla con una tarjeta
+ *   detectada. Mantiene el servidor disponible durante la recuperación.
  *
  * CAMBIOS v6.7.0:
  * - Sale del modo configuración apagando BLE sin reiniciar el WiFi.
@@ -241,8 +258,10 @@
 #include <BLE2902.h>
 #include "sonidos_configuracion.h"
 #include "sesion_configuracion.h"
+#include "presencia_tarjeta.h"
+#include "servidor_lector.h"
 
-#define FIRMWARE_VERSION "6.7.0"
+#define FIRMWARE_VERSION "6.7.2"
 
 
 // =================== CONFIGURACIÓN DEL BUZZER ===================
@@ -276,6 +295,9 @@
 // Revisión del chip de tarjetas (PN532), ver revisarPn532().
 #define REVISAR_PN532_CADA_MS 10000
 #define PN532_FALLOS_ANTES_DE_REINICIAR 3
+#define CONSULTAR_TARJETA_CADA_MS 50
+#define TARJETA_TIMEOUT_MS 200
+#define I2C_TIMEOUT_MS 50
 
 // =================== MODO CONFIGURACIÓN (BLUETOOTH) ===================
 // Sin WiFi durante este tiempo, el lector vuelve a ofrecerse por Bluetooth
@@ -330,7 +352,7 @@ SonidosConfiguracion sonidosConfig(tocarNotaConfig);
 // =================== VARIABLES GLOBALES ===================
 PN532_I2C *pn532i2c;
 PN532 *nfc;
-WebServer server(80);
+ServidorLector server(80);
 Preferences prefs;
 
 // gym_id del dueño. Vacío = lector sin vincular. NUNCA se devuelve en
@@ -361,6 +383,8 @@ unsigned long desconectadoDesde = 0;  // 0 = conectado (o nunca intentó)
 unsigned long ultimoReintentoWifi = 0;
 // La última vez que alguien le preguntó algo por la red.
 unsigned long ultimaPeticionEn = 0;
+uint32_t consultasDiscover = 0;
+uint32_t consultasLecturas = 0;
 
 // Chip de tarjetas: si contesta, y si llegó a funcionar desde que encendió
 // (sin eso, un chip desconectado reiniciaría el lector en bucle).
@@ -389,9 +413,8 @@ struct Lectura {
 };
 Lectura lecturas[LECTURAS_GUARDADAS];
 uint32_t lecturaSeq = 0;
-unsigned long sinTarjetaDesde = 0;  // 0 = hay tarjeta (o nunca hubo)
-unsigned long lastCardReadTime = 0;
-String lastScannedCard = "";
+PresenciaTarjeta presenciaTarjeta;
+unsigned long ultimaConsultaTarjeta = 0;
 
 // Monitoreo
 unsigned long lastWiFiCheck = 0;
@@ -724,6 +747,7 @@ void setup() {
   // Lector de tarjetas
   Wire.begin(PN532_SDA, PN532_SCL);
   Wire.setClock(100000);
+  Wire.setTimeOut(I2C_TIMEOUT_MS);
   delay(500);
   pn532i2c = new PN532_I2C(Wire);
   nfc = new PN532(*pn532i2c);
@@ -822,6 +846,10 @@ void loop() {
                   wifiConnected ? WiFi.RSSI() : 0, modoConfig ? "SI" : "NO",
                   pn532Ok ? "OK" : "NO",
                   ultimaPeticionEn == 0 ? 0 : msDesde(ultimaPeticionEn) / 1000);
+    Serial.printf("[HTTP] Discover: %u, Lecturas: %u, Sin petición: %u, "
+                  "Fallos envío: %u, Máximo: %lums\n",
+                  consultasDiscover, consultasLecturas, server.clientesSinPeticion,
+                  server.fallosEnvio, server.maximoAtendiendoMs);
     if (freeHeap < MIN_FREE_HEAP || bloque < MIN_BLOQUE_LIBRE) {
       Serial.println("[WARNING] Memoria baja - Reiniciando...");
       delay(500);
@@ -975,7 +1003,8 @@ void revisarWifi(unsigned long ahora) {
       entrarModoConfig(CONFIG_SIN_DUENO);
     }
 
-    if (serverRunning && msDesde(lastServerRestart) >= SERVER_RESTART_INTERVAL) {
+    if (serverRunning && msDesde(lastServerRestart) >= SERVER_RESTART_INTERVAL &&
+        msDesde(ultimaPeticionEn) >= 10000) {
       // Reinicio preventivo. Las rutas ya están registradas: solo se
       // cierra y se abre el socket.
       server.close();
@@ -1757,7 +1786,7 @@ void handleStatus() {
   server.sendHeader("Connection", "close");
   server.sendHeader("Access-Control-Allow-Origin", "*");
 
-  DynamicJsonDocument doc(400);
+  DynamicJsonDocument doc(768);
   doc["status"] = "OK";
   doc["wifi_connected"] = wifiConnected;
   // Sin `last_uid`: este endpoint está abierto y no debe repartir pases.
@@ -1771,6 +1800,11 @@ void handleStatus() {
   doc["lector_tarjetas_ok"] = pn532Ok;
   doc["arranque"] = motivoDeArranque();
   doc["senal"] = WiFi.RSSI();
+  doc["http_sin_peticion"] = server.clientesSinPeticion;
+  doc["http_fallos_envio"] = server.fallosEnvio;
+  doc["http_max_ms"] = server.maximoAtendiendoMs;
+  doc["consultas_discover"] = consultasDiscover;
+  doc["consultas_lecturas"] = consultasLecturas;
 
   String response;
   serializeJson(doc, response);
@@ -1779,6 +1813,7 @@ void handleStatus() {
 
 void handleDiscover() {
   anotarPeticion();
+  consultasDiscover++;
   DynamicJsonDocument doc(768);
   doc["device_id"] = "ESP32_RFID_GYMONE";
   doc["device_type"] = "RFID_READER";
@@ -2127,34 +2162,36 @@ void revisarBotonReset() {
 // =================== RFID ===================
 
 void leerTarjetas() {
+  if (!pn532Ok || millis() - ultimaConsultaTarjeta < CONSULTAR_TARJETA_CADA_MS) return;
   uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0};
-  uint8_t uidLength;
+  uint8_t uidLength = 0;
+  bool respuestaValida = false;
 
-  if (nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength)) {
-    sinTarjetaDesde = 0;
-    String cardUid = getCardUID(uid, uidLength);
+  bool detectada = nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, uid,
+                                          &uidLength, TARJETA_TIMEOUT_MS,
+                                          &respuestaValida);
+  // El intervalo se cuenta desde el final: incluso un chip lento deja
+  // vueltas libres para atender el HTTP y las demás tareas.
+  ultimaConsultaTarjeta = millis();
+  if (detectada) {
 
     // Un pase por cada vez que se acerca la tarjeta. Si se queda apoyada, no
     // se repite (antes se volvía a aceptar, y a pitar, cada 3 s).
-    if (cardUid != lastScannedCard) {
-      lastScannedCard = cardUid;
-      lastCardReadTime = millis();
+    if (presenciaTarjeta.detectar(uid, uidLength, millis())) {
+      String cardUid = getCardUID(uid, uidLength);
       lastUid = cardUid;
       beepLectura();
       registrarLectura(cardUid);
       Serial.print("[RFID] UID: ");
       Serial.println(cardUid);
     }
-  } else if (lastScannedCard.length() > 0) {
-    // 1 s sin leerla = la retiraron. Un fallo suelto de lectura con la
-    // tarjeta apoyada dura mucho menos.
-    if (sinTarjetaDesde == 0) {
-      sinTarjetaDesde = millis();
-    } else if (millis() - sinTarjetaDesde > 1000) {
+  } else if (respuestaValida) {
+    // Solo respuestas válidas sin tarjeta confirman que la retiraron.
+    if (presenciaTarjeta.sinTarjeta(millis())) {
       lastUid = "NO_CARD";
-      lastScannedCard = "";
-      sinTarjetaDesde = 0;
     }
+  } else {
+    presenciaTarjeta.fallo();
   }
 }
 
@@ -2169,9 +2206,12 @@ bool iniciarPn532() {
   }
   Serial.printf("PN532 OK - FW v%u.%u\n", (unsigned)((version >> 16) & 0xFF),
                 (unsigned)((version >> 8) & 0xFF));
-  nfc->SAMConfig();
-  // Reintentos MUY bajos para no bloquear el loop
-  nfc->setPassiveActivationRetries(0x01);
+  // Una sola búsqueda por consulta; sin tarjeta debe responder con cero
+  // objetivos antes de TARJETA_TIMEOUT_MS, no seguir buscando por su cuenta.
+  if (!nfc->SAMConfig() || !nfc->setPassiveActivationRetries(0x00)) {
+    pn532Ok = false;
+    return false;
+  }
   pn532Ok = true;
   return true;
 }
@@ -2185,12 +2225,16 @@ bool iniciarPn532() {
 // si no contesta se reinicia el bus y el chip, y si tras varios intentos
 // sigue igual, el lector completo.
 void revisarPn532(unsigned long ahora) {
-  // Con una tarjeta apoyada no se le interrumpe.
-  if (lastScannedCard.length() > 0) return;
+  // Una tarjeta reciente no se interrumpe. Si el chip falla con una tarjeta
+  // aún marcada, la revisión sigue funcionando y puede recuperar el bus.
+  if (presenciaTarjeta.detectadaRecientemente(millis(), REVISAR_PN532_CADA_MS)) return;
+  // leerTarjetas() puede haber esperado; no restar un instante posterior al
+  // `ahora` tomado al principio de esta vuelta.
+  ahora = millis();
   if (ahora - ultimaRevisionPn532 < REVISAR_PN532_CADA_MS) return;
   ultimaRevisionPn532 = ahora;
 
-  if (nfc->getFirmwareVersion() != 0) {
+  if (pn532Ok && nfc->getFirmwareVersion() != 0) {
     if (!pn532Ok) Serial.println("[RFID] El chip de tarjetas volvió a contestar");
     pn532Ok = true;
     pn532FuncionoDesdeArranque = true;
@@ -2218,6 +2262,7 @@ void revisarPn532(unsigned long ahora) {
   Wire.end();
   Wire.begin(PN532_SDA, PN532_SCL);
   Wire.setClock(100000);
+  Wire.setTimeOut(I2C_TIMEOUT_MS);
   if (iniciarPn532()) {
     Serial.println("[RFID] Chip de tarjetas recuperado");
     pn532FuncionoDesdeArranque = true;
@@ -2241,6 +2286,7 @@ void registrarLectura(const String &uid) {
 // es MENOR que el que tenía, el lector se reinició.
 void handleLecturas() {
   anotarPeticion();
+  consultasLecturas++;
   if (!peticionAutorizada()) {
     responderNoAutorizado();
     return;

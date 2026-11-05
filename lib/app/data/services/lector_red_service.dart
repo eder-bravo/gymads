@@ -82,10 +82,28 @@ enum ConfirmacionLector { confirmada, sinSoporte, sinRespuesta }
 /// 2. Barrido de la subred del teléfono: se pregunta `/api/discover` a cada
 ///    dirección. Unos segundos, pero funciona con cualquier router.
 class LectorRedService {
-  LectorRedService({http.Client? cliente, this.gymId})
-      : _cliente = cliente ?? http.Client();
+  LectorRedService({
+    http.Client? cliente,
+    http.Client Function()? crearCliente,
+    this.gymId,
+  })  : assert(cliente == null || crearCliente == null),
+        _cliente = cliente,
+        _crearCliente = crearCliente ?? http.Client.new;
 
-  final http.Client _cliente;
+  final http.Client? _cliente;
+  final http.Client Function() _crearCliente;
+
+  // Cada consulta real posee su conexión. Future.timeout por sí solo no
+  // cancela el HTTP: los barridos dejaban conexiones pendientes después de
+  // rendirse y seguían llegando al lector mientras la app decía que no estaba.
+  Future<T> _conCliente<T>(Future<T> Function(http.Client) consultar) async {
+    final cliente = _cliente ?? _crearCliente();
+    try {
+      return await consultar(cliente);
+    } finally {
+      if (_cliente == null) cliente.close();
+    }
+  }
 
   /// Con qué gimnasio se pregunta: el lector responde `mine` comparándolo.
   final String? gymId;
@@ -152,7 +170,7 @@ class LectorRedService {
   }) async {
     for (var vuelta = 0; vuelta < 2; vuelta++) {
       try {
-        final respuesta = await _cliente
+        final respuesta = await _conCliente((cliente) => cliente
             .post(
               Uri.parse('${lector.baseUrl}/confirmar_config'),
               headers: {'Content-Type': 'application/json'},
@@ -162,7 +180,7 @@ class LectorRedService {
                 if (sesion != null) 'sesion': sesion,
               }),
             )
-            .timeout(const Duration(milliseconds: 1200));
+            .timeout(const Duration(milliseconds: 1200)));
         if (respuesta.statusCode == 200) {
           final datos = json.decode(respuesta.body);
           if (datos is Map && datos['ok'] == true) {
@@ -218,7 +236,8 @@ class LectorRedService {
     try {
       final uri = Uri.parse('http://$ip/api/discover')
           .replace(queryParameters: {'gym_id': gymId ?? ''});
-      final respuesta = await _cliente.get(uri).timeout(timeout);
+      final respuesta =
+          await _conCliente((cliente) => cliente.get(uri).timeout(timeout));
       if (respuesta.statusCode != 200) return null;
 
       final datos = json.decode(respuesta.body);

@@ -1,7 +1,7 @@
 import Cocoa
 import FlutterMacOS
 import XCTest
-@testable import gymads
+@testable import GymOne
 
 class RunnerTests: XCTestCase {
 

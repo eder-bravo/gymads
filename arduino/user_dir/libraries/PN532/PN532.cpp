@@ -125,7 +125,7 @@ uint32_t PN532::getFirmwareVersion(void)
 
     // read data packet
     int16_t status = HAL(readResponse)(pn532_packetbuffer, sizeof(pn532_packetbuffer));
-    if (0 > status) {
+    if (status != 4) {
         return 0;
     }
 
@@ -307,7 +307,7 @@ bool PN532::SAMConfig(void)
     if (HAL(writeCommand)(pn532_packetbuffer, 4))
         return false;
 
-    return (0 < HAL(readResponse)(pn532_packetbuffer, sizeof(pn532_packetbuffer)));
+    return (0 <= HAL(readResponse)(pn532_packetbuffer, sizeof(pn532_packetbuffer)));
 }
 
 /**************************************************************************/
@@ -331,7 +331,7 @@ bool PN532::setPassiveActivationRetries(uint8_t maxRetries)
     if (HAL(writeCommand)(pn532_packetbuffer, 5))
         return 0x0;  // no ACK
 
-    return (0 < HAL(readResponse)(pn532_packetbuffer, sizeof(pn532_packetbuffer)));
+    return (0 <= HAL(readResponse)(pn532_packetbuffer, sizeof(pn532_packetbuffer)));
 }
 
 /**************************************************************************/
@@ -379,8 +379,10 @@ bool PN532::setRFField(uint8_t autoRFCA, uint8_t rFOnOff)
     @returns 1 if everything executed properly, 0 for an error
 */
 /**************************************************************************/
-bool PN532::readPassiveTargetID(uint8_t cardbaudrate, uint8_t *uid, uint8_t *uidLength, uint16_t timeout)
+bool PN532::readPassiveTargetID(uint8_t cardbaudrate, uint8_t *uid, uint8_t *uidLength, uint16_t timeout, bool *responseValid)
 {
+    *uidLength = 0;
+    if (responseValid) *responseValid = false;
     pn532_packetbuffer[0] = PN532_COMMAND_INLISTPASSIVETARGET;
     pn532_packetbuffer[1] = 1;  // max 1 cards at once (we can set this to 2 later)
     pn532_packetbuffer[2] = cardbaudrate;
@@ -390,7 +392,8 @@ bool PN532::readPassiveTargetID(uint8_t cardbaudrate, uint8_t *uid, uint8_t *uid
     }
 
     // read data packet
-    if (HAL(readResponse)(pn532_packetbuffer, sizeof(pn532_packetbuffer), timeout) < 0) {
+    const int16_t responseLength = HAL(readResponse)(pn532_packetbuffer, sizeof(pn532_packetbuffer), timeout);
+    if (responseLength < 1) {
         return 0x0;
     }
 
@@ -407,7 +410,17 @@ bool PN532::readPassiveTargetID(uint8_t cardbaudrate, uint8_t *uid, uint8_t *uid
       b6..NFCIDLen    NFCID
     */
 
-    if (pn532_packetbuffer[0] != 1)
+    if (pn532_packetbuffer[0] == 0) {
+        if (responseValid) *responseValid = (responseLength == 1);
+        return 0;
+    }
+    if (pn532_packetbuffer[0] != 1 || responseLength < 6)
+        return 0;
+
+    // The public API requires a 7-byte output buffer. Never copy a corrupt
+    // length, or bytes left over from the previous response, into the caller.
+    const uint8_t length = pn532_packetbuffer[5];
+    if ((length != 4 && length != 7) || responseLength < 6 + length)
         return 0;
 
     uint16_t sens_res = pn532_packetbuffer[2];
@@ -419,12 +432,13 @@ bool PN532::readPassiveTargetID(uint8_t cardbaudrate, uint8_t *uid, uint8_t *uid
     DMSG("\n");
 
     /* Card appears to be Mifare Classic */
-    *uidLength = pn532_packetbuffer[5];
+    *uidLength = length;
 
-    for (uint8_t i = 0; i < pn532_packetbuffer[5]; i++) {
+    for (uint8_t i = 0; i < length; i++) {
         uid[i] = pn532_packetbuffer[6 + i];
     }
 
+    if (responseValid) *responseValid = true;
     return 1;
 }
 

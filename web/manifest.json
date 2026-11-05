@@ -1,6 +1,6 @@
 {
-    "name": "gymads",
-    "short_name": "gymads",
+    "name": "GymOne",
+    "short_name": "GymOne",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#1A1AFD",

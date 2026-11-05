@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr wchar_t kWindowTitle[] = L"gymads";
+constexpr wchar_t kWindowTitle[] = L"GymOne";
 
 bool SendAppLinkToRunningInstance() {
   HWND hwnd = ::FindWindow(L"FLUTTER_RUNNER_WIN32_WINDOW", kWindowTitle);

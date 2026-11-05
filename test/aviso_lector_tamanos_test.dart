@@ -19,7 +19,9 @@ import 'package:image/image.dart' as img;
 const _capturas = bool.fromEnvironment('CAPTURAS_AVISO');
 
 /// Una foto vertical de 1200×1600, como las que toma la cámara de la app: una
-/// silueta clara sobre un fondo, para ver que la cara no se recorta.
+/// silueta clara sobre un fondo. La foto se recorta para llenar la pantalla,
+/// como la de perfil: las marcas de arriba y abajo pueden quedar fuera, pero
+/// la cara (el círculo en y=700) debe verse sin que la tape una franja.
 Uint8List _fotoVertical() {
   final foto = img.Image(width: 1200, height: 1600);
   img.fill(foto, color: img.ColorRgb8(70, 96, 120));
@@ -27,7 +29,7 @@ Uint8List _fotoVertical() {
       x: 600, y: 2100, radius: 900, color: img.ColorRgb8(40, 52, 70));
   img.fillCircle(foto,
       x: 600, y: 700, radius: 300, color: img.ColorRgb8(224, 184, 150));
-  // Una marca arriba y abajo: si se recortara, desaparecerían.
+  // Una marca arriba y abajo: muestran cuánto se recorta en cada pantalla.
   img.fillRect(foto,
       x1: 0, y1: 0, x2: 1200, y2: 40, color: img.ColorRgb8(255, 210, 0));
   img.fillRect(foto,

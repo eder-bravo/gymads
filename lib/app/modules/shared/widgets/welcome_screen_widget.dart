@@ -1,22 +1,21 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:gymads/core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/theme/siempre_oscuro.dart';
 import '../../../core/utils/plataforma_app.dart';
 import '../../../core/widgets/formulario.dart';
 import '../../../data/services/fotos_de_clientes.dart';
 import '../../../data/services/storage_service.dart';
 
-/// El aviso al pasar la tarjeta: la foto del cliente a pantalla completa y
-/// dos franjas, arriba qué pasó (¡Bienvenido!, Membresía vencida…) y abajo
-/// quién es, cuántos días le quedan y, en el mostrador, qué hacer.
+/// El aviso al pasar la tarjeta: la foto del cliente de orilla a orilla, en
+/// alta resolución, y encima dos franjas que se oscurecen hacia la orilla:
+/// arriba qué pasó (¡Bienvenido!, Membresía vencida…) y abajo quién es,
+/// cuándo vence su membresía y, en el mostrador, qué hacer.
 ///
-/// La foto se ve entera entre las franjas (la cara nunca se recorta, aunque
-/// sea vertical en una pantalla acostada) y los lados se llenan con la misma
-/// foto difuminada.
+/// Va oscuro en los dos modos, como la foto ampliada: el texto blanco se lee
+/// sobre cualquier foto.
 class WelcomeScreenWidget extends StatelessWidget {
   final String userName;
   final String userPhotoUrl;
@@ -105,7 +104,6 @@ class WelcomeScreenWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!isVisible) return const SizedBox.shrink();
-    final c = context.colores;
     final medidas = _Medidas.de(context);
     final colorEstado = _rechazo ? AppColors.error : AppColors.accent;
 
@@ -113,45 +111,46 @@ class WelcomeScreenWidget extends StatelessWidget {
     // fuera del Scaffold, y sin esto Flutter subraya cada texto en amarillo.
     final contenido = Material(
       type: MaterialType.transparency,
-      // Fondo sólido: se transparentaba Inicio por detrás.
-      child: Container(
-        color: c.backgroundColor,
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: 1),
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          builder: (context, t, _) => _FotoDelCliente(
-            nombre: userName,
-            guardada: userPhotoUrl,
-            lista: foto,
-            noRegistrada: isNotFound,
-            builder: (fondo, centro) => Stack(
+      child: SiempreOscuro(
+        // Fondo sólido: se transparentaba Inicio por detrás.
+        child: Container(
+          color: Colors.black,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            builder: (context, t, _) => Stack(
               fit: StackFit.expand,
               children: [
-                Opacity(opacity: t, child: fondo),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    FractionalTranslation(
-                      translation: Offset(0, t - 1),
+                Opacity(
+                  opacity: t,
+                  child: _FotoDelCliente(
+                    nombre: userName,
+                    guardada: userPhotoUrl,
+                    lista: foto,
+                    noRegistrada: isNotFound,
+                    colorEstado: colorEstado,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: Opacity(
+                    opacity: t,
+                    child: Transform.translate(
+                      offset: Offset(0, -16 * (1 - t)),
                       child: _franjaDeArriba(colorEstado, medidas),
                     ),
-                    // La foto entera, en el hueco que dejan las franjas:
-                    // nunca queda debajo de una.
-                    Expanded(
-                      child: Opacity(
-                        opacity: t,
-                        child: Padding(
-                          padding: EdgeInsets.all(medidas.bajo ? 8 : 16),
-                          child: centro,
-                        ),
-                      ),
-                    ),
-                    FractionalTranslation(
-                      translation: Offset(0, 1 - t),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Opacity(
+                    opacity: t,
+                    child: Transform.translate(
+                      offset: Offset(0, 16 * (1 - t)),
                       child: _franjaDeAbajo(context, medidas),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -167,8 +166,8 @@ class WelcomeScreenWidget extends StatelessWidget {
 
     // Se quita al momento, pero solo con la X: un toque en otro lado (al
     // acomodar el teléfono, o el cliente que se asoma) no debe cerrarlo. Se
-    // cierra solo pasados unos segundos. Va sobre la franja de color, así
-    // que es blanca en los dos modos.
+    // cierra solo pasados unos segundos. Va sobre la franja oscura, así que
+    // es blanca en los dos modos.
     return Stack(
       children: [
         Positioned.fill(child: contenido),
@@ -197,37 +196,63 @@ class WelcomeScreenWidget extends StatelessWidget {
     );
   }
 
+  /// Arriba: el estado en una etiqueta de su color, sobre un oscurecido que
+  /// se desvanece hacia la foto.
   Widget _franjaDeArriba(Color color, _Medidas m) {
-    return Material(
-      color: color,
-      elevation: 0,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.black.withOpacity(0.55),
+            Colors.black.withOpacity(0),
+          ],
+        ),
+      ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          // A los lados deja lugar a la X: el título va centrado.
-          padding:
-              EdgeInsets.fromLTRB(76, m.rellenoFranja, 76, m.rellenoFranja),
-          // En un renglón: si no cabe junto a la X, se encoge un poco en vez
-          // de partirse en dos y comerle lugar a la foto.
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(_iconoTitulo, color: Colors.white, size: m.titulo * 0.9),
-                SizedBox(width: m.titulo * 0.3),
-                Text(
-                  _titulo,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: m.titulo,
-                    fontWeight: FontWeight.bold,
-                    height: 1.1,
+          // A la derecha deja lugar a la X; abajo, espacio para el
+          // desvanecido.
+          padding: EdgeInsets.fromLTRB(m.orilla, m.bajo ? 12 : 20,
+              76, m.bajo ? 28 : 48),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            heightFactor: 1,
+            // Si no cabe junto a la X, se encoge un poco en vez de partirse.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: DecoratedBox(
+                decoration: ShapeDecoration(
+                  color: color,
+                  shape: const StadiumBorder(),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: m.estado * 0.9, vertical: m.estado * 0.45),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_iconoTitulo,
+                          color: Colors.white, size: m.estado * 1.2),
+                      SizedBox(width: m.estado * 0.4),
+                      Text(
+                        _titulo,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: m.estado,
+                          fontWeight: FontWeight.w700,
+                          height: 1.1,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -235,9 +260,14 @@ class WelcomeScreenWidget extends StatelessWidget {
     );
   }
 
+  /// Abajo: quién es, cuándo vence y qué hacer, en blanco sobre un oscurecido
+  /// que crece hacia la orilla.
   Widget _franjaDeAbajo(BuildContext context, _Medidas m) {
-    final c = context.colores;
     final fecha = _fecha;
+    final ancha = MediaQuery.sizeOf(context).width >= 700;
+    const secundario = Color(0xB3FFFFFF); // blanco 70 %
+    const tabulares = [FontFeature.tabularFigures()];
+
     final botones = <Widget>[
       if (isNotFound && onRegister != null)
         BotonGuardar(
@@ -252,8 +282,8 @@ class WelcomeScreenWidget extends StatelessWidget {
           icon: const Icon(Icons.edit, size: 20),
           label: const Text('Editar'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: c.textPrimary,
-            side: BorderSide(color: c.borde),
+            foregroundColor: Colors.white,
+            side: BorderSide(color: Colors.white.withOpacity(0.4)),
             minimumSize: const Size(0, 44),
             padding: const EdgeInsets.symmetric(horizontal: 18),
             shape:
@@ -270,97 +300,99 @@ class WelcomeScreenWidget extends StatelessWidget {
           onPressed: onAbonar,
         ),
     ];
-    return Material(
-      color: c.cardBackground,
+
+    final texto = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!isNotFound) ...[
+          Text(
+            userName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: m.nombre,
+              fontWeight: FontWeight.w700,
+              height: 1.15,
+              letterSpacing: -0.3,
+            ),
+          ),
+          SizedBox(height: m.bajo ? 4 : 8),
+          if (fecha != null)
+            Text(
+              fecha,
+              style: TextStyle(
+                color: secundario,
+                fontSize: m.dato,
+                fontFeatures: tabulares,
+              ),
+            ),
+          SizedBox(height: m.bajo ? 2 : 6),
+        ],
+        Text(
+          _mensaje,
+          style: TextStyle(
+            color: isNotFound ? Colors.white : secundario,
+            fontSize: isNotFound ? m.dato * 1.15 : m.dato * 0.9,
+            fontWeight: isNotFound ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ],
+    );
+
+    final grupoDeBotones =
+        Wrap(spacing: 12, runSpacing: 8, children: botones);
+    final Widget informacion;
+    if (botones.isEmpty) {
+      informacion = texto;
+    } else if (ancha) {
+      // En pantalla ancha, los botones a la derecha, a la altura del texto.
+      informacion = Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(child: texto),
+          const SizedBox(width: 24),
+          grupoDeBotones,
+        ],
+      );
+    } else {
+      informacion = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          texto,
+          SizedBox(height: m.bajo ? 8 : 16),
+          grupoDeBotones,
+        ],
+      );
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: const [0, 0.45, 1],
+          colors: [
+            Colors.black.withOpacity(0),
+            Colors.black.withOpacity(0.7),
+            Colors.black.withOpacity(0.85),
+          ],
+        ),
+      ),
       child: SafeArea(
         top: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
-              24, m.rellenoFranja * 1.2, 24, m.rellenoFranja * 1.4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!isNotFound) ...[
-                Text(
-                  userName,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: m.nombre,
-                    fontWeight: FontWeight.bold,
-                    height: 1.15,
-                  ),
-                ),
-                SizedBox(height: m.bajo ? 4 : 8),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 16,
-                  runSpacing: 2,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.event_available,
-                            size: m.dato * 1.15,
-                            color:
-                                isExpired ? AppColors.error : c.textSecondary),
-                        const SizedBox(width: 6),
-                        // Con letra grande en un teléfono angosto se parte
-                        // en dos renglones en vez de salirse.
-                        Flexible(
-                          child: Text(
-                            isExpired
-                                ? '0 días restantes'
-                                : '$daysLeft días restantes',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color:
-                                  isExpired ? AppColors.error : c.textPrimary,
-                              fontSize: m.dato,
-                              fontWeight: FontWeight.w600,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures()
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (fecha != null)
-                      Text(
-                        fecha,
-                        style: TextStyle(
-                          color: c.textSecondary,
-                          fontSize: m.dato * 0.9,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                  ],
-                ),
-                SizedBox(height: m.bajo ? 4 : 10),
-              ],
-              Text(
-                _mensaje,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: c.textSecondary,
-                  fontSize: isNotFound ? m.dato : m.dato * 0.85,
-                  fontWeight: isNotFound ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-              if (botones.isNotEmpty) ...[
-                SizedBox(height: m.bajo ? 8 : 16),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: botones,
-                ),
-              ],
-            ],
+              m.orilla, m.bajo ? 40 : 72, m.orilla, m.bajo ? 12 : 28),
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            heightFactor: 1,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: informacion,
+            ),
           ),
         ),
       ),
@@ -371,17 +403,20 @@ class WelcomeScreenWidget extends StatelessWidget {
 /// Tamaños del aviso según la pantalla.
 class _Medidas {
   const _Medidas({
-    required this.titulo,
+    required this.estado,
     required this.nombre,
     required this.dato,
-    required this.rellenoFranja,
+    required this.orilla,
     required this.bajo,
   });
 
-  final double titulo;
+  /// La letra de la etiqueta de arriba.
+  final double estado;
   final double nombre;
   final double dato;
-  final double rellenoFranja;
+
+  /// El margen a los lados del texto.
+  final double orilla;
 
   /// Teléfono de lado: muy poca altura, todo más compacto para que la foto
   /// conserve lugar.
@@ -391,31 +426,30 @@ class _Medidas {
     final tamano = MediaQuery.sizeOf(context);
     if (tamano.height < 500) {
       return const _Medidas(
-          titulo: 24, nombre: 22, dato: 15, rellenoFranja: 8, bajo: true);
+          estado: 15, nombre: 22, dato: 15, orilla: 20, bajo: true);
     }
     if (tamano.shortestSide >= 600 || PlataformaApp.pantallaGrande) {
       return const _Medidas(
-          titulo: 46, nombre: 40, dato: 22, rellenoFranja: 22, bajo: false);
+          estado: 22, nombre: 44, dato: 21, orilla: 40, bajo: false);
     }
     if (tamano.shortestSide < 360) {
       return const _Medidas(
-          titulo: 26, nombre: 24, dato: 16, rellenoFranja: 14, bajo: false);
+          estado: 16, nombre: 26, dato: 15, orilla: 20, bajo: false);
     }
     return const _Medidas(
-        titulo: 32, nombre: 28, dato: 18, rellenoFranja: 16, bajo: false);
+        estado: 18, nombre: 30, dato: 17, orilla: 24, bajo: false);
   }
 }
 
-/// La foto a pantalla completa: [builder] recibe el fondo (difuminada, de
-/// orilla a orilla) y el centro (entera). Sin foto, las iniciales; con una
-/// tarjeta no registrada, el ícono.
+/// La foto a pantalla completa. Sin foto, las
+/// iniciales; con una tarjeta no registrada, el ícono.
 class _FotoDelCliente extends StatefulWidget {
   const _FotoDelCliente({
     required this.nombre,
     required this.guardada,
     required this.lista,
     required this.noRegistrada,
-    required this.builder,
+    required this.colorEstado,
   });
 
   final String nombre;
@@ -428,13 +462,18 @@ class _FotoDelCliente extends StatefulWidget {
 
   final bool noRegistrada;
 
-  final Widget Function(Widget fondo, Widget centro) builder;
+  /// El color del aviso, para el fondo sin foto.
+  final Color colorEstado;
 
   @override
   State<_FotoDelCliente> createState() => _FotoDelClienteState();
 }
 
 class _FotoDelClienteState extends State<_FotoDelCliente> {
+  /// Para una foto vieja y completa (vertical): un poco arriba del centro,
+  /// donde queda la cara. En una foto cuadrada no cambia nada.
+  static const _encuadre = Alignment(0, -0.25);
+
   ImageProvider? _foto;
   bool _fallo = false;
 
@@ -487,14 +526,12 @@ class _FotoDelClienteState extends State<_FotoDelCliente> {
     final foto = _foto;
     if (widget.noRegistrada) {
       return _sustituto(
-        AppColors.error,
         (lado) => Icon(Icons.contactless_outlined,
             size: lado * 0.5, color: Colors.white),
       );
     }
     if (foto == null || _fallo) {
       return _sustituto(
-        AppColors.accent,
         (lado) => Text(
           _iniciales(widget.nombre),
           style: TextStyle(
@@ -505,46 +542,33 @@ class _FotoDelClienteState extends State<_FotoDelCliente> {
         ),
       );
     }
-    return widget.builder(
-      Stack(
-        fit: StackFit.expand,
-        children: [
-          // Sin clamp las orillas se difuminan contra lo transparente y
-          // quedan oscuras.
-          ImageFiltered(
-            imageFilter: ImageFilter.blur(
-                sigmaX: 30, sigmaY: 30, tileMode: TileMode.clamp),
-            child: Image(
-              image: foto,
-              fit: BoxFit.cover,
-              gaplessPlayback: true,
-              errorBuilder: (context, _, __) => const SizedBox.shrink(),
-            ),
-          ),
-          // Oscurece el difuminado para que la foto entera destaque.
-          ColoredBox(color: Colors.black.withOpacity(0.35)),
-        ],
-      ),
-      Image(
-        image: foto,
-        fit: BoxFit.contain,
-        gaplessPlayback: true,
-        errorBuilder: (context, _, __) {
-          _alFallar();
-          return const SizedBox.shrink();
-        },
-      ),
+    // A pantalla completa: lo primero es ver bien quién es. En alta
+    // resolución (ver `FotosDeClientes.proveedorGrande`).
+    return Image(
+      image: foto,
+      fit: BoxFit.cover,
+      alignment: _encuadre,
+      filterQuality: FilterQuality.high,
+      gaplessPlayback: true,
+      errorBuilder: (context, _, __) {
+        _alFallar();
+        return const SizedBox.shrink();
+      },
     );
   }
 
-  /// Sin foto: un círculo de color, del mayor tamaño que quepa entre las
-  /// franjas, sobre un fondo suave del mismo color.
-  Widget _sustituto(Color color, Widget Function(double lado) contenido) {
-    return widget.builder(
-      ColoredBox(color: color.withOpacity(0.12)),
-      LayoutBuilder(builder: (context, limites) {
-        final lado = limites.biggest.shortestSide * 0.85;
-        return Center(
+  /// Sin foto: un círculo del color del aviso sobre un fondo oscuro del mismo
+  /// color, en la parte que no tapan las franjas.
+  Widget _sustituto(Widget Function(double lado) contenido) {
+    final color = widget.colorEstado;
+    return ColoredBox(
+      color: Color.alphaBlend(Colors.black.withOpacity(0.7), color),
+      child: LayoutBuilder(builder: (context, limites) {
+        final lado = (limites.maxWidth * 0.55)
+            .clamp(0.0, limites.maxHeight * 0.38)
+            .toDouble();
+        return Align(
+          alignment: const Alignment(0, -0.3),
           child: Container(
             width: lado,
             height: lado,

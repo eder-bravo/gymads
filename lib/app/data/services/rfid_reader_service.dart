@@ -6,6 +6,17 @@ import '../config/rfid_config.dart';
 import 'tenant_context_service.dart';
 
 class RfidReaderService {
+  static Future<http.Response> _consultar(Uri uri) async {
+    final cliente = http.Client();
+    try {
+      return await cliente.get(uri).timeout(const Duration(seconds: 3));
+    } finally {
+      // También cancela el socket al vencer el tiempo: no dejar que los
+      // sondeos anteriores se acumulen mientras ya se manda el siguiente.
+      cliente.close();
+    }
+  }
+
   /// Por qué el lector se negó a contestar, si es que se negó.
   ///
   /// Un 403 no es un fallo de red del que valga la pena reintentar: por más
@@ -63,9 +74,8 @@ class RfidReaderService {
     if (baseUrl == null) return nada;
 
     try {
-      final response = await http
-          .get(Uri.parse(_conGymId('$baseUrl/lecturas?desde=$desde')))
-          .timeout(const Duration(seconds: 3));
+      final response = await _consultar(
+          Uri.parse(_conGymId('$baseUrl/lecturas?desde=$desde')));
 
       if (response.statusCode == 404) {
         return (respuesta: null, sinSoporte: true);
@@ -103,9 +113,7 @@ class RfidReaderService {
         return null;
       }
 
-      final response = await http.get(
-        Uri.parse(_conGymId('$baseUrl/uid')),
-      ).timeout(const Duration(seconds: 3));
+      final response = await _consultar(Uri.parse(_conGymId('$baseUrl/uid')));
 
       if (response.statusCode == 403) {
         _marcarRechazo('checkForCard', response.body);
@@ -150,9 +158,7 @@ class RfidReaderService {
         return null;
       }
 
-      final response = await http.get(
-        Uri.parse(_conGymId('$baseUrl/uid_only')),
-      ).timeout(const Duration(seconds: 3));
+      final response = await _consultar(Uri.parse(_conGymId('$baseUrl/uid_only')));
 
       if (response.statusCode == 403) {
         _marcarRechazo('checkForCardSilent', response.body);

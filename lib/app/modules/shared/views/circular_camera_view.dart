@@ -36,8 +36,10 @@ class _CircularCameraViewState extends State<CircularCameraView>
   /// usaba en cuanto se disparaba, sin poder verla.
   File? _fotoTomada;
 
-  /// El tamaño de la pantalla de la cámara: con él se sabe dónde estaba el
-  /// círculo guía para recortar la foto.
+  /// Para saber, al disparar, dónde quedó el círculo guía sobre la imagen de
+  /// la cámara y así recortar la foto a lo que encierra.
+  final _vistaKey = GlobalKey();
+  final _previaKey = GlobalKey();
 
   @override
   void initState() {
@@ -145,8 +147,12 @@ class _CircularCameraViewState extends State<CircularCameraView>
       final File resultFile = File(targetPath);
       await File(photoFile.path).copy(targetPath);
 
-      // La foto completa, no solo lo de adentro del círculo.
-      await prepararFotoCompleta(targetPath);
+      // Recortada a lo que encierra el círculo, en alta resolución.
+      await prepararFoto(
+        targetPath,
+        vista: _tamano(_vistaKey),
+        vistaPrevia: _tamano(_previaKey),
+      );
 
       if (await resultFile.exists() && mounted) {
         // Limpiar archivo temporal original
@@ -175,6 +181,11 @@ class _CircularCameraViewState extends State<CircularCameraView>
         });
       }
     }
+  }
+
+  Size? _tamano(GlobalKey llave) {
+    final caja = llave.currentContext?.findRenderObject();
+    return caja is RenderBox && caja.hasSize ? caja.size : null;
   }
 
   @override
@@ -217,14 +228,21 @@ class _CircularCameraViewState extends State<CircularCameraView>
             ),
           ),
         ),
-        // La foto completa, como se va a guardar.
+        // Como se va a guardar: lo que encerraba el círculo.
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.file(foto, key: const Key('foto_tomada')),
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: ClipOval(
+                  child: Image.file(
+                    foto,
+                    key: const Key('foto_tomada'),
+                    fit: BoxFit.cover,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
               ),
             ),
           ),
@@ -303,12 +321,13 @@ class _CircularCameraViewState extends State<CircularCameraView>
 
   Widget _camara() {
     return Stack(
+      key: _vistaKey,
       children: [
         // Vista previa de la cámara que llena toda la pantalla
         Positioned.fill(
-          child: Transform.scale(
-            scale: 1.0,
-            child: Center(
+          child: Center(
+            child: KeyedSubtree(
+              key: _previaKey,
               child: CameraPreview(_controller!),
             ),
           ),
@@ -465,7 +484,7 @@ class _CircularCameraViewState extends State<CircularCameraView>
 class CircularMaskPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    // Solo una guía para la cara: la foto se guarda completa.
+    // Lo de adentro del círculo es lo que se guarda.
     final guia = circuloGuia(size);
     final double centerX = guia.center.dx;
     final double centerY = guia.center.dy;
@@ -487,11 +506,10 @@ class CircularMaskPainter extends CustomPainter {
       circlePath,
     );
 
-    // Una sombra ligera alrededor: se ve toda la foto, que es la que se
-    // guarda, y el círculo resalta dónde va la cara.
+    // Se oscurece lo de afuera: solo lo que encierra el círculo se guarda.
     canvas.drawPath(
       maskPath,
-      Paint()..color = Colors.black.withOpacity(0.3),
+      Paint()..color = Colors.black.withOpacity(0.55),
     );
 
     // Dibujar el borde del círculo con mejor visibilidad

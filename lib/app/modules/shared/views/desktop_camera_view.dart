@@ -46,6 +46,10 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
   bool _tomando = false;
   bool _cerrado = false;
   Future<void> _operacion = Future.value();
+
+  /// La zona donde se dibuja la cámara y el círculo guía: al disparar se
+  /// mide para recortar la foto a lo que el círculo encierra.
+  final _vistaKey = GlobalKey();
   double get _aspecto => _argumentos != null
       ? _argumentos!.size.width / _argumentos!.size.height
       : _windows?.value.aspectRatio ?? 4 / 3;
@@ -196,9 +200,19 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
           await File(imagen.path).delete();
         } catch (_) {}
       }
-      // La foto completa (derecha y de tamaño razonable), no solo lo de
-      // adentro del círculo.
-      await prepararFotoCompleta(destino.path);
+      // Derecha y, con el círculo guía, recortada a lo que encierra, en alta
+      // resolución. Sin círculo (cámara genérica) queda completa.
+      final caja = _vistaKey.currentContext?.findRenderObject();
+      final vista = caja is RenderBox && caja.hasSize ? caja.size : null;
+      await prepararFoto(
+        destino.path,
+        vista: widget.circular ? vista : null,
+        vistaPrevia: vista == null
+            ? null
+            : (vista.width / vista.height > _aspecto
+                ? Size(vista.height * _aspecto, vista.height)
+                : Size(vista.width, vista.width / _aspecto)),
+      );
       if (_cerrado) {
         await destino.delete();
         return;
@@ -309,7 +323,16 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
 
   Widget _contenido() {
     if (_foto != null) {
-      return Center(child: Image.file(_foto!, fit: BoxFit.contain));
+      // Como se va a guardar: con el círculo, solo lo que encerraba.
+      return Center(
+          child: widget.circular
+              ? AspectRatio(
+                  aspectRatio: 1,
+                  child: ClipOval(
+                      child: Image.file(_foto!,
+                          fit: BoxFit.cover,
+                          filterQuality: FilterQuality.high)))
+              : Image.file(_foto!, fit: BoxFit.contain));
     }
     if (_cargando) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
@@ -349,7 +372,7 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
       final preview = _argumentos != null
           ? Texture(textureId: _argumentos!.textureId!)
           : _windows!.buildPreview();
-      return Stack(fit: StackFit.expand, children: [
+      return Stack(key: _vistaKey, fit: StackFit.expand, children: [
         Center(child: AspectRatio(aspectRatio: _aspecto, child: preview)),
         if (widget.circular)
           IgnorePointer(child: CustomPaint(painter: _GuiaFoto())),
@@ -389,8 +412,8 @@ class _GuiaFoto extends CustomPainter {
     canvas.drawPath(
         Path.combine(PathOperation.difference,
             Path()..addRect(Offset.zero & size), Path()..addOval(circulo)),
-        // Sombra ligera: se ve toda la foto, que es la que se guarda.
-        Paint()..color = Colors.black.withOpacity(0.3));
+        // Se oscurece lo de afuera: solo lo del círculo se guarda.
+        Paint()..color = Colors.black.withOpacity(0.55));
     canvas.drawOval(
         circulo,
         Paint()

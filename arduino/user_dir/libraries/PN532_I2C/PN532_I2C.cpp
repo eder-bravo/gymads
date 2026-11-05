@@ -69,7 +69,7 @@ int8_t PN532_I2C::writeCommand(const uint8_t *header, uint8_t hlen, const uint8_
     write(checksum);
     write(PN532_POSTAMBLE);
     
-    _wire->endTransmission();
+    if (_wire->endTransmission() != 0) return PN532_INVALID_FRAME;
     
     DMSG('\n');
 
@@ -78,19 +78,18 @@ int8_t PN532_I2C::writeCommand(const uint8_t *header, uint8_t hlen, const uint8_
 
 int16_t PN532_I2C::getResponseLength(uint8_t buf[], uint8_t len, uint16_t timeout) {
     const uint8_t PN532_NACK[] = {0, 0, 0xFF, 0xFF, 0, 0};
-    uint16_t time = 0;
+    const unsigned long started = millis();
 
     do {
-        if (_wire->requestFrom(PN532_I2C_ADDRESS, 6)) {
+        if (_wire->requestFrom(PN532_I2C_ADDRESS, 6) == 6) {
             if (read() & 1) {  // check first byte --- status
                 break;         // PN532 is ready
             }
         }
 
         delay(1);
-        time++;
-        if ((0 != timeout) && (time > timeout)) {
-            return -1;
+        if ((0 != timeout) && (millis() - started >= timeout)) {
+            return PN532_TIMEOUT;
         }
     } while (1); 
     
@@ -103,36 +102,43 @@ int16_t PN532_I2C::getResponseLength(uint8_t buf[], uint8_t len, uint16_t timeou
     }
     
     uint8_t length = read();
+    if ((uint8_t)(length + read()) != 0 || length < 2 || length > len + 2) {
+        return PN532_INVALID_FRAME;
+    }
 
     // request for last respond msg again
     _wire->beginTransmission(PN532_I2C_ADDRESS);
     for (uint16_t i = 0; i < sizeof(PN532_NACK); ++i) {
       write(PN532_NACK[i]);
     }
-    _wire->endTransmission();
+    if (_wire->endTransmission() != 0) return PN532_INVALID_FRAME;
 
     return length;
 }
 
 int16_t PN532_I2C::readResponse(uint8_t buf[], uint8_t len, uint16_t timeout)
 {
-    uint16_t time = 0;
+    const unsigned long started = millis();
     uint8_t length;
 
-    length = getResponseLength(buf, len, timeout);
+    // Preserve negative errors: converting -1 to uint8_t requested a bogus
+    // 255-byte frame and entered a second wait after the first had timed out.
+    const int16_t responseLength = getResponseLength(buf, len, timeout);
+    if (responseLength < 0) return responseLength;
+    length = (uint8_t)responseLength;
 
     // [RDY] 00 00 FF LEN LCS (TFI PD0 ... PDn) DCS 00
     do {
-        if (_wire->requestFrom(PN532_I2C_ADDRESS, 6 + length + 2)) {
+        if (timeout != 0 && millis() - started >= timeout) return PN532_TIMEOUT;
+        if (_wire->requestFrom(PN532_I2C_ADDRESS, 6 + length + 2) == 6 + length + 2) {
             if (read() & 1) {  // check first byte --- status
                 break;         // PN532 is ready
             }
         }
 
         delay(1);
-        time++;
-        if ((0 != timeout) && (time > timeout)) {
-            return -1;
+        if ((0 != timeout) && (millis() - started >= timeout)) {
+            return PN532_TIMEOUT;
         }
     } while (1); 
     
@@ -145,6 +151,7 @@ int16_t PN532_I2C::readResponse(uint8_t buf[], uint8_t len, uint16_t timeout)
     }
     
     length = read();
+    if (length != responseLength) return PN532_INVALID_FRAME;
 
     if (0 != (uint8_t)(length + read())) {   // checksum of length
         return PN532_INVALID_FRAME;
@@ -177,7 +184,7 @@ int16_t PN532_I2C::readResponse(uint8_t buf[], uint8_t len, uint16_t timeout)
         DMSG("checksum is not ok\n");
         return PN532_INVALID_FRAME;
     }
-    read();         // POSTAMBLE
+    if (read() != PN532_POSTAMBLE) return PN532_INVALID_FRAME;
     
     return length;
 }
@@ -191,17 +198,16 @@ int8_t PN532_I2C::readAckFrame()
     DMSG(millis());
     DMSG('\n');
     
-    uint16_t time = 0;
+    const unsigned long started = millis();
     do {
-        if (_wire->requestFrom(PN532_I2C_ADDRESS,  sizeof(PN532_ACK) + 1)) {
+        if (_wire->requestFrom(PN532_I2C_ADDRESS, sizeof(PN532_ACK) + 1) == sizeof(PN532_ACK) + 1) {
             if (read() & 1) {  // check first byte --- status
                 break;         // PN532 is ready
             }
         }
 
         delay(1);
-        time++;
-        if (time > PN532_ACK_WAIT_TIME) {
+        if (millis() - started >= PN532_ACK_WAIT_TIME) {
             DMSG("Time out when waiting for ACK\n");
             return PN532_TIMEOUT;
         }

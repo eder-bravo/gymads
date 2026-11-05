@@ -1,6 +1,6 @@
 # Lector GymOne: Bluetooth solo para configurar
 
-Firmware: `esp32_rfid_wifi_setup_fixed/` (v6.7.0). App: `LectorBleService`,
+Firmware: `esp32_rfid_wifi_setup_fixed/` (v6.7.2). App: `LectorBleService`,
 `LectorRedService`, `LectorRepository` y el asistente `AgregarLectorView`.
 
 ## Cómo funciona
@@ -23,6 +23,68 @@ Firmware: `esp32_rfid_wifi_setup_fixed/` (v6.7.0). App: `LectorBleService`,
    encuentra aunque el router le cambie la IP.
 
 El trabajo diario (leer tarjetas) es por WiFi/HTTP, igual que antes.
+
+### WiFi conectado pero la app no encuentra al lector
+
+`WiFi: OK` confirma la asociación al módem; «Última petición» indica cuándo
+entró una solicitud al handler. Ninguno confirma que la respuesta llegó a
+la app. El 27 de octubre, después de reiniciar físicamente el lector 6.7.1,
+se observaron consultas HTTP de 0.08–1.68 s, una con tiempo agotado y otra
+de 3.49 s. Los datos no permiten atribuir todo el incidente a una sola causa.
+
+La app ahora cierra las conexiones de descubrimiento y sondeo también cuando
+vence el tiempo de espera. `Future.timeout` solo dejaba de esperar: las
+consultas del barrido podían seguir vivas. Cada consulta real tiene su propio
+cliente, que se cierra al terminar; no se cierra un cliente prestado por quien
+llama. La pantalla reintenta un fallo de comunicación, actualiza su estado
+cada 10 s mientras se ve y comprueba de inmediato al reanudar la app.
+
+El servidor HTTP del ESP32 atiende un cliente a la vez. En 6.7.2, una conexión
+aceptada sin petición se suelta a los 750 ms (el core esperaba 5 s). La escritura
+de cada cabecera/cuerpo usa envío no bloqueante con presupuesto total de 1 s,
+incluidos los envíos parciales, y TCP_NODELAY para las respuestas pequeñas.
+Cerrar el servidor suelta también al cliente que estaba atendiendo. El reinicio
+preventivo espera 10 s sin peticiones para no interrumpir el sondeo activo.
+El parser de cabeceras/cuerpo sigue siendo el del core; sus límites son
+independientes del presupuesto de envío.
+
+Cada minuto se imprime `[HTTP]` y `/api/status` incluye:
+
+| Campo | Qué mide desde el arranque |
+|---|---|
+| `http_sin_peticion` | Conexiones cerradas por no enviar la petición a tiempo |
+| `http_fallos_envio` | Escrituras incompletas o que agotaron el plazo |
+| `http_max_ms` | Máxima duración observada de una llamada al servidor |
+| `consultas_discover` | Consultas recibidas para identificar el lector |
+| `consultas_lecturas` | Consultas recibidas para obtener pases |
+
+Actualizar tanto app como firmware. Las pruebas automáticas cubren liberación
+de clientes, clientes sin petición, envíos parciales, sockets bloqueados/rotos
+y vuelta del reloj. La validación física sigue siendo necesaria para confirmar
+estabilidad con el módem y los equipos del gimnasio.
+
+### Lecturas repetidas y recuperación del chip
+
+Desde 6.7.1, el controlador valida la longitud real de cada respuesta y acepta
+UID de 4 o 7 bytes antes de copiarlo. Una respuesta truncada no reutiliza el UID
+anterior ni escribe fuera del búfer. El transporte valida tramas completas y
+conserva los errores negativos; los límites de espera usan tiempo transcurrido,
+incluyendo lo que tarda el bus, en lugar de contar iteraciones.
+
+Una tarjeta apoyada genera un solo pase. Para volver a aceptar la misma tarjeta
+se requiere un segundo de respuestas válidas sin tarjeta. Un error de comunicación
+interrumpe esa confirmación de ausencia. Si pasan 10 s sin detectar de nuevo la
+tarjeta, la revisión del chip puede actuar aunque siga marcada como presente.
+Las consultas tienen una espera de respuesta de 200 ms, un límite I2C de 50 ms
+por operación y dejan al menos 50 ms entre consultas para atender la red.
+
+El registro del incidente del 27 de octubre contenía 383 463 líneas iguales
+de UID, sin versión ni mensajes legibles de arranque/error. Confirma repetición,
+pero no permite distinguir por sí solo un fallo del bus, del firmware cargado o
+de alimentación. La corrección requiere actualizar el ESP32; cambiar solo la
+app no actualiza el controlador. La verificación física debe comprobar que una
+tarjeta apoyada no repite pases, que retirarla y acercarla permite otro pase y
+que `/api/discover` y `/api/lecturas` siguen respondiendo durante la lectura.
 
 ### Búsqueda Bluetooth y diagnóstico del teléfono
 
@@ -186,3 +248,42 @@ arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app \
 ```
 
 En el IDE de Arduino: Herramientas → Partition Scheme → "Huge APP (3MB No OTA)".
+Usar las bibliotecas PN532 y PN532_I2C incluidas en este repositorio: contienen
+las validaciones y la distinción entre ausencia y error. El comando anterior
+las selecciona con `--libraries`; en el IDE hay que usar esas mismas versiones.
+
+En macOS, el IDE normalmente las toma de `~/Documents/Arduino/libraries`.
+Actualizar allí `PN532/PN532.h`, `PN532/PN532.cpp` y
+`PN532_I2C/PN532_I2C.cpp` con los archivos de `arduino/user_dir/libraries`,
+conservando una copia de los anteriores. Reiniciar el IDE después de actualizarlas.
+El error «candidate expects 4 arguments, 5 provided» indica que está usando
+la cabecera PN532 anterior. Para comprobar también esta instalación, compilar
+con el mismo comando de arriba pero sin `--libraries arduino/user_dir/libraries`.
+
+Prueba del controlador y del estado de presencia en macOS (sin hardware),
+con detección de accesos fuera de memoria y comportamiento indefinido:
+
+```sh
+g++ -std=c++17 -Wno-c++11-narrowing -Wno-vla-cxx-extension \
+  -fsanitize=address,undefined -g \
+  -Itest/herramientas/arduino_simulado \
+  -Iarduino/user_dir/libraries/PN532 -Iarduino/user_dir/libraries/PN532_I2C \
+  test/lecturas_pn532_test.cpp arduino/user_dir/libraries/PN532/PN532.cpp \
+  arduino/user_dir/libraries/PN532_I2C/PN532_I2C.cpp \
+  -o /tmp/gymads-lecturas-pn532-test
+/tmp/gymads-lecturas-pn532-test
+```
+
+Prueba del servidor acotado sin hardware:
+
+```sh
+g++ -std=c++17 -fsanitize=address,undefined -g \
+  -Itest/herramientas/arduino_simulado test/servidor_lector_test.cpp \
+  -o /tmp/gymads-servidor-lector-test
+/tmp/gymads-servidor-lector-test
+```
+
+Los avisos de narrowing y VLA se deshabilitan solo para compilar la biblioteca
+heredada con Clang. La prueba cubre tramas cortas después de una lectura válida,
+longitudes de UID corruptas, fallos de envío, ausencia confirmada, repeticiones,
+vuelta de `millis()` y límites de espera con un bus lento.

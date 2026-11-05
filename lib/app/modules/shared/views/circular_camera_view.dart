@@ -96,7 +96,9 @@ class _CircularCameraViewState extends State<CircularCameraView>
       await _controller?.dispose();
       _controller = CameraController(
         selectedCamera,
-        ResolutionPreset.high, // Cambiar a high para mejor calidad
+        // La foto sale con la resolución del preset: con 4K el recorte del
+        // círculo todavía tiene píxeles de sobra para los 1600 de la foto.
+        ResolutionPreset.ultraHigh,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );

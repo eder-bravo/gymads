@@ -135,7 +135,7 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
               cameraMacOSMode: mac.CameraMacOSMode.photo,
               enableAudio: false,
               pictureFormat: mac.PictureFormat.jpeg,
-              resolution: mac.PictureResolution.high,
+              resolution: mac.PictureResolution.veryHigh,
               isVideoMirrored: false);
           if (args == null || args.textureId == null) {
             throw StateError('La cámara no devolvió una vista previa.');
@@ -143,7 +143,7 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
           _argumentos = args;
           _mac = mac.CameraMacOSController(args);
         } else {
-          _windows = CameraController(camara.windows!, ResolutionPreset.high,
+          _windows = CameraController(camara.windows!, ResolutionPreset.veryHigh,
               enableAudio: false);
           await _windows!.initialize();
           _windows!.addListener(_errorWindows);
@@ -207,11 +207,7 @@ class _DesktopCameraViewState extends State<DesktopCameraView>
       await prepararFoto(
         destino.path,
         vista: widget.circular ? vista : null,
-        vistaPrevia: vista == null
-            ? null
-            : (vista.width / vista.height > _aspecto
-                ? Size(vista.height * _aspecto, vista.height)
-                : Size(vista.width, vista.width / _aspecto)),
+        vistaPrevia: Size(_aspecto, 1),
       );
       if (_cerrado) {
         await destino.delete();

@@ -85,7 +85,7 @@ class FotosDeClientes extends GetxService {
       ResizeImage(FileImage(archivo), width: anchoDecodificado);
 
   /// La del aviso del lector, a pantalla completa: hasta el tamaño con que se
-  /// guardan las fotos (1600 por lado, ver `prepararFotoCompleta`), para que
+  /// guardan las fotos (1600 por lado, ver `prepararFoto`), para que
   /// no se vea borrosa en una tableta o un monitor. Nunca la agranda.
   static ImageProvider proveedorGrande(File archivo) => ResizeImage(
         FileImage(archivo),

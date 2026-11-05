@@ -45,6 +45,20 @@ void main() {
       expect(cuadro.width, lessThanOrEqualTo(600)); // sin salirse
     });
 
+    test('sin vista previa, o con otra orientación, toma la foto entera', () {
+      final sola = cuadroDelCirculo(vista: vista, ancho: 1000, alto: 1500);
+      // Vista previa acostada y foto de pie (una tableta girada): se ignora.
+      final girada = cuadroDelCirculo(
+          vista: vista,
+          vistaPrevia: const Size(800, 600),
+          ancho: 1000,
+          alto: 1500);
+      expect(girada, sola);
+      expect(sola.width, sola.height);
+      expect(sola.left, greaterThanOrEqualTo(0));
+      expect(sola.right, lessThanOrEqualTo(1000));
+    });
+
     test('nunca se sale de la foto', () {
       final cuadro = cuadroDelCirculo(
           vista: vista,

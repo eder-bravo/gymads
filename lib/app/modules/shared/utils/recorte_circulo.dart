@@ -24,8 +24,11 @@ const ladoMaximoFoto = 1600;
 /// El cuadro de la foto, en píxeles, que contiene el círculo guía.
 ///
 /// - [vista]: el tamaño de la pantalla donde se dibuja la cámara (y el círculo).
-/// - [vistaPrevia]: el tamaño de la imagen de la cámara dentro de [vista]
-///   (centrada y entera, como la dibujan `CameraPreview` y `AspectRatio`).
+/// - [vistaPrevia]: la imagen de la cámara en pantalla; solo importa su
+///   proporción (se dibuja entera y centrada en [vista], como hacen
+///   `CameraPreview` y `AspectRatio`).
+///   Si no se conoce, o está acostada y la foto de pie (o al revés), se toma
+///   la foto entera como lo que se veía.
 /// - [ancho] y [alto]: los píxeles de la foto ya derecha.
 ///
 /// La foto y la vista previa pueden tener proporciones distintas (el sensor
@@ -33,11 +36,21 @@ const ladoMaximoFoto = 1600;
 /// central de la foto con la proporción de la vista previa.
 Rect cuadroDelCirculo({
   required Size vista,
-  required Size vistaPrevia,
+  Size? vistaPrevia,
   required int ancho,
   required int alto,
 }) {
-  final aspecto = vistaPrevia.width / vistaPrevia.height;
+  var aspecto = ancho / alto;
+  if (vistaPrevia != null &&
+      vistaPrevia.width > 0 &&
+      vistaPrevia.height > 0 &&
+      (vistaPrevia.width >= vistaPrevia.height) == (ancho >= alto)) {
+    aspecto = vistaPrevia.width / vistaPrevia.height;
+  }
+  // La imagen de la cámara dentro de la vista: entera y centrada.
+  vistaPrevia = vista.width / vista.height > aspecto
+      ? Size(vista.height * aspecto, vista.height)
+      : Size(vista.width, vista.width / aspecto);
 
   // Lo que se ve de la foto: su centro, con la proporción de la vista previa.
   final visibleAncho = ancho / alto > aspecto ? alto * aspecto : ancho * 1.0;
@@ -65,8 +78,8 @@ Rect cuadroDelCirculo({
 }
 
 /// Deja la foto de [ruta] como se va a guardar: derecha (las del teléfono
-/// guardan su giro aparte) y, con [vista] y [vistaPrevia], recortada al
-/// cuadro del círculo guía, de [ladoMaximoFoto] píxeles como máximo. Así el
+/// guardan su giro aparte) y, con [vista], recortada al cuadro del círculo
+/// guía (con [vistaPrevia] si se conoce), de [ladoMaximoFoto] píxeles como máximo. Así el
 /// cliente se ve de cerca en la lista, la ficha y el aviso del lector, sin
 /// el fondo de alrededor. Sin [vista] la foto queda completa.
 ///
@@ -83,7 +96,7 @@ Future<void> prepararFoto(
       final original = img.decodeImage(bytes);
       if (original == null) return null;
       var foto = img.bakeOrientation(original);
-      if (vista != null && vistaPrevia != null) {
+      if (vista != null) {
         final c = cuadroDelCirculo(
           vista: vista,
           vistaPrevia: vistaPrevia,
@@ -105,7 +118,11 @@ Future<void> prepararFoto(
                 height: ladoMaximoFoto,
                 interpolation: img.Interpolation.cubic);
       }
-      return img.encodeJpg(foto, quality: 92);
+      // Calidad 85 con color a media resolución (como las cámaras): se ve
+      // igual de bien a pantalla completa y pesa la mitad (unos 350 KB en
+      // vez de 700), que es lo que cada teléfono guarda de cada cliente.
+      return img.encodeJpg(foto,
+          quality: 85, chroma: img.JpegChroma.yuv420);
     });
     if (lista != null) await File(ruta).writeAsBytes(lista, flush: true);
   } catch (_) {

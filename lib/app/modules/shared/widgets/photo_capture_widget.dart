@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../core/utils/permiso_de_camara.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../../core/widgets/cached_user_image.dart';
+import '../utils/recorte_circulo.dart';
 import '../views/circular_camera_view.dart';
 import '../../../core/utils/plataforma_app.dart';
 
@@ -83,9 +84,12 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
         final foto = await ImagePicker().pickImage(
           source: ImageSource.camera,
           preferredCameraDevice: CameraDevice.rear,
-          imageQuality: 80,
         );
-        if (foto != null) tomada = File(foto.path);
+        if (foto != null) {
+          tomada = File(foto.path);
+          // Sin círculo guía: se recorta al centro, como en un teléfono.
+          await prepararFoto(foto.path, vista: const Size(390, 844));
+        }
       } catch (_) {
         SnackbarHelper.error('No se tomó la foto',
             'No se pudo abrir la cámara. Intenta de nuevo.');
